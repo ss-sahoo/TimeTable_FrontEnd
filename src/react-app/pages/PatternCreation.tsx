@@ -144,11 +144,16 @@ export default function PatternCreation() {
     }
   };
 
-  // Handle subject selection from suggestions
+  // Handle subject selection from suggestions - directly add section
   const handleSubjectSelect = (subjectName: string) => {
-    setNewSubjectName(subjectName);
+    // Clear the input and suggestions
+    setNewSubjectName('');
     setShowSubjectSuggestions(false);
     setFilteredSubjects([]);
+    setSubjectError('');
+    
+    // Directly add a section with this subject (don't create new subject)
+    addSectionToSubject(subjectName);
   };
 
   // Calculate total marks from all sections
@@ -864,7 +869,10 @@ export default function PatternCreation() {
                     <div className="w-6 h-6 bg-green-100 rounded-lg flex items-center justify-center">
                       <Plus className="w-3 h-3 text-green-600" />
                     </div>
-                    <h3 className="text-sm font-medium text-slate-700">Add Subject</h3>
+                    <div>
+                      <h3 className="text-sm font-medium text-slate-700">Add Subject</h3>
+                      <p className="text-xs text-slate-500">Search existing or create new</p>
+                    </div>
                   </div>
                   <button
                     onClick={() => setShowAvailableSubjects(!showAvailableSubjects)}
@@ -899,26 +907,32 @@ export default function PatternCreation() {
                         setTimeout(() => setShowSubjectSuggestions(false), 200);
                       }}
                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-colors"
-                      placeholder="Type to search subjects (e.g., PHY, MAT, CHEM)"
+                      placeholder="Search existing (PHY, MAT) or type new subject name"
                     />
                     
                     {/* Autocomplete Suggestions Dropdown */}
                     {showSubjectSuggestions && filteredSubjects.length > 0 && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        <div className="px-3 py-2 bg-blue-50 border-b border-blue-200">
+                          <p className="text-xs text-blue-700 font-medium">
+                            Click to add section with this subject
+                          </p>
+                        </div>
                         {filteredSubjects.map((subject) => (
                           <button
                             key={subject.id}
                             type="button"
                             onClick={() => handleSubjectSelect(subject.name)}
-                            className="w-full px-3 py-2 text-sm text-left hover:bg-blue-50 transition-colors flex items-center gap-2 border-b border-slate-100 last:border-b-0"
+                            className="w-full px-3 py-2 text-sm text-left hover:bg-green-50 hover:border-l-4 hover:border-l-green-500 transition-all flex items-center gap-2 border-b border-slate-100 last:border-b-0"
                           >
                             <BookOpen className="w-4 h-4 text-green-600 flex-shrink-0" />
-                            <div>
+                            <div className="flex-1">
                               <div className="font-medium text-slate-900">{subject.name}</div>
                               {subject.description && (
                                 <div className="text-xs text-slate-500 truncate">{subject.description}</div>
                               )}
                             </div>
+                            <Plus className="w-4 h-4 text-green-600 flex-shrink-0" />
                           </button>
                         ))}
                       </div>
@@ -928,16 +942,17 @@ export default function PatternCreation() {
                     onClick={handleAddSubject}
                     disabled={!newSubjectName.trim() || addingSubject}
                     className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+                    title="Create a new subject (or click suggestion above to use existing)"
                   >
                     {addingSubject ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Adding...
+                        Creating...
                       </>
                     ) : (
                       <>
                         <Plus className="w-4 h-4" />
-                        Add Subject
+                        Create New
                       </>
                     )}
                   </button>
