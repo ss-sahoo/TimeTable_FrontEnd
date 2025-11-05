@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* Skeleton loading animations */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Force dark mode styles to ensure they work */
+.dark {
+  color-scheme: dark;
+}
+
+/* Debug: Add visible background color to verify dark mode is active */
+html.dark {
+  background: #111827 !important;
+}
+
+html.dark body {
+  background: #111827 !important;
+  color: #f3f4f6 !important;
+}
