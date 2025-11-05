@@ -90,7 +90,8 @@ export default function ExamCreation() {
 
   const [patterns, setPatterns] = useState<ExamPattern[]>([]);
   const [selectedPattern, setSelectedPattern] = useState<ExamPattern | null>(null);
-  const [patternOption, setPatternOption] = useState<'use_existing' | 'template' | null>(null);
+  // Always use template mode - no need for pattern option
+  const patternOption = 'template';
   const [patternQuestions, setPatternQuestions] = useState<any[]>([]);
 
   const [formData, setFormData] = useState<ExamFormData>({
@@ -257,14 +258,7 @@ export default function ExamCreation() {
     }
   };
 
-  const handlePatternOptionChange = (option: 'use_existing' | 'template') => {
-    setPatternOption(option);
-    if (option === 'use_existing' && selectedPattern) {
-      fetchPatternQuestions(selectedPattern.id);
-    } else {
-      setPatternQuestions([]);
-    }
-  };
+  // Removed: Always using template mode, no need to handle pattern option changes
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -281,9 +275,7 @@ export default function ExamCreation() {
       newErrors.pattern = 'Please select an exam pattern';
     }
 
-    if (formData.pattern && !patternOption) {
-      newErrors.pattern = 'Please select how to use the pattern (questions vs template)';
-    }
+    // Removed validation: Always using template mode by default
 
     if (!formData.start_date) {
       newErrors.start_date = 'Start date is required';
@@ -364,19 +356,8 @@ export default function ExamCreation() {
         response = await api.post('/exams/exams/', examData);
         const newExam = response.data;
 
-        // If user chose to use existing pattern questions, assign them to the exam
-        if (patternOption === 'use_existing' && selectedPattern) {
-          try {
-            await api.post('/patterns/assign-pattern-questions/', {
-              exam_id: newExam.id,
-              pattern_id: selectedPattern.id,
-              use_existing_questions: true
-            });
-          } catch (assignError) {
-            console.error('Failed to assign pattern questions:', assignError);
-            // Don't fail the entire exam creation if question assignment fails
-          }
-        }
+        // Always using template mode - no need to assign existing questions
+        // Pattern structure will be used, questions added later
       }
 
       navigate('/exams');
@@ -616,91 +597,7 @@ export default function ExamCreation() {
                 )}
               </div>
 
-              {/* Pattern Option Selection */}
-              {selectedPattern && (
-                <div className="border-t border-slate-200 pt-4">
-                  <h3 className="text-sm font-medium text-slate-900 mb-3">How do you want to use this pattern?</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <label className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${
-                      patternOption === 'use_existing' 
-                        ? 'border-blue-500 bg-blue-50' 
-                        : 'border-slate-200 hover:bg-slate-50'
-                    }`}>
-                      <input
-                        type="radio"
-                        name="patternOption"
-                        className="mt-1"
-                        checked={patternOption === 'use_existing'}
-                        onChange={() => handlePatternOptionChange('use_existing')}
-                      />
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">Use existing questions</div>
-                        <div className="text-xs text-slate-600 mt-1">
-                          Copy all questions from this pattern into the exam
-                        </div>
-                      </div>
-                    </label>
-                    
-                    <label className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${
-                      patternOption === 'template' 
-                        ? 'border-blue-500 bg-blue-50' 
-                        : 'border-slate-200 hover:bg-slate-50'
-                    }`}>
-                      <input
-                        type="radio"
-                        name="patternOption"
-                        className="mt-1"
-                        checked={patternOption === 'template'}
-                        onChange={() => handlePatternOptionChange('template')}
-                      />
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">Template only</div>
-                        <div className="text-xs text-slate-600 mt-1">
-                          Use pattern structure only, add questions later
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-                  
-                  {!patternOption && (
-                    <div className="mt-2 text-xs text-slate-500 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      Please select one option before creating the exam
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Pattern Questions Preview */}
-              {patternOption === 'use_existing' && patternQuestions.length > 0 && (
-                <div className="border-t border-slate-200 pt-4">
-                  <h3 className="text-sm font-medium text-slate-900 mb-3">
-                    Questions that will be copied ({patternQuestions.reduce((total, section) => total + section.questions.length, 0)} total)
-                  </h3>
-                  <div className="space-y-3 max-h-48 overflow-y-auto">
-                    {patternQuestions.map((sectionData, index) => (
-                      <div key={index} className="bg-slate-50 rounded-lg p-3">
-                        <div className="text-xs font-medium text-slate-700 mb-2">
-                          {sectionData.section.name} ({sectionData.questions.length} questions)
-                        </div>
-                        <div className="space-y-1">
-                          {sectionData.questions.slice(0, 3).map((question: any, qIndex: number) => (
-                            <div key={qIndex} className="text-xs text-slate-600 flex items-center gap-2">
-                              <div className="w-1 h-1 bg-slate-400 rounded-full"></div>
-                              <span className="truncate">{question.question_text}</span>
-                            </div>
-                          ))}
-                          {sectionData.questions.length > 3 && (
-                            <div className="text-xs text-slate-500">
-                              +{sectionData.questions.length - 3} more questions
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Removed: Pattern option selection - always using template mode by default */}
 
               {/* Pattern Structure Preview */}
               {selectedPattern && (
