@@ -185,29 +185,13 @@ export default function PatternCreation() {
     }
   };
 
-  // Calculate next available question number for a specific subject
-  const getNextQuestionNumberForSubject = (subjectName: string) => {
-    // Get all sections for this subject
-    const subjectSections = pattern.sections.filter(s => s.subject === subjectName);
-    
-    if (subjectSections.length === 0) {
-      return 1; // New subject always starts from question 1
-    }
-    
-    // Find the highest end_question for this subject
-    const maxEndQuestion = Math.max(...subjectSections.map(section => 
-      typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question
-    ));
-    return maxEndQuestion + 1;
-  };
-
-  // Calculate next available question number (for backwards compatibility)
+  // Calculate next available question number GLOBALLY (across all subjects)
   const getNextQuestionNumber = () => {
     if (pattern.sections.length === 0) {
       return 1; // First section starts from question 1
     }
     
-    // Find the highest end_question number across all sections
+    // Find the highest end_question number across ALL sections (all subjects)
     const maxEndQuestion = Math.max(...pattern.sections.map(section => 
       typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question
     ));
@@ -312,8 +296,8 @@ export default function PatternCreation() {
   };
 
   const addSectionToSubject = (subjectName: string) => {
-    // Use per-subject question numbering (each subject starts from 1)
-    const nextStartQuestion = getNextQuestionNumberForSubject(subjectName);
+    // Use GLOBAL question numbering (continues across all subjects)
+    const nextStartQuestion = getNextQuestionNumber();
     const suggestedEndQuestion = getSuggestedEndQuestion(nextStartQuestion, 5);
     
     const defaultMarkingScheme: MarkingScheme = {
@@ -548,37 +532,31 @@ export default function PatternCreation() {
         sectionError.start_question = 'Start question must be less than end question';
       }
 
-      // Check for overlapping question ranges within the same subject
-      const sameSubjectSections = pattern.sections.filter(s => s.subject === section.subject);
-      sameSubjectSections.forEach((otherSection, otherIndex) => {
-        if (otherSection === section) return; // Skip self
+      // Check for overlapping question ranges GLOBALLY (across all sections)
+      pattern.sections.forEach((otherSection, otherIndex) => {
+        if (otherIndex === index) return; // Skip self
         
         const otherStartQ = typeof otherSection.start_question === 'string' ? parseInt(otherSection.start_question) || 0 : otherSection.start_question;
         const otherEndQ = typeof otherSection.end_question === 'string' ? parseInt(otherSection.end_question) || 0 : otherSection.end_question;
         
         // Check for overlap
         if ((startQ >= otherStartQ && startQ <= otherEndQ) || (endQ >= otherStartQ && endQ <= otherEndQ)) {
-          sectionError.start_question = `Questions ${startQ}-${endQ} overlap with another section in ${section.subject}`;
+          sectionError.start_question = `Questions ${startQ}-${endQ} overlap with another section`;
         }
       });
 
-      // Validate that sections within same subject are sequential
-      const sameSubjectPrevSections = sameSubjectSections.filter((s, i) => {
-        const sIdx = pattern.sections.indexOf(s);
-        return sIdx < index && s.subject === section.subject;
-      });
-      
-      if (sameSubjectPrevSections.length > 0) {
-        const prevSection = sameSubjectPrevSections[sameSubjectPrevSections.length - 1];
+      // Validate GLOBAL sequential numbering
+      if (index > 0) {
+        const prevSection = pattern.sections[index - 1];
         const prevEndQ = typeof prevSection.end_question === 'string' ? parseInt(prevSection.end_question) || 0 : prevSection.end_question;
         
         if (startQ !== prevEndQ + 1) {
           sectionError.start_question = `Should start from ${prevEndQ + 1} (previous section ended at ${prevEndQ})`;
         }
       } else {
-        // First section of this subject should start from 1
+        // Very first section should start from 1
         if (startQ !== 1) {
-          sectionError.start_question = `First section of ${section.subject} should start from question 1`;
+          sectionError.start_question = `First section should start from question 1`;
         }
       }
 
