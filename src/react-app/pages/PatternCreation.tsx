@@ -89,6 +89,8 @@ export default function PatternCreation() {
   const [addingSubject, setAddingSubject] = useState(false);
   const [subjectError, setSubjectError] = useState('');
   const [showAvailableSubjects, setShowAvailableSubjects] = useState(false);
+  const [showSubjectSuggestions, setShowSubjectSuggestions] = useState(false);
+  const [filteredSubjects, setFilteredSubjects] = useState<Subject[]>([]);
 
   const isEditing = Boolean(id);
 
@@ -124,6 +126,29 @@ export default function PatternCreation() {
     if (field === 'total_marks' && marksValidationError) {
       setMarksValidationError('');
     }
+  };
+
+  // Handle subject input change with autocomplete
+  const handleSubjectInputChange = (value: string) => {
+    setNewSubjectName(value);
+    
+    if (value.trim().length > 0 && subjectsData?.results) {
+      const filtered = subjectsData.results.filter(subject =>
+        subject.name.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredSubjects(filtered);
+      setShowSubjectSuggestions(filtered.length > 0);
+    } else {
+      setFilteredSubjects([]);
+      setShowSubjectSuggestions(false);
+    }
+  };
+
+  // Handle subject selection from suggestions
+  const handleSubjectSelect = (subjectName: string) => {
+    setNewSubjectName(subjectName);
+    setShowSubjectSuggestions(false);
+    setFilteredSubjects([]);
   };
 
   // Calculate total marks from all sections
@@ -812,15 +837,24 @@ export default function PatternCreation() {
 
               <div className="mt-4">
                 <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Description
+                  Description *
                 </label>
                 <textarea
                   value={pattern.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none"
+                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${
+                    errors.description ? 'border-red-300' : 'border-slate-300'
+                  }`}
                   placeholder="Describe the pattern structure and purpose..."
+                  required
                 />
+                {errors.description && (
+                  <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {errors.description}
+                  </p>
+                )}
               </div>
 
               {/* Add Subject Section */}
@@ -850,14 +884,45 @@ export default function PatternCreation() {
                   </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="md:col-span-2">
+                  <div className="md:col-span-2 relative">
                     <input
                       type="text"
                       value={newSubjectName}
-                      onChange={(e) => setNewSubjectName(e.target.value)}
+                      onChange={(e) => handleSubjectInputChange(e.target.value)}
+                      onFocus={() => {
+                        if (newSubjectName.trim() && filteredSubjects.length > 0) {
+                          setShowSubjectSuggestions(true);
+                        }
+                      }}
+                      onBlur={() => {
+                        // Delay to allow click on suggestion
+                        setTimeout(() => setShowSubjectSuggestions(false), 200);
+                      }}
                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-colors"
-                      placeholder="Enter subject name (e.g., Mathematics, Physics, Chemistry)"
+                      placeholder="Type to search subjects (e.g., PHY, MAT, CHEM)"
                     />
+                    
+                    {/* Autocomplete Suggestions Dropdown */}
+                    {showSubjectSuggestions && filteredSubjects.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {filteredSubjects.map((subject) => (
+                          <button
+                            key={subject.id}
+                            type="button"
+                            onClick={() => handleSubjectSelect(subject.name)}
+                            className="w-full px-3 py-2 text-sm text-left hover:bg-blue-50 transition-colors flex items-center gap-2 border-b border-slate-100 last:border-b-0"
+                          >
+                            <BookOpen className="w-4 h-4 text-green-600 flex-shrink-0" />
+                            <div>
+                              <div className="font-medium text-slate-900">{subject.name}</div>
+                              {subject.description && (
+                                <div className="text-xs text-slate-500 truncate">{subject.description}</div>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={handleAddSubject}
