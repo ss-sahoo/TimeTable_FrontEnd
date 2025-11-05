@@ -91,6 +91,7 @@ export default function PatternCreation() {
   const [showAvailableSubjects, setShowAvailableSubjects] = useState(false);
   const [showSubjectSuggestions, setShowSubjectSuggestions] = useState(false);
   const [filteredSubjects, setFilteredSubjects] = useState<Subject[]>([]);
+  const [recentlyAddedSubjects, setRecentlyAddedSubjects] = useState<Set<string>>(new Set());
 
   const isEditing = Boolean(id);
 
@@ -184,13 +185,29 @@ export default function PatternCreation() {
     }
   };
 
-  // Calculate next available question number
+  // Calculate next available question number for a specific subject
+  const getNextQuestionNumberForSubject = (subjectName: string) => {
+    // Get all sections for this subject
+    const subjectSections = pattern.sections.filter(s => s.subject === subjectName);
+    
+    if (subjectSections.length === 0) {
+      return 1; // New subject always starts from question 1
+    }
+    
+    // Find the highest end_question for this subject
+    const maxEndQuestion = Math.max(...subjectSections.map(section => 
+      typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question
+    ));
+    return maxEndQuestion + 1;
+  };
+
+  // Calculate next available question number (for backwards compatibility)
   const getNextQuestionNumber = () => {
     if (pattern.sections.length === 0) {
       return 1; // First section starts from question 1
     }
     
-    // Find the highest end_question number
+    // Find the highest end_question number across all sections
     const maxEndQuestion = Math.max(...pattern.sections.map(section => 
       typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question
     ));
@@ -254,16 +271,20 @@ export default function PatternCreation() {
         is_active: true
       });
 
+      // Mark this subject as recently added (for visual highlighting)
+      const subjectName = newSubjectName.trim();
+      setRecentlyAddedSubjects(prev => new Set(prev).add(subjectName));
+      
       // Clear the input
       setNewSubjectName('');
       
       // Refresh subjects data by refetching
-      refetchSubjects();
+      await refetchSubjects();
       
       // Automatically add a section for the new subject
       setTimeout(() => {
-        addSectionToSubject(newSubjectName.trim());
-      }, 200);
+        addSectionToSubject(subjectName);
+      }, 300);
       
     } catch (error: any) {
       console.error('Failed to add subject:', error);
@@ -291,11 +312,12 @@ export default function PatternCreation() {
   };
 
   const addSectionToSubject = (subjectName: string) => {
-    const nextStartQuestion = getNextQuestionNumber();
+    // Use per-subject question numbering (each subject starts from 1)
+    const nextStartQuestion = getNextQuestionNumberForSubject(subjectName);
     const suggestedEndQuestion = getSuggestedEndQuestion(nextStartQuestion, 5);
     
     const defaultMarkingScheme: MarkingScheme = {
-      max_marks: 1,
+      max_marks: 4,  // Default to 4 marks per question
       negative_marks: 0,
       partial_marking: false,
       marks_per_correct_option: 0,
@@ -524,6 +546,40 @@ export default function PatternCreation() {
       
       if (startQ >= endQ) {
         sectionError.start_question = 'Start question must be less than end question';
+      }
+
+      // Check for overlapping question ranges within the same subject
+      const sameSubjectSections = pattern.sections.filter(s => s.subject === section.subject);
+      sameSubjectSections.forEach((otherSection, otherIndex) => {
+        if (otherSection === section) return; // Skip self
+        
+        const otherStartQ = typeof otherSection.start_question === 'string' ? parseInt(otherSection.start_question) || 0 : otherSection.start_question;
+        const otherEndQ = typeof otherSection.end_question === 'string' ? parseInt(otherSection.end_question) || 0 : otherSection.end_question;
+        
+        // Check for overlap
+        if ((startQ >= otherStartQ && startQ <= otherEndQ) || (endQ >= otherStartQ && endQ <= otherEndQ)) {
+          sectionError.start_question = `Questions ${startQ}-${endQ} overlap with another section in ${section.subject}`;
+        }
+      });
+
+      // Validate that sections within same subject are sequential
+      const sameSubjectPrevSections = sameSubjectSections.filter((s, i) => {
+        const sIdx = pattern.sections.indexOf(s);
+        return sIdx < index && s.subject === section.subject;
+      });
+      
+      if (sameSubjectPrevSections.length > 0) {
+        const prevSection = sameSubjectPrevSections[sameSubjectPrevSections.length - 1];
+        const prevEndQ = typeof prevSection.end_question === 'string' ? parseInt(prevSection.end_question) || 0 : prevSection.end_question;
+        
+        if (startQ !== prevEndQ + 1) {
+          sectionError.start_question = `Should start from ${prevEndQ + 1} (previous section ended at ${prevEndQ})`;
+        }
+      } else {
+        // First section of this subject should start from 1
+        if (startQ !== 1) {
+          sectionError.start_question = `First section of ${section.subject} should start from question 1`;
+        }
       }
 
       // Validate min_questions_to_attempt
@@ -1047,24 +1103,51 @@ export default function PatternCreation() {
 
               {/* Subject Groups */}
               <div className="space-y-4">
-                {getSubjectsWithSections().map((subjectGroup, subjectIndex) => (
-                  <div key={subjectIndex} data-subject-group className="border border-slate-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        <h4 className="font-semibold text-slate-800 text-sm">{subjectGroup.name}</h4>
-                        <span className="text-xs text-slate-500">
-                          ({subjectGroup.sections.length} sections)
-                        </span>
+                {getSubjectsWithSections().map((subjectGroup, subjectIndex) => {
+                  const isNewlyAdded = recentlyAddedSubjects.has(subjectGroup.name);
+                  
+                  return (
+                    <div 
+                      key={subjectIndex} 
+                      data-subject-group 
+                      className={`border rounded-lg p-4 transition-all ${
+                        isNewlyAdded 
+                          ? 'border-green-300 bg-green-50 shadow-md' 
+                          : 'border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            isNewlyAdded ? 'bg-green-500' : 'bg-blue-500'
+                          }`}></div>
+                          <h4 className={`font-semibold text-sm ${
+                            isNewlyAdded ? 'text-green-800' : 'text-slate-800'
+                          }`}>
+                            {subjectGroup.name}
+                          </h4>
+                          {isNewlyAdded && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white rounded-full text-xs font-medium">
+                              <Zap className="w-3 h-3" />
+                              New
+                            </span>
+                          )}
+                          <span className="text-xs text-slate-500">
+                            ({subjectGroup.sections.length} sections)
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => addSectionToSubject(subjectGroup.name)}
+                          className={`inline-flex items-center gap-1 px-2 py-1 text-xs text-white rounded-md transition-colors ${
+                            isNewlyAdded 
+                              ? 'bg-green-600 hover:bg-green-700' 
+                              : 'bg-blue-600 hover:bg-blue-700'
+                          }`}
+                        >
+                          <Plus className="w-3 h-3" />
+                          Add Section
+                        </button>
                       </div>
-                      <button
-                        onClick={() => addSectionToSubject(subjectGroup.name)}
-                        className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                      >
-                        <Plus className="w-3 h-3" />
-                        Add Section
-                      </button>
-                    </div>
 
                     <div className="space-y-2">
                       {subjectGroup.sections.map((section, sectionIndex) => {
@@ -1240,7 +1323,8 @@ export default function PatternCreation() {
                       })}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
