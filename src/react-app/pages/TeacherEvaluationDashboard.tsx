@@ -36,7 +36,7 @@ import {
   Upload,
   MoreVertical
 } from 'lucide-react';
-import { useApi } from '../hooks/useApi';
+import { useApi, api } from '../hooks/useApi';
 
 interface QuestionEvaluation {
   id: number;
@@ -190,17 +190,8 @@ export default function TeacherEvaluationDashboard() {
 
   const handleBatchAIEvaluation = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/evaluation/exams/${examId}/batch-ai/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
-      });
-
-      if (response.ok) {
-        await refreshData();
-      }
+      await api.post(`/evaluation/exams/${examId}/batch-ai/`);
+      await refreshData();
     } catch (error) {
       console.error('Batch AI evaluation failed:', error);
     }

@@ -1,7 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-const DEFAULT_API_BASE_URL = 'http://localhost:8000/api';
+// Auto-detect API URL based on current host
+const getDefaultApiUrl = () => {
+  // In production, use the same domain
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    // If not localhost, use the same protocol and host
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      return `${window.location.protocol}//${hostname}/api`;
+    }
+  }
+  // Fallback to localhost for development
+  return 'http://localhost:8000/api';
+};
+
+const DEFAULT_API_BASE_URL = getDefaultApiUrl();
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || DEFAULT_API_BASE_URL;
 
