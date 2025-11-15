@@ -72,7 +72,7 @@ export default function CreateExamModal({ isOpen, onClose, onSuccess }: CreateEx
       // Reset form
       setFormData({ title: '', start_date: '', end_date: '', duration_minutes: 180 });
       setSubjects([]);
-    } catch (err) {
+    } catch {
       setError('Failed to create exam. Please try again.');
     } finally {
       setLoading(false);

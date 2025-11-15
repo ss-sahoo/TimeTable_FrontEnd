@@ -382,7 +382,7 @@ export const useKeyboardShortcuts = (shortcuts: Record<string, () => void>) => {
 };
 
 // Hook for creating accessible roving tabindex
-export const useRovingTabIndex = (items: any[]) => {
+export const useRovingTabIndex = <T,>(items: T[]) => {
   const [activeIndex, setActiveIndex] = useState<number>(0);
 
   const handleKeyDown = useCallback((event: KeyboardEvent) => {

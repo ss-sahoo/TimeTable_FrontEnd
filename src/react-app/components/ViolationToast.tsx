@@ -5,7 +5,10 @@ interface ViolationToastProps {
   violation: {
     type: string;
     timestamp: Date;
-    metadata?: any;
+    metadata?: {
+      action?: string;
+      [key: string]: unknown;
+    };
   } | null;
   onClose: () => void;
 }

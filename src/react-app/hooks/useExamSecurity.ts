@@ -1,10 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from './useApi';
 
+interface ViolationMetadata {
+  action?: string;
+  key?: string;
+  url?: string;
+  [key: string]: unknown;
+}
+
 interface ViolationData {
   type: string;
   timestamp: Date;
-  metadata?: any;
+  metadata?: ViolationMetadata;
 }
 
 interface SecurityConfig {
@@ -20,7 +27,7 @@ interface UseExamSecurityReturn {
   violations: ViolationData[];
   violationCount: number;
   isDisqualified: boolean;
-  logViolation: (type: string, metadata?: any) => void;
+  logViolation: (type: string, metadata?: ViolationMetadata) => void;
   clearViolations: () => void;
   isFullscreen: boolean;
   requestFullscreen: () => Promise<void>;
@@ -43,7 +50,6 @@ const useExamSecurity = (
   const [isDisqualified, setIsDisqualified] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  const violationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastViolationTimeRef = useRef<number>(0);
 
   // Log security configuration on initialization
@@ -60,7 +66,7 @@ const useExamSecurity = (
   }, [attemptId, config]);
 
   // Log violation to backend
-  const logViolationToBackend = useCallback(async (type: string, metadata?: any) => {
+  const logViolationToBackend = useCallback(async (type: string, metadata?: ViolationMetadata) => {
     try {
       const response = await api.post(`/exams/attempts/${attemptId}/violations/`, {
         violation_type: type,
@@ -78,7 +84,7 @@ const useExamSecurity = (
   }, [attemptId]);
 
   // Log violation
-  const logViolation = useCallback((type: string, metadata?: any) => {
+  const logViolation = useCallback((type: string, metadata?: ViolationMetadata) => {
     const now = Date.now();
     
     // Prevent spam violations (same type within 5 seconds)
@@ -164,11 +170,16 @@ const useExamSecurity = (
     if (!config.enableFullscreenEnforcement) return;
 
     const handleFullscreenChange = () => {
+      const doc = document as Document & {
+        webkitFullscreenElement?: Element | null;
+        mozFullScreenElement?: Element | null;
+        msFullscreenElement?: Element | null;
+      };
       const isCurrentlyFullscreen = !!(
         document.fullscreenElement ||
-        (document as any).webkitFullscreenElement ||
-        (document as any).mozFullScreenElement ||
-        (document as any).msFullscreenElement
+        doc.webkitFullscreenElement ||
+        doc.mozFullScreenElement ||
+        doc.msFullscreenElement
       );
       
       setIsFullscreen(isCurrentlyFullscreen);
@@ -322,23 +333,28 @@ const useExamSecurity = (
   // Request fullscreen
   const requestFullscreen = useCallback(async () => {
     try {
-      const element = document.documentElement;
+      const element = document.documentElement as HTMLElement & {
+        webkitRequestFullscreen?: () => Promise<void>;
+        mozRequestFullScreen?: () => Promise<void>;
+        msRequestFullscreen?: () => Promise<void>;
+      };
       
       if (element.requestFullscreen) {
         await element.requestFullscreen();
-      } else if ((element as any).webkitRequestFullscreen) {
-        await (element as any).webkitRequestFullscreen();
-      } else if ((element as any).mozRequestFullScreen) {
-        await (element as any).mozRequestFullScreen();
-      } else if ((element as any).msRequestFullscreen) {
-        await (element as any).msRequestFullscreen();
+      } else if (element.webkitRequestFullscreen) {
+        await element.webkitRequestFullscreen();
+      } else if (element.mozRequestFullScreen) {
+        await element.mozRequestFullScreen();
+      } else if (element.msRequestFullscreen) {
+        await element.msRequestFullscreen();
       }
       
       setIsFullscreen(true);
     } catch (error) {
       console.error('Failed to request fullscreen:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logViolation('fullscreen_error', {
-        error: error.message,
+        error: errorMessage,
         timestamp: new Date().toISOString()
       });
     }
@@ -347,14 +363,20 @@ const useExamSecurity = (
   // Exit fullscreen
   const exitFullscreen = useCallback(async () => {
     try {
+      const doc = document as Document & {
+        webkitExitFullscreen?: () => Promise<void>;
+        mozCancelFullScreen?: () => Promise<void>;
+        msExitFullscreen?: () => Promise<void>;
+      };
+      
       if (document.exitFullscreen) {
         await document.exitFullscreen();
-      } else if ((document as any).webkitExitFullscreen) {
-        await (document as any).webkitExitFullscreen();
-      } else if ((document as any).mozCancelFullScreen) {
-        await (document as any).mozCancelFullScreen();
-      } else if ((document as any).msExitFullscreen) {
-        await (document as any).msExitFullscreen();
+      } else if (doc.webkitExitFullscreen) {
+        await doc.webkitExitFullscreen();
+      } else if (doc.mozCancelFullScreen) {
+        await doc.mozCancelFullScreen();
+      } else if (doc.msExitFullscreen) {
+        await doc.msExitFullscreen();
       }
       
       setIsFullscreen(false);

@@ -34,9 +34,12 @@ export default function ExportModal({ isOpen, onClose, examId, examTitle }: Expo
       link.remove();
       window.URL.revokeObjectURL(url);
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('Export error:', error);
-      alert(`Export failed: ${error.response?.data?.error || 'Unknown error'}`);
+      const errorMessage = error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+        : undefined;
+      alert(`Export failed: ${errorMessage || 'Unknown error'}`);
     } finally {
       setExporting(null);
     }

@@ -8,7 +8,7 @@ interface ViolationWarningProps {
     confidence: number;
     message: string;
     timestamp: Date;
-    analysis?: any;
+    analysis?: Record<string, unknown>;
   } | null;
   violationCount: number;
   maxViolations: number;

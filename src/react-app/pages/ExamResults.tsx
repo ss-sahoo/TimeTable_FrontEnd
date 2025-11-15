@@ -89,13 +89,16 @@ const ExamResults: React.FC = () => {
       const data = response.data;
       console.log('Exam results data:', data);
       setResult(data);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error loading exam results:', error);
-      console.error('Error details:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      if (error.response?.status === 404) {
+      const errorResponse = error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: unknown; status?: number } }).response
+        : undefined;
+      console.error('Error details:', errorResponse?.data);
+      console.error('Error status:', errorResponse?.status);
+      if (errorResponse?.status === 404) {
         setError('Exam results not found');
-      } else if (error.response?.status === 403) {
+      } else if (errorResponse?.status === 403) {
         setError('Access denied - you cannot view these results');
       } else {
         setError('Failed to load exam results');

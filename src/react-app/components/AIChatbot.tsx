@@ -7,7 +7,6 @@ import {
   BookOpen,
   Loader2,
   X,
-  MessageCircle,
   Zap
 } from 'lucide-react';
 import { api } from '../hooks/useApi';
@@ -15,7 +14,7 @@ import { api } from '../hooks/useApi';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
-  sources?: any[];
+  sources?: Array<{ title?: string; content?: string; url?: string }>;
   timestamp: Date;
 }
 
@@ -72,7 +71,7 @@ export default function AIChatbot({ isOpen = true, onClose, sessionId }: AIChatb
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-    } catch (error: any) {
+    } catch {
       const errorMessage: Message = {
         role: 'assistant',
         content: '😕 Sorry, I encountered an error. Please try again or rephrase your question.',
@@ -145,12 +144,12 @@ export default function AIChatbot({ isOpen = true, onClose, sessionId }: AIChatb
                     <span className="text-xs font-semibold text-slate-600">Sources from Question Bank:</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {message.sources.slice(0, 3).map((source: any, idx: number) => (
+                    {message.sources.slice(0, 3).map((source, idx: number) => (
                       <span
                         key={idx}
                         className="px-2 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg border border-blue-200"
                       >
-                        Q{source.id}: {source.subject}
+                        Q{source.id || idx}: {source.title || 'Source'}
                       </span>
                     ))}
                   </div>

@@ -22,7 +22,7 @@ export default function AIImageToText({ className = "" }: AIImageToTextProps) {
     reader.readAsDataURL(file);
   };
 
-  const processImage = async (_file: File) => {
+  const processImage = async () => {
     setIsProcessing(true);
     
     // Simulate AI processing

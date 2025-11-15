@@ -1,27 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import { api } from '../hooks/useApi';
-import { Camera, AlertTriangle, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { Camera, AlertTriangle, CheckCircle, EyeOff } from 'lucide-react';
+
+interface ViolationData {
+  type: string;
+  confidence?: number;
+  message?: string;
+  timestamp?: Date;
+}
 
 interface WebcamMonitorProps {
   attemptId: number;
-  onViolationDetected?: (violation: any) => void;
+  onViolationDetected?: (violation: ViolationData) => void;
   captureInterval?: number; // in seconds
   showPreview?: boolean;
   className?: string;
-}
-
-interface DetectionResult {
-  faceCount: number;
-  faceDetected: boolean;
-  eyesDetected: boolean;
-  lookingAway: boolean;
-  mobileDetected: boolean;
-  violations: Array<{
-    type: string;
-    confidence: number;
-    message: string;
-  }>;
 }
 
 const WebcamMonitor: React.FC<WebcamMonitorProps> = ({
@@ -74,7 +68,7 @@ const WebcamMonitor: React.FC<WebcamMonitorProps> = ({
 
         // Check for violations
         if (analysis && analysis.violations && analysis.violations.length > 0) {
-          analysis.violations.forEach((violation: any) => {
+          analysis.violations.forEach((violation: { type: string; confidence?: number; message?: string }) => {
             if (onViolationDetected) {
               onViolationDetected({
                 type: violation.type,

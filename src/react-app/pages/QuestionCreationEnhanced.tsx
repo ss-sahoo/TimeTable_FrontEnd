@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router';
 import {
   ArrowLeft,
   ChevronLeft,
@@ -17,7 +17,8 @@ import {
   Sparkles,
   Zap,
   BookOpen,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { useApi, api } from '../hooks/useApi';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -73,6 +74,9 @@ interface QuestionData {
   subject: string;
   topic: string;
   pattern_section: number;
+  pattern_section_id?: number | null;
+  question_number?: number | null;
+  question_number_in_pattern?: number | null;
 }
 
 interface SectionStats {
@@ -86,17 +90,57 @@ interface SectionStats {
   progress_percentage: number;
 }
 
+interface SubjectSection extends PatternSection {
+  subject_start: number;
+  subject_end: number;
+  subject_section_index: number;
+}
+
+interface SubjectGroup {
+  subject: string;
+  slug: string;
+  sections: SubjectSection[];
+  total_questions: number;
+}
+
+interface AIQuestionPayload {
+  question_text?: string;
+  options?: unknown[];
+  correct_answer?: unknown;
+  solution?: string;
+  explanation?: string;
+  difficulty?: string;
+  topic?: string;
+}
+
 export default function EnhancedQuestionEditor() {
-  const { patternId, questionNumber } = useParams<{ patternId: string; questionNumber: string }>();
+  const { patternId, subjectSlug: subjectSlugParam, questionNumber: questionParam } = useParams<{ patternId: string; subjectSlug?: string; questionNumber?: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const examIdFromQuery = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const examIdRaw = params.get('examId');
+    if (!examIdRaw) return null;
+    const parsed = Number(examIdRaw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [location.search]);
   const { user } = useAuthContext();
-  const currentQuestionNumber = parseInt(questionNumber || '1');
+  const [currentSubjectSlug, setCurrentSubjectSlug] = useState<string | null>(subjectSlugParam ?? null);
+  const [currentQuestionNumber, setCurrentQuestionNumber] = useState<number>(() => {
+    const parsed = Number(questionParam);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  });
 
   const [pattern, setPattern] = useState<Pattern | null>(null);
-  const [currentSection, setCurrentSection] = useState<PatternSection | null>(null);
+  const [subjectGroups, setSubjectGroups] = useState<SubjectGroup[]>([]);
+  const [currentSection, setCurrentSection] = useState<SubjectSection | null>(null);
   const [sectionStats, setSectionStats] = useState<SectionStats[]>([]);
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiSuccess, setAiSuccess] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<QuestionFormData>({
     question_text: '',
@@ -114,56 +158,246 @@ export default function EnhancedQuestionEditor() {
   });
   // Track which question numbers already exist in current section
   const [existingNumbers, setExistingNumbers] = useState<Set<number>>(new Set());
+  const [existingNumbersBySection, setExistingNumbersBySection] = useState<Record<number, Set<number>>>({});
+  const [existingQuestionsBySection, setExistingQuestionsBySection] = useState<Record<number, Map<number, QuestionData>>>({});
+  const [sectionAbsoluteRanges, setSectionAbsoluteRanges] = useState<Record<number, { start: number; end: number; length: number }>>({});
+
+  const computeAbsoluteQuestionNumber = useCallback(
+    (section: SubjectSection | null, subjectQuestionNumber: number) => {
+      if (!section) {
+        return subjectQuestionNumber;
+      }
+      const sectionMap = existingQuestionsBySection[section.id];
+      const existingQuestion = sectionMap?.get(subjectQuestionNumber);
+      const existingAbsolute = existingQuestion?.question_number;
+      if (existingAbsolute !== undefined && existingAbsolute !== null && Number.isFinite(Number(existingAbsolute))) {
+        return Number(existingAbsolute);
+      }
+
+      const range = sectionAbsoluteRanges[section.id];
+      const baseStart = range ? range.start : section.start_question;
+      const maxOffset = range ? range.length - 1 : section.subject_end - section.subject_start;
+      const relativeOffset = subjectQuestionNumber - section.subject_start;
+      const clampedOffset = Math.max(0, Math.min(maxOffset, relativeOffset));
+      return baseStart + clampedOffset;
+    },
+    [existingQuestionsBySection, sectionAbsoluteRanges]
+  );
+
+  const buildNumbersSetForSection = useCallback((section: SubjectSection, results: QuestionData[]) => {
+    const nums = new Set<number>();
+    const range = sectionAbsoluteRanges[section.id];
+    const questionMap = new Map<number, QuestionData>();
+
+    results.forEach((q) => {
+      const subjectLocalRaw =
+        q.question_number_in_pattern !== undefined && q.question_number_in_pattern !== null
+          ? Number(q.question_number_in_pattern)
+          : null;
+
+      if (subjectLocalRaw !== null && Number.isFinite(subjectLocalRaw)) {
+        nums.add(subjectLocalRaw);
+        questionMap.set(subjectLocalRaw, q);
+        return;
+      }
+
+      const absoluteRaw =
+        q.question_number !== undefined && q.question_number !== null
+          ? Number(q.question_number)
+          : null;
+
+      if (
+        range &&
+        absoluteRaw !== null &&
+        Number.isFinite(absoluteRaw) &&
+        absoluteRaw >= range.start &&
+        absoluteRaw <= range.end
+      ) {
+        const adjusted = section.subject_start + (absoluteRaw - range.start);
+        if (adjusted >= section.subject_start && adjusted <= section.subject_end) {
+        nums.add(adjusted);
+          questionMap.set(adjusted, q);
+      }
+      }
+    });
+
+    return { numbers: nums, map: questionMap };
+  }, [sectionAbsoluteRanges]);
+
+  const loadSectionNumbers = useCallback(
+    async (section: SubjectSection, updateCurrent = false) => {
+      try {
+        const res = await api.get(
+          `/questions/questions/?pattern_section=${section.id}${
+            examIdFromQuery ? `&exam=${examIdFromQuery}` : ''
+          }`,
+        );
+        const payload = res.data as { results?: QuestionData[] } | QuestionData[] | undefined;
+        const resultsArray: QuestionData[] = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.results)
+            ? payload?.results ?? []
+            : [];
+        const { numbers: nums, map } = buildNumbersSetForSection(section, resultsArray);
+
+        setExistingNumbersBySection((prev) => ({
+          ...prev,
+          [section.id]: nums,
+        }));
+
+        setExistingQuestionsBySection((prev) => ({
+          ...prev,
+          [section.id]: map,
+        }));
+
+        if (updateCurrent) {
+          setExistingNumbers(nums);
+        }
+      } catch (err) {
+        console.error('Failed to load existing numbers', err);
+        if (updateCurrent) {
+          setExistingNumbers(new Set());
+        }
+      }
+    },
+    [examIdFromQuery, buildNumbersSetForSection],
+  );
 
   const fetchSectionStats = useCallback(async (patternData: Pattern) => {
     try {
-      const stats: SectionStats[] = [];
+    const stats: SectionStats[] = [];
+    
+    const queryExam = examIdFromQuery ? `&exam=${examIdFromQuery}` : '';
+
+    for (const section of patternData.sections) {
+      const totalNeeded = section.end_question - section.start_question + 1;
       
-      for (const section of patternData.sections) {
-        const totalNeeded = section.end_question - section.start_question + 1;
-        
-        // Fetch questions for this section
-        const response = await api.get(`/questions/questions/?pattern_section=${section.id}`);
-        const totalAdded = response.data?.results?.length || response.data?.length || 0;
-        
-        // Map question type to display name
-        const questionTypeDisplay = getQuestionTypeDisplayName(section.question_type);
-        
-        stats.push({
-          section_id: section.id,
-          section_name: section.name,
-          subject: section.subject,
-          question_type: questionTypeDisplay,
-          total_needed: totalNeeded,
-          total_added: totalAdded,
-          remaining: totalNeeded - totalAdded,
-          progress_percentage: (totalAdded / totalNeeded) * 100,
-        });
-      }
+      // Fetch questions for this section
+      const response = await api.get(`/questions/questions/?pattern_section=${section.id}${queryExam}`);
+      const totalAdded = response.data?.results?.length || response.data?.length || 0;
       
-      setSectionStats(stats);
+      // Map question type to display name
+      const questionTypeDisplay = getQuestionTypeDisplayName(section.question_type);
+      
+      stats.push({
+        section_id: section.id,
+        section_name: section.name,
+        subject: section.subject,
+        question_type: questionTypeDisplay,
+        total_needed: totalNeeded,
+        total_added: totalAdded,
+        remaining: totalNeeded - totalAdded,
+        progress_percentage: totalNeeded > 0 ? (totalAdded / totalNeeded) * 100 : 0,
+      });
+    }
+    
+    setSectionStats(stats);
     } catch (err) {
       console.error('Failed to fetch section stats:', err);
     }
+  }, [examIdFromQuery]);
+
+  const computeSectionAbsoluteRanges = useCallback((patternData: Pattern) => {
+    const ranges: Record<number, { start: number; end: number; length: number }> = {};
+    let cursor = 1;
+    patternData.sections.forEach(section => {
+      const length = Math.max(1, section.end_question - section.start_question + 1);
+      ranges[section.id] = {
+        start: cursor,
+        end: cursor + length - 1,
+        length,
+      };
+      cursor += length;
+    });
+
+    return ranges;
+  }, []);
+
+  const buildSubjectGroups = useCallback((patternData: Pattern): SubjectGroup[] => {
+    const subjectTotals = new Map<string, number>();
+    const subjectGroupsMap = new Map<string, SubjectGroup>();
+    const orderedGroups: SubjectGroup[] = [];
+
+    // Ensure sections are processed in ascending order so numbering is deterministic
+    const sortedSections = [...patternData.sections].sort((a, b) => {
+      if (a.subject === b.subject) {
+        return a.start_question - b.start_question;
+      }
+      return a.start_question - b.start_question;
+    });
+
+    sortedSections.forEach((section) => {
+      const subjectName = section.subject || 'General';
+      const currentTotal = subjectTotals.get(subjectName) || 0;
+      const sectionLength = section.end_question - section.start_question + 1;
+      const subjectStart = currentTotal + 1;
+      const subjectEnd = subjectStart + sectionLength - 1;
+
+      const extendedSection: SubjectSection = {
+        ...section,
+        subject_start: subjectStart,
+        subject_end: subjectEnd,
+        subject_section_index: (subjectGroupsMap.get(subjectName)?.sections.length || 0) + 1,
+      };
+
+      if (!subjectGroupsMap.has(subjectName)) {
+        const group: SubjectGroup = {
+          subject: subjectName,
+          slug: slugifySubject(subjectName),
+          sections: [extendedSection],
+          total_questions: subjectEnd,
+        };
+        subjectGroupsMap.set(subjectName, group);
+        orderedGroups.push(group);
+      } else {
+        const group = subjectGroupsMap.get(subjectName)!;
+        group.sections = [...group.sections, extendedSection];
+        group.total_questions = subjectEnd;
+        subjectGroupsMap.set(subjectName, group);
+      }
+
+      subjectTotals.set(subjectName, subjectEnd);
+    });
+
+    return orderedGroups.map(group => ({
+      ...group,
+      sections: group.sections.sort((a, b) => a.subject_start - b.subject_start),
+    }));
   }, []);
 
   const fetchPattern = useCallback(async (id: string) => {
     try {
       setLoading(true);
       const response = await api.get(`/patterns/patterns/${id}/`);
-      setPattern(response.data);
-      await fetchSectionStats(response.data);
+      const patternData = response.data;
+      setExistingNumbers(new Set());
+      setExistingNumbersBySection({});
+      setPattern(patternData);
+      const groups = buildSubjectGroups(patternData);
+      setSubjectGroups(groups);
+      const ranges = computeSectionAbsoluteRanges(patternData);
+      setSectionAbsoluteRanges(ranges);
+      await fetchSectionStats(patternData);
     } catch (err) {
       console.error('Failed to fetch pattern:', err);
     } finally {
       setLoading(false);
     }
-  }, [fetchSectionStats]);
+  }, [fetchSectionStats, buildSubjectGroups, computeSectionAbsoluteRanges]);
+
+  const absoluteQuestionNumber = useMemo(
+    () => computeAbsoluteQuestionNumber(currentSection, currentQuestionNumber),
+    [computeAbsoluteQuestionNumber, currentSection, currentQuestionNumber]
+  );
 
   const { data: existingQuestion, refetch: refetchQuestion, loading: questionLoading } = useApi<{
     results?: QuestionData[];
   } | QuestionData[]>(
-    patternId && currentSection ? `/questions/questions/?pattern_section=${currentSection.id}&question_number=${currentQuestionNumber}` : ''
+    patternId && currentSection
+      ? `/questions/questions/?pattern_section=${currentSection.id}&question_number=${absoluteQuestionNumber}${
+          examIdFromQuery ? `&exam=${examIdFromQuery}` : ''
+        }`
+      : ''
   );
 
   useEffect(() => {
@@ -172,45 +406,126 @@ export default function EnhancedQuestionEditor() {
     }
   }, [patternId, fetchPattern]);
 
-  useEffect(() => {
-    if (pattern && currentQuestionNumber) {
-      // Find which section this question belongs to
-      const section = pattern.sections.find(
-        s => currentQuestionNumber >= s.start_question && currentQuestionNumber <= s.end_question
-      );
-      if (section) {
-        setCurrentSection(section);
-        setFormData(prev => ({
-          ...prev,
-          question_type: section.question_type,
-          marks: section.marks_per_question,
-          negative_marks: section.negative_marking,
-          subject: section.subject,
-          pattern_section: section.id,
-        }));
-
-        // Load existing questions for navigator
-        (async () => {
-          try {
-            const res = await api.get(`/questions/questions/?pattern_section=${section.id}`);
-            const results = res.data?.results || res.data || [];
-            const nums = new Set<number>();
-            for (const q of results) {
-              if (q.question_number_in_pattern) nums.add(Number(q.question_number_in_pattern));
-            }
-            setExistingNumbers(nums);
-          } catch (e) {
-            console.error('Failed to load existing numbers', e);
-            setExistingNumbers(new Set());
-          }
-        })();
-      }
+  const currentSubjectGroup = useMemo(() => {
+    if (subjectGroups.length === 0) {
+      return null;
     }
-  }, [pattern, currentQuestionNumber]);
+    return subjectGroups.find(group => group.slug === currentSubjectSlug) ?? subjectGroups[0];
+  }, [subjectGroups, currentSubjectSlug]);
+
+  const groupedSectionStats = useMemo(() => {
+    if (subjectGroups.length === 0) {
+      return [] as Array<{ subject: string; slug: string; sections: Array<{ section: SubjectSection; stats?: SectionStats }> }>;
+    }
+
+    return subjectGroups.map(group => ({
+      subject: group.subject,
+      slug: group.slug,
+      sections: group.sections.map(section => ({
+        section,
+        stats: sectionStats.find(stat => stat.section_id === section.id),
+      })),
+    }));
+  }, [subjectGroups, sectionStats]);
+
+  useEffect(() => {
+    if (!pattern || !currentSubjectGroup || !currentQuestionNumber) {
+      return;
+    }
+
+    const section =
+      currentSubjectGroup.sections.find(
+        (s) => currentQuestionNumber >= s.subject_start && currentQuestionNumber <= s.subject_end,
+      ) ?? currentSubjectGroup.sections[0];
+
+    if (section) {
+      setCurrentSection(section);
+      setFormData((prev) => ({
+        ...prev,
+        question_type: section.question_type,
+        marks: section.marks_per_question,
+        negative_marks: section.negative_marking,
+        subject: section.subject,
+        pattern_section: section.id,
+      }));
+
+      loadSectionNumbers(section, true);
+    }
+  }, [pattern, currentSubjectGroup, currentQuestionNumber, loadSectionNumbers]);
+
+  useEffect(() => {
+    if (!currentSubjectGroup) return;
+
+    currentSubjectGroup.sections.forEach((section) => {
+      if (!existingNumbersBySection[section.id]) {
+        loadSectionNumbers(section, section.id === currentSection?.id);
+      }
+    });
+  }, [currentSubjectGroup, existingNumbersBySection, loadSectionNumbers, currentSection?.id]);
+
+  useEffect(() => {
+    if (!patternId || subjectGroups.length === 0) {
+      return;
+    }
+
+    const availableSlugs = subjectGroups.map(group => group.slug);
+    const resolvedSlug = subjectSlugParam && availableSlugs.includes(subjectSlugParam)
+      ? subjectSlugParam
+      : currentSubjectSlug && availableSlugs.includes(currentSubjectSlug)
+        ? currentSubjectSlug
+        : subjectGroups[0].slug;
+
+    const activeGroup = subjectGroups.find(group => group.slug === resolvedSlug) ?? subjectGroups[0];
+
+    let resolvedQuestionNumber = Number(questionParam);
+    if (!Number.isFinite(resolvedQuestionNumber) || resolvedQuestionNumber < 1) {
+      resolvedQuestionNumber = currentQuestionNumber;
+    }
+    if (!Number.isFinite(resolvedQuestionNumber) || resolvedQuestionNumber < 1 || resolvedQuestionNumber > activeGroup.total_questions) {
+      resolvedQuestionNumber = 1;
+    }
+
+    if (currentSubjectSlug !== resolvedSlug) {
+      setCurrentSubjectSlug(resolvedSlug);
+    }
+
+    if (currentQuestionNumber !== resolvedQuestionNumber) {
+      setCurrentQuestionNumber(resolvedQuestionNumber);
+    }
+
+    const currentPathSlug = subjectSlugParam ?? null;
+    const currentPathNumber = Number(questionParam);
+    if (currentPathSlug !== resolvedSlug || !Number.isFinite(currentPathNumber) || currentPathNumber !== resolvedQuestionNumber) {
+      const querySuffix = examIdFromQuery ? `?examId=${examIdFromQuery}` : '';
+      navigate(`/pattern/${patternId}/question/${resolvedSlug}/${resolvedQuestionNumber}${querySuffix}`, { replace: true });
+    }
+  }, [subjectGroups, patternId, subjectSlugParam, questionParam, currentSubjectSlug, currentQuestionNumber, navigate, examIdFromQuery]);
 
   // Load existing question data when found, or reset form for new questions
   useEffect(() => {
-    console.log('Loading question data:', { existingQuestion, currentSection, currentQuestionNumber });
+    const sectionMap = currentSection ? existingQuestionsBySection[currentSection.id] : undefined;
+    const mappedExisting = sectionMap?.get(currentQuestionNumber);
+
+    if (mappedExisting) {
+      console.log('Loading existing question from cached map:', mappedExisting);
+      setFormData({
+        question_text: mappedExisting.question_text || '',
+        question_type: mappedExisting.question_type || 'mcq',
+        difficulty: (mappedExisting.difficulty as 'easy' | 'medium' | 'hard') || 'medium',
+        options: mappedExisting.options || ['', '', '', ''],
+        correct_answer: mappedExisting.correct_answer || '',
+        solution: mappedExisting.solution || '',
+        explanation: mappedExisting.explanation || '',
+        marks: mappedExisting.marks || 1,
+        negative_marks: mappedExisting.negative_marks || 1,
+        subject: mappedExisting.subject || '',
+        topic: mappedExisting.topic || '',
+        pattern_section: mappedExisting.pattern_section,
+      });
+      return;
+    }
+
+    console.log('Loading question data from API response:', { existingQuestion, currentSection, currentQuestionNumber });
     
     if (existingQuestion && 'results' in existingQuestion && existingQuestion.results && existingQuestion.results.length > 0) {
       const question = existingQuestion.results[0] as QuestionData;
@@ -266,27 +581,7 @@ export default function EnhancedQuestionEditor() {
         });
       }
     }
-  }, [existingQuestion, currentSection, currentQuestionNumber]);
-
-  // Refresh existing numbers when current question number changes
-  useEffect(() => {
-    if (currentSection) {
-      (async () => {
-        try {
-          const res = await api.get(`/questions/questions/?pattern_section=${currentSection.id}`);
-          const results = res.data?.results || res.data || [];
-          const nums = new Set<number>();
-          for (const q of results) {
-            if (q.question_number_in_pattern) nums.add(Number(q.question_number_in_pattern));
-          }
-          setExistingNumbers(nums);
-        } catch (e) {
-          console.error('Failed to load existing numbers', e);
-          setExistingNumbers(new Set());
-        }
-      })();
-    }
-  }, [currentQuestionNumber, currentSection]);
+  }, [existingQuestion, currentSection, currentQuestionNumber, existingQuestionsBySection]);
 
   const getQuestionTypeDisplayName = (type: string): string => {
     const typeMapping: Record<string, string> = {
@@ -618,6 +913,13 @@ export default function EnhancedQuestionEditor() {
       return;
     }
 
+    // Validate correct_answer for single/mcq questions
+    if ((formData.question_type === 'single_mcq' || formData.question_type === 'mcq') && !formData.correct_answer.trim()) {
+      alert('Please choose the correct option for this question.');
+      setSaveStatus('error');
+      return;
+    }
+
     if (!user?.institute?.id && !user?.institute_id) {
       console.error('No institute found for user:', user);
       setSaveStatus('error');
@@ -628,34 +930,53 @@ export default function EnhancedQuestionEditor() {
     setSaveStatus('saving');
 
     try {
+      const patternSectionId = formData.pattern_section ?? currentSection?.id ?? null;
+      const patternSectionName = currentSection?.name ?? '';
+      const absoluteQuestionNumberForSave = computeAbsoluteQuestionNumber(currentSection ?? null, currentQuestionNumber);
       const dataToSave = {
         ...formData,
-        options: (formData.question_type === 'single_mcq' || formData.question_type === 'multiple_mcq' || formData.question_type === 'mcq') ? formData.options.filter(opt => opt.trim()) : [],
+        options:
+          formData.question_type === 'single_mcq' ||
+          formData.question_type === 'multiple_mcq' ||
+          formData.question_type === 'mcq'
+            ? formData.options.filter(opt => opt.trim())
+            : [],
+        question_number: absoluteQuestionNumberForSave,
         question_number_in_pattern: currentQuestionNumber,
+        pattern_section_id: patternSectionId,
+        pattern_section_name: patternSectionName,
+        exam: examIdFromQuery,
         institute: user?.institute?.id || user?.institute_id,
       };
 
       // Check if we have an existing question to update
-      const hasExistingQuestion = existingQuestion && (
-        ('results' in existingQuestion && existingQuestion.results && existingQuestion.results.length > 0) ||
-        (Array.isArray(existingQuestion) && existingQuestion.length > 0)
-      );
+      const sectionMap = currentSection ? existingQuestionsBySection[currentSection.id] : undefined;
+      const mappedExisting = sectionMap?.get(currentQuestionNumber) ?? null;
+
+      let questionToUpdate: QuestionData | null = null;
+
+      if (mappedExisting) {
+        questionToUpdate = mappedExisting;
+      } else if (existingQuestion) {
+        if ('results' in existingQuestion && existingQuestion.results && existingQuestion.results.length > 0) {
+          questionToUpdate = existingQuestion.results[0] as QuestionData;
+        } else if (Array.isArray(existingQuestion) && existingQuestion.length > 0) {
+          questionToUpdate = existingQuestion[0] as QuestionData;
+        }
+      }
       
       console.log('Save operation:', { 
-        hasExistingQuestion, 
+        mappedExisting,
         existingQuestion, 
         dataToSave, 
         userInstitute: user?.institute?.id || user?.institute_id,
         userObject: user 
       });
       
-      if (hasExistingQuestion) {
-        // Update existing question
-        const question = ('results' in existingQuestion && existingQuestion.results) ? existingQuestion.results[0] as QuestionData : (Array.isArray(existingQuestion) ? existingQuestion[0] as QuestionData : null);
-        if (question) {
-          console.log('Updating existing question:', question.id, dataToSave);
-          await api.put(`/questions/questions/${question.id}/`, dataToSave);
-        }
+      if (questionToUpdate) {
+        const targetId = questionToUpdate.id;
+        console.log('Updating existing question:', targetId, dataToSave);
+        await api.put(`/questions/questions/${targetId}/`, dataToSave);
       } else {
         // Create new question
         console.log('Creating new question:', dataToSave);
@@ -669,15 +990,8 @@ export default function EnhancedQuestionEditor() {
       if (pattern) {
         await fetchSectionStats(pattern);
       }
-      // Refresh numbers list
       if (currentSection) {
-        const res = await api.get(`/questions/questions/?pattern_section=${currentSection.id}`);
-        const results = res.data?.results || res.data || [];
-        const nums = new Set<number>();
-        for (const q of results) {
-          if (q.question_number_in_pattern) nums.add(Number(q.question_number_in_pattern));
-        }
-        setExistingNumbers(nums);
+        await loadSectionNumbers(currentSection, true);
       }
       
       setTimeout(() => setSaveStatus('idle'), 2000);
@@ -690,15 +1004,159 @@ export default function EnhancedQuestionEditor() {
     }
   };
 
-  const navigateToQuestion = (newQuestionNumber: number) => {
-    if (pattern) {
-      const minQ = Math.min(...pattern.sections.map(s => s.start_question));
-      const maxQ = Math.max(...pattern.sections.map(s => s.end_question));
-      
-      if (newQuestionNumber >= minQ && newQuestionNumber <= maxQ) {
-        navigate(`/pattern/${patternId}/question/${newQuestionNumber}`);
-      }
+  const handleGenerateAIQuestion = async () => {
+    const activeSection = currentSection;
+    const effectiveQuestionType = (activeSection?.question_type || formData.question_type || '').toLowerCase();
+
+    if (!activeSection) {
+      setAiError('Select a section before generating a question.');
+      return;
     }
+
+    setAiGenerating(true);
+    setAiError(null);
+    setAiSuccess(null);
+
+    try {
+      const response = await api.post('/questions/ai/generate-question/', {
+        question_type: activeSection.question_type || formData.question_type,
+        subject: activeSection.subject || formData.subject,
+        topic: formData.topic,
+        difficulty: formData.difficulty,
+        instructions: aiPrompt,
+        marks: activeSection.marks_per_question,
+        pattern_section_name: activeSection.name,
+        question_number: currentQuestionNumber,
+        exam_id: examIdFromQuery,
+      });
+
+      const aiQuestion = response.data?.question as AIQuestionPayload | undefined;
+      if (!aiQuestion) {
+        throw new Error('AI did not return a question payload.');
+      }
+
+      const rawOptions = Array.isArray(aiQuestion.options) ? aiQuestion.options.map((opt) => String(opt)) : [];
+      let normalizedOptions = rawOptions.map((opt) => opt.trim()).filter((opt) => opt.length > 0);
+
+      const isSingleChoice = ['single_mcq', 'mcq', 'single correct mcq'].includes(effectiveQuestionType);
+      const isMultipleChoice = ['multiple_mcq', 'multiple correct mcq'].includes(effectiveQuestionType);
+      const isTrueFalse = ['true_false', 'true/false'].includes(effectiveQuestionType);
+
+      if (isSingleChoice || isMultipleChoice) {
+        const desiredLength = Math.max(normalizedOptions.length, formData.options.length || 4, 4);
+        const paddedOptions = Array.from({ length: desiredLength }, (_, idx) => normalizedOptions[idx] || '');
+        normalizedOptions = paddedOptions;
+      } else if (isTrueFalse) {
+        normalizedOptions = ['True', 'False'];
+      } else {
+        normalizedOptions = [];
+      }
+
+      const mapAnswerValue = (value: unknown) => {
+        if (normalizedOptions.length === 0) {
+          return String(value ?? '').trim();
+        }
+
+        if (typeof value === 'number') {
+          const idx = value - 1;
+          return normalizedOptions[idx] || String(value);
+        }
+
+        const textValue = String(value ?? '').trim();
+        if (!textValue) return '';
+
+        if (textValue.length === 1 && /[A-Z]/i.test(textValue)) {
+          const idx = textValue.toUpperCase().charCodeAt(0) - 65;
+          return normalizedOptions[idx] || textValue;
+        }
+
+        return textValue;
+      };
+
+      let correctAnswerValue = aiQuestion.correct_answer ?? '';
+
+      if (isMultipleChoice) {
+        if (Array.isArray(correctAnswerValue)) {
+          const processed = correctAnswerValue
+            .map(mapAnswerValue)
+            .map((entry) => entry.split(/[|,]/g))
+            .flat()
+            .map((entry) => entry.trim())
+            .filter(Boolean);
+          correctAnswerValue = Array.from(new Set(processed)).join('|');
+        } else if (typeof correctAnswerValue === 'string') {
+          const parts = correctAnswerValue.split(/[|,]/g).map((part) => part.trim()).filter(Boolean);
+          const processed = parts.map(mapAnswerValue).map((entry) => entry.trim()).filter(Boolean);
+          correctAnswerValue = Array.from(new Set(processed)).join('|');
+        } else {
+          correctAnswerValue = mapAnswerValue(correctAnswerValue);
+        }
+      } else {
+        if (Array.isArray(correctAnswerValue)) {
+          correctAnswerValue = mapAnswerValue(correctAnswerValue[0]);
+        } else {
+          correctAnswerValue = mapAnswerValue(correctAnswerValue);
+        }
+      }
+
+      if (isTrueFalse && typeof correctAnswerValue === 'string') {
+        const normalized = correctAnswerValue.toLowerCase();
+        correctAnswerValue = normalized === 'true' ? 'True' : normalized === 'false' ? 'False' : correctAnswerValue;
+      }
+      if (typeof correctAnswerValue === 'string') {
+        correctAnswerValue = correctAnswerValue.trim();
+      }
+
+      const finalCorrectAnswer =
+        typeof correctAnswerValue === 'string'
+          ? correctAnswerValue
+          : String(correctAnswerValue ?? '').trim();
+
+      const aiDifficultyRaw = String(aiQuestion.difficulty || '').toLowerCase();
+      const mappedDifficulty = ['easy', 'medium', 'hard'].includes(aiDifficultyRaw) ? (aiDifficultyRaw as 'easy' | 'medium' | 'hard') : formData.difficulty;
+
+      setFormData((prev) => ({
+        ...prev,
+        question_text: aiQuestion.question_text || prev.question_text,
+        options: (isSingleChoice || isMultipleChoice || isTrueFalse) ? normalizedOptions : prev.options,
+        correct_answer: finalCorrectAnswer || prev.correct_answer,
+        solution: aiQuestion.solution || prev.solution,
+        explanation: aiQuestion.explanation || aiQuestion.solution || prev.explanation,
+        difficulty: mappedDifficulty,
+        topic: aiQuestion.topic || prev.topic,
+      }));
+      setSaveStatus('idle');
+
+      setAiSuccess(response.data?.message || 'AI generated a draft question. Review before saving.');
+    } catch (error: unknown) {
+      console.error('AI generation failed:', error);
+      const responseMessage =
+        typeof error === 'object' && error !== null && 'response' in error && (error as { response?: { data?: { error?: string } } }).response?.data?.error;
+      const fallbackMessage =
+        typeof error === 'object' && error !== null && 'message' in error ? String((error as { message?: unknown }).message) : undefined;
+      setAiError(responseMessage || fallbackMessage || 'Failed to generate question. Please try again.');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const navigateToQuestion = (subjectSlug: string, newQuestionNumber: number) => {
+    if (!patternId) return;
+    const group = subjectGroups.find(g => g.slug === subjectSlug);
+    if (!group) return;
+
+    const clamped = Math.min(Math.max(newQuestionNumber, 1), group.total_questions || 1);
+    const querySuffix = examIdFromQuery ? `?examId=${examIdFromQuery}` : '';
+    navigate(`/pattern/${patternId}/question/${subjectSlug}/${clamped}${querySuffix}`);
+  };
+
+  const handleSubjectChange = (subjectSlug: string) => {
+    if (!patternId) return;
+    const group = subjectGroups.find(g => g.slug === subjectSlug);
+    if (!group) return;
+    const desiredNumber = currentQuestionNumber <= group.total_questions ? currentQuestionNumber : 1;
+    const querySuffix = examIdFromQuery ? `?examId=${examIdFromQuery}` : '';
+    navigate(`/pattern/${patternId}/question/${subjectSlug}/${Math.max(1, desiredNumber)}${querySuffix}`);
   };
 
   const getSectionColor = (type: string) => {
@@ -955,7 +1413,7 @@ export default function EnhancedQuestionEditor() {
   };
 
   const { min, max } = getQuestionBounds();
-  const sectionInfo = getSectionInfo(currentQuestionNumber);
+  const sectionInfo = currentSection ?? getSectionInfo(currentQuestionNumber);
 
   if (loading || !pattern) {
     return (
@@ -1024,7 +1482,7 @@ export default function EnhancedQuestionEditor() {
             {/* Center - Question Navigation */}
             <div className="flex items-center gap-3">
               <button
-                onClick={() => navigateToQuestion(currentQuestionNumber - 1)}
+                onClick={() => navigateToQuestion(currentSubjectSlug || subjectGroups[0].slug, currentQuestionNumber - 1)}
                 disabled={currentQuestionNumber <= min}
                 className="p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:scale-110 disabled:hover:scale-100"
               >
@@ -1055,7 +1513,7 @@ export default function EnhancedQuestionEditor() {
               </div>
               
               <button
-                onClick={() => navigateToQuestion(currentQuestionNumber + 1)}
+                onClick={() => navigateToQuestion(currentSubjectSlug || subjectGroups[0].slug, currentQuestionNumber + 1)}
                 disabled={currentQuestionNumber >= max}
                 className="p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:scale-110 disabled:hover:scale-100"
               >
@@ -1118,6 +1576,64 @@ export default function EnhancedQuestionEditor() {
             {/* Main Question Form */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8">
               <div className="space-y-6">
+                <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-5">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <h3 className="flex items-center gap-2 font-semibold text-blue-900">
+                        <Sparkles className="w-4 h-4" />
+                        AI Question Assistant
+                      </h3>
+                      <p className="mt-1 text-xs text-blue-700">
+                        Describe the concept or nuance you want covered. We&apos;ll draft a {getQuestionTypeDisplayName(currentSection?.question_type || formData.question_type)} using Google Gemini.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleGenerateAIQuestion}
+                      disabled={aiGenerating}
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:from-indigo-600 hover:to-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {aiGenerating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Generate Question
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <textarea
+                    value={aiPrompt}
+                    onChange={(e) => {
+                      setAiPrompt(e.target.value);
+                      if (aiError) setAiError(null);
+                      if (aiSuccess) setAiSuccess(null);
+                    }}
+                    placeholder="e.g., Create a challenging problem on friction involving inclined planes with real-world context."
+                    className="mt-4 w-full rounded-xl border border-blue-200 bg-white/80 px-4 py-3 text-sm text-blue-900 shadow-inner focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    rows={3}
+                  />
+                  {aiError && (
+                    <div className="mt-3 rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 text-xs text-red-600 flex items-start gap-2">
+                      <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                      <span>{aiError}</span>
+                    </div>
+                  )}
+                  {aiSuccess && (
+                    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-xs text-emerald-700 flex items-start gap-2">
+                      <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                      <span>{aiSuccess}</span>
+                    </div>
+                  )}
+                  <p className="mt-3 text-[11px] uppercase tracking-[0.25em] text-blue-500">
+                    Powered by Google Gemini · Review the generated content before publishing.
+                  </p>
+                </div>
+
                 {/* Question Text */}
                 <div>
                   <label className="block text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
@@ -1261,38 +1777,95 @@ export default function EnhancedQuestionEditor() {
           {/* Right Sidebar - 1 col */}
           <div className="space-y-6">
                     {/* Question Number Navigator (for current section) */}
-                    {currentSection && (
-                      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-6">
-                        <div className="flex items-center justify-between mb-4">
+                    {currentSubjectGroup && (
+                      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-6 space-y-4">
+                        <div className="flex items-center justify-between">
                           <div>
-                            <h3 className="font-bold text-slate-900">Question Numbers</h3>
-                            <p className="text-xs text-slate-600">Click a number to jump</p>
+                            <h3 className="font-bold text-slate-900">Question Navigator</h3>
+                            <p className="text-xs text-slate-600">Navigate questions grouped by subject & section</p>
                           </div>
-                          <div className="text-xs text-slate-500">
-                            Q{currentSection.start_question}–{currentSection.end_question}
+                          <div className="text-xs text-slate-500 text-right">
+                            {currentSubjectGroup.subject} • {currentSubjectGroup.total_questions} questions
                           </div>
                         </div>
-                        <div className="grid grid-cols-5 gap-2">
-                          {Array.from({ length: currentSection.end_question - currentSection.start_question + 1 }).map((_, idx) => {
-                            const num = currentSection.start_question + idx;
-                            const isCurrent = num === currentQuestionNumber;
-                            const isExisting = existingNumbers.has(num);
+
+                        <div className="flex flex-wrap gap-2">
+                          {subjectGroups.map(group => {
+                            const isActive = group.slug === currentSubjectGroup.slug;
                             return (
                               <button
-                                key={num}
-                                onClick={() => navigateToQuestion(num)}
-                                className={`h-10 rounded-lg border text-sm font-semibold transition-all
-                                  ${isCurrent ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'}
-                                  ${isExisting ? 'ring-2 ring-emerald-300' : ''}
-                                `}
-                                title={isExisting ? 'Already added' : 'Empty'}
+                                key={group.slug}
+                                onClick={() => handleSubjectChange(group.slug)}
+                                className={`px-3 py-2 text-xs font-semibold rounded-full border transition-all ${
+                                  isActive
+                                    ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                                    : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                                }`}
                               >
-                                {num}
+                                {group.subject}
                               </button>
                             );
                           })}
                         </div>
-                        <div className="mt-3 flex items-center gap-3 text-xs text-slate-600">
+
+                        <div className="space-y-5">
+                          {currentSubjectGroup.sections.map(section => {
+                            const isCurrentSection = section.id === currentSection?.id;
+                            const cachedNumbers = existingNumbersBySection[section.id];
+                            const numbersSet = cachedNumbers
+                              ? cachedNumbers
+                              : isCurrentSection
+                                ? existingNumbers
+                                : new Set<number>();
+                            return (
+                              <div
+                                key={section.id}
+                                className={`rounded-xl border transition-all p-4 ${
+                                  isCurrentSection
+                                    ? 'border-blue-400 bg-blue-50 shadow-md'
+                                    : 'border-slate-200 bg-slate-50'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between mb-3">
+                                  <div>
+                                    <h4 className="text-sm font-bold text-slate-800">{section.name}</h4>
+                                    <p className="text-xs text-slate-500">
+                                      Section {section.subject_section_index} • Q{section.subject_start}–{section.subject_end}
+                                    </p>
+                                  </div>
+                                  <div className="text-xs text-slate-500">
+                                    {section.marks_per_question} marks/question
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-5 gap-2">
+                                  {Array.from({ length: section.subject_end - section.subject_start + 1 }).map((_, idx) => {
+                                    const num = section.subject_start + idx;
+                                    const isCurrent = isCurrentSection && num === currentQuestionNumber;
+                                    const isExisting = numbersSet.has(num);
+                                    return (
+                                      <button
+                                        key={`${section.id}-${num}`}
+                                        onClick={() => navigateToQuestion(currentSubjectGroup.slug, num)}
+                                        className={`h-10 rounded-lg border text-sm font-semibold transition-all ${
+                                          isCurrent
+                                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                                        } ${
+                                          isExisting ? 'ring-2 ring-emerald-300' : ''
+                                        }`}
+                                        title={isExisting ? 'Already added' : 'Empty'}
+                                      >
+                                        {num}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="pt-2 flex items-center gap-3 text-xs text-slate-600">
                           <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-300 inline-block"></span> Added</span>
                           <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-200 inline-block"></span> Current</span>
                         </div>
@@ -1324,59 +1897,79 @@ export default function EnhancedQuestionEditor() {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                {sectionStats.map((stat) => {
-                  const isComplete = stat.progress_percentage >= 100;
-                  const isCurrent = stat.section_id === currentSection?.id;
-                  
-                  return (
-                    <div
-                      key={stat.section_id}
-                      className={`p-4 rounded-xl border-2 transition-all ${
-                        isCurrent
-                          ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-300 shadow-lg'
-                          : isComplete
-                          ? 'bg-green-50 border-green-300'
-                          : 'bg-slate-50 border-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-800">{stat.section_name}</h4>
-                          <p className="text-xs text-slate-600">{stat.subject} • {stat.question_type.toUpperCase()}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-slate-900">{stat.total_added}/{stat.total_needed}</p>
-                          <p className="text-xs text-slate-600">{stat.progress_percentage.toFixed(0)}%</p>
-                        </div>
-                      </div>
-                      
-                      <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden shadow-inner">
-                        <div
-                          className={`h-3 rounded-full transition-all duration-700 ${
-                            isComplete
-                              ? 'bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500'
-                              : 'bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500'
-                          }`}
-                          style={{ width: `${Math.min(stat.progress_percentage, 100)}%` }}
-                        ></div>
-                      </div>
-                      
-                      <div className="mt-2 flex items-center justify-between">
-                        <span className={`text-xs font-semibold ${
-                          isComplete ? 'text-green-600' : stat.remaining <= 3 ? 'text-orange-600' : 'text-blue-600'
-                        }`}>
-                          {isComplete ? '✓ Complete!' : `${stat.remaining} remaining`}
-                        </span>
-                        {isCurrent && (
-                          <span className="px-2 py-0.5 bg-blue-500 text-white text-xs font-bold rounded-full">
-                            Current
-                          </span>
-                        )}
-                      </div>
+              <div className="space-y-6">
+                {groupedSectionStats.map(group => (
+                  <div key={group.slug} className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                        {group.subject}
+                      </h4>
+                      <span className="text-xs text-slate-500">
+                        {group.sections.reduce((acc, { section }) => acc + (section.subject_end - section.subject_start + 1), 0)} questions
+                      </span>
                     </div>
-                  );
-                })}
+                    <div className="space-y-3">
+                      {group.sections.map(({ section, stats }) => {
+                        const sectionLength = section.subject_end - section.subject_start + 1;
+                        const totalAdded = stats?.total_added ?? 0;
+                        const remaining = Math.max(sectionLength - totalAdded, 0);
+                        const progressPercentage = Math.min((totalAdded / sectionLength) * 100, 100);
+                        const isComplete = progressPercentage >= 100;
+                        const isCurrent = section.id === currentSection?.id;
+
+                        return (
+                          <div
+                            key={section.id}
+                            className={`p-4 rounded-xl border-2 transition-all ${
+                              isCurrent
+                                ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-300 shadow-lg'
+                                : isComplete
+                                ? 'bg-green-50 border-green-300'
+                                : 'bg-slate-50 border-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <h5 className="text-sm font-bold text-slate-800">{section.name}</h5>
+                                <p className="text-xs text-slate-600">
+                                  Section {section.subject_section_index} • Q{section.subject_start}–{section.subject_end} • {section.question_type.toUpperCase()}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-slate-900">{totalAdded}/{sectionLength}</p>
+                                <p className="text-xs text-slate-600">{progressPercentage.toFixed(0)}%</p>
+                              </div>
+                            </div>
+
+                            <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden shadow-inner">
+                              <div
+                                className={`h-3 rounded-full transition-all duration-700 ${
+                                  isComplete
+                                    ? 'bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500'
+                                    : 'bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500'
+                                }`}
+                                style={{ width: `${progressPercentage}%` }}
+                              ></div>
+                            </div>
+
+                            <div className="mt-2 flex items-center justify-between">
+                              <span className={`text-xs font-semibold ${
+                                isComplete ? 'text-green-600' : remaining <= 3 ? 'text-orange-600' : 'text-blue-600'
+                              }`}>
+                                {isComplete ? '✓ Complete!' : `${remaining} remaining`}
+                              </span>
+                              {isCurrent && (
+                                <span className="px-2 py-0.5 bg-blue-500 text-white text-xs font-bold rounded-full">
+                                  Current
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -1413,3 +2006,10 @@ export default function EnhancedQuestionEditor() {
     </div>
   );
 }
+
+const slugifySubject = (subject: string) =>
+  subject
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'subject';

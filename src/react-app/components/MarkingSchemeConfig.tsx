@@ -5,9 +5,7 @@ import {
   AlertCircle, 
   Info, 
   Settings,
-  HelpCircle,
-  Minus,
-  Plus
+  HelpCircle
 } from 'lucide-react';
 import { MarkingScheme } from '../../shared/types';
 
@@ -26,7 +24,7 @@ export default function MarkingSchemeConfig({
 }: MarkingSchemeConfigProps) {
   const [showHelp, setShowHelp] = useState(false);
 
-  const handleChange = (field: keyof MarkingScheme, value: any) => {
+  const handleChange = (field: keyof MarkingScheme, value: string | number | boolean) => {
     onChange({
       ...markingScheme,
       [field]: value

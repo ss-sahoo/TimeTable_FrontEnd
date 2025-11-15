@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   MessageCircle, Send, X, Bot, User, 
-  HelpCircle, BookOpen, Search, 
+  BookOpen, Search, 
   ChevronDown, ChevronUp, Loader2 
 } from 'lucide-react';
 
@@ -71,6 +71,17 @@ const ChatSupport: React.FC<ChatSupportProps> = ({ isOpen, onClose }) => {
     }
   ];
 
+  const addMessage = React.useCallback((type: 'user' | 'bot', message: string, isTyping = false) => {
+    const newMessage: ChatMessage = {
+      id: Date.now().toString(),
+      type,
+      message,
+      timestamp: new Date(),
+      isTyping
+    };
+    setMessages(prev => [...prev, newMessage]);
+  }, []);
+
   useEffect(() => {
     setHelpArticles(sampleArticles);
     setFilteredArticles(sampleArticles);
@@ -79,11 +90,11 @@ const ChatSupport: React.FC<ChatSupportProps> = ({ isOpen, onClose }) => {
     if (messages.length === 0) {
       addMessage('bot', 'Hello! I\'m here to help you with Exam Flow. How can I assist you today?');
     }
-  }, []);
+  }, [messages.length, addMessage]);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages.length]);
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -93,17 +104,6 @@ const ChatSupport: React.FC<ChatSupportProps> = ({ isOpen, onClose }) => {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const addMessage = (type: 'user' | 'bot', message: string, isTyping = false) => {
-    const newMessage: ChatMessage = {
-      id: Date.now().toString(),
-      type,
-      message,
-      timestamp: new Date(),
-      isTyping
-    };
-    setMessages(prev => [...prev, newMessage]);
   };
 
   const handleSendMessage = async () => {
@@ -221,7 +221,7 @@ const ChatSupport: React.FC<ChatSupportProps> = ({ isOpen, onClose }) => {
               ].map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab(tab.id as 'chat' | 'help' | 'search')}
                   className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-colors ${
                     activeTab === tab.id
                       ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'

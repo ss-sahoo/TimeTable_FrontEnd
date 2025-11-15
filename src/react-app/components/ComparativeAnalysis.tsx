@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   BarChart3, TrendingUp, TrendingDown, Users, 
   Clock, Target, Award, Loader2, RefreshCw,
-  Filter, Download, Eye, EyeOff, ChevronDown
+  Eye, EyeOff
 } from 'lucide-react';
 import { api } from '@/react-app/hooks/useApi';
 
@@ -37,7 +37,7 @@ const ComparativeAnalysis: React.FC<ComparativeAnalysisProps> = ({
 
   useEffect(() => {
     loadComparisonData();
-  }, [selectedExams]);
+  }, [selectedExams, loadComparisonData]);
 
   const loadComparisonData = async () => {
     try {
@@ -63,12 +63,15 @@ const ComparativeAnalysis: React.FC<ComparativeAnalysisProps> = ({
       }));
       
       setExams(examData);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load comparison data');
+    } catch (err) {
+      const errorMessage = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+        : undefined;
+      setError(errorMessage || 'Failed to load comparison data');
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedExams]);
 
   const sortedExams = [...exams].sort((a, b) => {
     switch (sortBy) {
@@ -166,7 +169,7 @@ const ComparativeAnalysis: React.FC<ComparativeAnalysisProps> = ({
           <label className="text-sm font-medium text-gray-700">Sort by:</label>
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) => setSortBy(e.target.value as 'score' | 'attempts' | 'pass_rate' | 'time')}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="score">Average Score</option>
@@ -197,7 +200,7 @@ const ComparativeAnalysis: React.FC<ComparativeAnalysisProps> = ({
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id as 'overview' | 'performance' | 'trends' | 'insights')}
             className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === tab.id
                 ? 'bg-white text-blue-600 shadow-sm'

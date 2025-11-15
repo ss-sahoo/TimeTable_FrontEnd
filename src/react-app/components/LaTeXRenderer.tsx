@@ -4,11 +4,10 @@ import { InlineMath, BlockMath } from 'react-katex';
 
 interface LaTeXRendererProps {
   content: string;
-  displayMode?: boolean;
   className?: string;
 }
 
-export default function LaTeXRenderer({ content, displayMode = false, className = '' }: LaTeXRendererProps) {
+export default function LaTeXRenderer({ content, className = '' }: LaTeXRendererProps) {
   // Handle undefined or null content
   if (!content) {
     return <div className={className}></div>;

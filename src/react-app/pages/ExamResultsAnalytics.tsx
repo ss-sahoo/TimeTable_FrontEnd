@@ -226,70 +226,64 @@ export default function ExamResultsAnalytics() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Exam Results & Analytics</h1>
-              <p className="text-gray-600 mt-1">
-                {resultsData?.exam.title || analyticsData?.exam.title || 'Loading...'}
-              </p>
-            </div>
-            <button
-              onClick={exportResults}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Download
-            </button>
-          </div>
-        </div>
+  const examTitle = resultsData?.exam.title || analyticsData?.exam.title || 'Exam';
 
-        {/* Results Section */}
-        <div className="bg-white rounded-xl border border-gray-200 mb-8">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Results</h2>
-            
-            {/* Search and Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+  return (
+    <div className="min-h-screen bg-slate-50 p-5">
+      <div className="w-full space-y-4 text-slate-700 text-sm">
+        <header className="flex flex-wrap items-center justify-between gap-2 bg-white border border-slate-200 rounded-lg shadow-sm px-4 py-3">
+          <div className="min-w-0">
+            <h1 className="text-lg font-semibold text-slate-900 leading-tight truncate">
+              Exam Results & Analytics
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5 truncate">{examTitle}</p>
+          </div>
+          <button
+            onClick={exportResults}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Download
+          </button>
+        </header>
+
+        <section className="bg-white border border-slate-200 rounded-lg shadow-sm">
+          <div className="border-b border-slate-200 px-4 py-3">
+            <h2 className="text-sm font-semibold text-slate-900 mb-3">Results</h2>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
+              <div className="relative col-span-2 md:col-span-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search students..."
+                  placeholder="Search students"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="px-3 py-2 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="submitted_at">Sort by Date</option>
                 <option value="score">Sort by Score</option>
-                <option value="percentage">Sort by Percentage</option>
+                <option value="percentage">Sort by %</option>
                 <option value="time_spent">Sort by Time</option>
               </select>
-              
               <select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="px-3 py-2 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="desc">High to Low</option>
-                <option value="asc">Low to High</option>
+                <option value="desc">High → Low</option>
+                <option value="asc">Low → High</option>
               </select>
-              
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="px-3 py-2 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="all">All Status</option>
                 <option value="submitted">Submitted</option>
@@ -299,121 +293,51 @@ export default function ExamResultsAnalytics() {
               </select>
             </div>
 
-            {/* Subject Totals */}
             {resultsData?.subject_totals && Object.keys(resultsData.subject_totals).length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="flex flex-wrap gap-2">
                 {Object.entries(resultsData.subject_totals).map(([subject, data]) => (
-                  <div key={subject} className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-medium text-gray-900">{subject}</h3>
-                    <p className="text-sm text-gray-600">{data.total_marks} marks • {data.questions} questions</p>
+                  <div key={subject} className="flex-auto min-w-[160px] bg-slate-100 border border-slate-200 rounded-md px-3 py-2">
+                    <p className="text-xs font-semibold text-slate-800 truncate">{subject}</p>
+                    <p className="text-[11px] text-slate-500">{data.total_marks} marks · {data.questions} Qs</p>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Results Table */}
           <div className="overflow-x-auto">
             {loadingResults ? (
-              <div className="flex items-center justify-center h-64">
+              <div className="flex items-center justify-center h-48 text-xs text-slate-500">
                 <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Loading results...</p>
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                  Loading results...
                 </div>
               </div>
             ) : (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full text-xs">
+                <thead className="bg-slate-100 text-slate-500 uppercase tracking-wide">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      S.No
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Task No
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Student Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Phone
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('score')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Score
-                        <ArrowUpDown className="w-3 h-3" />
-                      </div>
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('percentage')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Percentage
-                        <ArrowUpDown className="w-3 h-3" />
-                      </div>
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('time_spent')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Time Spent
-                        <ArrowUpDown className="w-3 h-3" />
-                      </div>
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('submitted_at')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Submitted At
-                        <ArrowUpDown className="w-3 h-3" />
-                      </div>
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
+                    {['S.No', 'Task', 'Student', 'Phone', 'Score', '%', 'Time', 'Submitted', 'Status'].map((col) => (
+                      <th key={col} className="px-3 py-2 text-left font-semibold">{col}</th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-slate-200 text-slate-700">
                   {resultsData?.results.map((result) => (
-                    <tr key={result.student_id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {result.s_no}
+                    <tr key={result.student_id} className="hover:bg-slate-50">
+                      <td className="px-3 py-2">{result.s_no}</td>
+                      <td className="px-3 py-2">{result.task_no}</td>
+                      <td className="px-3 py-2">
+                        <div className="font-semibold text-slate-800">{result.student_name}</div>
+                        <div className="text-[11px] text-slate-500">{result.student_email}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {result.task_no}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {result.student_name}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {result.student_email}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {result.phone}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {result.score.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {result.percentage.toFixed(1)}%
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatTime(result.time_spent)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(result.submitted_at)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(result.status)}`}>
+                      <td className="px-3 py-2">{result.phone}</td>
+                      <td className="px-3 py-2">{result.score.toFixed(2)}</td>
+                      <td className="px-3 py-2">{result.percentage.toFixed(1)}%</td>
+                      <td className="px-3 py-2">{formatTime(result.time_spent)}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{formatDate(result.submitted_at)}</td>
+                      <td className="px-3 py-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${getStatusColor(result.status)}`}>
                           {result.status.replace('_', ' ')}
                         </span>
                       </td>
@@ -423,195 +347,133 @@ export default function ExamResultsAnalytics() {
               </table>
             )}
           </div>
-        </div>
+        </section>
 
-        {/* Analytics Section */}
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Analytics</h2>
-            
-            {/* Analytics View Tabs */}
-            <div className="flex space-x-1 mb-6">
-              {[
-                { id: 'statistics', name: 'Statistics', icon: BarChart3 },
-                { id: 'heatmap', name: 'Heat Map', icon: Activity },
-                { id: 'histogram', name: 'Histogram', icon: TrendingUp },
-                { id: 'boxplot', name: 'Box Plot', icon: PieChart },
-                { id: 'question_analysis', name: 'Question Analysis', icon: FileText }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveAnalyticsView(tab.id as any)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    activeAnalyticsView === tab.id
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <tab.icon className="w-4 h-4" />
-                  {tab.name}
-                </button>
-              ))}
+        <section className="bg-white border border-slate-200 rounded-lg shadow-sm">
+          <div className="border-b border-slate-200 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-slate-900">Analytics</h2>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { id: 'statistics', name: 'Statistics', icon: BarChart3 },
+                  { id: 'heatmap', name: 'Heat Map', icon: Activity },
+                  { id: 'histogram', name: 'Histogram', icon: TrendingUp },
+                  { id: 'boxplot', name: 'Box Plot', icon: PieChart },
+                  { id: 'question_analysis', name: 'Questions', icon: FileText },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveAnalyticsView(tab.id as any)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      activeAnalyticsView === tab.id
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    <tab.icon className="w-3.5 h-3.5" />
+                    {tab.name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="p-6">
+          <div className="px-4 py-3">
             {loadingAnalytics ? (
-              <div className="flex items-center justify-center h-64">
+              <div className="flex items-center justify-center h-48 text-xs text-slate-500">
                 <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Loading analytics...</p>
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                  Loading analytics...
                 </div>
               </div>
             ) : (
               <>
-                {/* Statistics View */}
                 {activeAnalyticsView === 'statistics' && analyticsData && (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      <div className="bg-blue-50 p-6 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-blue-600">Mean Score</p>
-                            <p className="text-2xl font-bold text-blue-900">
-                              {analyticsData.statistics.average_score.toFixed(2)}
-                            </p>
-                          </div>
-                          <BarChart3 className="w-8 h-8 text-blue-600" />
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                      <div className="bg-blue-50 border border-blue-100 rounded-md px-3 py-2">
+                        <p className="text-[11px] font-semibold text-blue-700">Mean Score</p>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-lg font-bold text-blue-900">{analyticsData.statistics.average_score.toFixed(2)}</span>
+                          <BarChart3 className="w-4 h-4 text-blue-600" />
                         </div>
                       </div>
-                      
-                      <div className="bg-green-50 p-6 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-green-600">Median Score</p>
-                            <p className="text-2xl font-bold text-green-900">
-                              {analyticsData.statistics.median_score.toFixed(2)}
-                            </p>
-                          </div>
-                          <TrendingUp className="w-8 h-8 text-green-600" />
+                      <div className="bg-emerald-50 border border-emerald-100 rounded-md px-3 py-2">
+                        <p className="text-[11px] font-semibold text-emerald-700">Median Score</p>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-lg font-bold text-emerald-900">{analyticsData.statistics.median_score.toFixed(2)}</span>
+                          <TrendingUp className="w-4 h-4 text-emerald-600" />
                         </div>
                       </div>
-                      
-                      <div className="bg-purple-50 p-6 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-purple-600">Mode Score</p>
-                            <p className="text-2xl font-bold text-purple-900">
-                              {analyticsData.statistics.mode_score.toFixed(2)}
-                            </p>
-                          </div>
-                          <Target className="w-8 h-8 text-purple-600" />
+                      <div className="bg-purple-50 border border-purple-100 rounded-md px-3 py-2">
+                        <p className="text-[11px] font-semibold text-purple-700">Mode Score</p>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-lg font-bold text-purple-900">{analyticsData.statistics.mode_score.toFixed(2)}</span>
+                          <Target className="w-4 h-4 text-purple-600" />
                         </div>
                       </div>
-                      
-                      <div className="bg-orange-50 p-6 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-orange-600">Range</p>
-                            <p className="text-2xl font-bold text-orange-900">
-                              {analyticsData.statistics.range_score.toFixed(2)}
-                            </p>
-                          </div>
-                          <TrendingDown className="w-8 h-8 text-orange-600" />
+                      <div className="bg-orange-50 border border-orange-100 rounded-md px-3 py-2">
+                        <p className="text-[11px] font-semibold text-orange-700">Range</p>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-lg font-bold text-orange-900">{analyticsData.statistics.range_score.toFixed(2)}</span>
+                          <TrendingDown className="w-4 h-4 text-orange-600" />
                         </div>
                       </div>
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="bg-gray-50 p-6 rounded-lg">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Standard Deviation</h3>
-                        <p className="text-3xl font-bold text-gray-900">
-                          {analyticsData.statistics.std_deviation.toFixed(2)}
-                        </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-slate-100 border border-slate-200 rounded-md px-3 py-2">
+                        <p className="text-[11px] font-semibold text-slate-600">Std deviation</p>
+                        <p className="text-lg font-bold text-slate-900 mt-1">{analyticsData.statistics.std_deviation.toFixed(2)}</p>
                       </div>
-                      
-                      <div className="bg-gray-50 p-6 rounded-lg">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Variance</h3>
-                        <p className="text-3xl font-bold text-gray-900">
-                          {analyticsData.statistics.variance.toFixed(2)}
-                        </p>
+                      <div className="bg-slate-100 border border-slate-200 rounded-md px-3 py-2">
+                        <p className="text-[11px] font-semibold text-slate-600">Variance</p>
+                        <p className="text-lg font-bold text-slate-900 mt-1">{analyticsData.statistics.variance.toFixed(2)}</p>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Histogram View */}
                 {activeAnalyticsView === 'histogram' && analyticsData && (
-                  <div className="space-y-6">
-                    <h3 className="text-lg font-semibold text-gray-900">Score Distribution</h3>
-                    <div className="space-y-4">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-slate-900">Score Distribution</h3>
+                    <div className="space-y-1.5">
                       {analyticsData.histogram_data.map((item, index) => (
-                        <div key={index} className="flex items-center gap-4">
-                          <div className="w-20 text-sm text-gray-600">{item.range}</div>
-                          <div className="flex-1 bg-gray-200 rounded-full h-6 relative">
-                            <div 
-                              className="bg-blue-600 h-6 rounded-full flex items-center justify-end pr-2"
+                        <div key={index} className="flex items-center gap-2">
+                          <span className="w-16 text-[11px] text-slate-500">{item.range}</span>
+                          <div className="flex-1 h-3 bg-slate-200 rounded-full overflow-hidden">
+                            <div
+                              className="h-3 bg-blue-500 rounded-full"
                               style={{ width: `${item.percentage}%` }}
-                            >
-                              <span className="text-xs text-white font-medium">
-                                {item.count > 0 ? item.count : ''}
-                              </span>
-                            </div>
+                            ></div>
                           </div>
-                          <div className="w-16 text-sm text-gray-600 text-right">
-                            {item.percentage.toFixed(1)}%
-                          </div>
+                          <span className="w-12 text-right text-[11px] text-slate-500">{item.percentage.toFixed(1)}%</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Question Analysis View */}
                 {activeAnalyticsView === 'question_analysis' && analyticsData && (
-                  <div className="space-y-6">
-                    <h3 className="text-lg font-semibold text-gray-900">Question-wise Analysis</h3>
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-slate-900">Question-wise Analysis</h3>
                     <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                      <table className="min-w-full text-xs">
+                        <thead className="bg-slate-100 text-slate-500 uppercase tracking-wide">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Question
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Attempted
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Correct
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Wrong
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Success Rate
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Avg Score
-                            </th>
+                            {['Question', 'Attempted', 'Correct', 'Wrong', 'Success %', 'Avg Score'].map((col) => (
+                              <th key={col} className="px-3 py-2 text-left font-semibold">{col}</th>
+                            ))}
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="divide-y divide-slate-200 text-slate-700">
                           {analyticsData.question_analytics.map((qa) => (
-                            <tr key={qa.question_number} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                Q{qa.question_number}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {qa.total_attempts}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
-                                {qa.correct_attempts}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                                {qa.wrong_attempts}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {qa.success_rate.toFixed(1)}%
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {qa.average_score.toFixed(2)}/{qa.max_marks}
-                              </td>
+                            <tr key={qa.question_number} className="hover:bg-slate-50">
+                              <td className="px-3 py-2 font-semibold text-slate-800">Q{qa.question_number}</td>
+                              <td className="px-3 py-2">{qa.total_attempts}</td>
+                              <td className="px-3 py-2 text-emerald-600">{qa.correct_attempts}</td>
+                              <td className="px-3 py-2 text-rose-600">{qa.wrong_attempts}</td>
+                              <td className="px-3 py-2">{qa.success_rate.toFixed(1)}%</td>
+                              <td className="px-3 py-2">{qa.average_score.toFixed(2)}/{qa.max_marks}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -620,30 +482,31 @@ export default function ExamResultsAnalytics() {
                   </div>
                 )}
 
-                {/* Heat Map View */}
                 {activeAnalyticsView === 'heatmap' && analyticsData && (
-                  <div className="space-y-6">
-                    <h3 className="text-lg font-semibold text-gray-900">Subject-wise Performance</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-slate-900">Subject performance</h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
                       {analyticsData.heatmap_data.map((subject, index) => (
-                        <div key={index} className="bg-gray-50 p-6 rounded-lg">
-                          <h4 className="font-medium text-gray-900 mb-2">{subject.subject}</h4>
-                          <p className="text-sm text-gray-600 mb-4">{subject.section_name}</p>
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span>Average Score:</span>
-                              <span className="font-medium">{subject.average_score.toFixed(2)}/{subject.max_marks}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span>Questions:</span>
-                              <span className="font-medium">{subject.total_questions}</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-blue-600 h-2 rounded-full"
-                                style={{ width: `${(subject.average_score / subject.max_marks) * 100}%` }}
-                              ></div>
-                            </div>
+                        <div key={index} className="border border-slate-200 rounded-md px-3 py-2 bg-slate-50">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-slate-800 text-xs">{subject.subject}</span>
+                            <span className="text-[11px] text-slate-500">{subject.section_name}</span>
+                          </div>
+                          <div className="mt-2 text-[11px] text-slate-500 flex justify-between">
+                            <span>Average</span>
+                            <span className="font-semibold text-slate-800">
+                              {subject.average_score.toFixed(2)}/{subject.max_marks}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-[11px] text-slate-500 flex justify-between">
+                            <span>Questions</span>
+                            <span className="font-semibold text-slate-800">{subject.total_questions}</span>
+                          </div>
+                          <div className="mt-2 h-2 bg-slate-200 rounded-full overflow-hidden">
+                            <div
+                              className="h-2 bg-blue-500 rounded-full"
+                              style={{ width: `${(subject.average_score / subject.max_marks) * 100}%` }}
+                            ></div>
                           </div>
                         </div>
                       ))}
@@ -651,48 +514,36 @@ export default function ExamResultsAnalytics() {
                   </div>
                 )}
 
-                {/* Box Plot View */}
                 {activeAnalyticsView === 'boxplot' && analyticsData && (
-                  <div className="space-y-6">
-                    <h3 className="text-lg font-semibold text-gray-900">Score Distribution (Box Plot)</h3>
-                    <div className="bg-gray-50 p-6 rounded-lg">
-                      <div className="space-y-4">
-                        <div className="flex justify-between text-sm">
-                          <span>Minimum:</span>
-                          <span className="font-medium">{analyticsData.box_plot_data.quartiles.min.toFixed(2)}</span>
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-slate-900">Score distribution (quartiles)</h3>
+                    <div className="bg-slate-100 border border-slate-200 rounded-md px-3 py-2 text-xs text-slate-600 space-y-1.5">
+                      {([
+                        ['Minimum', analyticsData.box_plot_data.quartiles.min],
+                        ['Q1 (25%)', analyticsData.box_plot_data.quartiles.q1],
+                        ['Median', analyticsData.box_plot_data.quartiles.median],
+                        ['Q3 (75%)', analyticsData.box_plot_data.quartiles.q3],
+                        ['Maximum', analyticsData.box_plot_data.quartiles.max],
+                      ] as const).map(([label, value]) => (
+                        <div key={label} className="flex justify-between">
+                          <span>{label}</span>
+                          <span className="font-semibold text-slate-800">{value.toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span>Q1 (25th percentile):</span>
-                          <span className="font-medium">{analyticsData.box_plot_data.quartiles.q1.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span>Median (50th percentile):</span>
-                          <span className="font-medium">{analyticsData.box_plot_data.quartiles.median.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span>Q3 (75th percentile):</span>
-                          <span className="font-medium">{analyticsData.box_plot_data.quartiles.q3.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span>Maximum:</span>
-                          <span className="font-medium">{analyticsData.box_plot_data.quartiles.max.toFixed(2)}</span>
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 )}
               </>
             )}
           </div>
-        </div>
+        </section>
       </div>
 
-      {/* Export Modal */}
       <ExportModal
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
         examId={parseInt(examId || '0')}
-        examTitle={resultsData?.exam.title || analyticsData?.exam.title || 'Exam'}
+        examTitle={examTitle}
       />
     </div>
   );

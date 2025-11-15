@@ -1,13 +1,13 @@
 import { useState, useRef } from 'react';
 import { Bold, Italic, List, ListOrdered, Image, Calculator, ChevronDown, ChevronUp, Upload, Eye, X } from 'lucide-react';
-import LaTeXRenderer, { hasLaTeX } from './LaTeXRenderer';
+import LaTeXRenderer from './LaTeXRenderer';
 
 // Helper component to render text with markdown-style formatting and LaTeX
 const FormattedTextPreview = ({ content }: { content: string }) => {
   if (!content) return <div className="text-slate-400">Preview will appear here...</div>;
   
   // Split by LaTeX first to preserve equations
-  const parts = content.split(/(\$\$[\s\S]*?\$\$|\$[^\$]+?\$)/);
+  const parts = content.split(/(\$\$[\s\S]*?\$\$|\$[^$]+?\$)/);
   
   return (
     <div className="prose prose-sm max-w-none">
@@ -24,7 +24,7 @@ const FormattedTextPreview = ({ content }: { content: string }) => {
         formatted = formatted.replace(/\*\*(.*?)\*\*/g, '___BOLD_START___$1___BOLD_END___');
         
         // Replace *italic* with <em> (now safe since bold is replaced)
-        formatted = formatted.replace(/\*([^\*]+?)\*/g, '<em>$1</em>');
+        formatted = formatted.replace(/\*([^*]+?)\*/g, '<em>$1</em>');
         
         // Replace bold placeholders with actual tags
         formatted = formatted.replace(/___BOLD_START___/g, '<strong>');
@@ -38,8 +38,8 @@ const FormattedTextPreview = ({ content }: { content: string }) => {
             return { type: 'ol', content: line.replace(/^(\d+)\.\s(.*)$/, '<li>$2</li>') };
           }
           // Unordered list (• item or - item format)
-          if (/^[•\-]\s/.test(line)) {
-            return { type: 'ul', content: line.replace(/^[•\-]\s(.*)$/, '<li>$1</li>') };
+          if (/^[•-]\s/.test(line)) {
+            return { type: 'ul', content: line.replace(/^[•-]\s(.*)$/, '<li>$1</li>') };
           }
           return { type: 'text', content: line };
         });

@@ -42,18 +42,18 @@ export default function ExamSchedulingModal({ isOpen, onClose, examId, examTitle
       loadTimezones();
       loadExamScheduleInfo();
     }
-  }, [isOpen, examId]);
+  }, [isOpen, examId, loadTimezones, loadExamScheduleInfo]);
 
-  const loadTimezones = async () => {
+  const loadTimezones = React.useCallback(async () => {
     try {
       const response = await api.get('/exams/timezones/');
       setTimezones(response.data);
     } catch (error) {
       console.error('Error loading timezones:', error);
     }
-  };
+  }, []);
 
-  const loadExamScheduleInfo = async () => {
+  const loadExamScheduleInfo = React.useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get(`/exams/${examId}/schedule-info/`);
@@ -79,7 +79,7 @@ export default function ExamSchedulingModal({ isOpen, onClose, examId, examTitle
     } finally {
       setLoading(false);
     }
-  };
+  }, [examId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,15 +110,18 @@ export default function ExamSchedulingModal({ isOpen, onClose, examId, examTitle
       
       onScheduleUpdate?.();
       onClose();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating exam schedule:', error);
-      setError(error.response?.data?.error || 'Failed to update exam schedule');
+      const errorMessage = error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+        : undefined;
+      setError(errorMessage || 'Failed to update exam schedule');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = (field: string, value: string | number | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value

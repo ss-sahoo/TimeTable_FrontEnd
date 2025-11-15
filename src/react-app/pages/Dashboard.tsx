@@ -514,9 +514,9 @@ export default function Dashboard() {
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm">
         <div className="p-5 border-b border-slate-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">Recent Exam Attempts</h2>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">Recent Results</h2>
             <Link
-              to="/exam-attempts"
+              to="/results"
               className="text-sm text-blue-600 hover:text-blue-700 font-medium"
             >
               View All

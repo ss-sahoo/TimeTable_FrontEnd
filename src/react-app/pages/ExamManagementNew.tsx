@@ -39,8 +39,15 @@ interface Exam {
   passing_marks: number;
   total_questions: number;
   total_marks: number;
+  questions_added: number;
+  questions_required: number;
+  questions_remaining: number;
+  question_completion_percent: number;
+  is_question_complete: boolean;
   created_at: string;
   updated_at: string;
+  share_url?: string | null;
+  public_access_token?: string | null;
   pattern: {
     id: number;
     name: string;
@@ -66,10 +73,21 @@ export default function ExamManagement() {
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [shareExam, setShareExam] = useState<Exam | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const dropdownRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
+  const copyFeedbackTimeout = useRef<number | null>(null);
 
   useEffect(() => {
     fetchExams();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (copyFeedbackTimeout.current) {
+        window.clearTimeout(copyFeedbackTimeout.current);
+      }
+    };
   }, []);
 
   // Close dropdown when clicking outside
@@ -118,6 +136,56 @@ export default function ExamManagement() {
       alert('Failed to delete exam. Please try again.');
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const getExamLink = (exam: Exam) => {
+    if (!exam.is_question_complete) {
+      return '';
+    }
+    return (
+      exam.share_url ||
+      (exam.public_access_token ? `${window.location.origin}/public-exam/${exam.public_access_token}` : '')
+    );
+  };
+
+  const handleCopyExamLink = async (exam: Exam) => {
+    if (!exam.is_question_complete) {
+      setCopyFeedback('Add all required questions before sharing this exam.');
+      if (copyFeedbackTimeout.current) {
+        window.clearTimeout(copyFeedbackTimeout.current);
+      }
+      copyFeedbackTimeout.current = window.setTimeout(() => setCopyFeedback(null), 2500);
+      return false;
+    }
+
+    const link = getExamLink(exam);
+
+    if (!link) {
+      setCopyFeedback('Public link is not available yet for this exam.');
+      if (copyFeedbackTimeout.current) {
+        window.clearTimeout(copyFeedbackTimeout.current);
+      }
+      copyFeedbackTimeout.current = window.setTimeout(() => setCopyFeedback(null), 2500);
+      return false;
+    }
+
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopyFeedback('Public exam link copied to clipboard.');
+      if (copyFeedbackTimeout.current) {
+        window.clearTimeout(copyFeedbackTimeout.current);
+      }
+      copyFeedbackTimeout.current = window.setTimeout(() => setCopyFeedback(null), 2500);
+      return true;
+    } catch (error) {
+      console.error('Failed to copy link:', error);
+      setCopyFeedback('Failed to copy link. Please try again.');
+      if (copyFeedbackTimeout.current) {
+        window.clearTimeout(copyFeedbackTimeout.current);
+      }
+      copyFeedbackTimeout.current = window.setTimeout(() => setCopyFeedback(null), 2500);
+      return false;
     }
   };
 
@@ -283,9 +351,29 @@ export default function ExamManagement() {
           </select>
         </div>
 
+        {copyFeedback && (
+          <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 text-white text-sm px-4 py-2 shadow-lg">
+            {copyFeedback}
+          </div>
+        )}
+
         {/* Exams Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {filteredExams.map((exam) => (
+          {filteredExams.map((exam) => {
+            const requiredQuestions = exam.questions_required || exam.total_questions || 0;
+            const addedQuestions = Math.max(0, exam.questions_added || 0);
+            const effectiveAdded = requiredQuestions > 0 ? Math.min(addedQuestions, requiredQuestions) : addedQuestions;
+            const percent =
+              requiredQuestions > 0
+                ? Math.min(
+                    100,
+                    Math.max(0, Math.round((effectiveAdded / requiredQuestions) * 100)),
+                  )
+                : 0;
+
+            const canShareExam = exam.is_question_complete && !!getExamLink(exam);
+
+            return (
             <div key={exam.id} className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-lg hover:border-slate-300 transition-all duration-200">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1 min-w-0">
@@ -299,6 +387,29 @@ export default function ExamManagement() {
                   {getStatusIcon(exam.status)}
                   {exam.status.charAt(0).toUpperCase() + exam.status.slice(1)}
                 </span>
+                {!exam.is_question_complete && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-lg bg-amber-100 text-amber-700 border border-amber-200">
+                    <AlertCircle className="w-3 h-3" />
+                    {`${effectiveAdded}/${requiredQuestions} questions`}
+                  </span>
+                )}
+              </div>
+
+              <div className="mb-4">
+                <div className="flex items-center justify-between text-[11px] text-slate-600 mb-1">
+                  <span>Question completion</span>
+                <span className="font-medium text-slate-900">
+                  {percent}%
+                </span>
+                </div>
+                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full ${exam.is_question_complete ? 'bg-green-500' : 'bg-blue-500'} transition-all`}
+                  style={{
+                    width: `${percent}%`,
+                  }}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2.5 mb-5">
@@ -321,7 +432,9 @@ export default function ExamManagement() {
                     <BookOpen className="w-4 h-4" />
                     <span className="text-xs">Questions</span>
                   </div>
-                  <span className="text-xs font-medium text-slate-900">{exam.total_questions}</span>
+                  <span className="text-xs font-medium text-slate-900">
+                    {effectiveAdded}/{requiredQuestions}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2 text-slate-600">
@@ -331,7 +444,6 @@ export default function ExamManagement() {
                   <span className="text-xs font-medium text-slate-900">{exam.total_marks}</span>
                 </div>
               </div>
-
               <div className="flex items-center gap-2 pt-4 border-t border-slate-100">
                 <Link
                   to={`/exams/${exam.id}`}
@@ -364,6 +476,31 @@ export default function ExamManagement() {
                   {openDropdown === exam.id && (
                     <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-10">
                       <div className="py-1">
+                        {canShareExam && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setShareExam(exam);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 flex items-center gap-2"
+                            >
+                              <Share2 className="w-4 h-4" />
+                              View Public Link
+                            </button>
+                            <button
+                              onClick={async () => {
+                                setOpenDropdown(null);
+                                await handleCopyExamLink(exam);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 flex items-center gap-2"
+                            >
+                              <Copy className="w-4 h-4" />
+                              Copy Public Link
+                            </button>
+                            <div className="border-t border-slate-100 my-1"></div>
+                          </>
+                        )}
                         <button
                           onClick={() => {
                             setDeleteConfirm(exam.id);
@@ -379,8 +516,10 @@ export default function ExamManagement() {
                   )}
                 </div>
               </div>
+
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {filteredExams.length === 0 && (
@@ -406,6 +545,50 @@ export default function ExamManagement() {
           </div>
         )}
       </div>
+
+      {/* Share Link Modal */}
+      {shareExam && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                <Share2 className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Share Exam Link</h3>
+                <p className="text-sm text-slate-600">Copy and share this link with students.</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4">
+              {getExamLink(shareExam) ? (
+                <p className="text-xs font-mono text-slate-800 break-all">{getExamLink(shareExam)}</p>
+              ) : (
+                <p className="text-xs text-slate-600">Public link not available for this exam yet.</p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={() => setShareExam(null)}
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={async () => {
+                  await handleCopyExamLink(shareExam);
+                }}
+                disabled={!getExamLink(shareExam)}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                <Copy className="w-4 h-4" />
+                Copy Link
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (

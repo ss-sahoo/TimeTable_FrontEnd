@@ -90,11 +90,23 @@ export default function PatternCreation() {
     }
   }, [id, isEditing]);
 
+  const normaliseSections = (sections: PatternSection[]): PatternSection[] =>
+    sections.map(section => {
+      const total = section.end_question - section.start_question + 1;
+      return {
+        ...section,
+        min_questions_to_attempt: Math.max(total, 1),
+      };
+    });
+
   const fetchPattern = async (patternId: string) => {
     try {
       setLoading(true);
       const response = await api.get(`/patterns/patterns/${patternId}/`);
-      setPattern(response.data);
+      setPattern({
+        ...response.data,
+        sections: normaliseSections(response.data.sections || []),
+      });
       setNextSectionOrder(response.data.sections.length + 1);
     } catch (error) {
       console.error('Failed to fetch pattern:', error);
@@ -136,7 +148,7 @@ export default function PatternCreation() {
       end_question: 1,
       marks_per_question: 1,
       negative_marking: 1.0,
-      min_questions_to_attempt: 5,
+      min_questions_to_attempt: 1,
       is_compulsory: true,
       order: nextSectionOrder,
     };
@@ -149,12 +161,37 @@ export default function PatternCreation() {
   };
 
   const updateSection = (index: number, field: keyof PatternSection, value: any) => {
-    setPattern(prev => ({
-      ...prev,
-      sections: prev.sections.map((section, i) =>
-        i === index ? { ...section, [field]: value } : section
-      ),
-    }));
+    setPattern(prev => {
+      const updatedSections = prev.sections.map((section, i) => {
+        if (i !== index) return section;
+
+        let updatedSection: PatternSection = { ...section, [field]: value };
+
+        if (field === 'start_question' || field === 'end_question') {
+          const startRaw = field === 'start_question' ? value : updatedSection.start_question;
+          const endRaw = field === 'end_question' ? value : updatedSection.end_question;
+          const start =
+            typeof startRaw === 'number' ? startRaw : parseInt(String(startRaw), 10);
+          const end =
+            typeof endRaw === 'number' ? endRaw : parseInt(String(endRaw), 10);
+
+          if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+            const total = (end - start) + 1;
+            updatedSection = {
+              ...updatedSection,
+              min_questions_to_attempt: Math.max(total, 1),
+            };
+          }
+        }
+
+        return updatedSection;
+      });
+
+      return {
+        ...prev,
+        sections: updatedSections,
+      };
+    });
 
     // Clear section error
     if (sectionErrors[index]?.[field]) {
@@ -678,13 +715,8 @@ export default function PatternCreation() {
                                 <input
                                   type="number"
                                   value={section.min_questions_to_attempt}
-                                  onChange={(e) => updateSection(
-                                    globalIndex,
-                                    'min_questions_to_attempt',
-                                    parseInt(e.target.value) || 0
-                                  )}
-                                  className="w-full px-2 py-1 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors"
-                                  min="0"
+                                  className="w-full px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 text-slate-500"
+                                  readOnly
                                 />
                               </div>
                             </div>

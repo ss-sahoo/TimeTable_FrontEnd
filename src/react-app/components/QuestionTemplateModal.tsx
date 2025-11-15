@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/react-app/hooks/useApi';
-import { Search, Filter, Star, Clock, BookOpen, Zap } from 'lucide-react';
+import { Search, Star, Clock, BookOpen, Zap } from 'lucide-react';
 
 interface QuestionTemplate {
   id: number;
@@ -53,13 +53,13 @@ export default function QuestionTemplateModal({ isOpen, onClose, onSelectTemplat
       loadTemplates();
       loadCategories();
     }
-  }, [isOpen]);
+  }, [isOpen, loadTemplates, loadCategories]);
 
   useEffect(() => {
     if (isOpen) {
       loadTemplates();
     }
-  }, [searchTerm, selectedCategory, selectedType, selectedDifficulty]);
+  }, [isOpen, searchTerm, selectedCategory, selectedType, selectedDifficulty, loadTemplates]);
 
   const loadTemplates = async () => {
     setLoading(true);
@@ -77,16 +77,16 @@ export default function QuestionTemplateModal({ isOpen, onClose, onSelectTemplat
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, selectedCategory, selectedType, selectedDifficulty]);
 
-  const loadCategories = async () => {
+  const loadCategories = React.useCallback(async () => {
     try {
       const response = await api.get('/questions/templates/categories/');
       setCategories(response.data);
     } catch (error) {
       console.error('Error loading categories:', error);
     }
-  };
+  }, []);
 
   const getCategoryColor = (category: string) => {
     const colors = {

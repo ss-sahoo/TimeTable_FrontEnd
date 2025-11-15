@@ -579,9 +579,9 @@ const ExamAnalytics: React.FC = () => {
               <div className="p-6 border-b border-slate-200/60">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xl font-bold text-slate-900">All Exam Attempts</h3>
+                    <h3 className="text-xl font-bold text-slate-900">All Exam Results</h3>
                     <p className="text-sm text-slate-600 mt-1">
-                      {filteredAndSortedAttempts.length} of {allAttempts.length} attempts
+                      {filteredAndSortedAttempts.length} of {allAttempts.length} results
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

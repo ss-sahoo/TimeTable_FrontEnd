@@ -27,22 +27,13 @@ import StudentAnalyticsOverview from "@/react-app/pages/StudentAnalyticsOverview
 import StudentExamList from "@/react-app/pages/StudentExamList";
 import ExamAccess from "@/react-app/pages/ExamAccess";
 import ExamSetup from "@/react-app/pages/ExamSetup";
-import SecureExamView from "@/react-app/pages/SecureExamView";
+import SecureExamExperience from "@/react-app/pages/SecureExamExperience";
 import ExamResults from "@/react-app/pages/ExamResults";
 import ExamResultsByExamId from "@/react-app/pages/ExamResultsByExamId";
 import TestResults from "@/react-app/pages/TestResults";
-import ThemeTest from "@/react-app/components/ThemeTest";
-import PredictiveAnalytics from "@/react-app/components/PredictiveAnalytics";
-import AIProctoringDashboard from "@/react-app/components/AIProctoringDashboard";
-import ComparativeAnalysis from "@/react-app/components/ComparativeAnalysis";
-import TrendAnalysis from "@/react-app/components/TrendAnalysis";
-import ChatSupport from "@/react-app/components/ChatSupport";
-import AccessibilitySettings from "@/react-app/components/AccessibilitySettings";
-import BulkImportModal from "@/react-app/components/BulkImportModal";
-import ExamInvitationModal from "@/react-app/components/ExamInvitationModal";
 import ViolationDashboard from "@/react-app/pages/ViolationDashboard";
 import ExamAnalytics from "@/react-app/pages/ExamAnalytics";
-import ExamAttempts from "@/react-app/pages/ExamAttempts";
+import Results from "@/react-app/pages/Results";
 import ExamReview from "@/react-app/pages/ExamReview";
 import ExamResultsAnalyticsEnhanced from "@/react-app/pages/ExamResultsAnalyticsEnhanced";
 import PublicExamAccess from "@/react-app/pages/PublicExamAccess";
@@ -178,7 +169,7 @@ function AppRoutes() {
       <Route path="/onboarding" element={<Onboarding />} />
       
       {/* Public Exam Access Route */}
-      <Route path="/public-exam/:examId" element={<PublicExamAccess />} />
+      <Route path="/public-exam/:token" element={<PublicExamAccess />} />
 
       {/* Protected Routes */}
       <Route path="/dashboard" element={
@@ -267,13 +258,13 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
           <Route path="/exam-setup/:examId" element={
-            <ProtectedRoute>
+            <FullscreenProtectedRoute>
               <ExamSetup />
-            </ProtectedRoute>
+            </FullscreenProtectedRoute>
           } />
           <Route path="/secure-exam/:attemptId" element={
             <FullscreenProtectedRoute>
-              <SecureExamView />
+              <SecureExamExperience />
             </FullscreenProtectedRoute>
           } />
           <Route path="/exam-results/:attemptId" element={
@@ -297,9 +288,15 @@ function AppRoutes() {
               <ExamReview />
             </ProtectedRoute>
           } />
+          <Route path="/results" element={
+            <ProtectedRoute>
+              <Results />
+            </ProtectedRoute>
+          } />
+          {/* Legacy route redirect */}
           <Route path="/exam-attempts" element={
             <ProtectedRoute>
-              <ExamAttempts />
+              <Results />
             </ProtectedRoute>
           } />
           <Route path="/violation-dashboard" element={
@@ -348,6 +345,11 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
           <Route path="/questions/create-enhanced" element={
+            <ProtectedRoute>
+              <QuestionCreationEnhanced />
+            </ProtectedRoute>
+          } />
+          <Route path="/pattern/:patternId/question/:subjectSlug/:questionNumber" element={
             <ProtectedRoute>
               <QuestionCreationEnhanced />
             </ProtectedRoute>

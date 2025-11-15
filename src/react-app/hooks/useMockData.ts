@@ -226,7 +226,7 @@ const mockQuestions: Record<string, Question> = {
 };
 
 // Generic mock API hook
-export function useMockApi<T>(url: string, dependencies: any[] = []) {
+export function useMockApi<T>(url: string) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -240,7 +240,7 @@ export function useMockApi<T>(url: string, dependencies: any[] = []) {
     // Simulate API delay
     setTimeout(() => {
       try {
-        let result: any = null;
+        let result: T | null = null;
         
         if (url.includes('/api/exams') && !url.includes('/subjects') && !url.includes('/questions')) {
           const status = url.includes('status=prepared') ? 'prepared' : 'preparing';
@@ -265,8 +265,10 @@ export function useMockApi<T>(url: string, dependencies: any[] = []) {
           if (result?.options) {
             try {
               result = { ...result, options: JSON.parse(result.options) };
-            } catch (e) {
-              result.options = null;
+            } catch {
+              if (result) {
+                result = { ...result, options: null };
+              }
             }
           }
         }

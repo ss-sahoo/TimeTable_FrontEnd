@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Shield, AlertTriangle, Eye, EyeOff, BarChart3, 
   Users, Clock, CheckCircle, XCircle, Loader2, 
-  RefreshCw, Settings, TrendingUp, TrendingDown,
+  RefreshCw, Settings,
   MousePointer, Keyboard, Monitor, Wifi
 } from 'lucide-react';
 import { api } from '@/react-app/hooks/useApi';
@@ -41,7 +41,7 @@ interface Violation {
   description: string;
   severity: 'low' | 'medium' | 'high';
   confidence: number;
-  details: any;
+  details: Record<string, unknown>;
   detected_at: string;
 }
 
@@ -57,7 +57,7 @@ const AIProctoringDashboard: React.FC<AIProctoringDashboardProps> = ({ examId, e
 
   useEffect(() => {
     loadProctoringData();
-  }, [examId]);
+  }, [examId, loadProctoringData]);
 
   const loadProctoringData = async () => {
     try {
@@ -76,12 +76,15 @@ const AIProctoringDashboard: React.FC<AIProctoringDashboardProps> = ({ examId, e
       const violationsResponse = await api.get(`/exams/${examId}/violations/`);
       setViolations(violationsResponse.data.violations);
       
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load proctoring data');
+    } catch (err) {
+      const errorMessage = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+        : undefined;
+      setError(errorMessage || 'Failed to load proctoring data');
     } finally {
       setLoading(false);
     }
-  };
+  }, [examId]);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -176,7 +179,7 @@ const AIProctoringDashboard: React.FC<AIProctoringDashboardProps> = ({ examId, e
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id as 'overview' | 'violations' | 'high-risk' | 'settings')}
             className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === tab.id
                 ? 'bg-white text-blue-600 shadow-sm'

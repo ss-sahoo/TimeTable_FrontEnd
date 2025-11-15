@@ -104,11 +104,26 @@ export default function PatternCreation() {
     }
   }, [id, isEditing]);
 
+  const normaliseSections = (sections: PatternSection[]): PatternSection[] =>
+    sections.map(section => {
+      const startQ = typeof section.start_question === 'string' ? parseInt(section.start_question) || 0 : section.start_question;
+      const endQ = typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question;
+      const total = endQ - startQ + 1;
+
+      return {
+        ...section,
+        min_questions_to_attempt: Math.max(total, 1),
+      };
+    });
+
   const fetchPattern = async (patternId: string) => {
     try {
       setLoading(true);
       const response = await api.get(`/patterns/patterns/${patternId}/`);
-      setPattern(response.data);
+      setPattern({
+        ...response.data,
+        sections: normaliseSections(response.data.sections || []),
+      });
       setNextSectionOrder(response.data.sections.length + 1);
     } catch (error) {
       console.error('Failed to fetch pattern:', error);
@@ -185,14 +200,17 @@ export default function PatternCreation() {
     }
   };
 
-  // Calculate next available question number GLOBALLY (across all subjects)
-  const getNextQuestionNumber = () => {
-    if (pattern.sections.length === 0) {
-      return 1; // First section starts from question 1
+  // Calculate next available question number WITHIN A SPECIFIC SUBJECT
+  const getNextQuestionNumberForSubject = (subjectName: string) => {
+    // Filter sections for this specific subject
+    const subjectSections = pattern.sections.filter(s => s.subject === subjectName);
+    
+    if (subjectSections.length === 0) {
+      return 1; // First section of this subject starts from question 1
     }
     
-    // Find the highest end_question number across ALL sections (all subjects)
-    const maxEndQuestion = Math.max(...pattern.sections.map(section => 
+    // Find the highest end_question number within THIS SUBJECT only
+    const maxEndQuestion = Math.max(...subjectSections.map(section => 
       typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question
     ));
     return maxEndQuestion + 1;
@@ -296,9 +314,10 @@ export default function PatternCreation() {
   };
 
   const addSectionToSubject = (subjectName: string) => {
-    // Use GLOBAL question numbering (continues across all subjects)
-    const nextStartQuestion = getNextQuestionNumber();
+    // Use SUBJECT-SPECIFIC question numbering (each subject starts from 1)
+    const nextStartQuestion = getNextQuestionNumberForSubject(subjectName);
     const suggestedEndQuestion = getSuggestedEndQuestion(nextStartQuestion, 5);
+    const totalQuestions = suggestedEndQuestion - nextStartQuestion + 1;
     
     const defaultMarkingScheme: MarkingScheme = {
       max_marks: 4,  // Default to 4 marks per question
@@ -316,11 +335,10 @@ export default function PatternCreation() {
       question_type: 'Single Correct MCQ',
       start_question: nextStartQuestion,
       end_question: suggestedEndQuestion,
-      min_questions_to_attempt: 5,
+      min_questions_to_attempt: Math.max(totalQuestions, 1),
       is_compulsory: true,
       order: nextSectionOrder,
       marking_scheme: defaultMarkingScheme,
-      id: `section-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Add unique ID
     };
 
     setPattern(prev => ({
@@ -394,26 +412,53 @@ export default function PatternCreation() {
   const updateSection = (index: number, field: keyof PatternSection, value: any) => {
     setPattern(prev => {
       const updatedSections = [...prev.sections];
-      updatedSections[index] = { ...updatedSections[index], [field]: value };
+      let currentSection = { ...updatedSections[index], [field]: value };
+
+      if (field === 'start_question' || field === 'end_question') {
+        const startRaw = currentSection.start_question;
+        const endRaw = currentSection.end_question;
+        const startQ = typeof startRaw === 'number' ? startRaw : parseInt(String(startRaw), 10);
+        const endQ = typeof endRaw === 'number' ? endRaw : parseInt(String(endRaw), 10);
+
+        if (Number.isFinite(startQ) && Number.isFinite(endQ) && endQ >= startQ) {
+          currentSection = {
+            ...currentSection,
+            min_questions_to_attempt: Math.max(endQ - startQ + 1, 1),
+          };
+        }
+      }
+
+      updatedSections[index] = currentSection;
       
       // Auto-update subsequent sections' start_question when end_question changes
+      // Only update sections within the same subject
       if (field === 'end_question') {
+        const currentSubject = currentSection.subject;
         let currentEndQuestion = typeof value === 'string' ? parseInt(value) || 0 : value;
+        
         for (let i = index + 1; i < updatedSections.length; i++) {
+          // Skip sections from different subjects
+          if (updatedSections[i].subject !== currentSubject) {
+            continue;
+          }
+          
           const nextStartQuestion = currentEndQuestion + 1;
           updatedSections[i] = { 
             ...updatedSections[i], 
             start_question: nextStartQuestion 
           };
           // Update end_question to maintain the same number of questions
-          const currentStartQ = typeof updatedSections[i].start_question === 'string' ? parseInt(updatedSections[i].start_question) || 0 : updatedSections[i].start_question;
-          const currentEndQ = typeof updatedSections[i].end_question === 'string' ? parseInt(updatedSections[i].end_question) || 0 : updatedSections[i].end_question;
-          const questionsInSection = currentEndQ - currentStartQ + 1;
+          const currentStartQ = typeof updatedSections[i].start_question === 'string' ? parseInt(updatedSections[i].start_question as string) || 0 : updatedSections[i].start_question;
+          const currentEndQ = typeof updatedSections[i].end_question === 'string' ? parseInt(updatedSections[i].end_question as string) || 0 : updatedSections[i].end_question;
+          const questionsInSection = (currentEndQ as number) - (currentStartQ as number) + 1;
+          const newEndQuestion = nextStartQuestion + questionsInSection - 1;
+          const totalInSection = Math.max(newEndQuestion - nextStartQuestion + 1, 1);
           updatedSections[i] = { 
             ...updatedSections[i], 
-            end_question: nextStartQuestion + questionsInSection - 1 
+            end_question: newEndQuestion,
+            min_questions_to_attempt: totalInSection,
           };
-          currentEndQuestion = nextStartQuestion + questionsInSection - 1;
+          currentEndQuestion = newEndQuestion;
         }
       }
       
@@ -532,31 +577,37 @@ export default function PatternCreation() {
         sectionError.start_question = 'Start question must be less than end question';
       }
 
-      // Check for overlapping question ranges GLOBALLY (across all sections)
+      // Check for overlapping question ranges WITHIN THE SAME SUBJECT only
       pattern.sections.forEach((otherSection, otherIndex) => {
         if (otherIndex === index) return; // Skip self
+        if (otherSection.subject !== section.subject) return; // Skip different subjects
         
         const otherStartQ = typeof otherSection.start_question === 'string' ? parseInt(otherSection.start_question) || 0 : otherSection.start_question;
         const otherEndQ = typeof otherSection.end_question === 'string' ? parseInt(otherSection.end_question) || 0 : otherSection.end_question;
         
-        // Check for overlap
+        // Check for overlap within the same subject
         if ((startQ >= otherStartQ && startQ <= otherEndQ) || (endQ >= otherStartQ && endQ <= otherEndQ)) {
-          sectionError.start_question = `Questions ${startQ}-${endQ} overlap with another section`;
+          sectionError.start_question = `Questions ${startQ}-${endQ} overlap with another section in ${section.subject}`;
         }
       });
 
-      // Validate GLOBAL sequential numbering
-      if (index > 0) {
-        const prevSection = pattern.sections[index - 1];
-        const prevEndQ = typeof prevSection.end_question === 'string' ? parseInt(prevSection.end_question) || 0 : prevSection.end_question;
+      // Validate SUBJECT-WISE sequential numbering
+      // Find previous section in the same subject
+      const subjectSections = pattern.sections.filter(s => s.subject === section.subject);
+      const indexInSubject = subjectSections.findIndex(s => s === section);
+      
+      if (indexInSubject > 0) {
+        // Not the first section in this subject - should continue from previous section
+        const prevSectionInSubject = subjectSections[indexInSubject - 1];
+        const prevEndQ = typeof prevSectionInSubject.end_question === 'string' ? parseInt(prevSectionInSubject.end_question) || 0 : prevSectionInSubject.end_question;
         
         if (startQ !== prevEndQ + 1) {
-          sectionError.start_question = `Should start from ${prevEndQ + 1} (previous section ended at ${prevEndQ})`;
+          sectionError.start_question = `Should start from ${prevEndQ + 1} (previous ${section.subject} section ended at ${prevEndQ})`;
         }
       } else {
-        // Very first section should start from 1
+        // First section in this subject - should start from 1
         if (startQ !== 1) {
-          sectionError.start_question = `First section should start from question 1`;
+          sectionError.start_question = `First section of ${section.subject} should start from question 1`;
         }
       }
 
@@ -1024,7 +1075,7 @@ export default function PatternCreation() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Pattern Structure</h2>
-                  <p className="text-xs text-slate-600">Organize sections by subject • Questions auto-numbered sequentially</p>
+                  <p className="text-xs text-slate-600">Organize sections by subject • Each subject starts from Question 1</p>
                 </div>
               </div>
 
@@ -1113,6 +1164,13 @@ export default function PatternCreation() {
                           <span className="text-xs text-slate-500">
                             ({subjectGroup.sections.length} sections)
                           </span>
+                          {subjectGroup.sections.length > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                              <Hash className="w-3 h-3" />
+                              Q{Math.min(...subjectGroup.sections.map(s => typeof s.start_question === 'string' ? parseInt(s.start_question) || 1 : s.start_question))}-
+                              {Math.max(...subjectGroup.sections.map(s => typeof s.end_question === 'string' ? parseInt(s.end_question) || 1 : s.end_question))}
+                            </span>
+                          )}
                         </div>
                         <button
                           onClick={() => addSectionToSubject(subjectGroup.name)}
@@ -1244,11 +1302,8 @@ export default function PatternCreation() {
                                 <input
                                   type="number"
                                   value={section.min_questions_to_attempt}
-                                  onChange={(e) => updateSection(globalIndex, 'min_questions_to_attempt', e.target.value === '' ? '' : parseInt(e.target.value) || '')}
-                                  className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                                    sectionErrors[globalIndex]?.min_questions_to_attempt ? 'border-red-300' : 'border-slate-300'
-                                  }`}
-                                  min="0"
+                                  className="w-full px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 text-slate-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  readOnly
                                 />
                                 {sectionErrors[globalIndex]?.min_questions_to_attempt && (
                                   <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
@@ -1281,10 +1336,10 @@ export default function PatternCreation() {
                                   const endQ = typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question;
                                   return endQ - startQ + 1;
                                 })()} questions</span>
-                                {globalIndex === 0 && (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                                {sectionIndex === 0 && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs" title="Each subject starts from question 1">
                                     <Zap className="w-3 h-3" />
-                                    Auto-numbered
+                                    Subject Q1
                                   </span>
                                 )}
                               </div>

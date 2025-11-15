@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Brain, TrendingUp, TrendingDown, AlertTriangle, 
-  Target, BarChart3, Users, Clock, CheckCircle, 
-  XCircle, Loader2, RefreshCw, Eye, EyeOff 
+  Brain, AlertTriangle, 
+  Target, BarChart3, CheckCircle, 
+  XCircle, Loader2, RefreshCw
 } from 'lucide-react';
 import { api } from '@/react-app/hooks/useApi';
 
@@ -83,7 +83,7 @@ const PredictiveAnalytics: React.FC<PredictiveAnalyticsProps> = ({ examId, examT
 
   useEffect(() => {
     loadInsights();
-  }, [examId]);
+  }, [examId, loadInsights]);
 
   const loadInsights = async () => {
     try {
@@ -91,12 +91,15 @@ const PredictiveAnalytics: React.FC<PredictiveAnalyticsProps> = ({ examId, examT
       setError(null);
       const response = await api.get(`/exams/${examId}/performance-insights/`);
       setInsights(response.data);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load predictive analytics');
+    } catch (err) {
+      const errorMessage = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+        : undefined;
+      setError(errorMessage || 'Failed to load predictive analytics');
     } finally {
       setLoading(false);
     }
-  };
+  }, [examId]);
 
   const getRiskColor = (riskLevel: string) => {
     switch (riskLevel) {
@@ -111,12 +114,7 @@ const PredictiveAnalytics: React.FC<PredictiveAnalyticsProps> = ({ examId, examT
     }
   };
 
-  const getGradeColor = (grade: string) => {
-    if (grade.startsWith('A')) return 'text-green-600';
-    if (grade.startsWith('B')) return 'text-blue-600';
-    if (grade.startsWith('C')) return 'text-yellow-600';
-    return 'text-red-600';
-  };
+  // Removed unused getGradeColor function
 
   if (loading) {
     return (

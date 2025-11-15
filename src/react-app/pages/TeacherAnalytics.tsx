@@ -331,7 +331,7 @@ export default function TeacherAnalytics() {
         {/* Recent Attempts */}
         <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm">
           <div className="p-5 border-b border-slate-200 dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">Recent Exam Attempts</h2>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">Recent Results</h2>
           </div>
           <div className="p-5">
             {attempts?.length === 0 ? (

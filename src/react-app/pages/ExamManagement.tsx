@@ -139,8 +139,9 @@ export default function ExamManagement() {
       try {
         await api.delete(`/exams/exams/${examId}/`);
         setExams(exams.filter(exam => exam.id !== examId));
-      } catch (err: any) {
-        alert('Failed to delete exam: ' + (err.message || 'Unknown error'));
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        alert('Failed to delete exam: ' + errorMessage);
       }
     }
   };

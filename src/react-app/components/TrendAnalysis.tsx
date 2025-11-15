@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, TrendingDown, BarChart3, LineChart, 
-  Calendar, Filter, Download, RefreshCw, 
+  Calendar, RefreshCw, 
   Target, Users, Clock, Award, AlertTriangle,
   ChevronDown, ChevronUp
 } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
 
 interface TrendData {
   period: string;
@@ -37,7 +36,7 @@ const TrendAnalysis: React.FC<TrendAnalysisProps> = ({
 
   useEffect(() => {
     loadTrendData();
-  }, [timeRange]);
+  }, [timeRange, loadTrendData]);
 
   const loadTrendData = async () => {
     try {
@@ -47,12 +46,15 @@ const TrendAnalysis: React.FC<TrendAnalysisProps> = ({
       // Mock trend data - in real implementation, this would come from API
       const mockData: TrendData[] = generateMockTrendData(timeRange);
       setTrendData(mockData);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load trend data');
+    } catch (err) {
+      const errorMessage = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+        : undefined;
+      setError(errorMessage || 'Failed to load trend data');
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange]);
 
   const generateMockTrendData = (range: string): TrendData[] => {
     const periods = range === 'week' ? 7 : range === 'month' ? 30 : range === 'quarter' ? 12 : 12;
@@ -177,7 +179,7 @@ const TrendAnalysis: React.FC<TrendAnalysisProps> = ({
         {['week', 'month', 'quarter', 'year'].map((range) => (
           <button
             key={range}
-            onClick={() => onTimeRangeChange(range as any)}
+            onClick={() => onTimeRangeChange(range as 'week' | 'month' | 'quarter' | 'year')}
             className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
               timeRange === range
                 ? 'bg-blue-600 text-white'
@@ -266,7 +268,7 @@ const TrendAnalysis: React.FC<TrendAnalysisProps> = ({
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id as 'overview' | 'performance' | 'engagement' | 'insights')}
             className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === tab.id
                 ? 'bg-white text-blue-600 shadow-sm'
@@ -291,7 +293,7 @@ const TrendAnalysis: React.FC<TrendAnalysisProps> = ({
                 {['score', 'attempts', 'pass_rate', 'time'].map((metric) => (
                   <button
                     key={metric}
-                    onClick={() => setSelectedMetric(metric as any)}
+                    onClick={() => setSelectedMetric(metric as 'score' | 'attempts' | 'pass_rate' | 'time')}
                     className={`px-3 py-1 rounded-md text-sm ${
                       selectedMetric === metric
                         ? 'bg-blue-600 text-white'

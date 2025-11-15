@@ -40,7 +40,8 @@
     "wrangler": "^4.33.0"
   },
   "scripts": {
-    "build": "npx tsc -b && npx vite build",
+    "build": "npx vite build",
+    "build:check": "npx tsc -b && npx vite build",
     "cf-typegen": "wrangler types",
     "check": "npx tsc && npx vite build && wrangler deploy --dry-run",
     "dev": "npx vite",

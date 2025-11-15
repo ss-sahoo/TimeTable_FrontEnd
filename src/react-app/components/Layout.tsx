@@ -17,15 +17,7 @@ import {
   FileText,
   BarChart3,
   ChevronLeft,
-  ChevronRight,
-  Brain,
-  Eye,
-  TrendingUp,
-  MessageCircle,
-  Accessibility,
-  Upload,
-  Mail,
-  TestTube
+  ChevronRight
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -47,7 +39,6 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { user, logout } = useAuthContext();
-  const { actualTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -68,7 +59,7 @@ export default function Layout({ children }: LayoutProps) {
       // Teachers and admins see full navigation
       baseNavigation.push(
         { name: 'Exams', href: '/exams', icon: BookOpen },
-        { name: 'Exam Attempts', href: '/exam-attempts', icon: FileText },
+        { name: 'Results', href: '/results', icon: FileText },
         { name: 'Patterns', href: '/patterns', icon: Zap }
       );
 

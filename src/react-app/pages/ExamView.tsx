@@ -40,6 +40,13 @@ import {
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
 
+const slugifySubject = (subject: string) =>
+  subject
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
 interface PatternSection {
   id: number;
   name: string;
@@ -113,16 +120,17 @@ export default function ExamView() {
       
       // Fetch question stats for each section
       if (response.data.pattern?.sections) {
-        await fetchSectionStats(response.data.pattern.sections);
+        await fetchSectionStats(response.data.pattern.sections, response.data.id);
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch exam details');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch exam details';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchSectionStats = async (sections: PatternSection[]) => {
+  const fetchSectionStats = async (sections: PatternSection[], examId?: number) => {
     try {
       const stats: SectionQuestionStats[] = [];
       
@@ -130,7 +138,13 @@ export default function ExamView() {
         const totalNeeded = section.end_question - section.start_question + 1;
         
         // Fetch questions for this section
-        const response = await api.get(`/questions/questions/?pattern_section=${section.id}`);
+        const queryParams = new URLSearchParams({
+          pattern_section: String(section.id),
+        });
+        if (examId) {
+          queryParams.set('exam', String(examId));
+        }
+        const response = await api.get(`/questions/questions/?${queryParams.toString()}`);
         const totalAdded = response.data?.results?.length || response.data?.length || 0;
         
         stats.push({
@@ -248,297 +262,334 @@ export default function ExamView() {
     : 0;
 
   const totalQuestionsAdded = sectionStats.reduce((acc, stat) => acc + stat.total_added, 0);
+  const sortedSections = [...(exam.pattern.sections || [])].sort((a, b) => {
+    if (a.subject === b.subject) {
+      return a.start_question - b.start_question || a.id - b.id;
+    }
+    return a.start_question - b.start_question || a.id - b.id;
+  });
+  const orderedSubjects = [...new Set(sortedSections.map((s) => s.subject))];
+  const subjectGroups = orderedSubjects.map((subject) => {
+    let offset = 0;
+    const sections = sortedSections
+      .filter((section) => section.subject === subject)
+      .map((section) => {
+        const questionCount = section.end_question - section.start_question + 1;
+        const localStart = offset + 1;
+        const localEnd = localStart + questionCount - 1;
+        offset += questionCount;
+        return {
+          ...section,
+          questionCount,
+          localStart,
+          localEnd,
+        };
+      });
+
+    return {
+      subject,
+      slug: slugifySubject(subject),
+      sections,
+      totalQuestions: offset,
+    };
+  });
+
+  const sectionRows = subjectGroups.flatMap(({ subject, slug, sections }) =>
+    sections.map((section) => {
+      const stats = getSectionStats(section.id);
+      return {
+        subject,
+        slug,
+        section,
+        stats,
+        isComplete: stats.progress_percentage >= 100,
+      };
+    })
+  );
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="space-y-6">
-        {/* Enhanced Header */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-start gap-4">
+    <div className="min-h-screen bg-slate-50 p-5">
+      <div className="w-full space-y-5 text-slate-700 text-base">
+        {/* Header */}
+        <header className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
               <button
                 onClick={() => navigate('/exams')}
-                className="p-2 rounded-lg hover:bg-slate-100 transition-colors mt-1"
+                className="p-2 rounded-md hover:bg-slate-100 transition-colors"
+                aria-label="Back to exams"
               >
-                <ArrowLeft className="w-5 h-5 text-slate-600" />
+                <ArrowLeft className="w-4 h-4 text-slate-500" />
               </button>
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900 mb-2">{exam.title}</h1>
-                <p className="text-sm text-slate-600">{exam.description}</p>
+              <div className="min-w-0">
+                <h1 className="text-xl font-semibold text-slate-900 leading-tight truncate">{exam.title}</h1>
+                <p className="text-xs text-slate-500 mt-1 line-clamp-2">{exam.description || 'No description provided.'}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border ${getStatusColor(exam.status)}`}>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${getStatusColor(exam.status)}`}>
                 {getStatusIcon(exam.status)}
                 {exam.status.charAt(0).toUpperCase() + exam.status.slice(1)}
               </span>
               <Link
                 to={`/exams/${exam.id}/results-analytics`}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 font-medium text-sm shadow-lg hover:shadow-xl"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-purple-600 text-white hover:bg-purple-700 transition-colors"
               >
-                <FileText className="w-4 h-4" />
-                Results and Analytics
+                <FileText className="w-3.5 h-3.5" />
+                Analytics
               </Link>
               <Link
                 to={`/exams/${exam.id}/evaluation`}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200 font-medium text-sm shadow-lg hover:shadow-xl"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
               >
-                <BarChart3 className="w-4 h-4" />
+                <BarChart3 className="w-3.5 h-3.5" />
                 Evaluation
               </Link>
               <button
                 onClick={() => navigate(`/exams/${exam.id}/edit`)}
-                className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+                className="p-2 rounded-md hover:bg-slate-100 transition-colors"
                 title="Edit Exam"
               >
-                <Edit className="w-5 h-5 text-blue-600" />
+                <Edit className="w-4 h-4 text-blue-600" />
               </button>
             </div>
           </div>
+        </header>
 
-          {/* Quick Info Bar */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-blue-600" />
+        {/* Quick Stats */}
+        <section className="bg-white border border-slate-200 rounded-lg shadow-sm p-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-md bg-blue-100 flex items-center justify-center">
+                <Calendar className="w-4 h-4 text-blue-600" />
               </div>
               <div>
-                <p className="text-xs text-slate-600">Start Date</p>
-                <p className="text-sm font-semibold text-slate-900">{new Date(exam.start_date).toLocaleDateString()}</p>
+                <p className="text-[11px] uppercase tracking-wide text-slate-400">Start</p>
+                <p className="text-sm font-semibold text-slate-800">{formatDate(exam.start_date)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Clock className="w-5 h-5 text-purple-600" />
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-md bg-indigo-100 flex items-center justify-center">
+                <Clock className="w-4 h-4 text-indigo-600" />
               </div>
               <div>
-                <p className="text-xs text-slate-600">Duration</p>
-                <p className="text-sm font-semibold text-slate-900">{formatDuration(exam.duration_minutes)}</p>
+                <p className="text-[11px] uppercase tracking-wide text-slate-400">Duration</p>
+                <p className="text-sm font-semibold text-slate-800">{formatDuration(exam.duration_minutes)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <BookOpen className="w-5 h-5 text-green-600" />
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-md bg-green-100 flex items-center justify-center">
+                <BookOpen className="w-4 h-4 text-green-600" />
               </div>
               <div>
-                <p className="text-xs text-slate-600">Questions</p>
-                <p className="text-sm font-semibold text-slate-900">{exam.total_questions}</p>
+                <p className="text-[11px] uppercase tracking-wide text-slate-400">Questions</p>
+                <p className="text-sm font-semibold text-slate-800">{exam.total_questions}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                <Target className="w-5 h-5 text-orange-600" />
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-md bg-orange-100 flex items-center justify-center">
+                <Target className="w-4 h-4 text-orange-600" />
               </div>
               <div>
-                <p className="text-xs text-slate-600">Total Marks</p>
-                <p className="text-sm font-semibold text-slate-900">{exam.total_marks}</p>
+                <p className="text-[11px] uppercase tracking-wide text-slate-400">Marks</p>
+                <p className="text-sm font-semibold text-slate-800">{exam.total_marks}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-md bg-slate-100 flex items-center justify-center">
+                <Users className="w-4 h-4 text-slate-600" />
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-400">Attempts</p>
+                <p className="text-sm font-semibold text-slate-800">{exam.max_attempts}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-md bg-emerald-100 flex items-center justify-center">
+                <Globe className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-400">Timezone</p>
+                <p className="text-sm font-semibold text-slate-800">{exam.timezone || 'Default'}</p>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Pattern Overview - Minimalist */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-          <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-blue-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center shadow-md">
-                  <Zap className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-slate-900">{exam.pattern.name}</h2>
-                  <p className="text-xs text-slate-600">{totalQuestionsAdded} of {exam.total_questions} questions added • {overallProgress.toFixed(0)}% complete</p>
-                </div>
+        {/* Main Grid */}
+        <div className="grid grid-cols-12 gap-4">
+          {/* Sections Table */}
+          <section className="col-span-12 lg:col-span-8 bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">{exam.pattern.name}</h2>
+                <p className="text-xs text-slate-500">
+                  {totalQuestionsAdded} of {exam.total_questions} questions added · {overallProgress.toFixed(0)}% complete
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="text-right mr-3">
-                  <p className="text-xl font-bold text-blue-600">{overallProgress.toFixed(0)}%</p>
-                </div>
-                <Link
-                  to={`/patterns/${exam.pattern.id}`}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all text-xs font-medium"
-                >
-                  View Pattern
-                </Link>
-              </div>
+              <Link
+                to={`/patterns/${exam.pattern.id}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Pattern
+              </Link>
             </div>
-            <div className="mt-3 w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-              <div
-                className="h-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-700"
-                style={{ width: `${Math.min(overallProgress, 100)}%` }}
-              ></div>
-            </div>
-          </div>
-
-          {/* Sections List - Compact */}
-          <div className="p-4">
-            <div className="space-y-3">
-              {exam.pattern.sections.map((section, index) => {
-                const stats = getSectionStats(section.id);
-                const isComplete = stats.progress_percentage >= 100;
-                const totalQuestions = section.end_question - section.start_question + 1;
-
-                return (
-                  <div
-                    key={section.id}
-                    className={`border rounded-lg transition-all ${
-                      isComplete
-                        ? 'border-green-300 bg-green-50/50'
-                        : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm'
-                    }`}
-                  >
-                    <div className="p-3">
-                      <div className="flex items-center justify-between mb-3">
-                        {/* Section Info */}
-                        <div className="flex items-center gap-2 flex-1">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-sm ${
-                            isComplete ? 'bg-green-600' : 'bg-blue-600'
-                          }`}>
-                            <Layers className="w-4 h-4 text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-sm font-bold text-slate-900">{section.name}</h3>
-                              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                                {getQuestionTypeDisplayName(section.question_type)}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-600">
-                              {section.subject} • Q{section.start_question}-{section.end_question} • +{section.marks_per_question}/-{section.negative_marking} marks
-                            </p>
+            <div className="max-h-[360px] overflow-auto">
+              <table className="w-full border-collapse text-[13px]">
+                <thead className="bg-slate-100 text-slate-500 uppercase tracking-wide">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold">Subject</th>
+                    <th className="px-3 py-2 text-left font-semibold">Section</th>
+                    <th className="px-3 py-2 text-left font-semibold">Range</th>
+                    <th className="px-3 py-2 text-left font-semibold">Type</th>
+                    <th className="px-3 py-2 text-center font-semibold">Marks</th>
+                    <th className="px-3 py-2 text-center font-semibold">Added</th>
+                    <th className="px-3 py-2 text-center font-semibold">Progress</th>
+                    <th className="px-3 py-2 text-right font-semibold">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {sectionRows.map(({ subject, slug, section, stats, isComplete }) => (
+                    <tr key={section.id} className="hover:bg-slate-50">
+                      <td className="px-3 py-2 font-medium text-slate-800">{subject}</td>
+                      <td className="px-3 py-2 text-slate-700">
+                        <span className="block text-slate-800 font-semibold">{section.name}</span>
+                        <span className="text-[11px] text-slate-500">#{section.id}</span>
+                      </td>
+                      <td className="px-3 py-2 text-slate-600">
+                        Q{section.start_question}-{section.end_question}
+                        <span className="block text-[11px] text-slate-400">
+                          Subject Q{section.localStart}-{section.localEnd}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-slate-600">{getQuestionTypeDisplayName(section.question_type)}</td>
+                      <td className="px-3 py-2 text-center text-slate-700">
+                        +{section.marks_per_question}/-{section.negative_marking}
+                      </td>
+                      <td className="px-3 py-2 text-center text-slate-700">
+                        {stats.total_added}/{section.questionCount}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span className="text-[12px] text-slate-600 font-medium">{stats.progress_percentage.toFixed(0)}%</span>
+                          <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
+                            <div
+                              className={`h-1.5 rounded-full ${isComplete ? 'bg-green-500' : 'bg-blue-500'}`}
+                              style={{ width: `${Math.min(stats.progress_percentage, 100)}%` }}
+                            ></div>
                           </div>
                         </div>
-
-                        {/* Stats & Action */}
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p className="text-base font-bold text-slate-900">{stats.total_added}/{totalQuestions}</p>
-                            <p className="text-xs text-slate-600">{stats.progress_percentage.toFixed(0)}%</p>
-                          </div>
-                          <Link
-                            to={`/pattern/${exam.pattern.id}/question/${section.start_question}`}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg font-medium text-xs transition-all ${
-                              isComplete
-                                ? 'bg-green-600 hover:bg-green-700 text-white'
-                                : 'bg-blue-600 hover:bg-blue-700 text-white'
-                            }`}
-                          >
-                            {isComplete ? (
-                              <>
-                                <Eye className="w-3.5 h-3.5" />
-                                View
-                              </>
-                            ) : (
-                              <>
-                                <Plus className="w-3.5 h-3.5" />
-                                Add ({stats.remaining})
-                              </>
-                            )}
-                          </Link>
-                        </div>
-                      </div>
-
-                      {/* Minimal Progress Bar */}
-                      <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                        <div
-                          className={`h-1.5 rounded-full transition-all duration-700 ${
-                            isComplete
-                              ? 'bg-green-500'
-                              : 'bg-blue-600'
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <Link
+                          to={`/pattern/${exam.pattern.id}/question/${slug}/${section.localStart}?examId=${exam.id}`}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium text-xs transition-colors ${
+                            isComplete ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-blue-600 text-white hover:bg-blue-700'
                           }`}
-                          style={{ width: `${Math.min(stats.progress_percentage, 100)}%` }}
-                        ></div>
-                      </div>
+                        >
+                          {isComplete ? <Eye className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                          {isComplete ? 'View' : `Add (${Math.max(stats.remaining, 0)})`}
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {sectionRows.length === 0 && (
+                <div className="flex items-center justify-center py-10 text-xs text-slate-500">
+                  No sections configured for this pattern.
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Side Column */}
+          <aside className="col-span-12 lg:col-span-4 space-y-3">
+            <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Layers className="w-4 h-4 text-blue-600" />
+                <h3 className="text-sm font-semibold text-slate-900">Pattern Snapshot</h3>
+              </div>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Total Sections</span>
+                  <span className="font-semibold text-slate-800">{exam.pattern.sections.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Total Questions</span>
+                  <span className="font-semibold text-slate-800">{exam.total_questions}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Total Marks</span>
+                  <span className="font-semibold text-slate-800">{exam.total_marks}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Completion</span>
+                  <span className="font-semibold text-blue-600">{overallProgress.toFixed(0)}%</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="w-4 h-4 text-green-600" />
+                <h3 className="text-sm font-semibold text-slate-900">Question Tracker</h3>
+              </div>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Questions Added</span>
+                  <span className="font-semibold text-green-600">{totalQuestionsAdded}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Needed</span>
+                  <span className="font-semibold text-slate-800">{exam.total_questions}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Remaining</span>
+                  <span className="font-semibold text-orange-500">
+                    {Math.max(exam.total_questions - totalQuestionsAdded, 0)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="w-4 h-4 text-purple-600" />
+                <h3 className="text-sm font-semibold text-slate-900">Subjects</h3>
+              </div>
+              <div className="space-y-1.5 text-xs">
+                {[...new Set(exam.pattern.sections.map((s) => s.subject))].map((subject) => {
+                  const subjectSections = exam.pattern.sections.filter((s) => s.subject === subject);
+                  const totalQs = subjectSections.reduce(
+                    (acc, s) => acc + (s.end_question - s.start_question + 1),
+                    0
+                  );
+                  return (
+                        <div key={subject} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-slate-50">
+                      <span className="font-medium text-slate-800">{subject}</span>
+                      <span className="text-[11px] text-slate-500">
+                        {subjectSections.length} sections · {totalQs} Qs
+                      </span>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Pattern Summary */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Layers className="w-5 h-5 text-blue-600" />
+            {exam.instructions && (
+              <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Info className="w-4 h-4 text-slate-500" />
+                  <h3 className="text-sm font-semibold text-slate-900">Instructions</h3>
+                </div>
+                <div className="text-xs text-slate-600 max-h-32 overflow-auto whitespace-pre-wrap">
+                  {exam.instructions}
+                </div>
               </div>
-              <h3 className="text-base font-bold text-slate-900">Pattern Summary</h3>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Total Sections</span>
-                <span className="text-sm font-bold text-slate-900">{exam.pattern.sections.length}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Total Questions</span>
-                <span className="text-sm font-bold text-slate-900">{exam.total_questions}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Total Marks</span>
-                <span className="text-sm font-bold text-slate-900">{exam.total_marks}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Duration</span>
-                <span className="text-sm font-bold text-slate-900">{formatDuration(exam.duration_minutes)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Question Status */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-green-600" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900">Question Status</h3>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Questions Added</span>
-                <span className="text-sm font-bold text-green-600">{totalQuestionsAdded}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Questions Needed</span>
-                <span className="text-sm font-bold text-slate-900">{exam.total_questions}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Remaining</span>
-                <span className="text-sm font-bold text-orange-600">{exam.total_questions - totalQuestionsAdded}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Completion</span>
-                <span className="text-sm font-bold text-blue-600">{overallProgress.toFixed(0)}%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Subjects */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <FileText className="w-5 h-5 text-purple-600" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900">Subjects</h3>
-            </div>
-            <div className="space-y-2">
-              {[...new Set(exam.pattern.sections.map(s => s.subject))].map((subject, idx) => {
-                const subjectSections = exam.pattern.sections.filter(s => s.subject === subject);
-                const totalQs = subjectSections.reduce((acc, s) => acc + (s.end_question - s.start_question + 1), 0);
-                return (
-                  <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-                    <span className="text-sm font-medium text-slate-900">{subject}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-600">{subjectSections.length} sections</span>
-                      <span className="text-xs font-semibold text-blue-600">{totalQs} Qs</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+            )}
+          </aside>
         </div>
       </div>
     </div>

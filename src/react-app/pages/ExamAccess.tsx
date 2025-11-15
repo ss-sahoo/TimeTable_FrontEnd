@@ -55,7 +55,7 @@ const ExamAccess: React.FC = () => {
   useEffect(() => {
     if (examData) {
       setExam(examData);
-      checkSystemRequirements();
+      checkSystemRequirements(examData);
     }
   }, [examData]);
 
@@ -98,12 +98,15 @@ const ExamAccess: React.FC = () => {
     }
   }, [exam]);
 
-  const checkSystemRequirements = async () => {
+  const checkSystemRequirements = async (examDetails?: Exam) => {
+    const requiresCamera = !!examDetails?.enable_webcam_proctoring;
+    const requiresFullscreen = !!examDetails?.require_fullscreen;
+
     const checks: SystemCheck = {
-      camera: false,
-      fullscreen: false,
+      camera: !requiresCamera,
+      fullscreen: !requiresFullscreen,
       notifications: false,
-      microphone: false
+      microphone: !requiresCamera
     };
 
     // Check camera - improved permission handling
@@ -115,11 +118,11 @@ const ExamAccess: React.FC = () => {
       
       if (!isSecure) {
         console.log('Camera access requires HTTPS');
-        checks.camera = false;
+        checks.camera = !requiresCamera;
       } else if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         console.log('Camera API not available');
-        checks.camera = false;
-      } else {
+        checks.camera = !requiresCamera;
+      } else if (requiresCamera) {
         // Request camera permission
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { 
@@ -133,27 +136,35 @@ const ExamAccess: React.FC = () => {
       }
     } catch (error: any) {
       console.log('Camera not available or permission denied:', error);
-      checks.camera = false;
+      checks.camera = !requiresCamera;
     }
 
     // Check fullscreen API
-    checks.fullscreen = !!(
-      document.fullscreenEnabled ||
-      (document as any).webkitFullscreenEnabled ||
-      (document as any).mozFullScreenEnabled ||
-      (document as any).msFullscreenEnabled
-    );
+    if (requiresFullscreen) {
+      checks.fullscreen = !!(
+        document.fullscreenEnabled ||
+        (document as any).webkitFullscreenEnabled ||
+        (document as any).mozFullScreenEnabled ||
+        (document as any).msFullscreenEnabled
+      );
+    } else {
+      checks.fullscreen = true;
+    }
 
     // Check notifications
     checks.notifications = 'Notification' in window && Notification.permission !== 'denied';
 
     // Check microphone
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (requiresCamera) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        checks.microphone = true;
+        stream.getTracks().forEach(track => track.stop());
+      } catch (error) {
+        console.log('Microphone not available:', error);
+      }
+    } else {
       checks.microphone = true;
-      stream.getTracks().forEach(track => track.stop());
-    } catch (error) {
-      console.log('Microphone not available:', error);
     }
 
     setSystemChecks(checks);
@@ -188,7 +199,7 @@ const ExamAccess: React.FC = () => {
 
       if (data.access_granted) {
         setExam(data.exam);
-        checkSystemRequirements();
+        checkSystemRequirements(data.exam);
       } else {
         setError(data.error || 'Invalid access code');
       }
@@ -261,7 +272,12 @@ const ExamAccess: React.FC = () => {
   };
 
   const handleStartExam = () => {
-    if (!canStart || !systemChecks.camera) {
+    if (!canStart) {
+      return;
+    }
+
+    if (exam?.enable_webcam_proctoring && !systemChecks.camera) {
+      setError('Camera access is required before starting this proctored exam.');
       return;
     }
 
@@ -518,9 +534,9 @@ const ExamAccess: React.FC = () => {
 
             <button
               onClick={handleStartExam}
-              disabled={!canStart || !systemChecks.camera}
+              disabled={!canStart || (exam?.enable_webcam_proctoring && !systemChecks.camera)}
               className={`px-8 py-4 rounded-lg text-lg font-semibold transition-colors flex items-center gap-3 mx-auto ${
-                canStart && systemChecks.camera
+                canStart && (exam?.enable_webcam_proctoring ? systemChecks.camera : true)
                   ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
@@ -530,7 +546,7 @@ const ExamAccess: React.FC = () => {
                   <Clock className="w-5 h-5" />
                   Exam Not Available Yet
                 </>
-              ) : !systemChecks.camera ? (
+              ) : exam?.enable_webcam_proctoring && !systemChecks.camera ? (
                 <>
                   <AlertTriangle className="w-5 h-5" />
                   Camera Required
@@ -552,7 +568,7 @@ const ExamAccess: React.FC = () => {
               </p>
             )}
             
-            {canStart && !systemChecks.camera && (
+            {canStart && exam?.enable_webcam_proctoring && !systemChecks.camera && (
               <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-red-600 text-sm">
                   <strong>Camera Required:</strong> Camera access is required to start this proctored exam.

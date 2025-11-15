@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
-  Accessibility, Eye, EyeOff, Type, Move, 
-  Volume2, VolumeX, Keyboard, MousePointer, 
+  Accessibility, Type, Move, 
+  Volume2, Keyboard, MousePointer, 
   CheckCircle, XCircle, Settings, HelpCircle 
 } from 'lucide-react';
 import { useAccessibility } from '@/react-app/hooks/useAccessibility';
@@ -14,7 +14,6 @@ interface AccessibilitySettingsProps {
 const AccessibilitySettings: React.FC<AccessibilitySettingsProps> = ({ isOpen, onClose }) => {
   const {
     settings,
-    updateSettings,
     toggleSetting,
     announce
   } = useAccessibility();

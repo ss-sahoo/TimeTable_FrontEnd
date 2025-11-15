@@ -33,7 +33,11 @@ interface Question {
   explanation: string;
   marks: number;
   subject: string;
-  pattern_section: number;
+  pattern_section?: number | null;
+  question_number?: number | null;
+  question_number_in_pattern?: number | null;
+  section_name?: string;
+  negative_marks?: number | null;
 }
 
 interface ExamAttempt {
@@ -180,69 +184,143 @@ const SecureExamView: React.FC = () => {
       const attemptData = attemptResponse.data;
       setExamAttempt(attemptData);
 
-      // Log exam permissions for debugging
-      console.log('==== EXAM PERMISSIONS LOADED ====');
+      console.log('==== EXAM ATTEMPT LOADED ====');
       console.log('Exam ID:', attemptData.exam.id);
       console.log('Exam Title:', attemptData.exam.title);
-      console.log('Public Exam:', attemptData.exam.is_public);
-      console.log('Allow Late Submission:', attemptData.exam.allow_late_submission);
-      console.log('Require Fullscreen:', attemptData.exam.require_fullscreen);
-      console.log('Disable Copy/Paste:', attemptData.exam.disable_copy_paste);
-      console.log('Disable Right Click:', attemptData.exam.disable_right_click);
-      console.log('Enable Webcam Proctoring:', attemptData.exam.enable_webcam_proctoring);
-      console.log('Allow Tab Switching:', attemptData.exam.allow_tab_switching);
       console.log('Max Violations Allowed:', attemptData.max_violations_allowed);
       console.log('=================================');
 
-      // Load questions
-      if (attemptData.exam && attemptData.exam.pattern?.id) {
-        // Get questions for this exam's pattern using the dedicated endpoint
+      const examId = attemptData.exam.id;
+
+      let mappedQuestions: Question[] = [];
+
+      try {
+        const questionsResponse = await api.get(`/questions/exams/${examId}/questions/`);
+        const examQuestions = Array.isArray(questionsResponse.data)
+          ? questionsResponse.data
+          : (questionsResponse.data?.results ?? []);
+
+        console.log(`Exam questions endpoint returned ${examQuestions.length} records for exam ${examId}`);
+
+        if (examQuestions.length > 0) {
+          mappedQuestions = examQuestions
+            .map((item: any, index: number) => {
+              const q = item.question || {};
+              const normalizedOptions =
+                Array.isArray(q.options) ? q.options : q.options ? [q.options] : [];
+
+              return {
+                id: q.id ?? item.question_id ?? index,
+                question_text: q.question_text ?? '',
+                question_type: q.question_type ?? 'mcq',
+                options: normalizedOptions,
+                correct_answer: q.correct_answer ?? '',
+                explanation: q.explanation ?? '',
+                marks: item.marks ?? q.marks ?? 0,
+                subject: q.subject ?? '',
+                pattern_section: q.pattern_section ?? null,
+                question_number: item.question_number ?? q.question_number ?? null,
+                question_number_in_pattern: q.question_number_in_pattern ?? item.order ?? null,
+                section_name: item.section_name ?? '',
+                negative_marks: item.negative_marks ?? q.negative_marks ?? null,
+              };
+            })
+            .filter((question: Question) => Boolean(question.question_text));
+        }
+      } catch (err) {
+        console.error(`Failed to load exam-question mappings for exam ${examId}:`, err);
+      }
+
+      if (mappedQuestions.length === 0) {
+        try {
+          const params = { exam: examId, page_size: 1000 };
+          const questionsResponse = await api.get('/questions/questions/', { params });
+          const rawQuestions = Array.isArray(questionsResponse.data)
+            ? questionsResponse.data
+            : (questionsResponse.data?.results ?? questionsResponse.data ?? []);
+
+          console.log(`General questions endpoint returned ${rawQuestions.length} records for exam ${examId}`);
+
+          mappedQuestions = rawQuestions
+            .map((item: any) => {
+              const normalizedOptions =
+                Array.isArray(item.options) ? item.options : item.options ? [item.options] : [];
+
+              return {
+                id: item.id,
+                question_text: item.question_text ?? '',
+                question_type: item.question_type ?? 'mcq',
+                options: normalizedOptions,
+                correct_answer: item.correct_answer ?? '',
+                explanation: item.explanation ?? '',
+                marks: item.marks ?? 0,
+                subject: item.subject ?? '',
+                pattern_section: item.pattern_section ?? null,
+                question_number: item.question_number ?? null,
+                question_number_in_pattern: item.question_number_in_pattern ?? null,
+                section_name: item.pattern_section_name ?? '',
+                negative_marks: item.negative_marks ?? null,
+              };
+            })
+            .filter((question: Question) => Boolean(question.question_text));
+        } catch (err) {
+          console.error(`Failed to load questions list for exam ${examId}:`, err);
+        }
+      }
+
+      if (mappedQuestions.length === 0 && attemptData.exam.pattern?.id) {
         const patternId = attemptData.exam.pattern.id;
-        console.log('Loading questions for pattern:', patternId);
-        
+        console.log('Falling back to pattern questions for pattern:', patternId);
+
         try {
           const questionsResponse = await api.get(`/patterns/patterns/${patternId}/questions/`);
-          const questionsData = questionsResponse.data;
-          
-          console.log('Pattern questions response:', questionsData);
-          
-          // The endpoint returns { sections_with_questions: [...] }
-          let allQuestions: any[] = [];
-          
-          if (questionsData.sections_with_questions && Array.isArray(questionsData.sections_with_questions)) {
-            // Extract all questions from all sections
-            questionsData.sections_with_questions.forEach((section: any) => {
-              if (section.questions && Array.isArray(section.questions)) {
-                allQuestions = allQuestions.concat(section.questions);
-              }
+          const sections = questionsResponse.data?.sections_with_questions ?? [];
+
+          sections.forEach((section: any) => {
+            const sectionQuestions = Array.isArray(section.questions) ? section.questions : [];
+            sectionQuestions.forEach((question: any) => {
+              const normalizedOptions =
+                Array.isArray(question.options)
+                  ? question.options
+                  : question.options
+                    ? [question.options]
+                    : [];
+
+              mappedQuestions.push({
+                id: question.id,
+                question_text: question.question_text ?? '',
+                question_type: question.question_type ?? 'mcq',
+                options: normalizedOptions,
+                correct_answer: question.correct_answer ?? '',
+                explanation: question.explanation ?? '',
+                marks: question.marks ?? section.section?.marks_per_question ?? 0,
+                subject: question.subject ?? section.section?.subject ?? '',
+                pattern_section: question.pattern_section ?? section.section?.id ?? null,
+                question_number: question.question_number ?? null,
+                question_number_in_pattern: question.question_number_in_pattern ?? null,
+                section_name: section.section?.name ?? '',
+                negative_marks: question.negative_marks ?? null,
+              });
             });
-          }
-          
-          // Sort questions by question_number_in_pattern in ascending order
-          allQuestions.sort((a: any, b: any) => {
-            const numA = a.question_number_in_pattern || a.id || 0;
-            const numB = b.question_number_in_pattern || b.id || 0;
-            return numA - numB;
           });
-          
-          console.log(`Loaded ${allQuestions.length} questions from pattern ${patternId}`);
-          console.log('Questions:', allQuestions.map((q: any) => `Q${q.question_number_in_pattern}:${q.question_type}`));
-          
-          setQuestions(allQuestions);
         } catch (err) {
-          console.error('Failed to load pattern questions:', err);
-          setQuestions([]);
+          console.error(`Failed to load pattern questions for pattern ${patternId}:`, err);
         }
-      } else {
-        console.error('Exam data is missing pattern:', attemptData);
-        setQuestions([]);
       }
+
+      mappedQuestions.sort((a, b) => {
+        const numA = a.question_number_in_pattern ?? a.question_number ?? 0;
+        const numB = b.question_number_in_pattern ?? b.question_number ?? 0;
+        return numA - numB;
+      });
+
+      setQuestions(mappedQuestions);
 
       // Load existing answers
       if (attemptData.answers) {
         const existingAnswers = new Map();
         Object.entries(attemptData.answers).forEach(([questionId, answer]: [string, any]) => {
-          existingAnswers.set(parseInt(questionId), answer);
+          existingAnswers.set(parseInt(questionId, 10), answer);
         });
         setAnswers(existingAnswers);
       }

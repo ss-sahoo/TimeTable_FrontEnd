@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Clock, CheckCircle, XCircle, AlertCircle, Calendar, User, BookOpen } from 'lucide-react';
+import { Mail, Clock, CheckCircle, XCircle, AlertCircle, Calendar, BookOpen } from 'lucide-react';
 import { api } from '@/react-app/hooks/useApi';
 
 interface Invitation {
@@ -36,8 +36,11 @@ const StudentInvitations: React.FC = () => {
       setError(null);
       const response = await api.get('/exams/invitations/student/');
       setInvitations(response.data);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load invitations');
+    } catch (err) {
+      const errorMessage = err && typeof err === 'object' && 'response' in err 
+        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error 
+        : undefined;
+      setError(errorMessage || 'Failed to load invitations');
     } finally {
       setLoading(false);
     }
@@ -48,8 +51,11 @@ const StudentInvitations: React.FC = () => {
       setActionLoading(invitationId);
       await api.post(`/exams/invitations/${invitationId}/accept/`);
       await loadInvitations();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to accept invitation');
+    } catch (err) {
+      const errorMessage = err && typeof err === 'object' && 'response' in err 
+        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error 
+        : undefined;
+      setError(errorMessage || 'Failed to accept invitation');
     } finally {
       setActionLoading(null);
     }
@@ -62,8 +68,11 @@ const StudentInvitations: React.FC = () => {
         reason: reason
       });
       await loadInvitations();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to decline invitation');
+    } catch (err) {
+      const errorMessage = err && typeof err === 'object' && 'response' in err 
+        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error 
+        : undefined;
+      setError(errorMessage || 'Failed to decline invitation');
     } finally {
       setActionLoading(null);
     }

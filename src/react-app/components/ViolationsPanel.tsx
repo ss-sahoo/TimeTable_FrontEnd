@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, Eye, EyeOff, Clock, Mouse, Keyboard, Monitor } from 'lucide-react';
 import { api } from '../hooks/useApi';
 
@@ -7,7 +7,7 @@ interface Violation {
   violation_type: string;
   violation_type_display: string;
   timestamp: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
 }
 
 interface ViolationsPanelProps {
@@ -21,25 +21,25 @@ const ViolationsPanel: React.FC<ViolationsPanelProps> = ({ attemptId, isOpen, on
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchViolations = async () => {
+  const fetchViolations = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await api.get(`/exams/attempts/${attemptId}/violations/history/`);
       setViolations(response.data.violations || []);
-    } catch (err: any) {
+    } catch (err) {
       setError('Failed to load violations');
       console.error('Error fetching violations:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [attemptId]);
 
   useEffect(() => {
     if (isOpen) {
       fetchViolations();
     }
-  }, [isOpen, attemptId]);
+  }, [isOpen, attemptId, fetchViolations]);
 
   const getViolationIcon = (type: string) => {
     switch (type) {

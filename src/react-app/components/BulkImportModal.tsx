@@ -8,12 +8,18 @@ interface BulkImportModalProps {
   questionBankId?: number;
 }
 
+interface CreatedQuestion {
+  id: number;
+  question_text: string;
+  [key: string]: unknown;
+}
+
 interface ImportResult {
   success: boolean;
   created_count: number;
   error_count: number;
   errors: string[];
-  created_questions: any[];
+  created_questions: CreatedQuestion[];
 }
 
 export default function BulkImportModal({ isOpen, onClose, onSuccess, questionBankId }: BulkImportModalProps) {
@@ -103,13 +109,16 @@ export default function BulkImportModal({ isOpen, onClose, onSuccess, questionBa
       if (response.data.success) {
         onSuccess();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Import error:', error);
+      const errorMessage = error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+        : undefined;
       setResult({
         success: false,
         created_count: 0,
         error_count: 1,
-        errors: [error.response?.data?.error || 'Import failed'],
+        errors: [errorMessage || 'Import failed'],
         created_questions: []
       });
     } finally {
