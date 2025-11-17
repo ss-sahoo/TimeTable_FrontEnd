@@ -11,8 +11,8 @@ const getDefaultApiUrl = () => {
       return `${window.location.protocol}//${hostname}/api`;
     }
   }
-  // Fallback to localhost for development
-  return 'http://localhost:8000/api';
+  // In development, hit backend directly
+  return 'http://localhost:8001/api';
 };
 
 const DEFAULT_API_BASE_URL = getDefaultApiUrl();

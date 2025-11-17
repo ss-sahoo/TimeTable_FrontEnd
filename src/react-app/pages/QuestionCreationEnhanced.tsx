@@ -113,6 +113,18 @@ interface AIQuestionPayload {
   topic?: string;
 }
 
+const stripOptionContent = (value?: string | null) =>
+  value
+    ? value
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    : '';
+
+const normalizeOptionValue = (value?: string | null) =>
+  stripOptionContent(value).toLowerCase();
+
 export default function EnhancedQuestionEditor() {
   const { patternId, subjectSlug: subjectSlugParam, questionNumber: questionParam } = useParams<{ patternId: string; subjectSlug?: string; questionNumber?: string }>();
   const navigate = useNavigate();
@@ -1259,7 +1271,9 @@ export default function EnhancedQuestionEditor() {
       
       case 'single_mcq':
       case 'mcq': {
-        const correctIndex = formData.options.findIndex(opt => opt.trim() === correct_answer.trim());
+        const correctIndex = formData.options.findIndex(
+          (opt) => normalizeOptionValue(opt) === normalizeOptionValue(correct_answer),
+        );
         return (
           <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-2xl p-5 shadow-lg">
             <div className="flex items-center gap-3 mb-4">
@@ -1304,7 +1318,12 @@ export default function EnhancedQuestionEditor() {
       }
       
       case 'multiple_mcq': {
-        const selectedAnswers = correct_answer ? correct_answer.split('|') : [];
+        const selectedAnswers = correct_answer
+          ? correct_answer.split('|').filter(Boolean)
+          : [];
+        const normalizedSelectedAnswers = selectedAnswers.map((answer) =>
+          normalizeOptionValue(answer),
+        );
         return (
           <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-2xl p-5 shadow-lg">
             <div className="flex items-center gap-3 mb-4">
@@ -1322,7 +1341,9 @@ export default function EnhancedQuestionEditor() {
                 <p className="text-sm text-slate-600 mb-2">Correct Answers:</p>
                 <div className="flex flex-wrap gap-2">
                   {selectedAnswers.map((answer, index) => {
-                    const optionIndex = formData.options.findIndex(opt => opt.trim() === answer.trim());
+                    const optionIndex = formData.options.findIndex(
+                      (opt) => normalizeOptionValue(opt) === normalizeOptionValue(answer),
+                    );
                     return (
                       <span key={index} className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
                         {optionIndex >= 0 ? String.fromCharCode(65 + optionIndex) : '?'}
@@ -1659,43 +1680,109 @@ export default function EnhancedQuestionEditor() {
                   </label>
                   {(formData.question_type === 'single_mcq' || formData.question_type === 'mcq') ? (
                     <select
-                      value={formData.correct_answer}
-                      onChange={(e) => handleInputChange('correct_answer', e.target.value)}
+                      value={
+                        formData.correct_answer
+                          ? String(
+                              formData.options.findIndex(
+                                (opt) =>
+                                  normalizeOptionValue(opt) ===
+                                  normalizeOptionValue(formData.correct_answer),
+                              ),
+                            )
+                          : ''
+                      }
+                      onChange={(e) => {
+                        if (e.target.value === '') {
+                          handleInputChange('correct_answer', '');
+                          return;
+                        }
+                        const selectedIndex = Number(e.target.value);
+                        if (!Number.isNaN(selectedIndex) && formData.options[selectedIndex]) {
+                          handleInputChange('correct_answer', formData.options[selectedIndex]);
+                        } else {
+                          handleInputChange('correct_answer', '');
+                        }
+                      }}
                       className="w-full px-4 py-3.5 border-2 border-green-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all bg-green-50 font-medium"
                     >
                       <option value="">Select correct option...</option>
-                      {formData.options.filter(o => o.trim()).map((option, index) => (
-                        <option key={index} value={option}>
-                          {String.fromCharCode(65 + index)}: {option.replace(/<[^>]*>/g, '').substring(0, 50)}...
-                        </option>
-                      ))}
+                      {formData.options.map((option, index) => {
+                        if (!option.trim()) return null;
+                        return (
+                          <option key={index} value={index}>
+                            {String.fromCharCode(65 + index)}:{' '}
+                            {stripOptionContent(option).substring(0, 50) || 'Option'}
+                          </option>
+                        );
+                      })}
                     </select>
                   ) : formData.question_type === 'multiple_mcq' ? (
                     <div className="space-y-3">
                       <p className="text-sm text-purple-700 font-medium">Select all correct options:</p>
                       <div className="grid grid-cols-2 gap-3">
-                        {formData.options.filter(o => o.trim()).map((option, index) => (
-                          <label key={index} className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 cursor-pointer transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={formData.correct_answer.includes(option)}
-                              onChange={(e) => {
-                                const currentAnswers = formData.correct_answer ? formData.correct_answer.split('|') : [];
-                                if (e.target.checked) {
-                                  currentAnswers.push(option);
-                                } else {
-                                  const index = currentAnswers.indexOf(option);
-                                  if (index > -1) currentAnswers.splice(index, 1);
-                                }
-                                handleInputChange('correct_answer', currentAnswers.join('|'));
-                              }}
-                              className="w-4 h-4 text-purple-600 border-purple-300 rounded focus:ring-purple-500"
-                            />
-                            <span className="text-sm font-medium text-purple-800">
-                              {String.fromCharCode(65 + index)}: {option.replace(/<[^>]*>/g, '').substring(0, 30)}...
-                            </span>
-                          </label>
-                        ))}
+                        {formData.options.filter(o => o.trim()).map((option, index) => {
+                          const isChecked =
+                            normalizeOptionValue(option) !== '' &&
+                            (formData.correct_answer
+                              ? formData.correct_answer
+                                  .split('|')
+                                  .filter(Boolean)
+                                  .some(
+                                    (answer) =>
+                                      normalizeOptionValue(answer) ===
+                                      normalizeOptionValue(option),
+                                  )
+                              : false);
+                          return (
+                            <label
+                              key={index}
+                              className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 cursor-pointer transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  const currentAnswers = formData.correct_answer
+                                    ? formData.correct_answer.split('|').filter(Boolean)
+                                    : [];
+                                  if (e.target.checked) {
+                                    const exists = currentAnswers.some(
+                                      (answer) =>
+                                        normalizeOptionValue(answer) ===
+                                        normalizeOptionValue(option),
+                                    );
+                                    if (!exists) {
+                                      currentAnswers.push(option);
+                                    }
+                                  } else {
+                                    const filtered = currentAnswers.filter(
+                                      (answer) =>
+                                        normalizeOptionValue(answer) !==
+                                        normalizeOptionValue(option),
+                                    );
+                                    currentAnswers.splice(0, currentAnswers.length, ...filtered);
+                                  }
+                                  const uniqueAnswers: string[] = [];
+                                  currentAnswers.forEach((answer) => {
+                                    const normalized = normalizeOptionValue(answer);
+                                    const exists = uniqueAnswers.some(
+                                      (existing) =>
+                                        normalizeOptionValue(existing) === normalized,
+                                    );
+                                    if (!exists) {
+                                      uniqueAnswers.push(answer);
+                                    }
+                                  });
+                                  handleInputChange('correct_answer', uniqueAnswers.join('|'));
+                                }}
+                                className="w-4 h-4 text-purple-600 border-purple-300 rounded focus:ring-purple-500"
+                              />
+                              <span className="text-sm font-medium text-purple-800">
+                                {String.fromCharCode(65 + index)}: {option.replace(/<[^>]*>/g, '').substring(0, 30)}...
+                              </span>
+                            </label>
+                          );
+                        })}
                       </div>
                       <p className="text-xs text-purple-600">
                         Selected answers will be stored as: {formData.correct_answer || 'None selected'}

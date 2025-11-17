@@ -191,7 +191,7 @@ export default function TeacherEvaluationDashboard() {
   const handleBatchAIEvaluation = async () => {
     try {
       await api.post(`/evaluation/exams/${examId}/batch-ai/`);
-      await refreshData();
+        await refreshData();
     } catch (error) {
       console.error('Batch AI evaluation failed:', error);
     }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { api } from '../hooks/useApi';
 import { 
@@ -23,9 +23,42 @@ import {
   RefreshCw,
   Download,
   Share2,
-  Zap
+  Zap,
+  Filter,
+  FileText,
+  Printer,
+  Loader2,
 } from 'lucide-react';
 import LaTeXRenderer from '../components/LaTeXRenderer';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+
+interface AnswerSheetBranding {
+  logo_url?: string | null;
+  primary_hex?: string;
+}
+
+interface AnswerSheetInfo {
+  url: string | null;
+  generated_at?: string | null;
+  branding?: AnswerSheetBranding;
+  grading?: {
+    percentage?: number;
+    marks_obtained?: number;
+    total_marks?: number;
+    grade?: string;
+    remarks?: string;
+  };
+  invigilator_placeholders?: { label: string; value: string }[];
+  question_breakdown?: {
+    question_number: number;
+    question_text: string;
+    student_answer: string;
+    correct_answer: string;
+    marks_obtained: number;
+    max_marks: number;
+  }[];
+}
 
 interface ExamResult {
   attempt: {
@@ -66,6 +99,7 @@ interface ExamResult {
   };
   submitted_at: string;
   time_spent: number;
+  answer_sheet_pdf?: AnswerSheetInfo | null;
 }
 
 const ExamResults: React.FC = () => {
@@ -76,6 +110,9 @@ const ExamResults: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'detailed' | 'sections'>('overview');
+  const [detailFilter, setDetailFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
+  const [downloading, setDownloading] = useState(false);
+  const answerSheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Load exam result for the attempt ID
@@ -106,6 +143,20 @@ const ExamResults: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const parseAnswerSheetPayload = (payload?: any): AnswerSheetInfo | null => {
+    if (!payload) {
+      return null;
+    }
+    return {
+      url: payload.url ?? payload.pdf_url ?? null,
+      generated_at: payload.generated_at ?? null,
+      branding: payload.branding,
+      grading: payload.grading,
+      invigilator_placeholders: payload.invigilator_placeholders,
+      question_breakdown: payload.question_breakdown,
+    };
   };
 
   const formatTime = (seconds: number) => {
@@ -147,6 +198,95 @@ const ExamResults: React.FC = () => {
     return { level: 'Needs Improvement', color: 'text-red-600', bg: 'bg-red-50' };
   };
 
+  const sectionValues = useMemo(
+    () => (result ? Object.values(result.section_results || {}) : []),
+    [result]
+  );
+  const totalMarks = useMemo(
+    () => sectionValues.reduce((sum, section) => sum + (section.max_marks || 0), 0),
+    [sectionValues]
+  );
+  const availableSections = useMemo(
+    () => sectionValues.filter(section => section.status === 'available'),
+    [sectionValues]
+  );
+  const pendingSections = useMemo(
+    () => sectionValues.filter(section => section.status === 'pending_review'),
+    [sectionValues]
+  );
+  const totalAvailableScore = useMemo(
+    () => availableSections.reduce((sum, section) => sum + (section.score || 0), 0),
+    [availableSections]
+  );
+  const detailedEntries = useMemo(() => {
+    if (!result) return [];
+    const entries = Object.entries(result.detailed_answers || {}).map(([key, value]) => ({
+      id: key,
+      ...value,
+    }));
+    if (detailFilter === 'correct') {
+      return entries.filter((entry) => entry.is_correct);
+    }
+    if (detailFilter === 'incorrect') {
+      return entries.filter((entry) => !entry.is_correct);
+    }
+    return entries;
+  }, [result, detailFilter]);
+  const accuracy = useMemo(() => {
+    if (!result || totalMarks === 0) return 0;
+    return ((result.attempt.score || 0) / totalMarks) * 100;
+  }, [result, totalMarks]);
+  const attemptPercentageValue = useMemo(() => {
+    const raw = result?.attempt.percentage;
+    const numeric = Number(raw);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+    const fallback = Number(result?.percentage);
+    return Number.isFinite(fallback) ? fallback : 0;
+  }, [result]);
+  const performance = useMemo(
+    () => getPerformanceLevel(attemptPercentageValue),
+    [attemptPercentageValue]
+  );
+  const canDownloadAnswerSheet = activeTab === 'detailed' && detailedEntries.length > 0;
+
+  const handleDownloadPdf = async () => {
+    if (!answerSheetRef.current) return;
+    setDownloading(true);
+    try {
+      const canvas = await html2canvas(answerSheetRef.current, {
+        scale: 2,
+        useCORS: true,
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'pt', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      const safeTitle = attempt.exam_title.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+      pdf.save(`exam-results-${safeTitle}-attempt-${attempt.id}.pdf`);
+    } catch (err) {
+      console.error('Failed to generate PDF:', err);
+      alert('Unable to generate PDF. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -176,10 +316,7 @@ const ExamResults: React.FC = () => {
     );
   }
 
-  const { attempt, section_results, detailed_answers } = result;
-  const availableSections = Object.values(section_results).filter(section => section.status === 'available');
-  const pendingSections = Object.values(section_results).filter(section => section.status === 'pending_review');
-  const performance = getPerformanceLevel(attempt.percentage);
+  const { attempt } = result;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -210,43 +347,96 @@ const ExamResults: React.FC = () => {
           </div>
         </div>
 
-        {/* Main Score Card */}
-        <div className="bg-white rounded-lg border border-slate-200 shadow-sm mb-6">
-          <div className="p-4">
-            <div className="text-center mb-6">
-              <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full border-4 ${getGradeColor(attempt.percentage)} mb-4`}>
-                <Trophy className="w-10 h-10" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <p className="text-sm text-slate-500">Overall Grade</p>
+                <div className="flex items-center gap-3 mt-1">
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center border-4 ${getGradeColor(attemptPercentageValue)}`}>
+                    <Trophy className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-bold text-slate-900">{getGrade(attemptPercentageValue)}</h2>
+                    <p className={`text-sm font-medium ${performance.color}`}>{performance.level}</p>
+                  </div>
+                </div>
               </div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-2">{getGrade(attempt.percentage)}</h2>
-              <p className={`text-sm font-medium ${performance.color}`}>{performance.level}</p>
+              <div className="grid grid-cols-2 gap-4 sm:w-1/2">
+                <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
+                  <p className="text-xs uppercase tracking-wide text-blue-600">Score</p>
+                  <p className="text-2xl font-bold text-blue-900 mt-1">{attempt.score || 0}</p>
+                  <p className="text-xs text-blue-700">out of {totalMarks || result.total_questions}</p>
+                </div>
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                  <p className="text-xs uppercase tracking-wide text-emerald-600">Accuracy</p>
+                  <p className="text-2xl font-bold text-emerald-900 mt-1">{accuracy.toFixed(1)}%</p>
+                    <p className="text-xs text-emerald-700">
+                      {availableSections.length} sections graded
+                    </p>
+                </div>
+              </div>
             </div>
-
-            {/* Score Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-3 bg-slate-50 rounded-lg">
-                <div className="text-2xl font-bold text-slate-900">{attempt.score || 0}</div>
-                <div className="text-xs text-slate-600">Score</div>
-                <div className="text-xs text-slate-500">out of {result.total_questions || 0}</div>
+              <div className="p-3 border border-slate-100 rounded-xl bg-slate-50">
+                <p className="text-xs text-slate-500 uppercase">Time Spent</p>
+                <p className="text-lg font-semibold text-slate-900 mt-1">{formatTime(attempt.time_spent)}</p>
+                <p className="text-xs text-slate-500">Duration</p>
               </div>
-              
-              <div className="text-center p-3 bg-slate-50 rounded-lg">
-                <div className="text-2xl font-bold text-slate-900">{attempt.percentage || 0}%</div>
-                <div className="text-xs text-slate-600">Percentage</div>
-                <div className="text-xs text-slate-500">Overall</div>
+              <div className="p-3 border border-slate-100 rounded-xl bg-slate-50">
+                <p className="text-xs text-slate-500 uppercase">Violations</p>
+                <p className="text-lg font-semibold text-slate-900 mt-1">{attempt.violations_count}</p>
+                <p className="text-xs text-slate-500">Detected</p>
               </div>
-              
-              <div className="text-center p-3 bg-slate-50 rounded-lg">
-                <div className="text-2xl font-bold text-slate-900">{formatTime(attempt.time_spent)}</div>
-                <div className="text-xs text-slate-600">Time Spent</div>
-                <div className="text-xs text-slate-500">Duration</div>
+              <div className="p-3 border border-slate-100 rounded-xl bg-slate-50">
+                <p className="text-xs text-slate-500 uppercase">Questions Attempted</p>
+                <p className="text-lg font-semibold text-slate-900 mt-1">{result.total_questions}</p>
+                <p className="text-xs text-slate-500">Across sections</p>
               </div>
-              
-              <div className="text-center p-3 bg-slate-50 rounded-lg">
-                <div className="text-2xl font-bold text-slate-900">{attempt.violations_count}</div>
-                <div className="text-xs text-slate-600">Violations</div>
-                <div className="text-xs text-slate-500">Detected</div>
+              <div className="p-3 border border-slate-100 rounded-xl bg-slate-50">
+                <p className="text-xs text-slate-500 uppercase">Marks Awarded</p>
+                <p className="text-lg font-semibold text-slate-900 mt-1">{totalAvailableScore}</p>
+                <p className="text-xs text-slate-500">Graded sections</p>
               </div>
             </div>
+          </div>
+          <div className="bg-gradient-to-br from-indigo-600 to-blue-600 rounded-2xl text-white p-6 flex flex-col justify-between space-y-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-indigo-100">Instant Report</p>
+              <h3 className="text-xl font-semibold mt-2">{attempt.exam_title}</h3>
+              <p className="text-sm text-indigo-100 mt-1">{attempt.student_name}</p>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between items-center bg-white/10 rounded-xl px-3 py-2">
+                <span>Total Marks</span>
+                <span className="font-semibold">{totalMarks || '--'}</span>
+              </div>
+              <div className="flex justify-between items-center bg-white/10 rounded-xl px-3 py-2">
+                <span>Submitted On</span>
+                <span className="font-semibold">{new Date(attempt.submitted_at).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center bg-white/10 rounded-xl px-3 py-2">
+                <span>Pending Sections</span>
+                <span className="font-semibold">{pendingSections.length}</span>
+              </div>
+            </div>
+            <button
+              onClick={handleDownloadPdf}
+              disabled={downloading || !canDownloadAnswerSheet}
+              className="no-print flex items-center justify-center gap-2 rounded-xl bg-white text-indigo-700 font-semibold py-3 hover:bg-indigo-50 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {downloading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Preparing PDF...
+                </>
+              ) : (
+                <>
+                  <Printer className="w-4 h-4" />
+                  {canDownloadAnswerSheet ? 'Download Answer Sheet' : 'Open Detailed Tab'}
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -391,15 +581,76 @@ const ExamResults: React.FC = () => {
             {/* Sections Tab */}
             {activeTab === 'sections' && (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{availableSections.length}</div>
-                    <div className="text-sm text-slate-600">Sections Graded</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
+                    <p className="text-xs uppercase text-green-600">Sections Graded</p>
+                    <p className="text-3xl font-bold text-green-800 mt-2">{availableSections.length}</p>
+                    <p className="text-sm text-green-700">Total score {totalAvailableScore}/{totalMarks}</p>
                   </div>
-                  <div className="text-center p-4 bg-orange-50 rounded-lg">
-                    <div className="text-2xl font-bold text-orange-600">{pendingSections.length}</div>
-                    <div className="text-sm text-slate-600">Under Review</div>
+                  <div className="rounded-2xl border border-orange-100 bg-orange-50 p-4">
+                    <p className="text-xs uppercase text-orange-600">Pending Review</p>
+                    <p className="text-3xl font-bold text-orange-800 mt-2">{pendingSections.length}</p>
+                    <p className="text-sm text-orange-700">Awaiting manual evaluation</p>
                   </div>
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                    <p className="text-xs uppercase text-blue-600">Average Accuracy</p>
+                    <p className="text-3xl font-bold text-blue-800 mt-2">{attemptPercentageValue.toFixed(1)}%</p>
+                    <p className="text-sm text-blue-700">Across graded sections</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {availableSections.length > 0 && (
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                      <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        Graded Sections
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {availableSections.map((section, index) => (
+                          <div key={index} className="p-3 rounded-xl bg-white border border-green-100 shadow-sm">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">{section.section_name}</p>
+                                <p className="text-xs text-slate-500">{section.question_type.toUpperCase()}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-green-600">
+                                  {section.score || 0}/{section.max_marks}
+                                </p>
+                                <p className="text-xs text-slate-500">{section.feedback}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {pendingSections.length > 0 && (
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                      <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-orange-600" />
+                        Pending Review
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {pendingSections.map((section, index) => (
+                          <div key={index} className="p-3 rounded-xl bg-white border border-orange-100 shadow-sm">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">{section.section_name}</p>
+                                <p className="text-xs text-slate-500">{section.question_type.toUpperCase()}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs font-semibold text-orange-600 uppercase">Pending</p>
+                                <p className="text-xs text-slate-500">{section.feedback}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -407,57 +658,139 @@ const ExamResults: React.FC = () => {
             {/* Detailed Answers Tab */}
             {activeTab === 'detailed' && (
               <div className="space-y-4">
-                {Object.keys(detailed_answers).length > 0 ? (
-                  <div className="space-y-3">
-                    {Object.entries(detailed_answers).map(([questionId, answer]) => (
-                      <div key={questionId} className="border border-slate-200 rounded-lg p-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <h4 className="font-medium text-slate-900 text-sm">Question {questionId}</h4>
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              answer.is_correct 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {answer.is_correct ? 'Correct' : 'Incorrect'}
-                            </span>
-                            <span className="text-xs text-slate-500">{answer.marks_obtained}/{answer.max_marks} marks</span>
-                          </div>
-                        </div>
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-xs font-medium text-slate-700 mb-1">Question:</p>
-                            <div className="text-sm text-slate-900">
-                              <LaTeXRenderer content={answer.question_text} />
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                              <p className="text-xs font-medium text-slate-700 mb-1">Your Answer:</p>
-                              <p className="text-sm text-slate-900 bg-slate-50 p-2 rounded">{answer.user_answer}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs font-medium text-slate-700 mb-1">Correct Answer:</p>
-                              <p className="text-sm text-slate-900 bg-slate-50 p-2 rounded">{answer.correct_answer}</p>
-                            </div>
-                          </div>
-                          {answer.explanation && (
-                            <div>
-                              <p className="text-xs font-medium text-slate-700 mb-1">Explanation:</p>
-                              <div className="text-sm text-slate-900 bg-blue-50 p-2 rounded">
-                                <LaTeXRenderer content={answer.explanation} />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-slate-600" />
+                    <div className="flex gap-2">
+                      {[
+                        { id: 'all', label: 'All' },
+                        { id: 'correct', label: 'Correct' },
+                        { id: 'incorrect', label: 'Incorrect' },
+                      ].map((filter) => (
+                        <button
+                          key={filter.id}
+                          onClick={() => setDetailFilter(filter.id as typeof detailFilter)}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${
+                            detailFilter === filter.id
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          {filter.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-500 flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Printable answer sheet view
+                  </div>
+                </div>
+
+                {!detailedEntries || detailedEntries.length === 0 ? (
+                  <div className="text-center py-10 text-sm text-slate-600">
+                    Detailed answers are not available for this exam.
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <Eye className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-                    <p className="text-sm text-slate-600">No detailed answers available yet.</p>
-                    <p className="text-xs text-slate-500 mt-1">Answers will be available after grading is complete.</p>
+                  <div ref={answerSheetRef} className="space-y-6 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    {/* Cover / Exam Overview */}
+                    <div className="border-b border-slate-200 pb-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-blue-500">Answer Sheet</p>
+                          <h2 className="text-2xl font-bold text-slate-900 mt-1">{attempt.exam_title}</h2>
+                          <p className="text-sm text-slate-500">Attempt #{attempt.id}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-slate-600">{attempt.student_name}</p>
+                          <p className="text-xs text-slate-500">{new Date(attempt.submitted_at).toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-slate-600">
+                        <div>
+                          <p className="text-xs uppercase text-slate-400">Institute Status</p>
+                          <p className="font-semibold text-slate-900">{attempt.status.replace('_', ' ').toUpperCase()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase text-slate-400">Total Marks</p>
+                          <p className="font-semibold text-slate-900">{totalMarks || result.total_questions}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase text-slate-400">Duration</p>
+                          <p className="font-semibold text-slate-900">{formatTime(attempt.time_spent)}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Performance summary for PDF */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { label: 'Score', value: `${attempt.score || 0} / ${totalMarks || result.total_questions}` },
+                        { label: 'Accuracy', value: `${accuracy.toFixed(1)}%` },
+                        { label: 'Violations', value: `${attempt.violations_count}` },
+                        { label: 'Sections graded', value: `${availableSections.length}` },
+                      ].map((item) => (
+                        <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                          <p className="text-xs uppercase text-slate-400">{item.label}</p>
+                          <p className="text-lg font-semibold text-slate-900 mt-1">{item.value}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Question breakdown */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold text-slate-900">Detailed Responses</h3>
+                        <p className="text-xs text-slate-500">{detailedEntries.length} questions listed</p>
+                      </div>
+
+                      <div className="space-y-4">
+                        {detailedEntries.map((detail, index) => (
+                          <div
+                            key={detail.id || index}
+                            className="print-block-avoid border border-slate-200 rounded-2xl bg-white shadow-sm p-5 space-y-4"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                              <div>
+                                <p className="text-xs uppercase text-slate-500">Question {index + 1}</p>
+                                <h3 className="text-base font-semibold text-slate-900">{detail.question_type.toUpperCase()}</h3>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-slate-500">
+                                <span className="font-semibold text-slate-700">
+                                  Marks {detail.marks_obtained}/{detail.max_marks}
+                                </span>
+                                <span
+                                  className={`px-4 py-1 rounded-full text-xs font-semibold ${
+                                    detail.is_correct ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                                  }`}
+                                >
+                                  {detail.is_correct ? 'Correct' : 'Incorrect'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="bg-slate-50 rounded-xl p-4">
+                              <LaTeXRenderer content={detail.question_text} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                                <p className="text-xs font-semibold text-emerald-700 uppercase mb-1">Student Answer</p>
+                                <p className="text-sm text-emerald-900">{detail.user_answer || 'Not attempted'}</p>
+                              </div>
+                              <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                                <p className="text-xs font-semibold text-blue-700 uppercase mb-1">Correct Answer</p>
+                                <p className="text-sm text-blue-900">{detail.correct_answer}</p>
+                              </div>
+                            </div>
+                            {detail.explanation && (
+                              <div className="bg-slate-50 rounded-xl p-4 text-sm text-slate-700">
+                                <p className="text-xs uppercase text-slate-500 mb-2">Explanation</p>
+                                <LaTeXRenderer content={detail.explanation} />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
