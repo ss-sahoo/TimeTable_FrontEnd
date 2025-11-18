@@ -40,6 +40,7 @@ import PublicExamAccess from "@/react-app/pages/PublicExamAccess";
 import TeacherAnalytics from "@/react-app/pages/TeacherAnalytics";
 import TeacherEvaluationDashboard from "@/react-app/pages/TeacherEvaluationDashboard";
 import InstituteProfile from "@/react-app/pages/InstituteProfile";
+import LandingPage from "@/react-app/pages/LandingPage";
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -134,6 +135,24 @@ function RoleProtectedRoute({
 
 // Public Route Component (redirect to dashboard if authenticated)
 function PublicRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, loading } = useAuthContext();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return isAuthenticated ? <Navigate to="/dashboard" /> : children;
+}
+
+// Landing Route Component (show landing page if not authenticated, dashboard if authenticated)
+function LandingRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuthContext();
 
   if (loading) {
@@ -385,8 +404,14 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
 
-      {/* Default redirect */}
-      <Route path="/" element={<Navigate to="/dashboard" />} />
+      {/* Landing Page */}
+      <Route path="/" element={
+        <LandingRoute>
+          <LandingPage />
+        </LandingRoute>
+      } />
+      
+      {/* Default redirect for authenticated users */}
       <Route path="*" element={<Navigate to="/dashboard" />} />
     </Routes>
   );

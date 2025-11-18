@@ -1057,9 +1057,9 @@ const SecureExamExperience: React.FC = () => {
               <div>
                 <p className={`text-lg font-mono ${getTimeColor()}`}>{formatTime(timeRemaining)}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Time Remaining</p>
-              </div>
             </div>
-
+          </div>
+          
             <div className="bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-2">
               <p className="text-lg font-semibold">{attemptedCount}/{totalQuestions}</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">Attempted ({progressPercent}%)</p>
@@ -1078,28 +1078,28 @@ const SecureExamExperience: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={requestFullscreen}
+            <button
+              onClick={requestFullscreen}
                 className="p-3 border border-slate-200 dark:border-slate-700 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 title="Request fullscreen"
-              >
-                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
+            >
+              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
                 className="px-5 py-3 bg-emerald-600 text-white rounded-2xl font-semibold text-sm flex items-center gap-2 shadow-sm hover:bg-emerald-700 transition-colors disabled:opacity-70"
-              >
-                {isSubmitting ? (
+            >
+              {isSubmitting ? (
                   <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-                Submit Exam
-              </button>
-            </div>
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+              Submit Exam
+            </button>
           </div>
         </div>
+      </div>
       </header>
 
       <div className="px-6 py-4 h-[calc(100vh-104px)] flex gap-4 overflow-hidden">
@@ -1178,7 +1178,7 @@ const SecureExamExperience: React.FC = () => {
                   <button
                     onClick={() => handleFlagToggle(currentQuestion.id)}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 ${
-                      currentAnswer?.is_flagged
+                      currentAnswer?.is_flagged 
                         ? 'bg-amber-500/90 text-white shadow'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
                     }`}
@@ -1186,176 +1186,176 @@ const SecureExamExperience: React.FC = () => {
                     <Flag className="w-4 h-4" />
                     {currentAnswer?.is_flagged ? 'Flagged for Review' : 'Mark for Review'}
                   </button>
-                </div>
+              </div>
 
                 <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6 question-scroll">
                   <div className="text-lg leading-relaxed text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-2xl px-6 py-5">
-                    <LaTeXRenderer content={currentQuestion.question_text} />
-                  </div>
+                  <LaTeXRenderer content={currentQuestion.question_text} />
+              </div>
 
-                  {(currentQuestion.question_type === 'mcq' || currentQuestion.question_type === 'single_mcq') && (
-                    <div className="space-y-3">
-                      {currentQuestion.options.map((option, index) => {
-                        const optionText = typeof option === 'string' ? option : option.text;
-                        const optionId = typeof option === 'object' && option.id ? option.id : index;
-
-                        return (
-                          <label
-                            key={optionId}
-                            className={`block p-4 border-2 rounded-2xl cursor-pointer transition-all ${currentAnswer?.answer === optionText
-                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
-                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-blue-300 dark:hover:border-slate-500'}`}
-                          >
-                            <input
-                              type="radio"
-                              name={`question-${currentQuestion.id}`}
-                              value={optionText}
-                              checked={currentAnswer?.answer === optionText}
-                              onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                              className="sr-only"
-                            />
-                            <div className="flex items-center gap-3">
-                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                                currentAnswer?.answer === optionText
-                                  ? 'border-blue-500 bg-blue-500'
-                                  : 'border-slate-300 dark:border-slate-600'
-                              }`}>
-                                {currentAnswer?.answer === optionText && <div className="w-2 h-2 bg-white rounded-full" />}
-                              </div>
-                              <span className="text-sm text-slate-900 dark:text-white">
-                                <LaTeXRenderer content={optionText} />
-                              </span>
-                            </div>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {currentQuestion.question_type === 'multiple_mcq' && (() => {
-                    const selectedAnswers = currentAnswer?.answer ? String(currentAnswer.answer).split('|').filter(Boolean) : [];
+              {(currentQuestion.question_type === 'mcq' || currentQuestion.question_type === 'single_mcq') && (
+                <div className="space-y-3">
+                  {currentQuestion.options.map((option, index) => {
+                    const optionText = typeof option === 'string' ? option : option.text;
+                    const optionId = typeof option === 'object' && option.id ? option.id : index;
+                    
                     return (
-                      <div className="space-y-3">
-                        <p className="text-sm text-purple-600 dark:text-purple-400 font-medium mb-3">
-                          Select all correct options (multiple answers allowed)
-                        </p>
-                        {currentQuestion.options.map((option, index) => {
-                          const optionText = typeof option === 'string' ? option : option.text;
-                          const optionId = typeof option === 'object' && option.id ? option.id : index;
-                          const isSelected = selectedAnswers.includes(optionText);
+                      <label
+                        key={optionId}
+                            className={`block p-4 border-2 rounded-2xl cursor-pointer transition-all ${currentAnswer?.answer === optionText
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
+                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-blue-300 dark:hover:border-slate-500'}`}
+                      >
+                        <input
+                          type="radio"
+                          name={`question-${currentQuestion.id}`}
+                          value={optionText}
+                          checked={currentAnswer?.answer === optionText}
+                          onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                          className="sr-only"
+                        />
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                            currentAnswer?.answer === optionText
+                              ? 'border-blue-500 bg-blue-500'
+                                  : 'border-slate-300 dark:border-slate-600'
+                          }`}>
+                                {currentAnswer?.answer === optionText && <div className="w-2 h-2 bg-white rounded-full" />}
+                          </div>
+                              <span className="text-sm text-slate-900 dark:text-white">
+                            <LaTeXRenderer content={optionText} />
+                          </span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
 
-                          return (
-                            <label
-                              key={optionId}
+              {currentQuestion.question_type === 'multiple_mcq' && (() => {
+                    const selectedAnswers = currentAnswer?.answer ? String(currentAnswer.answer).split('|').filter(Boolean) : [];
+                return (
+                <div className="space-y-3">
+                  <p className="text-sm text-purple-600 dark:text-purple-400 font-medium mb-3">
+                          Select all correct options (multiple answers allowed)
+                  </p>
+                  {currentQuestion.options.map((option, index) => {
+                    const optionText = typeof option === 'string' ? option : option.text;
+                    const optionId = typeof option === 'object' && option.id ? option.id : index;
+                    const isSelected = selectedAnswers.includes(optionText);
+                    
+                    return (
+                      <label
+                        key={optionId}
                               className={`block p-4 border-2 rounded-2xl cursor-pointer transition-all ${isSelected
-                                ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 shadow-md'
+                            ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 shadow-md'
                                 : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-purple-300 dark:hover:border-slate-500'}`}
-                            >
-                              <input
-                                type="checkbox"
-                                name={`question-${currentQuestion.id}-${index}`}
-                                value={optionText}
-                                checked={isSelected}
-                                onChange={(e) => {
-                                  const currentAnswers = currentAnswer?.answer ? String(currentAnswer.answer).split('|') : [];
+                      >
+                        <input
+                          type="checkbox"
+                          name={`question-${currentQuestion.id}-${index}`}
+                          value={optionText}
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const currentAnswers = currentAnswer?.answer ? String(currentAnswer.answer).split('|') : [];
                                   const newAnswers = e.target.checked
                                     ? [...currentAnswers, optionText]
                                     : currentAnswers.filter(a => a !== optionText);
-                                  handleAnswerChange(currentQuestion.id, newAnswers.join('|'));
-                                }}
-                                className="sr-only"
-                              />
-                              <div className="flex items-center gap-3">
-                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                            handleAnswerChange(currentQuestion.id, newAnswers.join('|'));
+                          }}
+                          className="sr-only"
+                        />
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
                                   isSelected ? 'border-purple-500 bg-purple-500' : 'border-slate-300 dark:border-slate-600'
-                                }`}>
+                          }`}>
                                   {isSelected && <CheckCircle className="w-4 h-4 text-white" />}
-                                </div>
+                          </div>
                                 <span className="text-sm text-slate-900 dark:text-white">
-                                  <LaTeXRenderer content={optionText} />
-                                </span>
-                              </div>
-                            </label>
-                          );
-                        })}
-                        <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
-                          Selected: {selectedAnswers.length > 0 ? selectedAnswers.join(', ') : 'None'}
-                        </p>
-                      </div>
+                            <LaTeXRenderer content={optionText} />
+                          </span>
+                        </div>
+                      </label>
                     );
-                  })()}
+                  })}
+                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+                    Selected: {selectedAnswers.length > 0 ? selectedAnswers.join(', ') : 'None'}
+                  </p>
+                </div>
+                );
+              })()}
 
-                  {currentQuestion.question_type === 'numerical' && (
+              {currentQuestion.question_type === 'numerical' && (
                     <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-2xl p-5">
-                      <input
-                        type="number"
-                        value={currentAnswer?.answer || ''}
-                        onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                  <input
+                    type="number"
+                    value={currentAnswer?.answer || ''}
+                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
                         className="w-full p-4 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
-                        placeholder="Enter your numerical answer"
-                        step="0.01"
-                      />
-                    </div>
-                  )}
+                    placeholder="Enter your numerical answer"
+                    step="0.01"
+                  />
+                </div>
+              )}
 
-                  {currentQuestion.question_type === 'subjective' && (
+              {currentQuestion.question_type === 'subjective' && (
                     <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-2xl p-5">
-                      <textarea
-                        value={currentAnswer?.answer || ''}
-                        onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                  <textarea
+                    value={currentAnswer?.answer || ''}
+                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
                         className="w-full h-48 p-4 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                         placeholder="Write your answer here..."
-                      />
-                    </div>
-                  )}
-
-                  {currentQuestion.question_type === 'true_false' && (
-                    <div className="space-y-3">
-                      {['True', 'False'].map((option) => (
-                        <label
-                          key={option}
-                          className={`block p-4 border-2 rounded-2xl cursor-pointer transition-all ${
-                            currentAnswer?.answer === option
-                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
-                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-blue-300 dark:hover:border-slate-500'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name={`question-${currentQuestion.id}`}
-                            value={option}
-                            checked={currentAnswer?.answer === option}
-                            onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                            className="sr-only"
-                          />
-                          <div className="flex items-center gap-3">
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                              currentAnswer?.answer === option ? 'border-blue-500 bg-blue-500' : 'border-slate-300 dark:border-slate-600'
-                            }`}>
-                              {currentAnswer?.answer === option && <div className="w-2 h-2 bg-white rounded-full" />}
-                            </div>
-                            <span className="text-sm font-medium">{option}</span>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-
-                  {currentQuestion.question_type === 'fill_blank' && (
-                    <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-2xl p-5">
-                      <input
-                        type="text"
-                        value={currentAnswer?.answer || ''}
-                        onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                        className="w-full p-4 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
-                        placeholder="Fill in the blank..."
-                      />
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                        Type your answer in the blank space provided
-                      </p>
-                    </div>
-                  )}
+                  />
                 </div>
+              )}
+
+              {currentQuestion.question_type === 'true_false' && (
+                <div className="space-y-3">
+                  {['True', 'False'].map((option) => (
+                    <label
+                      key={option}
+                          className={`block p-4 border-2 rounded-2xl cursor-pointer transition-all ${
+                        currentAnswer?.answer === option
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
+                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-blue-300 dark:hover:border-slate-500'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name={`question-${currentQuestion.id}`}
+                        value={option}
+                        checked={currentAnswer?.answer === option}
+                        onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                              currentAnswer?.answer === option ? 'border-blue-500 bg-blue-500' : 'border-slate-300 dark:border-slate-600'
+                        }`}>
+                              {currentAnswer?.answer === option && <div className="w-2 h-2 bg-white rounded-full" />}
+                        </div>
+                            <span className="text-sm font-medium">{option}</span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {currentQuestion.question_type === 'fill_blank' && (
+                    <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-2xl p-5">
+                  <input
+                    type="text"
+                    value={currentAnswer?.answer || ''}
+                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                        className="w-full p-4 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
+                    placeholder="Fill in the blank..."
+                  />
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                    Type your answer in the blank space provided
+                  </p>
+                </div>
+              )}
+            </div>
 
                 <div className="px-8 py-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900/60">
                   <div className="flex flex-wrap items-center gap-4 text-xs font-semibold">
@@ -1371,7 +1371,7 @@ const SecureExamExperience: React.FC = () => {
                       <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
                       Remaining: {questionStats.notVisited}
                     </span>
-                  </div>
+        </div>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handlePreviousQuestion}
@@ -1395,18 +1395,18 @@ const SecureExamExperience: React.FC = () => {
         {showQuestionPalette && (
           <aside className="hidden lg:flex w-[340px] xl:w-[360px] flex-col gap-4">
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm p-5 flex flex-col h-[60%]">
-              <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-500">Question Navigator</p>
                   <p className="text-lg font-semibold">Palette</p>
                 </div>
-                <button
-                  onClick={() => setShowQuestionPalette(false)}
+              <button
+                onClick={() => setShowQuestionPalette(false)}
                   className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                >
-                  <EyeOff className="w-4 h-4" />
-                </button>
-              </div>
+              >
+                <EyeOff className="w-4 h-4" />
+              </button>
+            </div>
 
               {subjectSummaries.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto pb-3">
@@ -1443,7 +1443,7 @@ const SecureExamExperience: React.FC = () => {
                       <div>
                         <p className="text-sm font-semibold text-slate-900 dark:text-white">{summary.name}</p>
                         <p className="text-xs text-slate-500">{summary.answered}/{summary.total} answered • {summary.flagged} flagged</p>
-                      </div>
+                    </div>
                       {activeSubject === 'All' && (
                         <button
                           onClick={() => handleSubjectFilterChange(summary.key)}
@@ -1466,15 +1466,15 @@ const SecureExamExperience: React.FC = () => {
                             <span>Q{questionIndex + 1}</span>
                             <span className="text-[11px] text-slate-500">{question.marks}m</span>
                             {answers.get(question.id)?.is_flagged && <span className="text-[10px] text-amber-500 font-bold">⚑</span>}
-                          </button>
-                        );
-                      })}
+                  </button>
+                );
+              })}
                     </div>
                   </div>
                 )) : (
                   <p className="text-xs text-slate-500">No subjects available.</p>
                 )}
-              </div>
+            </div>
 
               <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] font-semibold">
                 <span className="flex items-center gap-1">
@@ -1486,27 +1486,27 @@ const SecureExamExperience: React.FC = () => {
                 <span className="flex items-center gap-1">
                   <span className="w-3 h-3 rounded-full bg-slate-400"></span> Not Visited
                 </span>
-              </div>
-            </div>
+                </div>
+                </div>
 
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-xs uppercase tracking-wide text-slate-500">Subject Overview</p>
                 <span className="text-xs font-semibold text-blue-600">{subjectSummaryEntries.length} Subjects</span>
-              </div>
+                </div>
               <div className="space-y-3">
                 {subjectSummaryEntries.length > 0 ? subjectSummaryEntries.map(summary => (
                   <div key={summary.name} className="flex items-center justify-between border border-slate-100 dark:border-slate-800 rounded-2xl px-3 py-2">
                     <div>
                       <p className="text-sm font-semibold">{summary.name}</p>
                       <p className="text-xs text-slate-500">{summary.answered}/{summary.total} attempted</p>
-                    </div>
+              </div>
                     <span className="text-xs font-semibold text-amber-600">{summary.flagged} flagged</span>
-                  </div>
+            </div>
                 )) : (
                   <p className="text-sm text-slate-500">Subject information not provided.</p>
                 )}
-              </div>
+          </div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm p-5">
