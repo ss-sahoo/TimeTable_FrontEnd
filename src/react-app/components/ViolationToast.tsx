@@ -46,6 +46,8 @@ const ViolationToast: React.FC<ViolationToastProps> = ({ violation, onClose }) =
         return 'Fullscreen Exited';
       case 'keyboard_shortcut':
         return 'Blocked Shortcut Used';
+      case 'camera_error':
+        return 'Camera Issue Detected';
       default:
         return 'Violation Detected';
     }

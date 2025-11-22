@@ -100,8 +100,6 @@ const SecureExamExperience: React.FC = () => {
   
   // Pre-exam flow states
   const [examStarted, setExamStarted] = useState(false);
-  const [showInstructions, setShowInstructions] = useState(true);
-  const [agreedToPolicy, setAgreedToPolicy] = useState(false);
   const [photoTaken, setPhotoTaken] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [capturingPhoto, setCapturingPhoto] = useState(false);
@@ -129,6 +127,17 @@ const SecureExamExperience: React.FC = () => {
   useEffect(() => {
     loadExamData();
   }, [attemptId]);
+
+  // Auto-start exam once data is loaded
+  useEffect(() => {
+    if (examAttempt && questions.length > 0 && !examStarted) {
+      // Small delay to ensure everything is ready, then start exam
+      const timer = setTimeout(() => {
+        setExamStarted(true);
+      }, 1000); // 1 second delay for smooth transition
+      return () => clearTimeout(timer);
+    }
+  }, [examAttempt, questions.length, examStarted]);
 
   // Timer effect
   useEffect(() => {
@@ -803,238 +812,21 @@ const SecureExamExperience: React.FC = () => {
     );
   }
 
-  // Pre-exam Instructions Screen
-  if (!examStarted && showInstructions) {
-    // Get pattern sections for display
-    const patternSections = examAttempt?.exam.pattern?.sections || [];
-    
+  // Show brief loading/starting message while exam initializes
+  if (!examStarted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-gray-900 flex items-center justify-center p-4">
-        <div className="w-full max-w-6xl h-[95vh] bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
-          {/* Header - Fixed */}
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white text-center">{examAttempt?.exam.title}</h1>
-            <p className="text-xs text-gray-600 dark:text-gray-400 text-center mt-1">Read the instructions carefully before starting</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-600 mb-4">
+            <Flag className="w-8 h-8 text-white animate-pulse" />
           </div>
-
-          {/* Content Area - Scrollable if needed */}
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left Column */}
-              <div className="space-y-4">
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-blue-100 dark:bg-blue-900/30 rounded-lg p-3 text-center border border-blue-200 dark:border-blue-700">
-                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{questions.length}</p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Questions</p>
-                  </div>
-                  <div className="bg-purple-100 dark:bg-purple-900/30 rounded-lg p-3 text-center border border-purple-200 dark:border-purple-700">
-                    <p className="text-xl font-bold text-purple-600 dark:text-purple-400">{examAttempt?.exam.duration_minutes}</p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Minutes</p>
-                  </div>
-                  <div className="bg-green-100 dark:bg-green-900/30 rounded-lg p-3 text-center border border-green-200 dark:border-green-700">
-                    <p className="text-xl font-bold text-green-600 dark:text-green-400">{patternSections.length}</p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Sections</p>
-                  </div>
-                </div>
-
-                {/* Exam Structure */}
-                {patternSections.length > 0 && (
-                  <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-2">Exam Structure:</h3>
-                    <div className="space-y-1.5">
-                      {patternSections.map((section, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-xs bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
-                          <span className="font-medium text-gray-900 dark:text-white">{section.name}</span>
-                          <span className="text-gray-600 dark:text-gray-400">
-                            Q{section.start_question}-{section.end_question}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Right Column - Instructions */}
-              <div className="bg-blue-50 dark:bg-gray-700/50 rounded-lg p-4 border border-blue-200 dark:border-gray-600">
-                <h2 className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-3">Important Instructions:</h2>
-            
-                <div className="space-y-2 text-xs text-gray-700 dark:text-gray-300">
-                  <p className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold">•</span>
-                    <span>Timer cannot be paused once started</span>
-                  </p>
-                  <p className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold">•</span>
-                    <span>Auto-save every 30 seconds</span>
-                  </p>
-                  <p className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold">•</span>
-                    <span>Navigate freely between questions</span>
-                  </p>
-                  <p className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold">•</span>
-                    <span>Flag questions for review</span>
-                  </p>
-                  {examAttempt?.exam.require_fullscreen && (
-                    <p className="flex items-start gap-2 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded">
-                      <span className="text-yellow-600 dark:text-yellow-400 font-bold">⚠</span>
-                      <span className="text-yellow-700 dark:text-yellow-300"><strong>Fullscreen required</strong></span>
-                    </p>
-                  )}
-                  {!examAttempt?.exam.allow_tab_switching && (
-                    <p className="flex items-start gap-2 bg-red-50 dark:bg-red-900/20 p-2 rounded">
-                      <span className="text-red-600 dark:text-red-400 font-bold">⚠</span>
-                      <span className="text-red-700 dark:text-red-300"><strong>No tab switching</strong> - Violations recorded</span>
-                    </p>
-                  )}
-                  {examAttempt?.exam.enable_webcam_proctoring && (
-                    <p className="flex items-start gap-2 bg-purple-50 dark:bg-purple-900/20 p-2 rounded">
-                      <span className="text-purple-600 dark:text-purple-400 font-bold">📷</span>
-                      <span className="text-purple-700 dark:text-purple-300"><strong>Webcam proctoring</strong> enabled</span>
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer - Fixed */}
-          <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 space-y-4">
-            {/* Policy Agreement */}
-            <label className="flex items-start gap-3 cursor-pointer bg-blue-50 dark:bg-gray-700/50 p-4 rounded-lg border border-blue-200 dark:border-gray-600">
-              <input
-                type="checkbox"
-                checked={agreedToPolicy}
-                onChange={(e) => setAgreedToPolicy(e.target.checked)}
-                className="mt-0.5 w-5 h-5 text-blue-600 border-gray-300 dark:border-gray-500 rounded focus:ring-blue-500"
-              />
-              <span className="text-xs text-gray-700 dark:text-gray-300">
-                I have read and understood the instructions. I agree to follow all exam rules and policies. 
-                I understand that any violation may result in disqualification.
-              </span>
-            </label>
-
-            {/* Buttons */}
-            <div className="flex gap-4">
-              <button
-                onClick={() => navigate('/student-dashboard')}
-                className="flex-1 px-6 py-3 bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition-all font-semibold text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setShowInstructions(false);
-                  startWebcam(); // Start webcam when moving to photo screen
-                }}
-                disabled={!agreedToPolicy}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              >
-                Continue to Photo Verification →
-              </button>
-            </div>
-          </div>
+          <h2 className="text-xl font-semibold text-slate-900 mb-2">Starting Exam...</h2>
+          <p className="text-sm text-slate-600">Please wait while we prepare your exam environment</p>
         </div>
       </div>
     );
   }
 
-  // Photo Capture Screen
-  if (!examStarted && !photoTaken) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 dark:from-gray-900 dark:via-purple-900 dark:to-gray-900 flex items-center justify-center p-6">
-        <div className="max-w-2xl w-full bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 border border-gray-200 dark:border-gray-700">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 text-center">Photo Verification</h1>
-          
-          <div className="bg-purple-50 dark:bg-gray-700/50 rounded-xl p-6 mb-6 border border-purple-200 dark:border-gray-600">
-            <p className="text-gray-700 dark:text-gray-300 text-center mb-4 text-sm">
-              Please capture your photo for identity verification
-            </p>
-            
-            {!capturedPhoto ? (
-              <div className="space-y-4">
-                {/* Webcam Preview */}
-                <div className="relative bg-gray-900 rounded-xl overflow-hidden border-2 border-gray-300 dark:border-gray-600">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    className="w-full h-64 object-cover"
-                  />
-                  <canvas ref={canvasRef} className="hidden" />
-                </div>
-                
-                {photoError && (
-                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3">
-                    <p className="text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4" />
-                      {photoError}
-                    </p>
-                  </div>
-                )}
-                
-                <button
-                  onClick={capturePhotoFromWebcam}
-                  disabled={capturingPhoto}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {capturingPhoto ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      📸 Capture Photo
-                    </>
-                  )}
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Show captured photo */}
-                <div className="bg-gray-900 rounded-xl overflow-hidden border-2 border-green-300 dark:border-green-600">
-                  <img src={capturedPhoto} alt="Captured" className="w-full h-64 object-cover" />
-                </div>
-                <div className="flex items-center justify-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-500" />
-                  <p className="text-green-600 dark:text-green-400 font-semibold text-sm">Photo captured and uploaded successfully!</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-4">
-            <button
-              onClick={() => {
-                setShowInstructions(true);
-                setPhotoTaken(false);
-                setCapturedPhoto(null);
-                stopWebcam();
-              }}
-              className="flex-1 px-6 py-3 bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white rounded-xl hover:bg-gray-300 dark:hover:bg-gray-700 transition-all font-semibold text-sm"
-            >
-              ← Back
-            </button>
-            <button
-              onClick={() => setExamStarted(true)}
-              disabled={!photoTaken}
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
-            >
-              <Flag className="w-5 h-5" />
-              🏁 Start Exam
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const currentQuestion = questions[currentQuestionIndex];
   const currentAnswer = answers.get(currentQuestion?.id);

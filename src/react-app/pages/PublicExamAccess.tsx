@@ -402,208 +402,185 @@ export default function PublicExamAccess() {
   }
 
   return (
-    <div className="relative min-h-screen bg-slate-50">
+    <div className="relative h-screen w-full overflow-hidden bg-slate-50">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-48 left-1/2 h-[560px] w-[560px] -translate-x-1/2 rounded-full bg-blue-100/60 blur-3xl" />
         <div className="absolute bottom-0 right-0 h-96 w-96 translate-x-24 bg-sky-100/50 blur-3xl" />
       </div>
 
-      <div className="relative mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+      <div className="relative h-full w-full flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white/80 backdrop-blur-sm">
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-4 py-2 text-xs font-medium uppercase tracking-[0.2em] text-blue-700 shadow-sm transition hover:bg-blue-50"
+            className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium uppercase tracking-[0.2em] text-blue-700 shadow-sm transition hover:bg-blue-50"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-5 w-5" />
             Back
           </button>
-          <span className="text-xs uppercase tracking-[0.3em] text-slate-500">
+          <span className="text-sm uppercase tracking-[0.3em] text-slate-500">
             Secure Candidate Portal
           </span>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr]">
-          {/* Overview Pane */}
-          <div className="space-y-8">
-            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-blue-100/40">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="rounded-2xl bg-blue-50 p-3 text-blue-600">
-                    <Sparkles className="h-6 w-6" />
-                </div>
-                <div>
-                    <p className="text-xs uppercase tracking-[0.4em] text-blue-500">
-                    Public Exam Access
-                  </p>
-                    <h1 className="mt-2 text-2xl font-semibold text-slate-900">{exam.title}</h1>
-                    {exam.institute_name && (
-                      <p className="mt-1 text-sm text-slate-500">
-                        Hosted by {exam.institute_name}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-medium uppercase tracking-[0.3em] text-blue-600">
-                  Exam ID #{exam.exam_id}
-                </div>
-              </div>
-
-              {exam.description && (
-                <p className="mt-6 text-sm leading-relaxed text-slate-600">
-                  {exam.description}
-                </p>
-              )}
-
-              <div className="mt-8 grid gap-4 sm:grid-cols-2">
-                {examMetrics.map(({ label, value, icon: Icon }) => (
-                  <div
-                    key={label}
-                    className="flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50/80 px-4 py-3 text-sm text-slate-700"
-                  >
-                    <div className="rounded-xl bg-white p-2 shadow-sm">
-                      <Icon className="h-4 w-4 text-blue-600" />
+        {/* Main Content - Full Width Grid */}
+        <div className="flex-1 overflow-hidden">
+          <div className="h-full w-full grid grid-cols-12 gap-4 p-4">
+            {/* Left Column - Exam Info */}
+            <div className="col-span-7 flex flex-col gap-3 overflow-y-auto pr-2">
+              {/* Exam Header Card */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-blue-100/40 flex-shrink-0">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="rounded-xl bg-blue-50 p-2.5 text-blue-600">
+                      <Sparkles className="h-5 w-5" />
                     </div>
-                    <div>
-                      <p className="text-[11px] uppercase tracking-[0.25em] text-blue-500">
-                        {label}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs uppercase tracking-[0.3em] text-blue-500">
+                        Public Exam Access
                       </p>
-                      <p className="text-base font-medium text-slate-900">{value}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-8 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-5 text-slate-700 md:grid-cols-2">
-                <div className="flex items-center gap-3">
-                  <Calendar className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Opens</p>
-                    <p className="text-sm font-medium text-slate-900">{formatDate(exam.start_date)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Clock className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Closes</p>
-                    <p className="text-sm font-medium text-slate-900">{formatDate(exam.end_date)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Building2 className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.25em] text-slate-500">
-                      Delivered By
-                    </p>
-                    <p className="text-sm font-medium text-slate-900">
-                      {exam.created_by_name || 'Invigilator'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.25em] text-slate-500">
-                      Attempts Allowed
-                    </p>
-                    <p className="text-sm font-medium text-slate-900">{exam.max_attempts}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/60">
-              <div className="flex items-center gap-2 text-slate-900">
-                <Shield className="h-5 w-5 text-blue-600" />
-                <h2 className="text-base font-semibold">Exam Security & Integrity</h2>
-              </div>
-              <div className="grid gap-4 text-sm text-slate-600 md:grid-cols-2">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <ShieldCheck className="h-4 w-4 text-blue-600" />
-                    Proctored Environment
-                  </h3>
-                  <p className="mt-2 text-xs leading-relaxed">
-                    Live monitoring with AI checks ensures authentic participation and flags suspicious behaviour in real time.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <Users className="h-4 w-4 text-blue-600" />
-                    Identity Verification
-                  </h3>
-                  <p className="mt-2 text-xs leading-relaxed">
-                    We validate your details against secure records before granting exam access.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <Target className="h-4 w-4 text-blue-600" />
-                    Time-Bound Session
-                  </h3>
-                  <p className="mt-2 text-xs leading-relaxed">
-                    The exam timer starts the moment you enter the secure environment and cannot be paused.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <Globe className="h-4 w-4 text-blue-600" />
-                    Location Controls
-                  </h3>
-                  <p className="mt-2 text-xs leading-relaxed">
-                    Access is restricted to approved networks and device configurations for fairness.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 text-slate-700 shadow-lg shadow-slate-200/60">
-              <h3 className="mb-5 flex items-center gap-2 text-sm font-semibold text-slate-900">
-                <Sparkles className="h-5 w-5 text-blue-600" />
-                What Happens Next
-              </h3>
-              <div className="space-y-4">
-                {timeline.map((item, idx) => (
-                  <div
-                    key={item.title}
-                    className="relative pl-8"
-                  >
-                    <div className="absolute left-0 top-1 flex h-full flex-col items-center">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-[11px] font-semibold text-blue-700">
-                        {idx + 1}
-                      </div>
-                      {idx !== timeline.length - 1 && (
-                        <div className="mt-1 h-full w-px bg-gradient-to-b from-blue-200 to-transparent" />
+                      <h1 className="mt-1 text-2xl font-semibold text-slate-900 truncate">{exam.title}</h1>
+                      {exam.institute_name && (
+                        <p className="mt-0.5 text-sm text-slate-500 truncate">
+                          Hosted by {exam.institute_name}
+                        </p>
                       )}
                     </div>
-                    <h4 className="text-sm font-semibold text-slate-900">{item.title}</h4>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-600">{item.description}</p>
                   </div>
-                ))}
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium uppercase tracking-[0.2em] text-blue-600 whitespace-nowrap">
+                    ID #{exam.exam_id}
+                  </div>
+                </div>
+
+                {exam.description && (
+                  <p className="mt-4 text-sm leading-relaxed text-slate-600 line-clamp-2">
+                    {exam.description}
+                  </p>
+                )}
+
+                <div className="mt-4 grid grid-cols-4 gap-2">
+                  {examMetrics.map(({ label, value, icon: Icon }) => (
+                    <div
+                      key={label}
+                      className="flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/80 px-3 py-2"
+                    >
+                      <div className="rounded-lg bg-white p-1.5 shadow-sm">
+                        <Icon className="h-3.5 w-3.5 text-blue-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-[0.2em] text-blue-500 truncate">
+                          {label}
+                        </p>
+                        <p className="text-base font-semibold text-slate-900 truncate">{value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Opens</p>
+                      <p className="text-sm font-medium text-slate-900 truncate">{formatDate(exam.start_date)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Closes</p>
+                      <p className="text-sm font-medium text-slate-900 truncate">{formatDate(exam.end_date)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Security Info - Compact */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-lg shadow-slate-200/60 flex-shrink-0">
+                <div className="flex items-center gap-2 text-slate-900 mb-3">
+                  <Shield className="h-5 w-5 text-blue-600" />
+                  <h2 className="text-base font-semibold">Security & Integrity</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 mb-1">
+                      <ShieldCheck className="h-4 w-4 text-blue-600" />
+                      Proctored
+                    </h3>
+                    <p className="text-xs leading-relaxed text-slate-600">
+                      AI monitoring ensures authentic participation.
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 mb-1">
+                      <Users className="h-4 w-4 text-blue-600" />
+                      Verified
+                    </h3>
+                    <p className="text-xs leading-relaxed text-slate-600">
+                      Identity validation before access.
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 mb-1">
+                      <Target className="h-4 w-4 text-blue-600" />
+                      Timed
+                    </h3>
+                    <p className="text-xs leading-relaxed text-slate-600">
+                      Timer starts immediately, cannot pause.
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 mb-1">
+                      <Globe className="h-4 w-4 text-blue-600" />
+                      Controlled
+                    </h3>
+                    <p className="text-xs leading-relaxed text-slate-600">
+                      Restricted to approved networks.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Timeline - Compact */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-lg shadow-slate-200/60 flex-shrink-0">
+                <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <Sparkles className="h-5 w-5 text-blue-600" />
+                  What Happens Next
+                </h3>
+                <div className="grid grid-cols-5 gap-2">
+                  {timeline.map((item, idx) => (
+                    <div key={item.title} className="text-center">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-xs font-semibold text-blue-700 mx-auto mb-1.5">
+                        {idx + 1}
+                      </div>
+                      <h4 className="text-xs font-semibold text-slate-900 mb-1">{item.title}</h4>
+                      <p className="text-[10px] leading-tight text-slate-600">{item.description}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Form Pane */}
-          <div className="space-y-8">
-            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-blue-100/40">
-              <div className="mb-6">
-                <h2 className="text-lg font-semibold text-slate-900">Confirm Your Identity</h2>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                  We use these details to personalise your exam session and share your results. Please ensure everything matches your official records.
-                </p>
-              </div>
+            {/* Right Column - Form */}
+            <div className="col-span-5 flex flex-col gap-3 overflow-y-auto">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-blue-100/40 flex-shrink-0">
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Confirm Your Identity</h2>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                    Provide accurate details to access the exam.
+                  </p>
+                </div>
 
-              {!accessPayload ? (
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label
-                        htmlFor="first_name"
-                        className="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
-                      >
-                        First Name *
-                      </label>
-                      <div className="relative">
+                {!accessPayload ? (
+                  <form onSubmit={handleSubmit} className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label
+                          htmlFor="first_name"
+                          className="mb-1 block text-xs font-semibold uppercase tracking-[0.15em] text-slate-500"
+                        >
+                          First Name *
+                        </label>
                         <input
                           type="text"
                           id="first_name"
@@ -611,191 +588,192 @@ export default function PublicExamAccess() {
                           required
                           value={formData.first_name}
                           onChange={handleInputChange}
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                          placeholder="e.g. Priya"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-100"
+                          placeholder="First name"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="last_name"
+                          className="mb-1 block text-xs font-semibold uppercase tracking-[0.15em] text-slate-500"
+                        >
+                          Last Name *
+                        </label>
+                        <input
+                          type="text"
+                          id="last_name"
+                          name="last_name"
+                          required
+                          value={formData.last_name}
+                          onChange={handleInputChange}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-100"
+                          placeholder="Last name"
                         />
                       </div>
                     </div>
+
                     <div>
                       <label
-                        htmlFor="last_name"
-                        className="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                        htmlFor="email"
+                        className="mb-1 block text-xs font-semibold uppercase tracking-[0.15em] text-slate-500"
                       >
-                        Last Name *
+                        Email Address *
                       </label>
-                      <input
-                        type="text"
-                        id="last_name"
-                        name="last_name"
-                        required
-                        value={formData.last_name}
-                        onChange={handleInputChange}
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        placeholder="e.g. Sharma"
-                      />
+                      <div className="relative">
+                        <Mail className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="email"
+                          id="email"
+                          name="email"
+                          required
+                          value={formData.email}
+                          onChange={handleInputChange}
+                          className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-100"
+                          placeholder="you@example.com"
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <label
-                      htmlFor="email"
-                      className="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
-                    >
-                      Email Address *
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        required
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-10 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        placeholder="you@example.com"
-                      />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label
+                          htmlFor="phone"
+                          className="mb-1 block text-xs font-semibold uppercase tracking-[0.15em] text-slate-500"
+                        >
+                          Phone
+                        </label>
+                        <div className="relative">
+                          <Phone className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="tel"
+                            id="phone"
+                            name="phone"
+                            value={formData.phone}
+                            onChange={handleInputChange}
+                            className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-100"
+                            placeholder="Optional"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="student_id"
+                          className="mb-1 block text-xs font-semibold uppercase tracking-[0.15em] text-slate-500"
+                        >
+                          Student ID
+                        </label>
+                        <input
+                          type="text"
+                          id="student_id"
+                          name="student_id"
+                          value={formData.student_id}
+                          onChange={handleInputChange}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-100"
+                          placeholder="Optional"
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <label
-                      htmlFor="phone"
-                      className="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
-                    >
-                      Phone Number
-                    </label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="tel"
-                        id="phone"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleInputChange}
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-10 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        placeholder="Optional"
-                      />
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+                      <label className="flex items-start gap-2 text-xs text-slate-600">
+                        <input
+                          type="checkbox"
+                          id="agree_to_terms"
+                          name="agree_to_terms"
+                          checked={formData.agree_to_terms}
+                          onChange={handleInputChange}
+                          className="mt-0.5 h-4 w-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span>
+                          I confirm the information is accurate and agree to follow exam rules and proctoring requirements.
+                        </span>
+                      </label>
                     </div>
-                  </div>
 
-                  <div>
-                    <label
-                      htmlFor="student_id"
-                      className="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
-                    >
-                      Student ID
-                    </label>
-                    <input
-                      type="text"
-                      id="student_id"
-                      name="student_id"
-                      value={formData.student_id}
-                      onChange={handleInputChange}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                      placeholder="Optional"
-                    />
-                  </div>
-
-                  <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
-                    <label className="flex items-start gap-3 text-xs text-slate-600">
-                      <input
-                        type="checkbox"
-                        id="agree_to_terms"
-                        name="agree_to_terms"
-                        checked={formData.agree_to_terms}
-                        onChange={handleInputChange}
-                        className="mt-1 h-4 w-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span>
-                        I confirm that the information provided is accurate and I agree to follow the exam rules, proctoring requirements and honour code for this assessment.
-                      </span>
-                    </label>
-                  </div>
-
-                  {submitError && (
-                    <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">
-                      <AlertCircle className="mt-0.5 h-5 w-5" />
-                      <p>{submitError}</p>
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={submitting || !formData.agree_to_terms}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/40 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    {submitting ? (
-                      <>
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Verifying…
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-4 w-4" />
-                        Verify & Continue
-                      </>
+                    {submitError && (
+                      <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+                        <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+                        <p>{submitError}</p>
+                      </div>
                     )}
-                  </button>
-                </form>
-              ) : (
-                <div className="space-y-6">
-                  <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                    <div>
-                      <p className="font-semibold text-emerald-700">Access granted</p>
-                      <p className="text-xs leading-relaxed text-emerald-600">
-                        {submitSuccess}
-                      </p>
+
+                    <button
+                      type="submit"
+                      disabled={submitting || !formData.agree_to_terms}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/40 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      {submitting ? (
+                        <>
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Verifying…
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4" />
+                          Verify & Continue
+                        </>
+                      )}
+                    </button>
+                  </form>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+                      <div>
+                        <p className="font-semibold text-emerald-700">Access granted</p>
+                        <p className="text-xs leading-relaxed text-emerald-600 mt-0.5">
+                          {submitSuccess}
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-xs text-slate-600">
-                    <p className="font-semibold text-slate-900">Next steps</p>
-                    <ol className="mt-2 space-y-1.5 list-decimal list-inside">
-                      <li>We will launch secure exam setup in the next screen.</li>
-                      <li>Complete camera, microphone and environment checks.</li>
-                      <li>Enter fullscreen proctoring to begin attempting questions.</li>
-                    </ol>
-                  </div>
-
-                  {startExamError && (
-                    <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">
-                      <AlertCircle className="h-5 w-5" />
-                      <p>{startExamError}</p>
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-slate-600">
+                      <p className="font-semibold text-slate-900 mb-1.5">Next steps</p>
+                      <ol className="space-y-1 list-decimal list-inside text-xs">
+                        <li>Secure exam setup will launch</li>
+                        <li>Complete camera & environment checks</li>
+                        <li>Enter fullscreen to begin</li>
+                      </ol>
                     </div>
-                  )}
 
-                  <button
-                    onClick={handleContinueToExam}
-                    disabled={startingExam}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-400/40 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    {startingExam ? (
-                      <>
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Preparing secure exam…
-                      </>
-                    ) : (
-                      <>
-                        Enter secure exam environment
-                        <Play className="h-4 w-4" />
-                      </>
+                    {startExamError && (
+                      <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+                        <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                        <p>{startExamError}</p>
+                      </div>
                     )}
-                  </button>
-                </div>
-              )}
-            </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 text-slate-600 shadow-lg shadow-slate-200/60">
-              <h3 className="mb-4 text-sm font-semibold text-slate-900">Please remember</h3>
-              <ul className="space-y-2 text-xs leading-relaxed">
-                <li>• Complete the exam within the allotted time once the secure session starts.</li>
-                <li>• Your webcam and screen activity may be monitored throughout.</li>
-                <li>• External resources or assistance are strictly prohibited.</li>
-                <li>• Any violation may lead to immediate disqualification.</li>
-                <li>• Your details are protected and only used for administering this exam.</li>
-              </ul>
+                    <button
+                      onClick={handleContinueToExam}
+                      disabled={startingExam}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-400/40 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      {startingExam ? (
+                        <>
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Preparing…
+                        </>
+                      ) : (
+                        <>
+                          Enter Secure Exam
+                          <Play className="h-4 w-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-600 shadow-lg shadow-slate-200/60 flex-shrink-0">
+                <h3 className="mb-2 text-sm font-semibold text-slate-900">Please remember</h3>
+                <ul className="space-y-1 text-xs leading-relaxed">
+                  <li>• Complete within allotted time</li>
+                  <li>• Webcam & screen monitored</li>
+                  <li>• No external resources allowed</li>
+                  <li>• Violations may disqualify</li>
+                  <li>• Details protected & secure</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>

@@ -41,6 +41,8 @@ import TeacherAnalytics from "@/react-app/pages/TeacherAnalytics";
 import TeacherEvaluationDashboard from "@/react-app/pages/TeacherEvaluationDashboard";
 import InstituteProfile from "@/react-app/pages/InstituteProfile";
 import LandingPage from "@/react-app/pages/LandingPage";
+import ProctoringDiagnostics from "@/react-app/pages/ProctoringDiagnostics";
+import ProctoringSnapshotsView from "@/react-app/pages/ProctoringSnapshotsView";
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -323,6 +325,11 @@ function AppRoutes() {
               <ViolationDashboard />
             </ProtectedRoute>
           } />
+          <Route path="/proctoring-snapshots/:attemptId" element={
+            <ProtectedRoute>
+              <ProctoringSnapshotsView />
+            </ProtectedRoute>
+          } />
           <Route path="/patterns" element={
             <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
               <PatternManagement />
@@ -396,6 +403,11 @@ function AppRoutes() {
           <Route path="/settings" element={
             <ProtectedRoute>
               <Settings />
+            </ProtectedRoute>
+          } />
+          <Route path="/proctoring-test" element={
+            <ProtectedRoute>
+              <ProctoringDiagnostics />
             </ProtectedRoute>
           } />
           <Route path="/institute-profile" element={
