@@ -44,8 +44,8 @@
     "wrangler": "^4.33.0"
   },
   "scripts": {
-    "build": "npx vite build",
-    "build:check": "npx tsc -b && npx vite build",
+    "build": "NODE_OPTIONS=--max-old-space-size=4096 npx vite build",
+    "build:check": "npx tsc -b && NODE_OPTIONS=--max-old-space-size=4096 npx vite build",
     "cf-typegen": "wrangler types",
     "check": "npx tsc && npx vite build && wrangler deploy --dry-run",
     "dev": "npx vite",
