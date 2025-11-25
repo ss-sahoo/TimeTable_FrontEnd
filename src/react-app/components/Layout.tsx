@@ -17,11 +17,11 @@ import {
   FileText,
   BarChart3,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
-import ThemeToggle from './ThemeToggle';
+import { useOnboardingTour } from '../contexts/OnboardingTourContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -39,6 +39,16 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { user, logout } = useAuthContext();
+  const {
+    ctaLabel,
+    ctaTone,
+    isActive: tourActive,
+    hasCompleted: tourCompleted,
+    isPaused: tourPaused,
+    startTour,
+    resumeTour,
+    restartTour,
+  } = useOnboardingTour();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -87,6 +97,31 @@ export default function Layout({ children }: LayoutProps) {
     navigate('/login');
   };
 
+  const handleOnboardingClick = () => {
+    if (tourActive) return;
+    if (tourCompleted) {
+      restartTour();
+      return;
+    }
+    if (tourPaused) {
+      resumeTour();
+      return;
+    }
+    startTour();
+  };
+
+  const onboardingToneClasses = (() => {
+    switch (ctaTone) {
+      case 'success':
+        return 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-emerald-500/30';
+      case 'outline':
+        return 'bg-white text-blue-600 border border-blue-200 hover:border-blue-400 hover:text-blue-700';
+      case 'primary':
+      default:
+        return 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-blue-500/40';
+    }
+  })();
+
   const isActive = (path: string) => location.pathname === path;
 
   return (
@@ -115,6 +150,7 @@ export default function Layout({ children }: LayoutProps) {
           <nav className="p-4 space-y-1">
             {getNavigation().map((item) => {
               const Icon = item.icon;
+              const tourNavId = item.href === '/patterns' ? 'nav-patterns' : undefined;
               
               // Handle disabled/separator items
               if (item.disabled) {
@@ -133,6 +169,7 @@ export default function Layout({ children }: LayoutProps) {
                   key={item.name}
                   to={item.href}
                   onClick={() => setSidebarOpen(false)}
+                  data-tour-id={tourNavId}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                     isActive(item.href)
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
@@ -189,6 +226,7 @@ export default function Layout({ children }: LayoutProps) {
             {getNavigation().map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
+              const tourNavId = item.href === '/patterns' ? 'nav-patterns' : undefined;
               
               // Handle disabled/separator items
               if (item.disabled) {
@@ -213,6 +251,7 @@ export default function Layout({ children }: LayoutProps) {
                 <Link
                   key={item.name}
                   to={item.href}
+                  data-tour-id={tourNavId}
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all group ${
                     active
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
@@ -296,9 +335,30 @@ export default function Layout({ children }: LayoutProps) {
             </div>
 
             <div className="flex items-center gap-3">
-              {/* Theme Toggle */}
-              <ThemeToggle />
-              
+              {/* Onboarding CTA */}
+              <button
+                type="button"
+                onClick={handleOnboardingClick}
+                disabled={tourActive}
+                className={`group relative inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-80 disabled:cursor-not-allowed ${onboardingToneClasses}`}
+                data-tour-id="cta-start-onboarding"
+              >
+                <div className="absolute inset-0 rounded-full bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" aria-hidden />
+                <Sparkles className="w-4 h-4" />
+                <span>{ctaLabel}</span>
+                {!tourActive && tourPaused && (
+                  <span className="text-[11px] font-normal px-2 py-0.5 rounded-full bg-white/30 text-white">
+                    Resume
+                  </span>
+                )}
+                {tourActive && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-normal px-2 py-0.5 rounded-full bg-white/20">
+                    <span className="w-2 h-2 rounded-full bg-lime-400 animate-pulse" />
+                    Live
+                  </span>
+                )}
+              </button>
+
               {/* Notifications */}
               <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 relative transition-colors">
                 <Bell className="w-5 h-5 text-slate-700 dark:text-gray-300" />

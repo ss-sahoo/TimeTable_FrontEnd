@@ -134,6 +134,14 @@ export default function ExamManagement() {
 
   const stats = getExamStats();
 
+  const scrollToExamGrid = () => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+    const gridElement = document.getElementById('exam-grid');
+    gridElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleDeleteExam = async (examId: number) => {
     if (window.confirm('Are you sure you want to delete this exam? This action cannot be undone.')) {
       try {
@@ -168,6 +176,7 @@ export default function ExamManagement() {
           </div>
           <Link
             to="/exams/create"
+            data-tour-id="cta-create-exam"
             className="inline-flex items-center gap-2 px-3 py-2 text-sm text-white rounded-lg transition-colors"
             style={{ backgroundColor: '#216865' }}
             onMouseEnter={(e) => e.target.style.backgroundColor = '#1a524f'}
@@ -176,6 +185,48 @@ export default function ExamManagement() {
             <Plus className="w-4 h-4" />
             Create Exam
           </Link>
+        </div>
+
+        <div
+          data-tour-id="panel-scheduling"
+          className="mb-6 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 via-cyan-50 to-indigo-50 px-5 py-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
+        >
+          <div className="space-y-3">
+            <div className="text-xs font-semibold text-blue-700 uppercase tracking-[0.2em]">
+              Scheduling & Invites
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-slate-900">
+                Orchestrate exam windows with timezone-smart reminders
+              </h3>
+              <p className="text-sm text-slate-600 mt-2">
+                Open the scheduling drawer inside any exam card to configure slots, buffers, and branded email journeys
+                before sending invitations.
+              </p>
+            </div>
+            <ul className="space-y-1.5 text-sm text-slate-600">
+              <li className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-blue-500" />
+                Auto-send invites, reminders, and fallback SMS notes
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-blue-500" />
+                Enforce buffers, grace periods, and rescheduling limits
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-blue-500" />
+                Preview the candidate experience before publishing
+              </li>
+            </ul>
+          </div>
+          <button
+            type="button"
+            onClick={scrollToExamGrid}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-blue-600 text-white text-sm font-semibold shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition-all"
+          >
+            <Calendar className="w-4 h-4" />
+            Jump to my exams
+          </button>
         </div>
 
         {/* Stats Cards */}
@@ -265,7 +316,7 @@ export default function ExamManagement() {
         </div>
 
         {/* Exams Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div id="exam-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredExams.map((exam) => (
             <div key={exam.id} className="bg-white rounded-lg border border-slate-200 p-4 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between mb-3">

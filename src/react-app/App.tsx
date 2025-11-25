@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
 import { AuthProvider, useAuthContext } from "@/react-app/contexts/AuthContext";
 import { ThemeProvider } from "@/react-app/contexts/ThemeContext";
+import { OnboardingTourProvider } from "@/react-app/contexts/OnboardingTourContext";
 import Layout from "@/react-app/components/Layout";
 import Login from "@/react-app/pages/Login";
 import Register from "@/react-app/pages/Register";
@@ -36,6 +37,14 @@ import ExamAnalytics from "@/react-app/pages/ExamAnalytics";
 import Results from "@/react-app/pages/Results";
 import ExamReview from "@/react-app/pages/ExamReview";
 import ExamResultsAnalyticsEnhanced from "@/react-app/pages/ExamResultsAnalyticsEnhanced";
+import ExamAnalyticsDashboard from "@/react-app/pages/ExamAnalyticsDashboard";
+import StatisticsPage from "@/react-app/pages/analytics/StatisticsPage";
+import HeatMapPage from "@/react-app/pages/analytics/HeatMapPage";
+import HistogramPage from "@/react-app/pages/analytics/HistogramPage";
+import BoxPlotPage from "@/react-app/pages/analytics/BoxPlotPage";
+import QuestionsPage from "@/react-app/pages/analytics/QuestionsPage";
+import EvaluationPage from "@/react-app/pages/analytics/EvaluationPage";
+import GraphsPage from "@/react-app/pages/analytics/GraphsPage";
 import PublicExamAccess from "@/react-app/pages/PublicExamAccess";
 import TeacherAnalytics from "@/react-app/pages/TeacherAnalytics";
 import TeacherEvaluationDashboard from "@/react-app/pages/TeacherEvaluationDashboard";
@@ -220,9 +229,22 @@ function AppRoutes() {
           } />
           <Route path="/exams/:examId/results-analytics" element={
             <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
-              <ExamResultsAnalyticsEnhanced />
+              <Navigate to="statistics" replace />
             </RoleProtectedRoute>
           } />
+          <Route path="/exams/:examId/results-analytics/*" element={
+            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+              <ExamAnalyticsDashboard />
+            </RoleProtectedRoute>
+          }>
+            <Route path="statistics" element={<StatisticsPage />} />
+            <Route path="heatmap" element={<HeatMapPage />} />
+            <Route path="histogram" element={<HistogramPage />} />
+            <Route path="boxplot" element={<BoxPlotPage />} />
+            <Route path="questions" element={<QuestionsPage />} />
+            <Route path="evaluation" element={<EvaluationPage />} />
+            <Route path="graphs" element={<GraphsPage />} />
+          </Route>
           <Route path="/exams/:examId/evaluation" element={
             <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
               <TeacherEvaluationDashboard />
@@ -434,7 +456,9 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <Router>
-          <AppRoutes />
+          <OnboardingTourProvider>
+            <AppRoutes />
+          </OnboardingTourProvider>
         </Router>
       </AuthProvider>
     </ThemeProvider>

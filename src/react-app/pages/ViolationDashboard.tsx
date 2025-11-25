@@ -210,7 +210,10 @@ const ViolationDashboard: React.FC = () => {
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div
+            className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
+            data-tour-id="panel-proctoring"
+          >
             <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
               <div className="flex items-center justify-between">
                 <div>

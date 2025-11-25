@@ -219,6 +219,7 @@ export default function PatternManagement() {
             </div>
             <Link
               to="/patterns/create"
+              data-tour-id="cta-create-pattern"
               className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               <Plus className="w-4 h-4" />
