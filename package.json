@@ -11,6 +11,7 @@
     "face-api.js": "^0.22.2",
     "framer-motion": "^12.23.24",
     "hono": "4.7.7",
+    "html2canvas": "^1.4.1",
     "jwt-decode": "^4.0.0",
     "katex": "^0.16.25",
     "lucide-react": "^0.510.0",
