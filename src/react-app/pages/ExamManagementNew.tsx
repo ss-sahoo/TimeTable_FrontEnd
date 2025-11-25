@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
-import { getPublicExamLink } from '../utils/urlUtils';
+import { getPublicExamLink, normalizeShareUrl } from '../utils/urlUtils';
 
 interface Exam {
   id: number;
@@ -144,8 +144,10 @@ export default function ExamManagement() {
     if (!exam.is_question_complete) {
       return '';
     }
+    // Normalize share_url from backend (replace localhost) or generate new link
+    const normalizedShareUrl = normalizeShareUrl(exam.share_url);
     return (
-      exam.share_url ||
+      normalizedShareUrl ||
       (exam.public_access_token ? getPublicExamLink(exam.public_access_token) : '')
     );
   };

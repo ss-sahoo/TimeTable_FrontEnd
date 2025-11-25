@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
-import { getPublicExamLink } from '../utils/urlUtils';
+import { getPublicExamLink, normalizeShareUrl } from '../utils/urlUtils';
 import timezones from '@/shared/timezones';
 
 const userDefaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
@@ -532,11 +532,12 @@ export default function ExamCreation() {
         const response = await api.post('/exams/exams/', examData);
         const newExam = response.data;
 
-        const shareUrl =
+        const shareUrl = normalizeShareUrl(
           newExam?.share_url ||
           (newExam?.public_access_token
-            ? `${window.location.origin}/public-exam/${newExam.public_access_token}`
-            : undefined);
+            ? getPublicExamLink(newExam.public_access_token)
+            : undefined)
+        );
 
         if (newExam?.id) {
           setCreationSuccess({
@@ -564,9 +565,10 @@ export default function ExamCreation() {
 
   const handleCopyCreatedLink = async () => {
     if (!creationSuccess) return;
-    const link =
+    const link = normalizeShareUrl(
       creationSuccess.shareUrl ||
-      (creationSuccess.token ? getPublicExamLink(creationSuccess.token) : '');
+      (creationSuccess.token ? getPublicExamLink(creationSuccess.token) : '')
+    );
     if (!link) return;
 
     try {
@@ -581,9 +583,10 @@ export default function ExamCreation() {
   };
 
   const handleCopyPublicLink = async () => {
-    const link =
+    const link = normalizeShareUrl(
       publicLinkInfo?.share_url ||
-      (publicLinkInfo?.token ? getPublicExamLink(publicLinkInfo.token) : '');
+      (publicLinkInfo?.token ? getPublicExamLink(publicLinkInfo.token) : '')
+    );
     if (!link) return;
 
     try {
@@ -707,7 +710,7 @@ export default function ExamCreation() {
                 </p>
                 {creationSuccess.shareUrl && (
                   <p className="mt-2 text-xs font-mono text-blue-900 break-all bg-white/60 px-3 py-2 rounded-lg border border-blue-200">
-                    {creationSuccess.shareUrl}
+                    {normalizeShareUrl(creationSuccess.shareUrl)}
                   </p>
                 )}
               </div>
@@ -1361,7 +1364,7 @@ export default function ExamCreation() {
                           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                             <div className="flex-1">
                               <p className="text-xs font-medium text-slate-600">Shareable URL</p>
-                              <p className="text-sm font-semibold text-blue-900 break-all">{publicLinkInfo.share_url}</p>
+                              <p className="text-sm font-semibold text-blue-900 break-all">{normalizeShareUrl(publicLinkInfo.share_url)}</p>
                             </div>
                             <div className="flex items-center gap-2">
                               <button

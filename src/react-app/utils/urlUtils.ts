@@ -2,7 +2,7 @@
  * Get the frontend base URL for generating shareable links.
  * Uses environment variable if set, otherwise uses production domain.
  */
-const PRODUCTION_DOMAIN = 'http://exams.dashoapp.com';
+const PRODUCTION_DOMAIN = 'https://exams.dashoapp.com';
 
 export function getFrontendUrl(): string {
   // Check for environment variable first
@@ -29,5 +29,19 @@ export function getPublicExamLink(token: string): string {
 export function getExamViewLink(examId: number | string): string {
   const baseUrl = getFrontendUrl();
   return `${baseUrl}/exam-view/${examId}`;
+}
+
+/**
+ * Normalize a URL by replacing localhost with production domain
+ * This ensures backend URLs with localhost are converted to production domain
+ */
+export function normalizeShareUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  
+  // Replace any localhost URL with production domain
+  const localhostPattern = /https?:\/\/localhost(:\d+)?/gi;
+  const productionDomain = getFrontendUrl();
+  
+  return url.replace(localhostPattern, productionDomain);
 }
 
