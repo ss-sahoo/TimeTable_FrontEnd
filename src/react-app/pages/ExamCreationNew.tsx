@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
+import { getPublicExamLink } from '../utils/urlUtils';
 import timezones from '@/shared/timezones';
 
 const userDefaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
@@ -565,7 +566,7 @@ export default function ExamCreation() {
     if (!creationSuccess) return;
     const link =
       creationSuccess.shareUrl ||
-      (creationSuccess.token ? `${window.location.origin}/public-exam/${creationSuccess.token}` : '');
+      (creationSuccess.token ? getPublicExamLink(creationSuccess.token) : '');
     if (!link) return;
 
     try {
@@ -582,7 +583,7 @@ export default function ExamCreation() {
   const handleCopyPublicLink = async () => {
     const link =
       publicLinkInfo?.share_url ||
-      (publicLinkInfo?.token ? `${window.location.origin}/public-exam/${publicLinkInfo.token}` : '');
+      (publicLinkInfo?.token ? getPublicExamLink(publicLinkInfo.token) : '');
     if (!link) return;
 
     try {

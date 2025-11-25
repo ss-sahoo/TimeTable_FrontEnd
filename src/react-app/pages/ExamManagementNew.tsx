@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
+import { getPublicExamLink } from '../utils/urlUtils';
 
 interface Exam {
   id: number;
@@ -145,7 +146,7 @@ export default function ExamManagement() {
     }
     return (
       exam.share_url ||
-      (exam.public_access_token ? `${window.location.origin}/public-exam/${exam.public_access_token}` : '')
+      (exam.public_access_token ? getPublicExamLink(exam.public_access_token) : '')
     );
   };
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Clock, Calendar, BookOpen, MoreVertical, Link, Copy } from 'lucide-react';
 import { Exam } from '@/shared/types';
+import { getExamViewLink } from '../utils/urlUtils';
 
 interface ExamCardProps {
   exam: Exam;
@@ -30,7 +31,7 @@ export default function ExamCard({ exam, onClick }: ExamCardProps) {
     setShowMenu(false);
   };
 
-  const examLink = `${window.location.origin}/exam-view/${exam.id}`;
+  const examLink = getExamViewLink(exam.id);
 
   const copyLink = () => {
     navigator.clipboard.writeText(examLink);
