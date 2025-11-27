@@ -52,6 +52,7 @@ import InstituteProfile from "@/react-app/pages/InstituteProfile";
 import LandingPage from "@/react-app/pages/LandingPage";
 import ProctoringDiagnostics from "@/react-app/pages/ProctoringDiagnostics";
 import ProctoringSnapshotsView from "@/react-app/pages/ProctoringSnapshotsView";
+import BulkImportPage from "@/react-app/pages/BulkImportPage";
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -381,6 +382,11 @@ function AppRoutes() {
             <ProtectedRoute>
               <QuestionCreation />
             </ProtectedRoute>
+          } />
+          <Route path="/exam/:examId/pattern/:patternId/bulk-import" element={
+            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+              <BulkImportPage />
+            </RoleProtectedRoute>
           } />
           <Route path="/questions" element={
             <ProtectedRoute>

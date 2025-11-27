@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
+import QuestionBulkImport from '../components/extraction/QuestionBulkImport';
 
 const slugifySubject = (subject: string) =>
   subject
@@ -105,6 +106,7 @@ export default function ExamView() {
   const [sectionStats, setSectionStats] = useState<SectionQuestionStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showBulkImport, setShowBulkImport] = useState(false);
 
   useEffect(() => {
     if (examId) {
@@ -427,13 +429,22 @@ export default function ExamView() {
                   {totalQuestionsAdded} of {exam.total_questions} questions added · {overallProgress.toFixed(0)}% complete
                 </p>
               </div>
-              <Link
-                to={`/patterns/${exam.pattern.id}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-              >
-                <ExternalLink className="w-3 h-3" />
-                Pattern
-              </Link>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => navigate(`/exam/${exam.id}/pattern/${exam.pattern.id}/bulk-import`)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors"
+                >
+                  <Upload className="w-3 h-3" />
+                  AI Bulk Import
+                </button>
+                <Link
+                  to={`/patterns/${exam.pattern.id}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Pattern
+                </Link>
+              </div>
             </div>
             <div className="max-h-[360px] overflow-auto">
               <table className="w-full border-collapse text-[13px]">
@@ -592,6 +603,19 @@ export default function ExamView() {
           </aside>
         </div>
       </div>
+
+      {/* Bulk Import Modal */}
+      {showBulkImport && exam && (
+        <QuestionBulkImport
+          examId={exam.id}
+          patternId={exam.pattern.id}
+          onClose={() => setShowBulkImport(false)}
+          onImportComplete={() => {
+            setShowBulkImport(false);
+            fetchExam(); // Refresh exam data to show new questions
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -286,7 +286,7 @@ export default function Register() {
         {/* Footer */}
         <div className="text-center mt-8">
           <p className="text-xs text-slate-500">
-            © 2024 ExamFlow. All rights reserved.
+            © 2024 DashoExams. All rights reserved.
           </p>
         </div>
       </div>

@@ -44,7 +44,7 @@ export default function AdminDashboard() {
                 <GraduationCap className="w-8 h-8 text-blue-600" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-slate-900">ExamFlow</h1>
+                <h1 className="text-3xl font-bold text-slate-900">DashoExams</h1>
                 <p className="text-slate-600">Professional exam creation and management</p>
               </div>
             </div>

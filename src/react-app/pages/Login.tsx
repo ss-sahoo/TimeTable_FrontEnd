@@ -45,7 +45,7 @@ export default function Login() {
             <GraduationCap className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Welcome Back</h1>
-          <p className="text-slate-600 text-sm">Sign in to your ExamFlow account</p>
+          <p className="text-slate-600 text-sm">Sign in to your DashoExams account</p>
         </div>
 
         {/* Login Form */}
@@ -166,7 +166,7 @@ export default function Login() {
         {/* Footer */}
         <div className="text-center mt-8">
           <p className="text-xs text-slate-500">
-            © 2024 ExamFlow. All rights reserved.
+            © 2024 DashoExams. All rights reserved.
           </p>
         </div>
       </div>

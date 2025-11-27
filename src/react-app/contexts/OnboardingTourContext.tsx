@@ -25,7 +25,7 @@ interface OnboardingTourContextValue {
 
 const OnboardingTourContext = createContext<OnboardingTourContextValue | undefined>(undefined);
 
-const STORAGE_KEY = 'examflow:onboarding-tour';
+const STORAGE_KEY = 'dashoexams:onboarding-tour';
 
 interface StoredTourState {
   hasCompleted: boolean;

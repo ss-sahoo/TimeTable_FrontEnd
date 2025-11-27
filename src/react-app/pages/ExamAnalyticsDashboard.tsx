@@ -59,15 +59,22 @@ export default function ExamAnalyticsDashboard() {
 
       // Load sections if pattern exists
       if (response.data.pattern) {
-        const patternResponse = await api.get(`/patterns/patterns/${response.data.pattern}/`);
-        const sectionsData = patternResponse.data.sections || [];
-        setSections(
-          sectionsData.map((section: any) => ({
-            id: section.id,
-            name: section.name,
-            subject: section.subject || '',
-          }))
-        );
+        // Handle both pattern ID (number) and pattern object
+        const patternId = typeof response.data.pattern === 'object' 
+          ? response.data.pattern.id 
+          : response.data.pattern;
+        
+        if (patternId) {
+          const patternResponse = await api.get(`/patterns/patterns/${patternId}/`);
+          const sectionsData = patternResponse.data.sections || [];
+          setSections(
+            sectionsData.map((section: any) => ({
+              id: section.id,
+              name: section.name,
+              subject: section.subject || '',
+            }))
+          );
+        }
       }
 
       // Set max score from exam total marks

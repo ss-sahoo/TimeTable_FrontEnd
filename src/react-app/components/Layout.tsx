@@ -133,10 +133,10 @@ export default function Layout({ children }: LayoutProps) {
           {/* Mobile Header */}
           <div className="flex items-center justify-between p-4 border-b border-blue-700 dark:border-blue-500 bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center shadow-lg">
-                <GraduationCap className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-violet-500 backdrop-blur flex items-center justify-center shadow-lg">
+                <Zap className="w-6 h-6 text-white" />
               </div>
-              <span className="font-bold text-white text-lg">ExamFlow</span>
+              <span className="font-bold text-white text-lg">DashoExams</span>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
@@ -212,11 +212,11 @@ export default function Layout({ children }: LayoutProps) {
           {/* Logo & Brand */}
           <div className="flex items-center justify-between p-3 border-b border-blue-700 bg-gradient-to-r from-blue-600 to-blue-700">
             <div className="flex items-center gap-2 overflow-hidden">
-              <div className="w-9 h-9 rounded-lg bg-white/20 backdrop-blur flex items-center justify-center shadow-lg flex-shrink-0">
-                <GraduationCap className="w-5 h-5 text-white" />
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-sky-500 to-violet-500 backdrop-blur flex items-center justify-center shadow-lg flex-shrink-0">
+                <Zap className="w-5 h-5 text-white" />
               </div>
               {!sidebarCollapsed && (
-                <span className="font-bold text-white text-base whitespace-nowrap">ExamFlow</span>
+                <span className="font-bold text-white text-base whitespace-nowrap">DashoExams</span>
               )}
             </div>
           </div>
@@ -433,9 +433,28 @@ export default function Layout({ children }: LayoutProps) {
         </div>
 
         {/* Page content */}
-        <main className="min-h-screen bg-slate-50 dark:bg-gray-900 transition-colors duration-200">
+        <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-gray-900 transition-colors duration-200">
           {children}
         </main>
+
+        {/* Footer */}
+        <footer className="bg-white dark:bg-gray-900 border-t border-slate-200 dark:border-gray-700 py-4">
+          <div className="px-4 lg:px-6">
+            <div className="flex items-center justify-center">
+              <p className="text-xs text-slate-500 dark:text-gray-400">
+                Powered by{' '}
+                <a 
+                  href="https://diracai.com/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors cursor-pointer"
+                >
+                  DiracAI
+                </a>
+              </p>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
   );

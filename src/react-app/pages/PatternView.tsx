@@ -20,9 +20,11 @@ import {
   TrendingUp,
   Calendar,
   User,
-  Settings
+  Settings,
+  Upload
 } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
+import QuestionBulkImport from '../components/extraction/QuestionBulkImport';
 
 interface PatternSection {
   id: number;
@@ -61,8 +63,9 @@ export default function PatternView() {
   const { patternId } = useParams<{ patternId: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'overview' | 'sections' | 'questions'>('overview');
+  const [showBulkImport, setShowBulkImport] = useState(false);
   
-  const { data: pattern, loading, error } = useApi<ExamPattern>(`/patterns/patterns/${patternId}/`);
+  const { data: pattern, loading, error, refetch } = useApi<ExamPattern>(`/patterns/patterns/${patternId}/`);
 
   const getQuestionTypeIcon = (type: string) => {
     switch (type) {
@@ -420,13 +423,22 @@ export default function PatternView() {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-slate-900">Questions Overview</h3>
-                  <Link
-                    to={`/patterns/${pattern.id}/questions/create`}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Questions
-                  </Link>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setShowBulkImport(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      <Upload className="w-4 h-4" />
+                      Bulk Import (AI)
+                    </button>
+                    <Link
+                      to={`/patterns/${pattern.id}/questions/create`}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Questions
+                    </Link>
+                  </div>
                 </div>
 
                 {pattern.sections && pattern.sections.length > 0 ? (
@@ -483,13 +495,22 @@ export default function PatternView() {
                     <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-slate-900 mb-2">No Questions Available</h3>
                     <p className="text-slate-600 mb-4">This pattern doesn't have any questions yet.</p>
-                    <Link
-                      to={`/patterns/${pattern.id}/questions/create`}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add Questions
-                    </Link>
+                    <div className="flex items-center justify-center gap-3">
+                      <button
+                        onClick={() => setShowBulkImport(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Bulk Import (AI)
+                      </button>
+                      <Link
+                        to={`/patterns/${pattern.id}/questions/create`}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Questions
+                      </Link>
+                    </div>
                   </div>
                 )}
               </div>
@@ -497,6 +518,19 @@ export default function PatternView() {
           </div>
         </div>
       </div>
+
+      {/* Bulk Import Modal */}
+      {showBulkImport && pattern && (
+        <QuestionBulkImport
+          examId={pattern.id}
+          patternId={pattern.id}
+          onClose={() => setShowBulkImport(false)}
+          onImportComplete={() => {
+            setShowBulkImport(false);
+            refetch(); // Refresh pattern data to show new questions
+          }}
+        />
+      )}
     </div>
   );
 }

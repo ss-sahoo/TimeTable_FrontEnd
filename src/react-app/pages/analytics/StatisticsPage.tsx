@@ -125,27 +125,27 @@ export default function StatisticsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <AnalyticsCard
           title="Mean Score"
-          value={stats?.average_score.toFixed(2) || '0.00'}
+          value={stats?.average_score?.toFixed(2) ?? '0.00'}
           icon={BarChart3}
-          subtitle={`Out of ${data?.exam.total_marks || 0} marks`}
+          subtitle={`Out of ${data?.exam?.total_marks ?? 0} marks`}
         />
         <AnalyticsCard
           title="Median Score"
-          value={stats?.median_score.toFixed(2) || '0.00'}
+          value={stats?.median_score?.toFixed(2) ?? '0.00'}
           icon={TrendingUp}
           subtitle="50th percentile"
         />
         <AnalyticsCard
           title="Mode Score"
-          value={stats?.mode_score.toFixed(2) || '0.00'}
+          value={stats?.mode_score?.toFixed(2) ?? '0.00'}
           icon={Target}
           subtitle="Most frequent score"
         />
         <AnalyticsCard
           title="Range"
-          value={stats?.range_score.toFixed(2) || '0.00'}
+          value={stats?.range_score?.toFixed(2) ?? '0.00'}
           icon={TrendingDown}
-          subtitle={`${stats?.lowest_score.toFixed(2) || 0} - ${stats?.highest_score.toFixed(2) || 0}`}
+          subtitle={`${stats?.lowest_score?.toFixed(2) ?? 0} - ${stats?.highest_score?.toFixed(2) ?? 0}`}
         />
       </div>
 
@@ -153,25 +153,25 @@ export default function StatisticsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <AnalyticsCard
           title="Std Deviation"
-          value={stats?.std_deviation.toFixed(2) || '0.00'}
+          value={stats?.std_deviation?.toFixed(2) ?? '0.00'}
           subtitle="Score variability"
         />
         <AnalyticsCard
           title="Variance"
-          value={stats?.variance.toFixed(2) || '0.00'}
+          value={stats?.variance?.toFixed(2) ?? '0.00'}
           subtitle="Statistical variance"
         />
         <AnalyticsCard
           title="Average Time"
-          value={`${Math.floor((stats?.average_time_spent || 0) / 60)}m ${(stats?.average_time_spent || 0) % 60}s`}
+          value={`${Math.floor((stats?.average_time_spent ?? 0) / 60)}m ${(stats?.average_time_spent ?? 0) % 60}s`}
           icon={Clock}
           subtitle="Time spent on exam"
         />
         <AnalyticsCard
           title="Completion Rate"
-          value={`${stats?.completion_rate.toFixed(1) || 0}%`}
+          value={`${stats?.completion_rate?.toFixed(1) ?? 0}%`}
           icon={Users}
-          subtitle={`${stats?.total_attempts || 0} of ${stats?.total_invited || 0} invited`}
+          subtitle={`${stats?.total_attempts ?? 0} of ${stats?.total_invited ?? 0} invited`}
         />
       </div>
 
@@ -181,23 +181,23 @@ export default function StatisticsPage() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="text-center">
             <p className="text-xs text-slate-500 mb-1">25th Percentile</p>
-            <p className="text-2xl font-bold text-slate-900">{stats?.percentiles.p25.toFixed(2) || '0.00'}</p>
+            <p className="text-2xl font-bold text-slate-900">{stats?.percentiles?.p25?.toFixed(2) ?? '0.00'}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500 mb-1">50th Percentile (Median)</p>
-            <p className="text-2xl font-bold text-blue-600">{stats?.percentiles.p50.toFixed(2) || '0.00'}</p>
+            <p className="text-2xl font-bold text-blue-600">{stats?.percentiles?.p50?.toFixed(2) ?? '0.00'}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500 mb-1">75th Percentile</p>
-            <p className="text-2xl font-bold text-slate-900">{stats?.percentiles.p75.toFixed(2) || '0.00'}</p>
+            <p className="text-2xl font-bold text-slate-900">{stats?.percentiles?.p75?.toFixed(2) ?? '0.00'}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500 mb-1">90th Percentile</p>
-            <p className="text-2xl font-bold text-slate-900">{stats?.percentiles.p90.toFixed(2) || '0.00'}</p>
+            <p className="text-2xl font-bold text-slate-900">{stats?.percentiles?.p90?.toFixed(2) ?? '0.00'}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500 mb-1">95th Percentile</p>
-            <p className="text-2xl font-bold text-slate-900">{stats?.percentiles.p95.toFixed(2) || '0.00'}</p>
+            <p className="text-2xl font-bold text-slate-900">{stats?.percentiles?.p95?.toFixed(2) ?? '0.00'}</p>
           </div>
         </div>
       </div>

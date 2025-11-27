@@ -91,7 +91,7 @@ export default function Onboarding() {
                 <Sparkles className="w-10 h-10 text-white" />
               </div>
               <h1 className="text-3xl font-bold text-slate-900 mb-3">
-                Welcome to ExamFlow! 🎉
+                Welcome to DashoExams! 🎉
               </h1>
               <p className="text-slate-600 text-lg">
                 Let's get you set up in just a few steps
