@@ -316,7 +316,7 @@ export default function ExamManagement() {
         </div>
 
         {/* Exams Grid */}
-        <div id="exam-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div id="exam-grid" data-tour-id="exam-list" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredExams.map((exam) => (
             <div key={exam.id} className="bg-white rounded-lg border border-slate-200 p-4 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between mb-3">

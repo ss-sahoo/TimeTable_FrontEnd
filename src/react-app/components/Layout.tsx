@@ -67,10 +67,11 @@ export default function Layout({ children }: LayoutProps) {
       );
     } else {
       // Teachers and admins see full navigation
+      // IMPORTANT: Patterns first - this is the starting point for exam creation flow
       baseNavigation.push(
+        { name: 'Patterns', href: '/patterns', icon: Zap },
         { name: 'Exams', href: '/exams', icon: BookOpen },
-        { name: 'Results', href: '/results', icon: FileText },
-        { name: 'Patterns', href: '/patterns', icon: Zap }
+        { name: 'Results', href: '/results', icon: FileText }
       );
 
       if (user?.role === 'super_admin' || user?.role === 'institute_admin') {
@@ -150,7 +151,6 @@ export default function Layout({ children }: LayoutProps) {
           <nav className="p-4 space-y-1">
             {getNavigation().map((item) => {
               const Icon = item.icon;
-              const tourNavId = item.href === '/patterns' ? 'nav-patterns' : undefined;
               
               // Handle disabled/separator items
               if (item.disabled) {
@@ -164,12 +164,24 @@ export default function Layout({ children }: LayoutProps) {
                 );
               }
               
+              // Generate tour ID based on href
+              const getTourId = (href: string) => {
+                if (href === '/patterns') return 'nav-patterns';
+                if (href === '/exams') return 'nav-exams';
+                if (href === '/results') return 'nav-results';
+                if (href === '/dashboard') return 'nav-dashboard';
+                if (href === '/analytics') return 'nav-analytics';
+                if (href === '/users') return 'nav-users';
+                if (href === '/settings') return 'nav-settings';
+                return undefined;
+              };
+              
               return (
                 <Link
                   key={item.name}
                   to={item.href}
                   onClick={() => setSidebarOpen(false)}
-                  data-tour-id={tourNavId}
+                  data-tour-id={getTourId(item.href)}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                     isActive(item.href)
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
@@ -226,7 +238,6 @@ export default function Layout({ children }: LayoutProps) {
             {getNavigation().map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
-              const tourNavId = item.href === '/patterns' ? 'nav-patterns' : undefined;
               
               // Handle disabled/separator items
               if (item.disabled) {
@@ -239,19 +250,31 @@ export default function Layout({ children }: LayoutProps) {
                       </div>
                     )}
                     {sidebarCollapsed && (
-                      <div className="flex items-center justify-center">
-                        <Icon className="w-4 h-4 text-slate-500 dark:text-gray-400" title={item.name.replace('--- ', '').replace(' ---', '')} />
+                      <div className="flex items-center justify-center" title={item.name.replace('--- ', '').replace(' ---', '')}>
+                        <Icon className="w-4 h-4 text-slate-500 dark:text-gray-400" />
                       </div>
                     )}
                   </div>
                 );
               }
               
+              // Generate tour ID based on href
+              const getDesktopTourId = (href: string) => {
+                if (href === '/patterns') return 'nav-patterns';
+                if (href === '/exams') return 'nav-exams';
+                if (href === '/results') return 'nav-results';
+                if (href === '/dashboard') return 'nav-dashboard';
+                if (href === '/analytics') return 'nav-analytics';
+                if (href === '/users') return 'nav-users';
+                if (href === '/settings') return 'nav-settings';
+                return undefined;
+              };
+              
               return (
                 <Link
                   key={item.name}
                   to={item.href}
-                  data-tour-id={tourNavId}
+                  data-tour-id={getDesktopTourId(item.href)}
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all group ${
                     active
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'

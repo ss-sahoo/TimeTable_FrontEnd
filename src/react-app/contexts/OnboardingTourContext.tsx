@@ -99,10 +99,14 @@ export function OnboardingTourProvider({ children }: { children: ReactNode }) {
     const desired = currentStep.route.replace(/\/$/, '');
     const currentPath = location.pathname.replace(/\/$/, '');
 
-    if (!currentPath.startsWith(desired)) {
+    // Only navigate if we're not already on the correct route
+    if (currentPath !== desired && !currentPath.startsWith(desired)) {
       if (pendingRouteRef.current === desired) return;
       pendingRouteRef.current = desired;
-      navigate(currentStep.route);
+      // Small delay to prevent rapid navigation
+      setTimeout(() => {
+        navigate(currentStep.route);
+      }, 100);
     }
   }, [isActive, currentStep, location.pathname, navigate]);
 

@@ -229,7 +229,7 @@ export default function PatternManagement() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6" data-tour-id="pattern-stats">
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-slate-200 dark:border-gray-700 p-3">
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-blue-600" />
