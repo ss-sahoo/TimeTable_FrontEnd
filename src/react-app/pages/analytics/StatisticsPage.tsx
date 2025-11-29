@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router';
-import { BarChart3, TrendingUp, Target, TrendingDown, Clock, Users, Award, AlertTriangle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { 
+  BarChart3, TrendingUp, Target, TrendingDown, Clock, Users, Award, AlertTriangle,
+  Activity, Percent, Timer, UserCheck
+} from 'lucide-react';
 import { api } from '@/react-app/hooks/useApi';
-import AnalyticsCard from '@/react-app/components/analytics/AnalyticsCard';
-import ChartContainer from '@/react-app/components/analytics/ChartContainer';
-import ExportButton from '@/react-app/components/analytics/ExportButton';
+import ModernCard from '@/react-app/components/analytics/ModernCard';
+import StatCard from '@/react-app/components/analytics/StatCard';
+import GlassCard from '@/react-app/components/analytics/GlassCard';
+import ModernChartContainer from '@/react-app/components/analytics/ModernChartContainer';
+import PageHeader from '@/react-app/components/analytics/PageHeader';
+import ModernExportButton from '@/react-app/components/analytics/ModernExportButton';
+import ProgressRing from '@/react-app/components/analytics/ProgressRing';
 
 interface StatisticsData {
   exam: {
@@ -77,19 +85,20 @@ export default function StatisticsPage() {
   };
 
   const handleExport = (format: 'csv' | 'excel' | 'pdf' | 'image') => {
-    // TODO: Implement export functionality
     console.log('Export as', format);
   };
 
   if (loading && !data) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-slate-900">Statistics</h2>
-        </div>
+      <div className="space-y-6">
+        <PageHeader
+          title="Statistics"
+          subtitle="Comprehensive performance metrics"
+          icon={BarChart3}
+        />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-32 bg-slate-200 animate-pulse rounded-lg" />
+            <div key={i} className="h-32 bg-gradient-to-br from-slate-100 to-slate-200 animate-pulse rounded-2xl" />
           ))}
         </div>
       </div>
@@ -98,163 +107,247 @@ export default function StatisticsPage() {
 
   if (error && !data) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-slate-900">Statistics</h2>
-        </div>
-        <ChartContainer loading={false} error={error} height={200} />
+      <div className="space-y-6">
+        <PageHeader
+          title="Statistics"
+          subtitle="Comprehensive performance metrics"
+          icon={BarChart3}
+        />
+        <ModernChartContainer loading={false} error={error} height={200} onRetry={loadStatistics} />
       </div>
     );
   }
 
   const stats = data?.statistics;
+  const totalMarks = data?.exam?.total_marks ?? 100;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-900">Statistics</h2>
-          <p className="text-sm text-slate-500 mt-1">
-            Comprehensive performance metrics and analysis
-          </p>
-        </div>
-        <ExportButton onExport={handleExport} />
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="Statistics"
+        subtitle="Comprehensive performance metrics and analysis"
+        icon={BarChart3}
+        actions={<ModernExportButton onExport={handleExport} />}
+      />
 
-      {/* Basic Statistics */}
+      {/* Hero Stats - Gradient Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <AnalyticsCard
+        <ModernCard
           title="Mean Score"
-          value={stats?.average_score?.toFixed(2) ?? '0.00'}
+          value={stats?.average_score?.toFixed(1) ?? '0'}
           icon={BarChart3}
-          subtitle={`Out of ${data?.exam?.total_marks ?? 0} marks`}
+          subtitle={`Out of ${totalMarks} marks`}
+          gradient="blue"
         />
-        <AnalyticsCard
+        <ModernCard
           title="Median Score"
-          value={stats?.median_score?.toFixed(2) ?? '0.00'}
+          value={stats?.median_score?.toFixed(1) ?? '0'}
           icon={TrendingUp}
           subtitle="50th percentile"
+          gradient="emerald"
         />
-        <AnalyticsCard
-          title="Mode Score"
-          value={stats?.mode_score?.toFixed(2) ?? '0.00'}
-          icon={Target}
-          subtitle="Most frequent score"
-        />
-        <AnalyticsCard
-          title="Range"
-          value={stats?.range_score?.toFixed(2) ?? '0.00'}
-          icon={TrendingDown}
-          subtitle={`${stats?.lowest_score?.toFixed(2) ?? 0} - ${stats?.highest_score?.toFixed(2) ?? 0}`}
-        />
-      </div>
-
-      {/* Additional Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <AnalyticsCard
-          title="Std Deviation"
-          value={stats?.std_deviation?.toFixed(2) ?? '0.00'}
-          subtitle="Score variability"
-        />
-        <AnalyticsCard
-          title="Variance"
-          value={stats?.variance?.toFixed(2) ?? '0.00'}
-          subtitle="Statistical variance"
-        />
-        <AnalyticsCard
-          title="Average Time"
-          value={`${Math.floor((stats?.average_time_spent ?? 0) / 60)}m ${(stats?.average_time_spent ?? 0) % 60}s`}
-          icon={Clock}
-          subtitle="Time spent on exam"
-        />
-        <AnalyticsCard
+        <ModernCard
           title="Completion Rate"
-          value={`${stats?.completion_rate?.toFixed(1) ?? 0}%`}
-          icon={Users}
-          subtitle={`${stats?.total_attempts ?? 0} of ${stats?.total_invited ?? 0} invited`}
+          value={`${stats?.completion_rate?.toFixed(0) ?? 0}%`}
+          icon={UserCheck}
+          subtitle={`${stats?.total_attempts ?? 0} of ${stats?.total_invited ?? 0}`}
+          gradient="purple"
+        />
+        <ModernCard
+          title="Average Time"
+          value={`${Math.floor((stats?.average_time_spent ?? 0) / 60)}m`}
+          icon={Timer}
+          subtitle="Time spent on exam"
+          gradient="cyan"
         />
       </div>
 
-      {/* Percentiles */}
-      <div className="bg-white border border-slate-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">Percentile Distribution</h3>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="text-center">
-            <p className="text-xs text-slate-500 mb-1">25th Percentile</p>
-            <p className="text-2xl font-bold text-slate-900">{stats?.percentiles?.p25?.toFixed(2) ?? '0.00'}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-xs text-slate-500 mb-1">50th Percentile (Median)</p>
-            <p className="text-2xl font-bold text-blue-600">{stats?.percentiles?.p50?.toFixed(2) ?? '0.00'}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-xs text-slate-500 mb-1">75th Percentile</p>
-            <p className="text-2xl font-bold text-slate-900">{stats?.percentiles?.p75?.toFixed(2) ?? '0.00'}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-xs text-slate-500 mb-1">90th Percentile</p>
-            <p className="text-2xl font-bold text-slate-900">{stats?.percentiles?.p90?.toFixed(2) ?? '0.00'}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-xs text-slate-500 mb-1">95th Percentile</p>
-            <p className="text-2xl font-bold text-slate-900">{stats?.percentiles?.p95?.toFixed(2) ?? '0.00'}</p>
-          </div>
+      {/* Score Distribution Stats */}
+      <GlassCard delay={0.1}>
+        <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+          <Activity className="w-5 h-5 text-blue-500" />
+          Score Distribution
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <StatCard
+            title="Highest"
+            value={stats?.highest_score?.toFixed(1) ?? '0'}
+            icon={TrendingUp}
+            variant="success"
+          />
+          <StatCard
+            title="Lowest"
+            value={stats?.lowest_score?.toFixed(1) ?? '0'}
+            icon={TrendingDown}
+            variant="danger"
+          />
+          <StatCard
+            title="Mode"
+            value={stats?.mode_score?.toFixed(1) ?? '0'}
+            icon={Target}
+            variant="info"
+          />
+          <StatCard
+            title="Range"
+            value={stats?.range_score?.toFixed(1) ?? '0'}
+            variant="warning"
+          />
+          <StatCard
+            title="Std Dev"
+            value={stats?.std_deviation?.toFixed(2) ?? '0'}
+            subtitle="Variability"
+          />
+          <StatCard
+            title="Variance"
+            value={stats?.variance?.toFixed(2) ?? '0'}
+            subtitle="Statistical"
+          />
         </div>
-      </div>
+      </GlassCard>
+
+      {/* Percentile Distribution */}
+      <GlassCard delay={0.2}>
+        <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+          <Percent className="w-5 h-5 text-purple-500" />
+          Percentile Distribution
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+          {[
+            { label: '25th', value: stats?.percentiles?.p25, color: 'amber' as const },
+            { label: '50th', value: stats?.percentiles?.p50, color: 'blue' as const },
+            { label: '75th', value: stats?.percentiles?.p75, color: 'emerald' as const },
+            { label: '90th', value: stats?.percentiles?.p90, color: 'purple' as const },
+            { label: '95th', value: stats?.percentiles?.p95, color: 'rose' as const },
+          ].map((p, index) => (
+            <motion.div
+              key={p.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 + index * 0.1 }}
+              className="flex flex-col items-center"
+            >
+              <ProgressRing
+                value={p.value ?? 0}
+                max={totalMarks}
+                size={100}
+                strokeWidth={8}
+                color={p.color}
+                showValue={false}
+              />
+              <div className="text-center mt-3">
+                <p className="text-2xl font-bold text-slate-900">{p.value?.toFixed(1) ?? '0'}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{p.label} Percentile</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </GlassCard>
 
       {/* Violation Statistics */}
       {stats?.violation_stats && (
-        <div className="bg-white border border-slate-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-600" />
+        <GlassCard delay={0.3}>
+          <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
             Violation Statistics
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <AnalyticsCard
-              title="Total Violations"
-              value={stats.violation_stats.total_violations}
-              icon={AlertTriangle}
-            />
-            <AnalyticsCard
-              title="Attempts with Violations"
-              value={stats.violation_stats.attempts_with_violations}
-              subtitle={`${((stats.violation_stats.attempts_with_violations / stats.total_attempts) * 100).toFixed(1)}% of attempts`}
-            />
-            <AnalyticsCard
-              title="Average Violations"
-              value={stats.violation_stats.average_violations.toFixed(2)}
-              subtitle="Per attempt"
-            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.4 }}
+              className="relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/50 p-5"
+            >
+              <div className="absolute top-0 right-0 w-20 h-20 bg-amber-200/30 rounded-full blur-2xl" />
+              <div className="relative">
+                <div className="flex items-center gap-2 text-amber-600 mb-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span className="text-xs font-semibold uppercase tracking-wider">Total Violations</span>
+                </div>
+                <p className="text-3xl font-bold text-amber-900">{stats.violation_stats.total_violations}</p>
+              </div>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.5 }}
+              className="relative overflow-hidden rounded-xl bg-gradient-to-br from-rose-50 to-pink-50 border border-rose-200/50 p-5"
+            >
+              <div className="absolute top-0 right-0 w-20 h-20 bg-rose-200/30 rounded-full blur-2xl" />
+              <div className="relative">
+                <div className="flex items-center gap-2 text-rose-600 mb-2">
+                  <Users className="w-4 h-4" />
+                  <span className="text-xs font-semibold uppercase tracking-wider">Affected Attempts</span>
+                </div>
+                <p className="text-3xl font-bold text-rose-900">{stats.violation_stats.attempts_with_violations}</p>
+                <p className="text-xs text-rose-600 mt-1">
+                  {((stats.violation_stats.attempts_with_violations / (stats.total_attempts || 1)) * 100).toFixed(1)}% of total
+                </p>
+              </div>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.6 }}
+              className="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200/50 p-5"
+            >
+              <div className="absolute top-0 right-0 w-20 h-20 bg-slate-200/30 rounded-full blur-2xl" />
+              <div className="relative">
+                <div className="flex items-center gap-2 text-slate-600 mb-2">
+                  <Activity className="w-4 h-4" />
+                  <span className="text-xs font-semibold uppercase tracking-wider">Avg per Attempt</span>
+                </div>
+                <p className="text-3xl font-bold text-slate-900">{stats.violation_stats.average_violations.toFixed(2)}</p>
+              </div>
+            </motion.div>
           </div>
-        </div>
+        </GlassCard>
       )}
 
       {/* Time Distribution */}
       {stats?.time_distribution?.submissions_by_hour && Object.keys(stats.time_distribution.submissions_by_hour).length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Submission Time Distribution</h3>
-          <div className="space-y-2">
+        <GlassCard delay={0.4}>
+          <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-cyan-500" />
+            Submission Time Distribution
+          </h3>
+          <div className="space-y-3">
             {Object.entries(stats.time_distribution.submissions_by_hour)
               .sort(([a], [b]) => Number(a) - Number(b))
-              .map(([hour, count]) => (
-                <div key={hour} className="flex items-center gap-3">
-                  <span className="w-16 text-xs text-slate-600">{hour}:00</span>
-                  <div className="flex-1 h-6 bg-slate-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-6 bg-blue-500 rounded-full flex items-center justify-end pr-2"
-                      style={{
-                        width: `${(Number(count) / Math.max(...Object.values(stats.time_distribution.submissions_by_hour))) * 100}%`,
-                      }}
-                    >
-                      <span className="text-[10px] text-white font-medium">{count}</span>
+              .map(([hour, count], index) => {
+                const maxCount = Math.max(...Object.values(stats.time_distribution.submissions_by_hour));
+                const percentage = (Number(count) / maxCount) * 100;
+                return (
+                  <motion.div
+                    key={hour}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.5 + index * 0.05 }}
+                    className="flex items-center gap-4"
+                  >
+                    <span className="w-14 text-sm font-medium text-slate-600">{hour}:00</span>
+                    <div className="flex-1 h-8 bg-slate-100 rounded-lg overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percentage}%` }}
+                        transition={{ duration: 0.8, delay: 0.6 + index * 0.05 }}
+                        className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-lg flex items-center justify-end pr-3"
+                      >
+                        {percentage > 20 && (
+                          <span className="text-xs font-semibold text-white">{count}</span>
+                        )}
+                      </motion.div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                    {percentage <= 20 && (
+                      <span className="text-xs font-medium text-slate-500 w-8">{count}</span>
+                    )}
+                  </motion.div>
+                );
+              })}
           </div>
-        </div>
+        </GlassCard>
       )}
     </div>
   );
 }
-

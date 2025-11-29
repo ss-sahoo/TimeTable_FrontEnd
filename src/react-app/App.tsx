@@ -45,6 +45,8 @@ import BoxPlotPage from "@/react-app/pages/analytics/BoxPlotPage";
 import QuestionsPage from "@/react-app/pages/analytics/QuestionsPage";
 import EvaluationPage from "@/react-app/pages/analytics/EvaluationPage";
 import GraphsPage from "@/react-app/pages/analytics/GraphsPage";
+import StudentsPage from "@/react-app/pages/analytics/StudentsPage";
+import StudentDetailPage from "@/react-app/pages/analytics/StudentDetailPage";
 import PublicExamAccess from "@/react-app/pages/PublicExamAccess";
 import TeacherAnalytics from "@/react-app/pages/TeacherAnalytics";
 import TeacherEvaluationDashboard from "@/react-app/pages/TeacherEvaluationDashboard";
@@ -229,20 +231,22 @@ function AppRoutes() {
             </RoleProtectedRoute>
           } />
           <Route path="/exams/:examId/results-analytics" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <FullscreenProtectedRoute>
               <Navigate to="statistics" replace />
-            </RoleProtectedRoute>
+            </FullscreenProtectedRoute>
           } />
           <Route path="/exams/:examId/results-analytics/*" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <FullscreenProtectedRoute>
               <ExamAnalyticsDashboard />
-            </RoleProtectedRoute>
+            </FullscreenProtectedRoute>
           }>
             <Route path="statistics" element={<StatisticsPage />} />
             <Route path="heatmap" element={<HeatMapPage />} />
             <Route path="histogram" element={<HistogramPage />} />
             <Route path="boxplot" element={<BoxPlotPage />} />
             <Route path="questions" element={<QuestionsPage />} />
+            <Route path="students" element={<StudentsPage />} />
+            <Route path="student/:studentId" element={<StudentDetailPage />} />
             <Route path="evaluation" element={<EvaluationPage />} />
             <Route path="graphs" element={<GraphsPage />} />
           </Route>
