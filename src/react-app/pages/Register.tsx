@@ -1,7 +1,23 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router';
-import { Eye, EyeOff, Mail, Lock, User, Building, AlertCircle, CheckCircle } from 'lucide-react';
-import { useApi, api } from '../hooks/useApi';
+import { motion } from 'framer-motion';
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  User,
+  Zap,
+  AlertCircle,
+  CheckCircle,
+  ArrowRight,
+  ArrowLeft,
+  Shield,
+  Users,
+  Award,
+  Check,
+} from 'lucide-react';
+import { api } from '../hooks/useApi';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -17,12 +33,13 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+
   const navigate = useNavigate();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
     setError('');
     setSuccess('');
   };
@@ -32,25 +49,22 @@ export default function Register() {
       setError('All fields are required');
       return false;
     }
-    
     if (formData.password !== formData.passwordConfirm) {
       setError('Passwords do not match');
       return false;
     }
-    
     if (formData.password.length < 8) {
       setError('Password must be at least 8 characters long');
       return false;
     }
-    
     return true;
   };
 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!validateForm()) return;
-    
+
     setLoading(true);
     setError('');
 
@@ -63,231 +77,454 @@ export default function Register() {
         password: formData.password,
         password_confirm: formData.passwordConfirm,
       };
-      
+
       const response = await api.post('/auth/register/', userData);
-      
-      // Store tokens
       localStorage.setItem('access_token', response.data.access);
       localStorage.setItem('refresh_token', response.data.refresh);
-      
-      setSuccess('Registration successful! Setting up your account...');
+
+      setSuccess('Account created successfully!');
       setTimeout(() => navigate('/onboarding'), 1500);
     } catch (err: any) {
-      setError(err.response?.data?.email?.[0] || err.response?.data?.username?.[0] || err.message || 'Registration failed. Please try again.');
+      setError(
+        err.response?.data?.email?.[0] ||
+          err.response?.data?.username?.[0] ||
+          err.message ||
+          'Registration failed. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  // Password strength indicator
+  const getPasswordStrength = () => {
+    const password = formData.password;
+    if (!password) return { strength: 0, label: '', color: '' };
+    
+    let strength = 0;
+    if (password.length >= 8) strength++;
+    if (/[A-Z]/.test(password)) strength++;
+    if (/[a-z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[^A-Za-z0-9]/.test(password)) strength++;
+
+    const levels = [
+      { label: 'Very Weak', color: 'bg-red-500' },
+      { label: 'Weak', color: 'bg-orange-500' },
+      { label: 'Fair', color: 'bg-yellow-500' },
+      { label: 'Good', color: 'bg-blue-500' },
+      { label: 'Strong', color: 'bg-emerald-500' },
+    ];
+
+    return { strength, ...levels[Math.min(strength, 4)] };
+  };
+
+  const passwordStrength = getPasswordStrength();
+
+
+  const benefits = [
+    { icon: Shield, title: 'Secure Platform', desc: 'Enterprise-grade security for your exams' },
+    { icon: Users, title: 'Unlimited Users', desc: 'Add students and teachers without limits' },
+    { icon: Award, title: 'Smart Analytics', desc: 'AI-powered insights and reports' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        {/* Logo and Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
-            <Building className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Create Account</h1>
-          <p className="text-slate-600 text-sm">Join your institute's exam platform</p>
+    <div className="min-h-screen flex">
+      {/* Left Panel - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-violet-900 via-purple-900 to-indigo-900 overflow-hidden">
+        {/* Animated background elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-20 right-20 w-72 h-72 bg-violet-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-20 left-20 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
+          <div className="absolute top-1/2 left-1/3 w-80 h-80 bg-pink-500/10 rounded-full blur-3xl" />
         </div>
 
-        {/* Registration Form */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                <span className="text-red-700 text-sm">{error}</span>
-              </div>
-            )}
+        {/* Grid pattern overlay */}
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+            backgroundSize: '50px 50px',
+          }}
+        />
 
-            {success && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                <span className="text-green-700 text-sm">{success}</span>
-              </div>
-            )}
+        {/* Content */}
+        <div className="relative z-10 flex flex-col justify-between p-12 w-full">
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            <motion.div
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', duration: 0.8 }}
+              className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center shadow-lg shadow-violet-500/30"
+            >
+              <Zap className="w-6 h-6 text-white" />
+            </motion.div>
+            <span className="text-2xl font-bold text-white">DashoExams</span>
+          </div>
 
-            {/* Name Fields */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-slate-700 mb-2">
-                  First Name
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-4 w-4 text-slate-400" />
+
+          {/* Main content */}
+          <div className="flex-1 flex flex-col justify-center max-w-lg">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <h1 className="text-4xl lg:text-5xl font-bold text-white mb-6 leading-tight">
+                Start Your
+                <span className="block bg-gradient-to-r from-violet-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
+                  Journey Today
+                </span>
+              </h1>
+              <p className="text-lg text-slate-300 mb-10 leading-relaxed">
+                Join thousands of institutions already using DashoExams to streamline 
+                their examination process.
+              </p>
+            </motion.div>
+
+            {/* Benefits */}
+            <div className="space-y-5">
+              {benefits.map((benefit, index) => (
+                <motion.div
+                  key={benefit.title}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.4 + index * 0.1 }}
+                  className="flex items-start gap-4 group"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                    <benefit.icon className="w-6 h-6 text-violet-300" />
                   </div>
+                  <div>
+                    <h3 className="text-white font-semibold">{benefit.title}</h3>
+                    <p className="text-slate-400 text-sm">{benefit.desc}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="text-slate-400 text-sm">
+            Join 10,000+ educators worldwide
+          </div>
+        </div>
+      </div>
+
+
+      {/* Right Panel - Register Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-8 bg-gradient-to-br from-slate-50 via-white to-violet-50/30 overflow-y-auto">
+        <div className="w-full max-w-md py-8">
+          {/* Mobile Logo */}
+          <div className="lg:hidden text-center mb-8">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 mb-4 shadow-lg shadow-violet-500/30"
+            >
+              <Zap className="w-7 h-7 text-white" />
+            </motion.div>
+            <h2 className="text-xl font-bold text-slate-900">DashoExams</h2>
+          </div>
+
+          {/* Back to Login */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to login
+            </Link>
+          </motion.div>
+
+          {/* Header */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <h2 className="text-3xl font-bold text-slate-900 mb-2">Create account</h2>
+            <p className="text-slate-600">Get started with your free account</p>
+          </motion.div>
+
+
+          {/* Register Form */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-6 sm:p-8 border border-slate-100"
+          >
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-3"
+                >
+                  <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                    <AlertCircle className="w-4 h-4 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-red-800">Registration failed</p>
+                    <p className="text-sm text-red-600 mt-0.5">{error}</p>
+                  </div>
+                </motion.div>
+              )}
+
+              {success && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-start gap-3"
+                >
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-emerald-800">Success!</p>
+                    <p className="text-sm text-emerald-600 mt-0.5">{success}</p>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Name Fields */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">First Name</label>
+                  <div className={`relative rounded-xl transition-all duration-200 ${focusedField === 'firstName' ? 'ring-2 ring-violet-500/20' : ''}`}>
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <User className={`h-4 w-4 transition-colors ${focusedField === 'firstName' ? 'text-violet-500' : 'text-slate-400'}`} />
+                    </div>
+                    <input
+                      name="firstName"
+                      type="text"
+                      required
+                      value={formData.firstName}
+                      onChange={handleInputChange}
+                      onFocus={() => setFocusedField('firstName')}
+                      onBlur={() => setFocusedField(null)}
+                      className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50/50 placeholder-slate-400 focus:outline-none focus:border-violet-500 focus:bg-white transition-all"
+                      placeholder="John"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name</label>
                   <input
-                    id="firstName"
-                    name="firstName"
+                    name="lastName"
                     type="text"
                     required
-                    value={formData.firstName}
+                    value={formData.lastName}
                     onChange={handleInputChange}
-                    className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                    placeholder="First name"
+                    onFocus={() => setFocusedField('lastName')}
+                    onBlur={() => setFocusedField(null)}
+                    className={`block w-full px-3 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50/50 placeholder-slate-400 focus:outline-none focus:border-violet-500 focus:bg-white transition-all ${focusedField === 'lastName' ? 'ring-2 ring-violet-500/20' : ''}`}
+                    placeholder="Doe"
                   />
                 </div>
               </div>
-              
+
+
+              {/* Email Field */}
               <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-slate-700 mb-2">
-                  Last Name
-                </label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Email Address</label>
+                <div className={`relative rounded-xl transition-all duration-200 ${focusedField === 'email' ? 'ring-2 ring-violet-500/20' : ''}`}>
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Mail className={`h-5 w-5 transition-colors ${focusedField === 'email' ? 'text-violet-500' : 'text-slate-400'}`} />
+                  </div>
+                  <input
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    onFocus={() => setFocusedField('email')}
+                    onBlur={() => setFocusedField(null)}
+                    className="block w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50/50 placeholder-slate-400 focus:outline-none focus:border-violet-500 focus:bg-white transition-all"
+                    placeholder="name@company.com"
+                  />
+                </div>
+              </div>
+
+              {/* Username Field */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Username</label>
                 <input
-                  id="lastName"
-                  name="lastName"
+                  name="username"
                   type="text"
                   required
-                  value={formData.lastName}
+                  value={formData.username}
                   onChange={handleInputChange}
-                  className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="Last name"
+                  onFocus={() => setFocusedField('username')}
+                  onBlur={() => setFocusedField(null)}
+                  className={`block w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50/50 placeholder-slate-400 focus:outline-none focus:border-violet-500 focus:bg-white transition-all ${focusedField === 'username' ? 'ring-2 ring-violet-500/20' : ''}`}
+                  placeholder="johndoe"
                 />
               </div>
-            </div>
 
-            {/* Email Field */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
-                Email Address
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-4 w-4 text-slate-400" />
+
+              {/* Password Field */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Password</label>
+                <div className={`relative rounded-xl transition-all duration-200 ${focusedField === 'password' ? 'ring-2 ring-violet-500/20' : ''}`}>
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Lock className={`h-5 w-5 transition-colors ${focusedField === 'password' ? 'text-violet-500' : 'text-slate-400'}`} />
+                  </div>
+                  <input
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    required
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    onFocus={() => setFocusedField('password')}
+                    onBlur={() => setFocusedField(null)}
+                    className="block w-full pl-12 pr-12 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50/50 placeholder-slate-400 focus:outline-none focus:border-violet-500 focus:bg-white transition-all"
+                    placeholder="Create a strong password"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5 text-slate-400 hover:text-slate-600 transition-colors" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-slate-400 hover:text-slate-600 transition-colors" />
+                    )}
+                  </button>
                 </div>
+                {/* Password Strength Indicator */}
+                {formData.password && (
+                  <div className="mt-2">
+                    <div className="flex gap-1 mb-1">
+                      {[1, 2, 3, 4, 5].map((level) => (
+                        <div
+                          key={level}
+                          className={`h-1 flex-1 rounded-full transition-colors ${
+                            level <= passwordStrength.strength ? passwordStrength.color : 'bg-slate-200'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Password strength: <span className="font-medium">{passwordStrength.label}</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+
+
+              {/* Confirm Password Field */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Confirm Password</label>
+                <div className={`relative rounded-xl transition-all duration-200 ${focusedField === 'passwordConfirm' ? 'ring-2 ring-violet-500/20' : ''}`}>
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Lock className={`h-5 w-5 transition-colors ${focusedField === 'passwordConfirm' ? 'text-violet-500' : 'text-slate-400'}`} />
+                  </div>
+                  <input
+                    name="passwordConfirm"
+                    type={showPasswordConfirm ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    required
+                    value={formData.passwordConfirm}
+                    onChange={handleInputChange}
+                    onFocus={() => setFocusedField('passwordConfirm')}
+                    onBlur={() => setFocusedField(null)}
+                    className="block w-full pl-12 pr-12 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50/50 placeholder-slate-400 focus:outline-none focus:border-violet-500 focus:bg-white transition-all"
+                    placeholder="Confirm your password"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center"
+                    onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
+                  >
+                    {showPasswordConfirm ? (
+                      <EyeOff className="h-5 w-5 text-slate-400 hover:text-slate-600 transition-colors" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-slate-400 hover:text-slate-600 transition-colors" />
+                    )}
+                  </button>
+                </div>
+                {formData.passwordConfirm && formData.password === formData.passwordConfirm && (
+                  <p className="mt-2 text-xs text-emerald-600 flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Passwords match
+                  </p>
+                )}
+              </div>
+
+              {/* Terms */}
+              <div className="flex items-start gap-3">
                 <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
+                  type="checkbox"
                   required
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="Enter your email"
+                  className="mt-1 w-4 h-4 text-violet-600 bg-slate-100 border-slate-300 rounded focus:ring-violet-500"
                 />
+                <p className="text-sm text-slate-600">
+                  I agree to the{' '}
+                  <a href="#" className="text-violet-600 hover:text-violet-700 font-medium">Terms of Service</a>
+                  {' '}and{' '}
+                  <a href="#" className="text-violet-600 hover:text-violet-700 font-medium">Privacy Policy</a>
+                </p>
               </div>
+
+
+              {/* Submit Button */}
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/25"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Creating account...
+                  </>
+                ) : (
+                  <>
+                    Create account
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </motion.button>
+            </form>
+
+            {/* Login Link */}
+            <div className="mt-6 text-center">
+              <p className="text-sm text-slate-600">
+                Already have an account?{' '}
+                <Link to="/login" className="font-semibold text-violet-600 hover:text-violet-700 transition-colors">
+                  Sign in
+                </Link>
+              </p>
             </div>
+          </motion.div>
 
-            {/* Username Field */}
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-slate-700 mb-2">
-                Username
-              </label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                required
-                value={formData.username}
-                onChange={handleInputChange}
-                className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder="Choose a username"
-              />
-            </div>
-
-            {/* Password Fields */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-4 w-4 text-slate-400" />
-                </div>
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  required
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="block w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="Create a password"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-slate-400 hover:text-slate-600" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-slate-400 hover:text-slate-600" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="passwordConfirm" className="block text-sm font-medium text-slate-700 mb-2">
-                Confirm Password
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-4 w-4 text-slate-400" />
-                </div>
-                <input
-                  id="passwordConfirm"
-                  name="passwordConfirm"
-                  type={showPasswordConfirm ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  required
-                  value={formData.passwordConfirm}
-                  onChange={handleInputChange}
-                  className="block w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="Confirm your password"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
-                >
-                  {showPasswordConfirm ? (
-                    <EyeOff className="h-4 w-4 text-slate-400 hover:text-slate-600" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-slate-400 hover:text-slate-600" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Creating account...
-                </div>
-              ) : (
-                'Create Account'
-              )}
-            </button>
-          </form>
-
-          {/* Login Link */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-slate-600">
-              Already have an account?{' '}
-              <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
-                Sign in
-              </Link>
+          {/* Footer */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="mt-8 text-center"
+          >
+            <p className="text-xs text-slate-500">
+              © 2024 DashoExams. Powered by{' '}
+              <a
+                href="https://diracai.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-violet-600 hover:text-violet-700 transition-colors"
+              >
+                DiracAI
+              </a>
             </p>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="text-center mt-8">
-          <p className="text-xs text-slate-500">
-            © 2024 DashoExams. All rights reserved.
-          </p>
+          </motion.div>
         </div>
       </div>
     </div>
