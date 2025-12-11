@@ -14,7 +14,7 @@ interface FileUploaderProps {
 
 const FileUploader: React.FC<FileUploaderProps> = ({
   onFileSelect,
-  acceptedFileTypes = ['.txt', '.docx', '.doc'],
+  acceptedFileTypes = ['.txt', '.docx', '.doc', '.pdf', '.jpg', '.jpeg', '.png'],
   maxSizeMB = 10,
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -53,6 +53,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
       'application/msword': ['.doc'],
       'text/plain': ['.txt'],
+      'application/pdf': ['.pdf'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
     },
     maxSize: maxSizeMB * 1024 * 1024,
     multiple: false,
@@ -99,7 +102,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
               : 'Drag & drop a file here, or click to select'}
           </p>
           <p className="text-sm text-gray-500 mb-4">
-            Supported formats: TXT, DOCX, DOC
+            Supported formats: PDF, DOCX, DOC, TXT, JPG, PNG
           </p>
           <p className="text-xs text-gray-400">Maximum file size: {maxSizeMB}MB</p>
         </div>

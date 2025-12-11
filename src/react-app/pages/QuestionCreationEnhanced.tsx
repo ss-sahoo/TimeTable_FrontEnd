@@ -125,6 +125,39 @@ const stripOptionContent = (value?: string | null) =>
 const normalizeOptionValue = (value?: string | null) =>
   stripOptionContent(value).toLowerCase();
 
+/**
+ * Convert a letter answer (A, B, C, D) to the actual option text
+ * If the answer is already the option text or not a letter, return as-is
+ */
+const convertLetterAnswerToOptionText = (answer: string, options: string[]): string => {
+  if (!answer || !options || options.length === 0) return answer;
+  
+  const trimmedAnswer = answer.trim().toUpperCase();
+  
+  // Check if it's a single letter A-Z
+  if (trimmedAnswer.length === 1 && /^[A-Z]$/.test(trimmedAnswer)) {
+    const index = trimmedAnswer.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+    if (index >= 0 && index < options.length && options[index]) {
+      return options[index];
+    }
+  }
+  
+  // For multiple choice answers like "A, B, C" or "A|B|C"
+  if (/^[A-Z]([,|]\s*[A-Z])*$/i.test(trimmedAnswer.replace(/\s/g, ''))) {
+    const letters = trimmedAnswer.split(/[,|]/).map(l => l.trim().toUpperCase());
+    const convertedOptions = letters
+      .map(letter => {
+        const index = letter.charCodeAt(0) - 65;
+        return (index >= 0 && index < options.length) ? options[index] : letter;
+      })
+      .filter(Boolean);
+    return convertedOptions.join('|');
+  }
+  
+  // Return as-is if not a letter format
+  return answer;
+};
+
 export default function EnhancedQuestionEditor() {
   const { patternId, subjectSlug: subjectSlugParam, questionNumber: questionParam } = useParams<{ patternId: string; subjectSlug?: string; questionNumber?: string }>();
   const navigate = useNavigate();
@@ -168,17 +201,21 @@ export default function EnhancedQuestionEditor() {
     topic: '',
     pattern_section: null,
   });
+  const [fixingNumbers, setFixingNumbers] = useState(false);
   // Track which question numbers already exist in current section
   const [existingNumbers, setExistingNumbers] = useState<Set<number>>(new Set());
   const [existingNumbersBySection, setExistingNumbersBySection] = useState<Record<number, Set<number>>>({});
   const [existingQuestionsBySection, setExistingQuestionsBySection] = useState<Record<number, Map<number, QuestionData>>>({});
   const [sectionAbsoluteRanges, setSectionAbsoluteRanges] = useState<Record<number, { start: number; end: number; length: number }>>({});
+  const [bulkDataLoaded, setBulkDataLoaded] = useState(false);
 
   const computeAbsoluteQuestionNumber = useCallback(
     (section: SubjectSection | null, subjectQuestionNumber: number) => {
       if (!section) {
         return subjectQuestionNumber;
       }
+      
+      // First check if we have a cached question with this subject-local number
       const sectionMap = existingQuestionsBySection[section.id];
       const existingQuestion = sectionMap?.get(subjectQuestionNumber);
       const existingAbsolute = existingQuestion?.question_number;
@@ -186,70 +223,161 @@ export default function EnhancedQuestionEditor() {
         return Number(existingAbsolute);
       }
 
-      const range = sectionAbsoluteRanges[section.id];
-      const baseStart = range ? range.start : section.start_question;
-      const maxOffset = range ? range.length - 1 : section.subject_end - section.subject_start;
+      // Use the section's actual start_question to compute the database question_number
+      // The database stores questions with question_number = section.start_question + offset
+      // where offset is the position within the subject (0-indexed)
       const relativeOffset = subjectQuestionNumber - section.subject_start;
-      const clampedOffset = Math.max(0, Math.min(maxOffset, relativeOffset));
-      return baseStart + clampedOffset;
+      const clampedOffset = Math.max(0, Math.min(section.end_question - section.start_question, relativeOffset));
+      return section.start_question + clampedOffset;
     },
-    [existingQuestionsBySection, sectionAbsoluteRanges]
+    [existingQuestionsBySection]
   );
 
   const buildNumbersSetForSection = useCallback((section: SubjectSection, results: QuestionData[]) => {
     const nums = new Set<number>();
-    const range = sectionAbsoluteRanges[section.id];
     const questionMap = new Map<number, QuestionData>();
 
-    results.forEach((q) => {
+    // Sort results by question_number or id to ensure consistent ordering
+    const sortedResults = [...results].sort((a, b) => {
+      const aNum = a.question_number ?? a.id ?? 0;
+      const bNum = b.question_number ?? b.id ?? 0;
+      return aNum - bNum;
+    });
+
+    sortedResults.forEach((q, index) => {
+      let subjectLocal: number | null = null;
+
+      // First try question_number_in_pattern (subject-local number)
       const subjectLocalRaw =
         q.question_number_in_pattern !== undefined && q.question_number_in_pattern !== null
           ? Number(q.question_number_in_pattern)
           : null;
 
-      if (subjectLocalRaw !== null && Number.isFinite(subjectLocalRaw)) {
-        nums.add(subjectLocalRaw);
-        questionMap.set(subjectLocalRaw, q);
-        return;
+      if (subjectLocalRaw !== null && Number.isFinite(subjectLocalRaw) && subjectLocalRaw > 0) {
+        subjectLocal = subjectLocalRaw;
+      } else {
+        // Fall back to question_number (database question number within section range)
+        const dbQuestionNumber =
+          q.question_number !== undefined && q.question_number !== null
+            ? Number(q.question_number)
+            : null;
+
+        if (
+          dbQuestionNumber !== null &&
+          Number.isFinite(dbQuestionNumber) &&
+          dbQuestionNumber >= section.start_question &&
+          dbQuestionNumber <= section.end_question
+        ) {
+          // Convert database question_number to subject-local number
+          const offset = dbQuestionNumber - section.start_question;
+          subjectLocal = section.subject_start + offset;
+        } else {
+          // Last resort: use index-based numbering
+          subjectLocal = section.subject_start + index;
+        }
       }
 
-      const absoluteRaw =
-        q.question_number !== undefined && q.question_number !== null
-          ? Number(q.question_number)
-          : null;
-
-      if (
-        range &&
-        absoluteRaw !== null &&
-        Number.isFinite(absoluteRaw) &&
-        absoluteRaw >= range.start &&
-        absoluteRaw <= range.end
-      ) {
-        const adjusted = section.subject_start + (absoluteRaw - range.start);
-        if (adjusted >= section.subject_start && adjusted <= section.subject_end) {
-        nums.add(adjusted);
-          questionMap.set(adjusted, q);
-      }
+      if (subjectLocal !== null && subjectLocal >= section.subject_start && subjectLocal <= section.subject_end) {
+        if (!nums.has(subjectLocal)) {
+          nums.add(subjectLocal);
+          questionMap.set(subjectLocal, q);
+        }
       }
     });
 
     return { numbers: nums, map: questionMap };
-  }, [sectionAbsoluteRanges]);
+  }, []);
+
+  // Optimized bulk loading of all questions for the pattern
+  const loadAllPatternQuestions = useCallback(
+    async (patternIdToLoad: string, sections: SubjectSection[]) => {
+      try {
+        const res = await api.get(
+          `/questions/pattern-questions/?pattern_id=${patternIdToLoad}${
+            examIdFromQuery ? `&exam_id=${examIdFromQuery}` : ''
+          }`,
+        );
+        
+        const data = res.data as {
+          questions_by_section: Record<string | number, QuestionData[]>;
+          existing_numbers_by_section: Record<string | number, number[]>;
+          sections: Array<{
+            section_id: number;
+            total_added: number;
+            total_needed: number;
+            progress_percentage: number;
+          }>;
+        };
+        
+        // Process all sections at once
+        const newExistingNumbersBySection: Record<number, Set<number>> = {};
+        const newExistingQuestionsBySection: Record<number, Map<number, QuestionData>> = {};
+        
+        sections.forEach((section) => {
+          // JSON serializes object keys as strings, so we need to handle both
+          const sectionQuestions = data.questions_by_section[section.id] || 
+                                   data.questions_by_section[String(section.id)] || 
+                                   [];
+          const { numbers: nums, map } = buildNumbersSetForSection(section, sectionQuestions);
+          newExistingNumbersBySection[section.id] = nums;
+          newExistingQuestionsBySection[section.id] = map;
+        });
+        
+        setExistingNumbersBySection(newExistingNumbersBySection);
+        setExistingQuestionsBySection(newExistingQuestionsBySection);
+        setBulkDataLoaded(true);
+        
+        // Update section stats from bulk response - merge with section data
+        if (data.sections) {
+          setSectionStats(data.sections.map(s => {
+            const section = sections.find(sec => sec.id === s.section_id);
+            return {
+              section_id: s.section_id,
+              section_name: section?.name || '',
+              subject: section?.subject || '',
+              question_type: section?.question_type || '',
+              total_needed: s.total_needed,
+              total_added: s.total_added,
+              remaining: s.total_needed - s.total_added,
+              progress_percentage: s.progress_percentage,
+            };
+          }));
+        }
+        
+        return true;
+      } catch (err) {
+        console.error('Failed to load bulk pattern questions, falling back to individual loads', err);
+        return false;
+      }
+    },
+    [examIdFromQuery, buildNumbersSetForSection],
+  );
 
   const loadSectionNumbers = useCallback(
     async (section: SubjectSection, updateCurrent = false) => {
+      // Skip if bulk data is already loaded
+      if (bulkDataLoaded && existingNumbersBySection[section.id]) {
+        if (updateCurrent) {
+          setExistingNumbers(existingNumbersBySection[section.id]);
+        }
+        return;
+      }
+      
       try {
+        // Fetch ALL questions for this section using optimized endpoint
         const res = await api.get(
-          `/questions/questions/?pattern_section=${section.id}${
-            examIdFromQuery ? `&exam=${examIdFromQuery}` : ''
+          `/questions/section-questions/${section.id}/${
+            examIdFromQuery ? `?exam_id=${examIdFromQuery}` : ''
           }`,
         );
-        const payload = res.data as { results?: QuestionData[] } | QuestionData[] | undefined;
-        const resultsArray: QuestionData[] = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload?.results)
-            ? payload?.results ?? []
-            : [];
+        
+        const data = res.data as {
+          questions: QuestionData[];
+          existing_numbers: number[];
+          questions_map: Record<number, QuestionData>;
+        };
+        
+        const resultsArray = data.questions || [];
         const { numbers: nums, map } = buildNumbersSetForSection(section, resultsArray);
 
         setExistingNumbersBySection((prev) => ({
@@ -272,7 +400,7 @@ export default function EnhancedQuestionEditor() {
         }
       }
     },
-    [examIdFromQuery, buildNumbersSetForSection],
+    [examIdFromQuery, buildNumbersSetForSection, bulkDataLoaded, existingNumbersBySection],
   );
 
   const fetchSectionStats = useCallback(async (patternData: Pattern) => {
@@ -284,9 +412,10 @@ export default function EnhancedQuestionEditor() {
     for (const section of patternData.sections) {
       const totalNeeded = section.end_question - section.start_question + 1;
       
-      // Fetch questions for this section
+      // Fetch questions for this section - use count from paginated response
       const response = await api.get(`/questions/questions/?pattern_section=${section.id}${queryExam}`);
-      const totalAdded = response.data?.results?.length || response.data?.length || 0;
+      // Use 'count' from paginated response for total, not results.length which is just the first page
+      const totalAdded = response.data?.count ?? response.data?.results?.length ?? response.data?.length ?? 0;
       
       // Map question type to display name
       const questionTypeDisplay = getQuestionTypeDisplayName(section.question_type);
@@ -380,22 +509,34 @@ export default function EnhancedQuestionEditor() {
   const fetchPattern = useCallback(async (id: string) => {
     try {
       setLoading(true);
+      setBulkDataLoaded(false);
       const response = await api.get(`/patterns/patterns/${id}/`);
       const patternData = response.data;
       setExistingNumbers(new Set());
       setExistingNumbersBySection({});
+      setExistingQuestionsBySection({});
       setPattern(patternData);
       const groups = buildSubjectGroups(patternData);
       setSubjectGroups(groups);
       const ranges = computeSectionAbsoluteRanges(patternData);
       setSectionAbsoluteRanges(ranges);
-      await fetchSectionStats(patternData);
+      
+      // Flatten all sections from groups for bulk loading
+      const allSections = groups.flatMap(g => g.sections);
+      
+      // Try bulk loading first (much faster)
+      const bulkSuccess = await loadAllPatternQuestions(id, allSections);
+      
+      // Fall back to individual section stats if bulk fails
+      if (!bulkSuccess) {
+        await fetchSectionStats(patternData);
+      }
     } catch (err) {
       console.error('Failed to fetch pattern:', err);
     } finally {
       setLoading(false);
     }
-  }, [fetchSectionStats, buildSubjectGroups, computeSectionAbsoluteRanges]);
+  }, [fetchSectionStats, buildSubjectGroups, computeSectionAbsoluteRanges, loadAllPatternQuestions]);
 
   const absoluteQuestionNumber = useMemo(
     () => computeAbsoluteQuestionNumber(currentSection, currentQuestionNumber),
@@ -466,14 +607,15 @@ export default function EnhancedQuestionEditor() {
   }, [pattern, currentSubjectGroup, currentQuestionNumber, loadSectionNumbers]);
 
   useEffect(() => {
-    if (!currentSubjectGroup) return;
+    // Skip if bulk data is already loaded
+    if (bulkDataLoaded || !currentSubjectGroup) return;
 
     currentSubjectGroup.sections.forEach((section) => {
       if (!existingNumbersBySection[section.id]) {
         loadSectionNumbers(section, section.id === currentSection?.id);
       }
     });
-  }, [currentSubjectGroup, existingNumbersBySection, loadSectionNumbers, currentSection?.id]);
+  }, [currentSubjectGroup, existingNumbersBySection, loadSectionNumbers, currentSection?.id, bulkDataLoaded]);
 
   useEffect(() => {
     if (!patternId || subjectGroups.length === 0) {
@@ -520,12 +662,20 @@ export default function EnhancedQuestionEditor() {
 
     if (mappedExisting) {
       console.log('Loading existing question from cached map:', mappedExisting);
+      const options = mappedExisting.options || ['', '', '', ''];
+      const rawAnswer = mappedExisting.correct_answer || '';
+      // Convert letter answers (A, B, C, D) to actual option text for MCQ questions
+      const questionType = mappedExisting.question_type || 'mcq';
+      const correctAnswer = (questionType === 'single_mcq' || questionType === 'mcq' || questionType === 'multiple_mcq')
+        ? convertLetterAnswerToOptionText(rawAnswer, options)
+        : rawAnswer;
+      
       setFormData({
         question_text: mappedExisting.question_text || '',
-        question_type: mappedExisting.question_type || 'mcq',
+        question_type: questionType,
         difficulty: (mappedExisting.difficulty as 'easy' | 'medium' | 'hard') || 'medium',
-        options: mappedExisting.options || ['', '', '', ''],
-        correct_answer: mappedExisting.correct_answer || '',
+        options: options,
+        correct_answer: correctAnswer,
         solution: mappedExisting.solution || '',
         explanation: mappedExisting.explanation || '',
         marks: mappedExisting.marks || 1,
@@ -542,12 +692,19 @@ export default function EnhancedQuestionEditor() {
     if (existingQuestion && 'results' in existingQuestion && existingQuestion.results && existingQuestion.results.length > 0) {
       const question = existingQuestion.results[0] as QuestionData;
       console.log('Loading existing question from results:', question);
+      const options = question.options || ['', '', '', ''];
+      const rawAnswer = question.correct_answer || '';
+      const questionType = question.question_type || 'mcq';
+      const correctAnswer = (questionType === 'single_mcq' || questionType === 'mcq' || questionType === 'multiple_mcq')
+        ? convertLetterAnswerToOptionText(String(rawAnswer), options)
+        : String(rawAnswer);
+      
       setFormData({
         question_text: question.question_text || '',
-        question_type: question.question_type || 'mcq',
+        question_type: questionType,
         difficulty: (question.difficulty as 'easy' | 'medium' | 'hard') || 'medium',
-        options: question.options || ['', '', '', ''],
-        correct_answer: question.correct_answer || '',
+        options: options,
+        correct_answer: correctAnswer,
         solution: question.solution || '',
         explanation: question.explanation || '',
         marks: question.marks || 1,
@@ -559,12 +716,19 @@ export default function EnhancedQuestionEditor() {
     } else if (existingQuestion && Array.isArray(existingQuestion) && existingQuestion.length > 0) {
       const question = existingQuestion[0] as QuestionData;
       console.log('Loading existing question from array:', question);
+      const options = question.options || ['', '', '', ''];
+      const rawAnswer = question.correct_answer || '';
+      const questionType = question.question_type || 'mcq';
+      const correctAnswer = (questionType === 'single_mcq' || questionType === 'mcq' || questionType === 'multiple_mcq')
+        ? convertLetterAnswerToOptionText(String(rawAnswer), options)
+        : String(rawAnswer);
+      
       setFormData({
         question_text: question.question_text || '',
-        question_type: question.question_type || 'mcq',
+        question_type: questionType,
         difficulty: (question.difficulty as 'easy' | 'medium' | 'hard') || 'medium',
-        options: question.options || ['', '', '', ''],
-        correct_answer: question.correct_answer || '',
+        options: options,
+        correct_answer: correctAnswer,
         solution: question.solution || '',
         explanation: question.explanation || '',
         marks: question.marks || 1,
@@ -999,11 +1163,18 @@ export default function EnhancedQuestionEditor() {
       // Refresh the question data to get the updated version
       await refetchQuestion();
       
-      if (pattern) {
-        await fetchSectionStats(pattern);
-      }
-      if (currentSection) {
-        await loadSectionNumbers(currentSection, true);
+      // Refresh the section data - use bulk reload if available
+      if (pattern && patternId) {
+        const allSections = subjectGroups.flatMap(g => g.sections);
+        const bulkSuccess = await loadAllPatternQuestions(patternId, allSections);
+        if (!bulkSuccess) {
+          await fetchSectionStats(pattern);
+          if (currentSection) {
+            await loadSectionNumbers(currentSection, true);
+          }
+        } else if (currentSection && existingNumbersBySection[currentSection.id]) {
+          setExistingNumbers(existingNumbersBySection[currentSection.id]);
+        }
       }
       
       setTimeout(() => setSaveStatus('idle'), 2000);
@@ -1013,6 +1184,34 @@ export default function EnhancedQuestionEditor() {
       setTimeout(() => setSaveStatus('idle'), 3000);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFixQuestionNumbers = async () => {
+    if (!patternId) return;
+    
+    setFixingNumbers(true);
+    try {
+      const payload: { pattern_id: number; exam_id?: number } = {
+        pattern_id: Number(patternId),
+      };
+      if (examIdFromQuery) {
+        payload.exam_id = examIdFromQuery;
+      }
+      
+      await api.post('/questions/fix-question-numbers/', payload);
+      
+      // Reload all data after fix
+      const allSections = subjectGroups.flatMap(g => g.sections);
+      await loadAllPatternQuestions(patternId, allSections);
+      
+      if (currentSection && existingNumbersBySection[currentSection.id]) {
+        setExistingNumbers(existingNumbersBySection[currentSection.id]);
+      }
+    } catch (error) {
+      console.error('Failed to fix question numbers:', error);
+    } finally {
+      setFixingNumbers(false);
     }
   };
 
@@ -1545,6 +1744,18 @@ export default function EnhancedQuestionEditor() {
             {/* Right Side - Save Status */}
             <div className="flex items-center gap-3">
               <button
+                onClick={handleFixQuestionNumbers}
+                disabled={fixingNumbers}
+                className="p-2.5 bg-amber-100 hover:bg-amber-200 rounded-xl transition-all hover:scale-110 disabled:opacity-50"
+                title="Fix question numbering (use if imported questions don't show)"
+              >
+                {fixingNumbers ? (
+                  <Loader2 className="w-4 h-4 text-amber-700 animate-spin" />
+                ) : (
+                  <Zap className="w-4 h-4 text-amber-700" />
+                )}
+              </button>
+              <button
                 onClick={() => refetchQuestion()}
                 className="p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all hover:scale-110"
                 title="Refresh question data"
@@ -1790,13 +2001,12 @@ export default function EnhancedQuestionEditor() {
                     </div>
                   ) : (
                     <input
-                      type={formData.question_type === 'numerical' ? 'number' : 'text'}
+                      type="text"
                       value={formData.correct_answer}
                       onChange={(e) => handleInputChange('correct_answer', e.target.value)}
-                      step={formData.question_type === 'numerical' ? '0.01' : undefined}
                       className="w-full px-4 py-3.5 border-2 border-green-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all bg-green-50 font-medium"
                       placeholder={
-                        formData.question_type === 'numerical' ? 'e.g., 3.14, 42, 2.45' :
+                        formData.question_type === 'numerical' ? 'e.g., 3.14, 42, 6.02×10²³' :
                         'Enter correct answer'
                       }
                     />
@@ -1904,6 +2114,7 @@ export default function EnhancedQuestionEditor() {
                               : isCurrentSection
                                 ? existingNumbers
                                 : new Set<number>();
+                            
                             return (
                               <div
                                 key={section.id}
@@ -1935,10 +2146,10 @@ export default function EnhancedQuestionEditor() {
                                         onClick={() => navigateToQuestion(currentSubjectGroup.slug, num)}
                                         className={`h-10 rounded-lg border text-sm font-semibold transition-all ${
                                           isCurrent
-                                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
-                                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
-                                        } ${
-                                          isExisting ? 'ring-2 ring-emerald-300' : ''
+                                            ? 'border-blue-500 bg-blue-600 text-white shadow-md'
+                                            : isExisting
+                                              ? 'border-emerald-400 bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
                                         }`}
                                         title={isExisting ? 'Already added' : 'Empty'}
                                       >
@@ -1968,7 +2179,44 @@ export default function EnhancedQuestionEditor() {
                 </h3>
               </div>
               <div className="p-4">
-                <AIImageToText />
+                <AIImageToText 
+                  onExtractedText={(text) => {
+                    // Set the extracted text as question text
+                    handleInputChange('question_text', text);
+                  }}
+                  onExtractedQuestion={(data) => {
+                    // Auto-fill the question form with extracted data
+                    if (data.question_text) {
+                      handleInputChange('question_text', data.question_text);
+                    }
+                    if (data.options && data.options.length > 0) {
+                      // Pad options to 4 if needed
+                      const paddedOptions = [...data.options];
+                      while (paddedOptions.length < 4) {
+                        paddedOptions.push('');
+                      }
+                      setFormData(prev => ({ ...prev, options: paddedOptions }));
+                    }
+                    if (data.correct_answer) {
+                      // Convert letter answer to option text if needed
+                      const answer = data.correct_answer.toUpperCase();
+                      if (answer.length === 1 && answer >= 'A' && answer <= 'D' && data.options) {
+                        const index = answer.charCodeAt(0) - 65;
+                        if (data.options[index]) {
+                          handleInputChange('correct_answer', data.options[index]);
+                        }
+                      } else {
+                        handleInputChange('correct_answer', data.correct_answer);
+                      }
+                    }
+                    if (data.solution) {
+                      handleInputChange('solution', data.solution);
+                    }
+                    if (data.explanation) {
+                      handleInputChange('explanation', data.explanation);
+                    }
+                  }}
+                />
               </div>
             </div>
 

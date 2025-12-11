@@ -8,7 +8,7 @@ interface PatternMappingStepProps {
   patternId: number;
   jobId: string;
   questions: any[];
-  onComplete: (mappings: Map<number, any>, mismatches: any) => void;
+  onComplete: (mappings: Record<number, any>, mismatches: any | null) => void;
 }
 
 export default function PatternMappingStep({

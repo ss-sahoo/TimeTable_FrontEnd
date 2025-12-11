@@ -147,7 +147,8 @@ export default function ExamView() {
           queryParams.set('exam', String(examId));
         }
         const response = await api.get(`/questions/questions/?${queryParams.toString()}`);
-        const totalAdded = response.data?.results?.length || response.data?.length || 0;
+        // Use 'count' from paginated response for total, not results.length which is just the first page
+        const totalAdded = response.data?.count ?? response.data?.results?.length ?? response.data?.length ?? 0;
         
         stats.push({
           section_id: section.id,

@@ -5,11 +5,37 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import FileUploader from './FileUploader';
+import DocumentPreAnalysis from './DocumentPreAnalysis';
+import SubjectPreview from './SubjectPreview';
 import ExtractionProgress from './ExtractionProgress';
 import QuestionPreview from './QuestionPreview';
 import SectionMapper from './SectionMapper';
 import ImportSummary from './ImportSummary';
 import { api } from '../../hooks/useApi';
+
+interface PreAnalysisResult {
+  job_id: string;
+  is_valid: boolean;
+  document_type: string;
+  document_type_display: string;
+  confidence: number;
+  detected_subjects: string[];
+  matched_subjects: string[];
+  unmatched_subjects: string[];
+  subject_question_counts: Record<string, number>;
+  total_estimated_questions: number;
+  error_message?: string;
+  reason?: string;
+  message?: string;
+}
+
+interface SubjectData {
+  subject: string;
+  question_count: number;
+  content_preview: string;
+  full_content_length: number;
+  download_url: string;
+}
 
 interface QuestionBulkImportProps {
   examId: number;
@@ -18,7 +44,7 @@ interface QuestionBulkImportProps {
   onImportComplete: () => void;
 }
 
-type WorkflowStep = 'upload' | 'extracting' | 'preview' | 'mapping' | 'importing' | 'summary';
+type WorkflowStep = 'upload' | 'pre-analysis' | 'subject-preview' | 'extracting' | 'preview' | 'mapping' | 'importing' | 'summary';
 
 interface ExtractedQuestion {
   id: number;
@@ -65,31 +91,94 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
   const [error, setError] = useState<string>('');
   const [importing, setImporting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [preAnalysisResult, setPreAnalysisResult] = useState<PreAnalysisResult | null>(null);
+  const [preAnalysisJobId, setPreAnalysisJobId] = useState<string>('');
+  const [subjectData, setSubjectData] = useState<SubjectData[]>([]);
+  const [confirmingPreAnalysis, setConfirmingPreAnalysis] = useState(false);
 
   const handleFileSelect = async (file: File) => {
     setUploading(true);
     setError('');
 
     try {
+      // First, run pre-analysis
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('exam_id', examId.toString());
       formData.append('pattern_id', patternId.toString());
 
-      const response = await api.post('/questions/bulk-extract/', formData, {
+      const response = await api.post('/questions/pre-analyze/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      setJobId(response.data.job_id);
-      setCurrentStep('extracting');
+      setPreAnalysisResult(response.data);
+      setPreAnalysisJobId(response.data.job_id);
+      setCurrentStep('pre-analysis');
     } catch (err: any) {
-      console.error('Upload failed:', err);
-      setError(err.response?.data?.error || 'Failed to upload file');
+      console.error('Pre-analysis failed:', err);
+      setError(err.response?.data?.error || 'Failed to analyze document');
     } finally {
       setUploading(false);
     }
+  };
+
+  const handlePreAnalysisConfirm = async () => {
+    if (!preAnalysisResult?.is_valid) return;
+    
+    setConfirmingPreAnalysis(true);
+    setError('');
+
+    try {
+      const response = await api.post(`/questions/pre-analyze/${preAnalysisJobId}/confirm/`, {
+        confirmed_subjects: preAnalysisResult.matched_subjects,
+        exam_id: examId,
+        proceed_to_extraction: true,
+      });
+
+      setJobId(response.data.extraction_job_id);
+      setCurrentStep('extracting');
+    } catch (err: any) {
+      console.error('Confirm failed:', err);
+      setError(err.response?.data?.error || 'Failed to start extraction');
+    } finally {
+      setConfirmingPreAnalysis(false);
+    }
+  };
+
+  const handleViewSubjects = async () => {
+    try {
+      const response = await api.get(`/questions/pre-analyze/${preAnalysisJobId}/subjects/`);
+      setSubjectData(response.data.subjects);
+      setCurrentStep('subject-preview');
+    } catch (err: any) {
+      console.error('Failed to load subjects:', err);
+      setError(err.response?.data?.error || 'Failed to load subject content');
+    }
+  };
+
+  const handleDownloadSubject = async (subject: string) => {
+    try {
+      const response = await api.get(
+        `/questions/pre-analyze/${preAnalysisJobId}/subjects/${subject.toLowerCase()}/download/`,
+        { responseType: 'blob' }
+      );
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${subject}_Questions.txt`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err: any) {
+      console.error('Download failed:', err);
+      setError('Failed to download file');
+    }
+  };
+
+  const handleBackToPreAnalysis = () => {
+    setCurrentStep('pre-analysis');
   };
 
   const handleExtractionComplete = () => {
@@ -193,12 +282,19 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
     setSectionMappings({});
     setImportResult(null);
     setError('');
+    setPreAnalysisResult(null);
+    setPreAnalysisJobId('');
+    setSubjectData([]);
   };
 
   const getStepTitle = (): string => {
     switch (currentStep) {
       case 'upload':
         return 'Upload Question File';
+      case 'pre-analysis':
+        return 'Document Analysis';
+      case 'subject-preview':
+        return 'Subject Preview';
       case 'extracting':
         return 'Extracting Questions';
       case 'preview':
@@ -215,13 +311,15 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
   };
 
   const getStepNumber = (): string => {
-    const steps = {
-      upload: '1',
-      extracting: '2',
-      preview: '3',
-      mapping: '4',
-      importing: '5',
-      summary: '6',
+    const steps: Record<WorkflowStep, string> = {
+      'upload': '1',
+      'pre-analysis': '2',
+      'subject-preview': '2',
+      'extracting': '3',
+      'preview': '4',
+      'mapping': '5',
+      'importing': '6',
+      'summary': '7',
     };
     return steps[currentStep] || '1';
   };
@@ -251,13 +349,18 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
           </button>
         </div>
 
-        {/* Progress Steps */}
+        {/* Progress Steps - Updated Flow */}
         {currentStep !== 'summary' && (
           <div className="px-6 py-4 bg-gray-50 border-b">
             <div className="flex items-center justify-between">
-              {['Upload', 'Extract', 'Review', 'Map', 'Import'].map((step, index) => {
+              {['Upload', 'Extract & Categorize', 'Review', 'Map', 'Import'].map((step, index) => {
                 const stepKeys: WorkflowStep[] = ['upload', 'extracting', 'preview', 'mapping', 'importing'];
-                const currentIndex = stepKeys.indexOf(currentStep);
+                // Map current step to the simplified flow
+                let mappedStep = currentStep;
+                if (currentStep === 'pre-analysis' || currentStep === 'subject-preview') {
+                  mappedStep = 'extracting'; // Pre-analysis is part of extraction flow
+                }
+                const currentIndex = stepKeys.indexOf(mappedStep as WorkflowStep);
                 const isActive = index === currentIndex;
                 const isCompleted = index < currentIndex;
 
@@ -315,10 +418,31 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
               {uploading && (
                 <div className="mt-4 flex items-center justify-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mr-3" />
-                  <span className="text-gray-600">Uploading file...</span>
+                  <span className="text-gray-600">Analyzing document...</span>
                 </div>
               )}
             </div>
+          )}
+
+          {currentStep === 'pre-analysis' && preAnalysisResult && (
+            <DocumentPreAnalysis
+              result={preAnalysisResult}
+              onConfirm={handlePreAnalysisConfirm}
+              onReupload={handleStartOver}
+              onViewSubjects={handleViewSubjects}
+              isLoading={confirmingPreAnalysis}
+            />
+          )}
+
+          {currentStep === 'subject-preview' && (
+            <SubjectPreview
+              jobId={preAnalysisJobId}
+              subjects={subjectData}
+              documentType={preAnalysisResult?.document_type || ''}
+              totalQuestions={preAnalysisResult?.total_estimated_questions || 0}
+              onBack={handleBackToPreAnalysis}
+              onDownload={handleDownloadSubject}
+            />
           )}
 
           {currentStep === 'extracting' && (
