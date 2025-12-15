@@ -132,13 +132,63 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
       const sections = extractResponse.data.sections || [];
       setExtractedSections(sections);
 
-      // Step 2: Get import preview
+      // Step 2: Use extract-by-section response directly (skip redundant preview API)
+      // Transform the response to match the preview format expected by UI
+      const extractData = extractResponse.data;
+      const totalExtracted = extractData.total_extracted || sections.reduce((sum: number, s: any) => sum + (s.total_extracted || 0), 0);
+      
+      // Create preview-like structure from extract response
+      const previewData = {
+        preview: {
+          exam_id: parseInt(examId),
+          pattern_id: parseInt(patternId),
+          subject: currentSubject,
+          total_extracted: totalExtracted,
+          total_will_import: 0, // Will be calculated by confirm API
+          total_overflow: totalExtracted, // All questions are overflow until pattern sections exist
+          total_remaining_after_import: 0,
+          section_mappings: sections.map((section: any) => ({
+            pattern_section_name: section.section_name,
+            question_type: section.section_type,
+            extracted_count: section.total_extracted,
+            will_import_count: 0,
+            overflow_count: section.total_extracted,
+            current_count: 0,
+            required_count: section.expected_count || section.total_extracted,
+            status: 'overflow'
+          })),
+          warnings: [],
+          recommendations: ['Questions extracted successfully. Pattern mapping will be calculated during import.'],
+          can_proceed: true,
+          requires_selection: false
+        },
+        confirmation_message: `Found ${totalExtracted} questions for ${currentSubject}. Review the extracted sections below.`,
+        options: [
+          {
+            action: 'import_all',
+            label: `Import All (${totalExtracted} questions)`,
+            description: 'Import all extracted questions'
+          },
+          {
+            action: 'skip',
+            label: 'Skip This Subject',
+            description: 'Do not import any questions for this subject'
+          }
+        ],
+        subject: currentSubject,
+        can_proceed: true
+      };
+
+      setConfirmationData(previewData);
+      setExtractionState('preview');
+
+      // COMMENTED OUT: Preview API call (redundant - confirm API recalculates this anyway)
+      /*
       const previewResponse = await api.post('/questions/section-import-preview/', {
         exam_id: parseInt(examId),
         pattern_id: parseInt(patternId),
         subject: currentSubject,
         extracted_sections: sections,
-        // Pass import target for targeted imports
         import_target: importTarget ? {
           mode: importTarget.mode,
           target_subject: importTarget.targetSubject,
@@ -148,6 +198,7 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
 
       setConfirmationData(previewResponse.data);
       setExtractionState('preview');
+      */
     } catch (err: any) {
       console.error('Extraction failed:', err);
       setError(err.response?.data?.error || 'Failed to extract questions');
@@ -275,59 +326,109 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
           </div>
         </div>
 
-        {/* Section Mappings */}
+        {/* Extracted Sections */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
             <BarChart3 className="w-5 h-5 text-gray-600" />
-            <span>Section Capacity</span>
+            <span>Extracted Sections</span>
           </h3>
 
-          {preview.section_mappings.map((mapping, index) => (
-            <div
-              key={index}
-              className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h4 className="font-semibold text-gray-900">{mapping.pattern_section_name}</h4>
-                  <p className="text-sm text-gray-500">{mapping.question_type}</p>
+          {/* Show sections from extractedSections (from extract-by-section API response) */}
+          {extractedSections && extractedSections.length > 0 ? (
+            extractedSections.map((section: any, index: number) => (
+              <div
+                key={index}
+                className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-gray-900 text-lg">{section.section_name || `Section ${index + 1}`}</h4>
+                    <p className="text-sm text-gray-500 mt-1">Type: {section.section_type || 'mixed'}</p>
+                    {section.expected_count && (
+                      <p className="text-xs text-gray-400 mt-1">Expected: {section.expected_count} questions</p>
+                    )}
+                  </div>
+                  <div className="ml-4 text-right">
+                    <p className="text-2xl font-bold text-indigo-600">{section.total_extracted || 0}</p>
+                    <p className="text-xs text-gray-500">Questions</p>
+                  </div>
                 </div>
-                <span className={`text-xs px-3 py-1 rounded-full font-medium ${getStatusColor(mapping.status)}`}>
-                  {mapping.status.toUpperCase()}
-                </span>
-              </div>
 
-              {/* Progress Bar */}
-              <div className="mb-3">
-                <div className="flex justify-between text-xs text-gray-500 mb-1">
-                  <span>Current: {mapping.current_count}</span>
-                  <span>Required: {mapping.required_count}</span>
-                </div>
-                <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-indigo-500 transition-all"
-                    style={{ width: `${Math.min(100, (mapping.current_count / mapping.required_count) * 100)}%` }}
-                  />
-                </div>
+                {/* Question preview (first 3 questions) */}
+                {section.questions && section.questions.length > 0 && (
+                  <div className="mt-4 border-t border-gray-100 pt-4">
+                    <button
+                      onClick={() => setExpandedSection(expandedSection === section.section_name ? null : section.section_name)}
+                      className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center space-x-1"
+                    >
+                      <span>{expandedSection === section.section_name ? 'Hide' : 'Show'} Questions ({section.questions.length})</span>
+                      <span>{expandedSection === section.section_name ? '▲' : '▼'}</span>
+                    </button>
+                    
+                    {expandedSection === section.section_name && (
+                      <div className="mt-3 space-y-2 max-h-96 overflow-y-auto">
+                        {section.questions.slice(0, 10).map((q: any, qIndex: number) => (
+                          <div key={qIndex} className="bg-gray-50 rounded-lg p-3 text-sm">
+                            <p className="font-medium text-gray-900">Q{q.question_number || qIndex + 1}:</p>
+                            <p className="text-gray-700 mt-1 line-clamp-3">{q.question_text}</p>
+                            {q.correct_answer && (
+                              <p className="text-green-700 mt-1 font-medium">Answer: {q.correct_answer}</p>
+                            )}
+                          </div>
+                        ))}
+                        {section.questions.length > 10 && (
+                          <p className="text-xs text-gray-500 text-center">... and {section.questions.length - 10} more questions</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+            ))
+          ) : preview.section_mappings && preview.section_mappings.length > 0 ? (
+            preview.section_mappings.map((mapping: any, index: number) => (
+              <div
+                key={index}
+                className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{mapping.pattern_section_name || `Section ${index + 1}`}</h4>
+                    <p className="text-sm text-gray-500">Type: {mapping.question_type}</p>
+                  </div>
+                  {mapping.status && (
+                    <span className={`text-xs px-3 py-1 rounded-full font-medium ${getStatusColor(mapping.status)}`}>
+                      {mapping.status.toUpperCase()}
+                    </span>
+                  )}
+                </div>
 
-              {/* Import Details */}
-              <div className="grid grid-cols-3 gap-3 text-sm">
-                <div className="bg-gray-50 rounded-lg p-2 text-center">
-                  <p className="font-semibold text-gray-900">{mapping.extracted_count}</p>
-                  <p className="text-xs text-gray-500">Extracted</p>
-                </div>
-                <div className="bg-green-50 rounded-lg p-2 text-center">
-                  <p className="font-semibold text-green-700">{mapping.will_import_count}</p>
-                  <p className="text-xs text-green-600">Will Import</p>
-                </div>
-                <div className="bg-amber-50 rounded-lg p-2 text-center">
-                  <p className="font-semibold text-amber-700">{mapping.overflow_count}</p>
-                  <p className="text-xs text-amber-600">Overflow</p>
+                {/* Question Count Details */}
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-gray-900">{mapping.extracted_count || 0}</p>
+                    <p className="text-xs text-gray-500 mt-1">Questions Extracted</p>
+                  </div>
+                  {mapping.expected_count !== undefined && (
+                    <div className="bg-blue-50 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-blue-700">{mapping.expected_count}</p>
+                      <p className="text-xs text-blue-600 mt-1">Expected</p>
+                    </div>
+                  )}
+                  {mapping.will_import_count !== undefined && (
+                    <div className="bg-green-50 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-green-700">{mapping.will_import_count}</p>
+                      <p className="text-xs text-green-600 mt-1">Will Import</p>
+                    </div>
+                  )}
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <p className="text-amber-800">No sections extracted. Please check the extraction response.</p>
             </div>
-          ))}
+          )}
         </div>
 
         {/* Warnings */}
