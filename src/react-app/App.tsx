@@ -56,11 +56,11 @@ import ProctoringDiagnostics from "@/react-app/pages/ProctoringDiagnostics";
 import ProctoringSnapshotsView from "@/react-app/pages/ProctoringSnapshotsView";
 import BulkImportPage from "@/react-app/pages/BulkImportPage";
 import SuperAdminDashboard from "@/react-app/pages/SuperAdminDashboard";
+import Timetable from "@/react-app/pages/Timetable";
 import {
   AdminRoleDashboard,
   TeacherRoleDashboard,
-  StaffDashboard,
-  StudentRoleDashboard,
+  StaffDashboard, 
 } from "@/react-app/pages/RoleDashboards";
 
 // Protected Route Component
@@ -220,10 +220,11 @@ function AppRoutes() {
 
       {/* Static role dashboards (design-only, no backend wiring yet) – public for now */}
       <Route path="/superadmin" element={<SuperAdminDashboard />} />
+      <Route path="/timetable" element={<Timetable />} />
+
       <Route path="/admin" element={<AdminRoleDashboard />} />
       <Route path="/teacher" element={<TeacherRoleDashboard />} />
-      <Route path="/staff" element={<StaffDashboard />} />
-      <Route path="/student" element={<StudentRoleDashboard />} />
+      <Route path="/staff" element={<StaffDashboard />} /> 
           <Route path="/exams" element={
             <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
               <ExamManagement />
