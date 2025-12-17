@@ -56,6 +56,7 @@ import ProctoringDiagnostics from "@/react-app/pages/ProctoringDiagnostics";
 import ProctoringSnapshotsView from "@/react-app/pages/ProctoringSnapshotsView";
 import BulkImportPage from "@/react-app/pages/BulkImportPage";
 import SuperAdminDashboard from "@/react-app/pages/SuperAdminDashboard";
+import CenterAdminDashboard from "@/react-app/pages/CenterAdminDashboard";
 import Timetable from "@/react-app/pages/Timetable";
 import {
   AdminRoleDashboard,
@@ -219,7 +220,10 @@ function AppRoutes() {
       } />
 
       {/* Static role dashboards (design-only, no backend wiring yet) – public for now */}
-      <Route path="/superadmin" element={<SuperAdminDashboard />} />
+      <Route path="/superadmin/dashboard" element={<SuperAdminDashboard />} />
+      <Route path="/superadmin" element={<Navigate to="/superadmin/dashboard" replace />} />
+      <Route path="/center-admin/dashboard" element={<CenterAdminDashboard />} />
+      <Route path="/center-admin" element={<Navigate to="/center-admin/dashboard" replace />} />
       <Route path="/timetable" element={<Timetable />} />
 
       <Route path="/admin" element={<AdminRoleDashboard />} />
