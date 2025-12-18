@@ -1,961 +1,950 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Building2,
-  Users,
-  UserCog,
-  UserPlus,
-  GraduationCap,
-  Layers,
-  LayoutGrid,
-  CalendarRange,
-  LineChart,
-  Plus,
-  ArrowRight,
-  ChevronDown,
-  Sparkles,
+  FileText,
   Settings,
-  FolderTree,
   Home,
+  Users,
+  GraduationCap,
   Search,
-  Filter,
-  Mail,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  X,
+  MoreVertical,
+  MapPin,
+  Menu,
   ChevronLeft,
-  ChevronRight,
+  Zap,
 } from "lucide-react";
+import { useAuthContext } from "../contexts/AuthContext";
 
-type TabKey = "centers" | "programs" | "exams" | "management";
+type SidebarTab = "home" | "exams" | "settings";
+type HomeSubTab = "centers" | "programs" | "peoples";
 
-const centers = [
+interface Center {
+  id: number;
+  name: string;
+  code: string;
+  city: string;
+  address: string;
+  contactEmail: string;
+  contactPhone: string;
+  website: string;
+  admins: number;
+  teachers: number;
+  staff: number;
+  students: number;
+  status: "active" | "inactive";
+}
+
+interface Program {
+  id: number;
+  name: string;
+  type: string;
+  centers: string[];
+  batches: number;
+  students: number;
+  status: "active" | "inactive";
+}
+
+interface Person {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  center: string;
+  status: "active" | "inactive";
+}
+
+const mockCenters: Center[] = [
   {
     id: 1,
     name: "Delhi Main Center",
     code: "DEL-MAIN",
     city: "New Delhi",
+    address: "123 Education Street, Delhi 110001",
+    contactEmail: "delhi@institute.com",
+    contactPhone: "+91-11-12345678",
+    website: "https://delhi.institute.com",
     admins: 2,
     teachers: 18,
     staff: 6,
     students: 320,
-    programs: 4,
+    status: "active",
   },
   {
     id: 2,
     name: "Kota Residential",
     code: "KOT-RES",
     city: "Kota",
+    address: "456 Study Lane, Kota 324005",
+    contactEmail: "kota@institute.com",
+    contactPhone: "+91-744-9876543",
+    website: "https://kota.institute.com",
     admins: 1,
     teachers: 24,
     staff: 10,
     students: 540,
-    programs: 6,
-  },
-  {
-    id: 3,
-    name: "Online Only Center",
-    code: "ONL-01",
-    city: "Virtual",
-    admins: 1,
-    teachers: 12,
-    staff: 3,
-    students: 780,
-    programs: 3,
+    status: "active",
   },
 ];
 
-const programs = [
+const mockPrograms: Program[] = [
   {
     id: 1,
     name: "Super 30 – JEE Advanced",
     type: "Flagship",
     centers: ["Delhi Main Center", "Kota Residential"],
-    batches: [
-      { name: "Super 30 – 2026 Elite", students: 30 },
-      { name: "Super 30 – 2027 Foundation", students: 28 },
-    ],
+    batches: 2,
+    students: 58,
+    status: "active",
   },
   {
     id: 2,
     name: "OnlyBoard – CBSE 12th",
     type: "Board Focused",
-    centers: ["Delhi Main Center", "Online Only Center"],
-    batches: [
-      { name: "OnlyBoard XII – Morning", students: 45 },
-      { name: "OnlyBoard XII – Evening", students: 40 },
-    ],
+    centers: ["Delhi Main Center"],
+    batches: 2,
+    students: 85,
+    status: "active",
   },
 ];
 
-const upcomingExams = [
+const mockPeoples: Person[] = [
   {
     id: 1,
-    title: "Super 30 – Monthly Mock (January)",
-    scope: "Program",
-    target: "Super 30 – JEE Advanced",
-    date: "12 Jan 2026",
-    totalBatches: 2,
+    name: "John Doe",
+    email: "john@institute.com",
+    role: "institute_admin",
+    center: "Delhi Main Center",
+    status: "active",
   },
   {
     id: 2,
-    title: "Institute Level Diagnostic Test",
-    scope: "Institute-wide",
-    target: "All Programs & Batches",
-    date: "20 Jan 2026",
-    totalBatches: 14,
+    name: "Jane Smith",
+    email: "jane@institute.com",
+    role: "teacher",
+    center: "Kota Residential",
+    status: "active",
   },
 ];
 
 export default function SuperAdminDashboard() {
-  const [activeTab, setActiveTab] = useState<TabKey>("centers");
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("home");
+  const [homeSubTab, setHomeSubTab] = useState<HomeSubTab>("centers");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user } = useAuthContext();
+
+  // Modal states
+  const [showAddCenterModal, setShowAddCenterModal] = useState(false);
+  const [showEditCenterModal, setShowEditCenterModal] = useState(false);
+  const [showViewCenterModal, setShowViewCenterModal] = useState(false);
+  const [showDeleteCenterModal, setShowDeleteCenterModal] = useState(false);
+  const [selectedCenter, setSelectedCenter] = useState<Center | null>(null);
+
+  const [showAddProgramModal, setShowAddProgramModal] = useState(false);
+  const [showAddPersonModal, setShowAddPersonModal] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Top header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 bg-blue-50 text-xs font-medium text-blue-700 border border-blue-100 mb-2">
-              <Sparkles className="w-3 h-3" />
-              Super Admin Workspace
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-gray-100">
-              Institute Control Center
-            </h1>
-            <p className="mt-1 text-sm text-slate-600 dark:text-gray-400 max-w-2xl">
-              Orchestrate institutes, centers, programs, batches and exams from a single, clean
-              workspace.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-sm font-medium text-slate-700 dark:text-gray-100 hover:bg-slate-50 transition">
-              <Settings className="w-4 h-4" />
-              Global Settings
-            </button>
-            <button className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium shadow-md hover:bg-blue-700 hover:shadow-lg transition">
-              <Plus className="w-4 h-4" />
-              New Center / Program
-            </button>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50">
+      {/* Ambient background effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 -left-40 w-80 h-80 bg-violet-400/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 right-1/3 w-80 h-80 bg-cyan-400/10 rounded-full blur-3xl" />
+      </div>
 
-        {/* Quick filters row (kept, stats removed as requested) */}
-        <div className="flex flex-col sm:flex-row justify-end gap-4">
-          <div className="space-y-3 max-w-md w-full">
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 p-4 shadow-sm">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                Quick Filters (Static)
-              </p>
-              <div className="space-y-2 text-xs text-slate-600 dark:text-gray-300">
-                <button className="w-full inline-flex items-center justify-between px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50">
-                  <span className="flex items-center gap-2">
-                    <Filter className="w-3 h-3" />
-                    Centers with pending admins
-                  </span>
-                  <span className="text-[11px] font-medium text-slate-500">2</span>
-                </button>
-                <button className="w-full inline-flex items-center justify-between px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50">
-                  <span className="flex items-center gap-2">
-                    <Filter className="w-3 h-3" />
-                    Programs without batches
-                  </span>
-                  <span className="text-[11px] font-medium text-slate-500">1</span>
-                </button>
+      <div className="flex h-screen overflow-hidden">
+        {/* Sidebar */}
+        <aside
+          className={`hidden lg:flex flex-col bg-white/80 backdrop-blur-xl border-r border-slate-200/50 shadow-xl shadow-slate-200/20 transition-all duration-300 ${
+            sidebarCollapsed ? "w-20" : "w-64"
+          }`}
+        >
+          {/* Logo */}
+          <div className="flex items-center justify-between h-[72px] px-5 border-b border-slate-200/50">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
+                <Zap className="w-6 h-6 text-white" />
+              </div>
+              {!sidebarCollapsed && (
+                <div className="overflow-hidden">
+                  <span className="font-bold text-slate-900 text-lg whitespace-nowrap tracking-tight">DashoExams</span>
+                  <p className="text-xs text-slate-500 whitespace-nowrap">Super Admin</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
+            {!sidebarCollapsed && (
+              <p className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Menu</p>
+            )}
+            <SidebarNavItem
+              icon={Home}
+              label="Home"
+              active={sidebarTab === "home"}
+              onClick={() => setSidebarTab("home")}
+              collapsed={sidebarCollapsed}
+            />
+            <SidebarNavItem
+              icon={FileText}
+              label="Exams"
+              active={sidebarTab === "exams"}
+              onClick={() => setSidebarTab("exams")}
+              collapsed={sidebarCollapsed}
+            />
+            <SidebarNavItem
+              icon={Settings}
+              label="Settings"
+              active={sidebarTab === "settings"}
+              onClick={() => setSidebarTab("settings")}
+              collapsed={sidebarCollapsed}
+            />
+          </nav>
+
+          {/* Collapse Toggle */}
+          <div className="p-4 border-t border-slate-200/50">
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-100/80 transition-all"
+            >
+              {sidebarCollapsed ? (
+                <ChevronLeft className="w-5 h-5" />
+              ) : (
+                <>
+                  <ChevronLeft className="w-5 h-5" />
+                  <span>Collapse</span>
+                </>
+              )}
+            </button>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Top Header */}
+          <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 h-[72px] flex items-center justify-between px-6">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2 rounded-lg hover:bg-slate-100"
+              >
+                <Menu className="w-5 h-5 text-slate-600" />
+              </button>
+              <div>
+                <h1 className="text-xl font-semibold text-slate-900">
+                  {sidebarTab === "home" && "Home"}
+                  {sidebarTab === "exams" && "Exams"}
+                  {sidebarTab === "settings" && "Settings"}
+                </h1>
               </div>
             </div>
-            <div className="bg-blue-600 text-white rounded-xl p-4 shadow-md">
-              <p className="text-xs font-semibold uppercase tracking-wide mb-1">
-                Design Note (Static)
-              </p>
-              <p className="text-[11px] leading-relaxed">
-                This layout is intentionally modular so we can later plug in real API data for
-                centers, programs, batches and exam analytics without changing the overall design.
-              </p>
+            <div className="flex items-center gap-3">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-medium text-slate-900">{user?.get_full_name || user?.email}</p>
+                <p className="text-xs text-slate-500">Super Admin</p>
+              </div>
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-blue-600 to-violet-600 rounded-xl flex items-center justify-center">
+                <Users className="w-5 h-5 text-white" />
+              </div>
             </div>
-          </div>
-        </div>
+          </header>
 
-        {/* Main area: left sidebar + tabbed workspace */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          {/* Left navigation / info */}
-          <aside className={`space-y-4 transition-all ${sidebarCollapsed ? "lg:w-20" : "lg:w-64"}`}>
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                {!sidebarCollapsed && (
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                    Navigation
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setSidebarCollapsed((prev) => !prev)}
-                  className="inline-flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 dark:border-gray-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-gray-900"
-                >
-                  {sidebarCollapsed ? (
-                    <ChevronRight className="w-4 h-4" />
-                  ) : (
-                    <ChevronLeft className="w-4 h-4" />
-                  )}
+          {/* Content Area */}
+          <main className="flex-1 overflow-y-auto p-6">
+            {sidebarTab === "home" && (
+              <HomeTab
+                activeSubTab={homeSubTab}
+                onSubTabChange={setHomeSubTab}
+                onAddCenter={() => setShowAddCenterModal(true)}
+                onEditCenter={(center) => {
+                  setSelectedCenter(center);
+                  setShowEditCenterModal(true);
+                }}
+                onViewCenter={(center) => {
+                  setSelectedCenter(center);
+                  setShowViewCenterModal(true);
+                }}
+                onDeleteCenter={(center) => {
+                  setSelectedCenter(center);
+                  setShowDeleteCenterModal(true);
+                }}
+                onAddProgram={() => setShowAddProgramModal(true)}
+                onAddPerson={() => setShowAddPersonModal(true)}
+              />
+            )}
+            {sidebarTab === "exams" && <ExamsTab />}
+            {sidebarTab === "settings" && <SettingsTab />}
+          </main>
+        </div>
+      </div>
+
+      {/* Mobile Sidebar */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="fixed inset-0 bg-black/60" onClick={() => setMobileMenuOpen(false)} />
+          <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center justify-between p-5 border-b">
+                <span className="font-bold text-slate-900 text-lg">DashoExams</span>
+                <button onClick={() => setMobileMenuOpen(false)}>
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-              <nav className="space-y-1 text-sm">
-                <SideNavItem
-                  icon={Building2}
-                  label="Centers"
-                  active={activeTab === "centers"}
-                  onClick={() => setActiveTab("centers")}
-                  collapsed={sidebarCollapsed}
+              <nav className="flex-1 p-4 space-y-1">
+                <SidebarNavItem
+                  icon={Home}
+                  label="Home"
+                  active={sidebarTab === "home"}
+                  onClick={() => {
+                    setSidebarTab("home");
+                    setMobileMenuOpen(false);
+                  }}
+                  collapsed={false}
                 />
-                <SideNavItem
-                  icon={Layers}
-                  label="Programs & Batches"
-                  active={activeTab === "programs"}
-                  onClick={() => setActiveTab("programs")}
-                  collapsed={sidebarCollapsed}
-                />
-                <SideNavItem
-                  icon={LayoutGrid}
+                <SidebarNavItem
+                  icon={FileText}
                   label="Exams"
-                  active={activeTab === "exams"}
-                  onClick={() => setActiveTab("exams")}
-                  collapsed={sidebarCollapsed}
+                  active={sidebarTab === "exams"}
+                  onClick={() => {
+                    setSidebarTab("exams");
+                    setMobileMenuOpen(false);
+                  }}
+                  collapsed={false}
                 />
-                <SideNavItem
-                  icon={FolderTree}
-                  label="Management"
-                  active={activeTab === "management"}
-                  onClick={() => setActiveTab("management")}
-                  collapsed={sidebarCollapsed}
+                <SidebarNavItem
+                  icon={Settings}
+                  label="Settings"
+                  active={sidebarTab === "settings"}
+                  onClick={() => {
+                    setSidebarTab("settings");
+                    setMobileMenuOpen(false);
+                  }}
+                  collapsed={false}
                 />
               </nav>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 p-4 text-xs space-y-2">
-              <p className="font-semibold text-slate-800 dark:text-gray-100 flex items-center gap-2">
-                <Home className="w-3 h-3" />
-                Home & People (Later)
-              </p>
-              <p className="text-slate-600 dark:text-gray-400">
-                The “Management” tab will later control home layout, people directory and role based
-                onboarding flows for each center and program.
-              </p>
-            </div>
-          </aside>
-
-          {/* Right workspace: tabs + content */}
-          <div className="lg:col-span-3 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden">
-            <div className="border-b border-slate-200 dark:border-gray-700 bg-slate-50/70 dark:bg-gray-900/40 px-4 sm:px-6">
-              <div className="flex flex-wrap gap-2 py-3">
-                <TabChip
-                  icon={Building2}
-                  label="Centers"
-                  active={activeTab === "centers"}
-                  onClick={() => setActiveTab("centers")}
-                />
-                <TabChip
-                  icon={Layers}
-                  label="Programs & Batches"
-                  active={activeTab === "programs"}
-                  onClick={() => setActiveTab("programs")}
-                />
-                <TabChip
-                  icon={LayoutGrid}
-                  label="Exams"
-                  active={activeTab === "exams"}
-                  onClick={() => setActiveTab("exams")}
-                />
-                <TabChip
-                  icon={FolderTree}
-                  label="Management"
-                  active={activeTab === "management"}
-                  onClick={() => setActiveTab("management")}
-                />
-              </div>
-            </div>
-            <div className="p-4 sm:p-6 space-y-6">
-              {activeTab === "centers" && <CentersTab />}
-              {activeTab === "programs" && <ProgramsTab />}
-              {activeTab === "exams" && <ExamsTab />}
-              {activeTab === "management" && <ManagementTab />}
-            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Modals */}
+      {showAddCenterModal && <AddCenterModal onClose={() => setShowAddCenterModal(false)} />}
+      {showEditCenterModal && selectedCenter && (
+        <EditCenterModal center={selectedCenter} onClose={() => setShowEditCenterModal(false)} />
+      )}
+      {showViewCenterModal && selectedCenter && (
+        <ViewCenterModal center={selectedCenter} onClose={() => setShowViewCenterModal(false)} />
+      )}
+      {showDeleteCenterModal && selectedCenter && (
+        <DeleteCenterModal center={selectedCenter} onClose={() => setShowDeleteCenterModal(false)} />
+      )}
+      {showAddProgramModal && <AddProgramModal onClose={() => setShowAddProgramModal(false)} />}
+      {showAddPersonModal && <AddPersonModal onClose={() => setShowAddPersonModal(false)} />}
     </div>
   );
 }
 
-function SummaryCard({
-  icon: Icon,
-  label,
-  value,
-  pill,
-  color,
-}: {
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  label: string;
-  value: string;
-  pill: string;
-  color: "blue" | "purple" | "emerald" | "orange";
-}) {
-  const colorClasses: Record<typeof color, string> = {
-    blue: "bg-blue-50 text-blue-700",
-    purple: "bg-purple-50 text-purple-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    orange: "bg-orange-50 text-orange-700",
-  } as const;
-
-  const iconBg: Record<typeof color, string> = {
-    blue: "bg-blue-600",
-    purple: "bg-purple-600",
-    emerald: "bg-emerald-600",
-    orange: "bg-orange-600",
-  } as const;
-
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 p-4 shadow-sm hover:shadow-md transition-all">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-gray-100">{value}</p>
-          <span
-            className={`inline-flex items-center mt-2 px-2.5 py-1 rounded-full text-[11px] font-medium ${colorClasses[color]}`}
-          >
-            {pill}
-          </span>
-        </div>
-        <div className={`w-10 h-10 rounded-xl ${iconBg[color]} flex items-center justify-center shadow-lg`}>
-          <Icon className="w-5 h-5 text-white" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TabChip({
+// Sidebar Nav Item Component
+function SidebarNavItem({
   icon: Icon,
   label,
   active,
   onClick,
+  collapsed,
 }: {
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   active: boolean;
   onClick: () => void;
+  collapsed: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm rounded-full border transition-all ${
+      className={`group flex items-center gap-3 px-3 py-3 rounded-2xl text-sm font-medium transition-all relative overflow-hidden w-full ${
+        collapsed ? "justify-center" : ""
+      } ${
         active
-          ? "bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500 shadow-sm"
-          : "text-slate-600 dark:text-gray-300 border-transparent hover:bg-white/60 dark:hover:bg-gray-800/80"
+          ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25"
+          : "text-slate-600 hover:bg-slate-100/80 hover:text-slate-900"
       }`}
+      title={collapsed ? label : undefined}
     >
-      <Icon className="w-4 h-4" />
-      <span>{label}</span>
+      {active && (
+        <>
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-400/10 to-violet-400/10" />
+        </>
+      )}
+      <Icon className="w-5 h-5 flex-shrink-0 relative z-10" />
+      {!collapsed && <span className="relative z-10">{label}</span>}
     </button>
   );
 }
 
-function CentersTab() {
+// Home Tab Component
+function HomeTab({
+  activeSubTab,
+  onSubTabChange,
+  onAddCenter,
+  onEditCenter,
+  onViewCenter,
+  onDeleteCenter,
+  onAddProgram,
+  onAddPerson,
+}: {
+  activeSubTab: HomeSubTab;
+  onSubTabChange: (tab: HomeSubTab) => void;
+  onAddCenter: () => void;
+  onEditCenter: (center: Center) => void;
+  onViewCenter: (center: Center) => void;
+  onDeleteCenter: (center: Center) => void;
+  onAddProgram: () => void;
+  onAddPerson: () => void;
+}) {
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">Centers</h2>
-          <p className="text-sm text-slate-600 dark:text-gray-400">
-            Assign admins, teachers, staff and students to individual centers. All static for now.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search centers..."
-              className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white dark:bg-gray-900 dark:border-gray-700 text-slate-700 dark:text-gray-100"
-              readOnly
-            />
-          </div>
-          <button className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-xs text-slate-700 hover:bg-slate-50">
-            <Plus className="w-3 h-3" />
-            Add Center
+    <div className="space-y-6">
+      {/* Sub Tabs */}
+      <div className="border-b border-slate-200">
+        <nav className="flex space-x-8">
+          <button
+            onClick={() => onSubTabChange("centers")}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeSubTab === "centers"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+            }`}
+          >
+            Centers
           </button>
+          <button
+            onClick={() => onSubTabChange("programs")}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeSubTab === "programs"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+            }`}
+          >
+            Programs
+          </button>
+          <button
+            onClick={() => onSubTabChange("peoples")}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeSubTab === "peoples"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+            }`}
+          >
+            Peoples
+          </button>
+        </nav>
+      </div>
+
+      {/* Sub Tab Content */}
+      {activeSubTab === "centers" && (
+        <CentersSubTab
+          onAdd={onAddCenter}
+          onEdit={onEditCenter}
+          onView={onViewCenter}
+          onDelete={onDeleteCenter}
+        />
+      )}
+      {activeSubTab === "programs" && <ProgramsSubTab onAdd={onAddProgram} />}
+      {activeSubTab === "peoples" && <PeoplesSubTab onAdd={onAddPerson} />}
+    </div>
+  );
+}
+
+// Centers Sub Tab
+function CentersSubTab({
+  onAdd,
+  onEdit,
+  onView,
+  onDelete,
+}: {
+  onAdd: () => void;
+  onEdit: (center: Center) => void;
+  onView: (center: Center) => void;
+  onDelete: (center: Center) => void;
+}) {
+  const [centers] = useState<Center[]>(mockCenters);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredCenters = centers.filter(
+    (c) =>
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.code.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search centers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        <button
+          onClick={onAdd}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-lg shadow-blue-500/25"
+        >
+          <Plus className="w-4 h-4" />
+          Add Center
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredCenters.map((center) => (
+          <CenterCard
+            key={center.id}
+            center={center}
+            onEdit={() => onEdit(center)}
+            onView={() => onView(center)}
+            onDelete={() => onDelete(center)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Center Card
+function CenterCard({
+  center,
+  onEdit,
+  onView,
+  onDelete,
+}: {
+  center: Center;
+  onEdit: () => void;
+  onView: () => void;
+  onDelete: () => void;
+}) {
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    if (showMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMenu]);
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-all">
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start gap-3">
+          <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+            <Building2 className="w-6 h-6 text-blue-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">{center.name}</h3>
+            <p className="text-sm text-slate-500">{center.code}</p>
+          </div>
+        </div>
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className="p-1 hover:bg-slate-100 rounded"
+          >
+            <MoreVertical className="w-5 h-5 text-slate-400" />
+          </button>
+          {showMenu && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 z-10">
+              <button
+                onClick={() => {
+                  onView();
+                  setShowMenu(false);
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+              >
+                <Eye className="w-4 h-4" />
+                View
+              </button>
+              <button
+                onClick={() => {
+                  onEdit();
+                  setShowMenu(false);
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+              >
+                <Edit className="w-4 h-4" />
+                Edit
+              </button>
+              <button
+                onClick={() => {
+                  onDelete();
+                  setShowMenu(false);
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {centers.map((center) => (
+      <div className="space-y-3 mb-4">
+        <div className="flex items-center gap-2 text-sm text-slate-600">
+          <MapPin className="w-4 h-4" />
+          <span>{center.city}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs text-slate-500">Admins</p>
+            <p className="text-sm font-semibold text-slate-900">{center.admins}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500">Teachers</p>
+            <p className="text-sm font-semibold text-slate-900">{center.teachers}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500">Staff</p>
+            <p className="text-sm font-semibold text-slate-900">{center.staff}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500">Students</p>
+            <p className="text-sm font-semibold text-slate-900">{center.students}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+        <span
+          className={`px-2 py-1 text-xs font-medium rounded ${
+            center.status === "active"
+              ? "bg-green-100 text-green-700"
+              : "bg-slate-100 text-slate-700"
+          }`}
+        >
+          {center.status}
+        </span>
+        <button
+          onClick={onView}
+          className="text-sm font-medium text-blue-600 hover:text-blue-700"
+        >
+          View Details →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Programs Sub Tab
+function ProgramsSubTab({ onAdd }: { onAdd: () => void }) {
+  const [programs] = useState<Program[]>(mockPrograms);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-slate-900">Programs</h2>
+        <button
+          onClick={onAdd}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-lg shadow-blue-500/25"
+        >
+          <Plus className="w-4 h-4" />
+          Add Program
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {programs.map((program) => (
           <div
-            key={center.id}
-            className="group relative overflow-hidden rounded-xl border border-slate-200 dark:border-gray-700 bg-gradient-to-br from-white to-slate-50 dark:from-gray-900 dark:to-gray-800 p-4 shadow-sm hover:shadow-md transition-all"
+            key={program.id}
+            className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-all"
           >
-            <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="absolute -right-16 -top-16 w-32 h-32 bg-blue-50 dark:bg-blue-900/20 rounded-full blur-3xl" />
-            </div>
-
-            <div className="flex items-start justify-between gap-3 relative z-10">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-base font-semibold text-slate-900 dark:text-gray-100">
-                    {center.name}
-                  </h3>
-                  <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-medium">
-                    {center.code}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-gray-400">{center.city}</p>
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                <GraduationCap className="w-6 h-6 text-purple-600" />
               </div>
-              <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-md">
-                <Building2 className="w-5 h-5 text-white" />
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-slate-900">{program.name}</h3>
+                <p className="text-sm text-slate-500">{program.type}</p>
               </div>
             </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-slate-600 dark:text-gray-300">
-              <div className="flex items-center gap-2">
-                <UserCog className="w-4 h-4 text-slate-500" />
-                <div>
-                  <p className="font-medium">{center.admins}</p>
-                  <p className="text-[11px] text-slate-500">Admins</p>
-                </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Batches</span>
+                <span className="font-medium text-slate-900">{program.batches}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <GraduationCap className="w-4 h-4 text-slate-500" />
-                <div>
-                  <p className="font-medium">{center.teachers}</p>
-                  <p className="text-[11px] text-slate-500">Teachers</p>
-                </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Students</span>
+                <span className="font-medium text-slate-900">{program.students}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-slate-500" />
-                <div>
-                  <p className="font-medium">{center.staff}</p>
-                  <p className="text-[11px] text-slate-500">Staff</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-emerald-500" />
-                <div>
-                  <p className="font-medium">{center.students}</p>
-                  <p className="text-[11px] text-slate-500">Students</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-              <p>{center.programs} active programs</p>
-              <button className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs font-medium">
-                Manage Center
-                <ArrowRight className="w-3 h-3" />
-              </button>
             </div>
           </div>
         ))}
       </div>
-      {/* Static create center form layout */}
-      <div className="mt-2 grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 dark:bg-gray-900/60 p-4">
-          <p className="text-xs font-semibold text-slate-700 dark:text-gray-200 mb-3">
-            Add / Edit Center (Static Form Layout)
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div className="space-y-1">
-              <label className="block text-[11px] font-medium text-slate-600">Center Name</label>
-              <input
-                readOnly
-                placeholder="e.g. Delhi Main Center"
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[11px] font-medium text-slate-600">Center Code</label>
-              <input
-                readOnly
-                placeholder="DEL-MAIN"
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[11px] font-medium text-slate-600">City</label>
-              <input
-                readOnly
-                placeholder="New Delhi"
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[11px] font-medium text-slate-600">
-                Default Programs
-              </label>
-              <select
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700"
-                disabled
-              >
-                <option>Super 30, OnlyBoard (static)</option>
-              </select>
-            </div>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <button className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 text-white">
-              <Plus className="w-3 h-3" />
-              Save (Mock)
-            </button>
-            <button className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700">
-              Cancel
-            </button>
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 text-xs space-y-2">
-          <p className="font-semibold text-slate-800 dark:text-gray-100">Role Assignment Idea</p>
-          <p className="text-slate-600 dark:text-gray-400">
-            Each center will later have a “People” sub-page where you can pick users and assign them
-            as <strong>admin</strong>, <strong>teacher</strong>, <strong>staff</strong> or{" "}
-            <strong>student</strong>. Teacher and staff can be promoted to admin.
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
 
-function ProgramsTab() {
-  const [expandedProgramId, setExpandedProgramId] = useState<number | null>(1);
+// Peoples Sub Tab
+function PeoplesSubTab({ onAdd }: { onAdd: () => void }) {
+  const [peoples] = useState<Person[]>(mockPeoples);
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">
-            Programs & Batches
-          </h2>
-          <p className="text-sm text-slate-600 dark:text-gray-400">
-            Each program can host multiple batches, and each batch contains a group of students.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50">
-            <Layers className="w-4 h-4" />
-            New Program
-          </button>
-          <button className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">
-            <Plus className="w-4 h-4" />
-            New Batch
-          </button>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        {programs.map((program) => {
-          const expanded = expandedProgramId === program.id;
-          return (
-            <div
-              key={program.id}
-              className="rounded-xl border border-slate-200 dark:border-gray-700 bg-slate-50/60 dark:bg-gray-900/80 overflow-hidden"
-            >
-              <button
-                onClick={() =>
-                  setExpandedProgramId(expanded ? null : program.id)
-                }
-                className="w-full flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow">
-                    <GraduationCap className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">
-                      {program.name}
-                    </p>
-                    <p className="text-xs text-slate-600 dark:text-gray-400">
-                      {program.type} • {program.batches.length} batches •{" "}
-                      {program.centers.length} centers
-                    </p>
-                  </div>
-                </div>
-                <ChevronDown
-                  className={`w-4 h-4 text-slate-500 transition-transform ${
-                    expanded ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {expanded && (
-                <div className="border-t border-slate-200 dark:border-gray-700 px-4 sm:px-5 py-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                  <div className="space-y-2">
-                    <p className="font-medium text-slate-700 dark:text-gray-200">
-                      Centers
-                    </p>
-                    <ul className="space-y-1 text-slate-600 dark:text-gray-400">
-                      {program.centers.map((center) => (
-                        <li key={center} className="flex items-center gap-2">
-                          <Building2 className="w-3 h-3" />
-                          <span>{center}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <p className="font-medium text-slate-700 dark:text-gray-200">
-                      Batches in this Program
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {program.batches.map((batch) => (
-                        <div
-                          key={batch.name}
-                          className="rounded-lg border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 flex items-center justify-between"
-                        >
-                          <div>
-                            <p className="text-xs font-semibold text-slate-900 dark:text-gray-100">
-                              {batch.name}
-                            </p>
-                            <p className="text-[11px] text-slate-500">
-                              {batch.students} students
-                            </p>
-                          </div>
-                          <button className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-[11px] font-medium hover:bg-blue-100">
-                            <Users className="w-3 h-3" />
-                            Manage
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Static program creation form layout */}
-      <div className="mt-2 grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 dark:bg-gray-900/60 p-4 space-y-3">
-          <p className="text-xs font-semibold text-slate-700 dark:text-gray-200">
-            Program Creation (Static Form Layout)
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div className="space-y-1">
-              <label className="block text-[11px] font-medium text-slate-600">Program Name</label>
-              <input
-                readOnly
-                placeholder="Super 30 – JEE Advanced"
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[11px] font-medium text-slate-600">Program Type</label>
-              <select
-                disabled
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700"
-              >
-                <option>Flagship (Super 30)</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[11px] font-medium text-slate-600">
-                Associated Centers
-              </label>
-              <input
-                readOnly
-                placeholder="Delhi Main Center, Kota Residential"
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[11px] font-medium text-slate-600">
-                Academic Session
-              </label>
-              <input
-                readOnly
-                placeholder="2025–2026"
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700"
-              />
-            </div>
-          </div>
-          <p className="text-[11px] text-slate-500">
-            Below this we can later add an inline table for configuring default{" "}
-            <strong>batches</strong> and mapping to exam patterns.
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 text-xs space-y-2">
-          <p className="font-semibold text-slate-800 dark:text-gray-100">
-            Batch Design Suggestion
-          </p>
-          <p className="text-slate-600 dark:text-gray-400">
-            Each batch will later reference a program, center, academic year and list of students.
-            Admins will be able to assign multiple batches to a program and then target exams to
-            either entire programs or specific batches.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ExamsTab() {
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">
-            Exams – Program & General
-          </h2>
-          <p className="text-sm text-slate-600 dark:text-gray-400">
-            Create exams either for specific programs/batches or for the entire institute.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">
-            <Plus className="w-4 h-4" />
-            Create Program Exam
-          </button>
-          <button className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 text-white text-sm hover:bg-black">
-            <Plus className="w-4 h-4" />
-            Create General Exam
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 space-y-3">
-          {upcomingExams.map((exam) => (
-            <div
-              key={exam.id}
-              className="rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:shadow-md transition-all"
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow">
-                  <CalendarRange className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">
-                    {exam.title}
-                  </p>
-                  <p className="text-xs text-slate-600 dark:text-gray-400">
-                    {exam.scope} • {exam.target}
-                  </p>
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    {exam.totalBatches} batches linked
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col items-start sm:items-end gap-2 text-xs">
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium">
-                  {exam.date}
-                </span>
-                <button className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium">
-                  View Blueprint
-                  <ArrowRight className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="space-y-3">
-          <div className="rounded-xl border border-slate-200 dark:border-gray-700 bg-slate-900 text-white p-4">
-            <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-              <LineChart className="w-4 h-4" />
-              High-level Snapshot
-            </h3>
-            <ul className="space-y-2 text-xs text-slate-200">
-              <li className="flex justify-between">
-                <span>Active exams</span>
-                <span className="font-semibold">8</span>
-              </li>
-              <li className="flex justify-between">
-                <span>Scheduled this week</span>
-                <span className="font-semibold">3</span>
-              </li>
-              <li className="flex justify-between">
-                <span>Programs covered</span>
-                <span className="font-semibold">4</span>
-              </li>
-              <li className="flex justify-between">
-                <span>General exams</span>
-                <span className="font-semibold">2</span>
-              </li>
-            </ul>
-          </div>
-
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-600">
-            <p className="font-semibold mb-1">Design Hint</p>
-            <p>
-              This panel will later show aggregated analytics across centers, programs and batches -
-              keep the layout clean for charts.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Static exam meta section */}
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white dark:bg-gray-900 p-4 text-xs space-y-3">
-        <p className="font-semibold text-slate-800 dark:text-gray-100">
-          Exam Blueprint (Static Form Sketch)
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <div className="space-y-1">
-            <label className="block text-[11px] font-medium text-slate-600">Exam Title</label>
-            <input
-              readOnly
-              placeholder="Super 30 – Monthly Mock (January)"
-              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="block text-[11px] font-medium text-slate-600">Scope</label>
-            <select
-              disabled
-              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700"
-            >
-              <option>Program (Super 30)</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="block text-[11px] font-medium text-slate-600">Target Batches</label>
-            <input
-              readOnly
-              placeholder="Super 30 – 2026 Elite, 2027 Foundation"
-              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="block text-[11px] font-medium text-slate-600">Schedule</label>
-            <input
-              readOnly
-              placeholder="12 Jan 2026 • 10:00 AM"
-              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700"
-            />
-          </div>
-        </div>
-        <p className="text-[11px] text-slate-500">
-          In the real implementation, this area can expand into the full exam creation wizard,
-          connecting to existing exam setup screens you already have in the product.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function SideNavItem({
-  icon: Icon,
-  label,
-  active,
-  collapsed,
-  onClick,
-}: {
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  label: string;
-  active: boolean;
-  collapsed: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full inline-flex items-center justify-between px-3 py-2 rounded-lg transition ${
-        active
-          ? "bg-slate-900 text-white"
-          : "text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-800"
-      }`}
-    >
-      <span className="inline-flex items-center gap-2 text-xs font-medium">
-        <Icon className="w-4 h-4" />
-        {!collapsed && <span>{label}</span>}
-      </span>
-      {!collapsed && active && (
-        <span className="text-[10px] uppercase tracking-wide text-blue-200">Active</span>
-      )}
-    </button>
-  );
-}
-
-function ManagementTab() {
-  const items = [
-    {
-      title: "Home Layout",
-      description: "Configure what each role sees on their first landing screen.",
-      icon: Home,
-    },
-    {
-      title: "People & Roles",
-      description: "Manage admins, teachers, staff and students per center.",
-      icon: Users,
-    },
-    {
-      title: "Admin Profiles",
-      description: "Control profile details, permissions and access levels for admins.",
-      icon: UserPlus,
-    },
-    {
-      title: "Batches",
-      description: "Create and organize batches under programs and centers.",
-      icon: GraduationCap,
-    },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">
-            Management Console
-          </h2>
-          <p className="text-sm text-slate-600 dark:text-gray-400">
-            Central place to manage home layouts, people, admin profiles and batches.
-          </p>
-        </div>
-        <button className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50">
-          <Settings className="w-4 h-4" />
-          Open Global Config
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-slate-900">Peoples</h2>
+        <button
+          onClick={onAdd}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-lg shadow-blue-500/25"
+        >
+          <Plus className="w-4 h-4" />
+          Add Person
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {items.map((item) => {
-          const Icon = item.icon;
-          return (
-            <div
-              key={item.title}
-              className="rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 flex items-start gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all"
-            >
-              <div className="w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center">
-                <Icon className="w-4 h-4" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100">
-                  {item.title}
-                </h3>
-                <p className="mt-1 text-xs text-slate-600 dark:text-gray-400">
-                  {item.description}
-                </p>
-                <button className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700">
-                  Configure
-                  <ArrowRight className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 dark:bg-gray-900/60 p-4 text-xs space-y-2">
-        <p className="font-semibold text-slate-800 dark:text-gray-100 flex items-center gap-2">
-          <Users className="w-3 h-3" />
-          Future People Management Flow
-        </p>
-        <p className="text-slate-600 dark:text-gray-400">
-          Here we will later add dedicated tables and forms for:
-        </p>
-        <ul className="list-disc list-inside text-slate-600 dark:text-gray-400 space-y-1">
-          <li>Global people directory (all users across centers).</li>
-          <li>Role assignment editor (superadmin, admin, teacher, staff, student).</li>
-          <li>Batch mapping screens to quickly place students into multiple batches.</li>
-        </ul>
-        <p className="text-[11px] text-slate-500 mt-1">
-          The current design is intentionally generic and static so we can extend it safely with
-          backend APIs later.
-        </p>
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Email</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Role</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Center</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {peoples.map((person) => (
+              <tr key={person.id} className="hover:bg-slate-50">
+                <td className="px-6 py-4 text-sm font-medium text-slate-900">{person.name}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{person.email}</td>
+                <td className="px-6 py-4 text-sm text-slate-600 capitalize">{person.role.replace("_", " ")}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{person.center}</td>
+                <td className="px-6 py-4">
+                  <span
+                    className={`px-2 py-1 text-xs font-medium rounded ${
+                      person.status === "active"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    {person.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
+// Exams Tab
+function ExamsTab() {
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <h2 className="text-xl font-semibold text-slate-900 mb-4">Exams Management</h2>
+        <p className="text-slate-600">Exam management interface will be implemented here</p>
+      </div>
+    </div>
+  );
+}
 
+// Settings Tab
+function SettingsTab() {
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <h2 className="text-xl font-semibold text-slate-900 mb-4">Settings</h2>
+        <p className="text-slate-600">System settings will be implemented here</p>
+      </div>
+    </div>
+  );
+}
+
+// Modal Components
+function Modal({
+  isOpen,
+  onClose,
+  title,
+  children,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose} />
+        <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+          <div className="bg-white px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-500">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="bg-white px-6 py-6">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddCenterModal({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal isOpen={true} onClose={onClose} title="Add Center">
+      <p className="text-slate-600">Add center form will be implemented here</p>
+      <div className="flex justify-end gap-3 mt-6">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+        >
+          Create
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function EditCenterModal({ center, onClose }: { center: Center; onClose: () => void }) {
+  return (
+    <Modal isOpen={true} onClose={onClose} title="Edit Center">
+      <p className="text-slate-600">Edit center form for {center.name} will be implemented here</p>
+      <div className="flex justify-end gap-3 mt-6">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+        >
+          Save Changes
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function ViewCenterModal({ center, onClose }: { center: Center; onClose: () => void }) {
+  return (
+    <Modal isOpen={true} onClose={onClose} title="Center Details">
+      <div className="space-y-4">
+        <div>
+          <p className="text-sm text-slate-500">Name</p>
+          <p className="text-base font-medium text-slate-900">{center.name}</p>
+        </div>
+        <div>
+          <p className="text-sm text-slate-500">Code</p>
+          <p className="text-base font-medium text-slate-900">{center.code}</p>
+        </div>
+        <div>
+          <p className="text-sm text-slate-500">City</p>
+          <p className="text-base font-medium text-slate-900">{center.city}</p>
+        </div>
+      </div>
+      <div className="flex justify-end gap-3 mt-6">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+        >
+          Close
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function DeleteCenterModal({ center, onClose }: { center: Center; onClose: () => void }) {
+  return (
+    <Modal isOpen={true} onClose={onClose} title="Delete Center">
+      <p className="text-slate-600">
+        Are you sure you want to delete <strong>{center.name}</strong>? This action cannot be undone.
+      </p>
+      <div className="flex justify-end gap-3 mt-6">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+        >
+          Delete
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function AddProgramModal({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal isOpen={true} onClose={onClose} title="Add Program">
+      <p className="text-slate-600">Add program form will be implemented here</p>
+      <div className="flex justify-end gap-3 mt-6">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+        >
+          Create
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function AddPersonModal({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal isOpen={true} onClose={onClose} title="Add Person">
+      <p className="text-slate-600">Add person form will be implemented here</p>
+      <div className="flex justify-end gap-3 mt-6">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+        >
+          Create
+        </button>
+      </div>
+    </Modal>
+  );
+}
