@@ -21,8 +21,11 @@ import {
   Activity,
   TrendingUp,
   CalendarDays,
+  User,
+  Shield,
 } from "lucide-react";
 import { useAuthContext } from "../contexts/AuthContext";
+import { useApi, api } from "../hooks/useApi";
 import Timetable from "./Timetable";
 
 type SidebarTab = "home" | "exams" | "batches" | "timetable";
@@ -384,69 +387,788 @@ function SidebarNavItem({
   );
 }
 
-// Home Tab Component
+// Interfaces for API responses
+interface Center {
+  id: string;
+  name: string;
+  city?: string;
+  address?: string;
+  institute?: {
+    id: string;
+    name: string;
+  };
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface CenterUser {
+  id: number | string;
+  username: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+  phone?: string;
+  role: string;
+  teacher_code?: string;
+}
+
+// Home Tab Component with Tabs
 function HomeTab() {
+  const { user } = useAuthContext();
+  const [activeTab, setActiveTab] = useState<"profile" | "peoples">("profile");
+  const [centerId, setCenterId] = useState<string | null>(null);
+
+  // Get center_id from user or fetch from profile
+  useEffect(() => {
+    const getCenterId = async () => {
+      if (user?.center_id) {
+        setCenterId(user.center_id);
+      } else {
+        // Try to fetch user profile to get center_id
+        try {
+          const response = await api.get('/auth/profile/');
+          if (response.data?.center_id) {
+            setCenterId(response.data.center_id);
+          }
+        } catch (error) {
+          console.error("Failed to fetch center_id:", error);
+        }
+      }
+    };
+    getCenterId();
+  }, [user]);
+
   return (
     <div className="space-y-6">
-      {/* Welcome Card */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Welcome to Your Center</h2>
-            <p className="text-slate-600">Manage your center's programs, exams, and batches from here</p>
-          </div>
-          <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center">
-            <Building2 className="w-8 h-8 text-white" />
-          </div>
+      {/* Tabs Navigation */}
+      <div className="bg-white rounded-xl border border-slate-200 p-1">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab("profile")}
+            className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
+              activeTab === "profile"
+                ? "bg-blue-600 text-white shadow-md"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Profile
+          </button>
+          <button
+            onClick={() => setActiveTab("peoples")}
+            className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
+              activeTab === "peoples"
+                ? "bg-blue-600 text-white shadow-md"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Peoples
+          </button>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard
-          icon={FileText}
-          label="Total Exams"
-          value="12"
-          color="blue"
-        />
-        <StatCard
-          icon={GraduationCap}
-          label="Active Batches"
-          value="3"
-          color="purple"
-        />
-        <StatCard
-          icon={Users}
-          label="Total Students"
-          value="143"
-          color="green"
-        />
+      {/* Tab Content */}
+      {activeTab === "profile" && <ProfileTab centerId={centerId} />}
+      {activeTab === "peoples" && <PeoplesTab centerId={centerId} />}
+    </div>
+  );
+}
+
+// Profile Tab Component
+function ProfileTab({ centerId }: { centerId: string | null }) {
+  const { data: centerData, loading, error } = useApi<Center>(
+    centerId ? `/timetable/centers/${centerId}/` : ""
+  );
+
+  if (!centerId) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="text-center py-8">
+          <Building2 className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+          <p className="text-slate-600">Loading center information...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading center details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !centerData) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="text-center py-8">
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X className="w-6 h-6 text-red-600" />
+          </div>
+          <p className="text-red-600 mb-2">Failed to load center details</p>
+          <p className="text-sm text-slate-500">{error || "Unknown error"}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-6">
+      <div className="flex items-center gap-4 mb-6">
+        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+          <Building2 className="w-8 h-8 text-white" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">{centerData.name}</h2>
+          {centerData.institute && (
+            <p className="text-slate-500">{centerData.institute.name}</p>
+          )}
+        </div>
       </div>
 
-      {/* Recent Activity */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Activity</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-4">
-          <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <FileText className="w-5 h-5 text-blue-600" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-slate-900">New exam created</p>
-              <p className="text-xs text-slate-500">Super 30 – Monthly Mock</p>
-            </div>
-            <span className="text-xs text-slate-500">2 hours ago</span>
+          <div>
+            <label className="text-sm font-medium text-slate-500 block mb-1">Center Name</label>
+            <p className="text-base text-slate-900 font-medium">{centerData.name}</p>
           </div>
-          <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg">
+          {centerData.city && (
+            <div>
+              <label className="text-sm font-medium text-slate-500 block mb-1">City</label>
+              <p className="text-base text-slate-900">{centerData.city}</p>
+            </div>
+          )}
+          {centerData.address && (
+            <div>
+              <label className="text-sm font-medium text-slate-500 block mb-1">Address</label>
+              <p className="text-base text-slate-900">{centerData.address}</p>
+            </div>
+          )}
+        </div>
+        <div className="space-y-4">
+          {centerData.institute && (
+            <div>
+              <label className="text-sm font-medium text-slate-500 block mb-1">Institute</label>
+              <p className="text-base text-slate-900">{centerData.institute.name}</p>
+            </div>
+          )}
+          {centerData.id && (
+            <div>
+              <label className="text-sm font-medium text-slate-500 block mb-1">Center ID</label>
+              <p className="text-base text-slate-900 font-mono text-sm">{centerData.id}</p>
+            </div>
+          )}
+          {centerData.created_at && (
+            <div>
+              <label className="text-sm font-medium text-slate-500 block mb-1">Created At</label>
+              <p className="text-base text-slate-900">
+                {new Date(centerData.created_at).toLocaleDateString()}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Peoples Tab Component
+function PeoplesTab({ centerId }: { centerId: string | null }) {
+  const { user } = useAuthContext();
+  const [teachers, setTeachers] = useState<CenterUser[]>([]);
+  const [admins, setAdmins] = useState<CenterUser[]>([]);
+  const [loadingTeachers, setLoadingTeachers] = useState(false);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
+  const [errorTeachers, setErrorTeachers] = useState<string | null>(null);
+  const [errorAdmins, setErrorAdmins] = useState<string | null>(null);
+  const [showCreateTeacherModal, setShowCreateTeacherModal] = useState(false);
+  const [showCreateAdminModal, setShowCreateAdminModal] = useState(false);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'SUPER_ADMIN';
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!centerId) return;
+
+      // Fetch Teachers
+      setLoadingTeachers(true);
+      setErrorTeachers(null);
+      try {
+        const teachersResponse = await api.get(`/timetable/centers/${centerId}/users/?role=TEACHER`);
+        // Handle both paginated response (results) and direct array response
+        const teachersData = teachersResponse.data?.results || teachersResponse.data || [];
+        setTeachers(Array.isArray(teachersData) ? teachersData : []);
+      } catch (err) {
+        setErrorTeachers(err instanceof Error ? err.message : "Failed to fetch teachers");
+        console.error("Error fetching teachers:", err);
+        setTeachers([]);
+      } finally {
+        setLoadingTeachers(false);
+      }
+
+      // Fetch Admins
+      setLoadingAdmins(true);
+      setErrorAdmins(null);
+      try {
+        const adminsResponse = await api.get(`/timetable/centers/${centerId}/users/?role=ADMIN`);
+        // Handle both paginated response (results) and direct array response
+        const adminsData = adminsResponse.data?.results || adminsResponse.data || [];
+        setAdmins(Array.isArray(adminsData) ? adminsData : []);
+      } catch (err) {
+        setErrorAdmins(err instanceof Error ? err.message : "Failed to fetch admins");
+        console.error("Error fetching admins:", err);
+        setAdmins([]);
+      } finally {
+        setLoadingAdmins(false);
+      }
+    };
+
+    fetchUsers();
+  }, [centerId, refetchTrigger]);
+
+  const handleRefetch = () => {
+    setRefetchTrigger(prev => prev + 1);
+  };
+
+  if (!centerId) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="text-center py-8">
+          <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+          <p className="text-slate-600">Loading center information...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Teachers Section */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <GraduationCap className="w-5 h-5 text-purple-600" />
+              <User className="w-5 h-5 text-purple-600" />
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-slate-900">New batch created</p>
-              <p className="text-xs text-slate-500">Super 30 – 2027 Foundation</p>
-            </div>
-            <span className="text-xs text-slate-500">1 day ago</span>
+            <h3 className="text-lg font-semibold text-slate-900">Teachers ({Array.isArray(teachers) ? teachers.length : 0})</h3>
           </div>
+          <button
+            onClick={() => setShowCreateTeacherModal(true)}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Create Teacher
+          </button>
+        </div>
+
+        {loadingTeachers ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
+            <p className="text-sm text-slate-500">Loading teachers...</p>
+          </div>
+        ) : errorTeachers ? (
+          <div className="text-center py-8">
+            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-2">
+              <X className="w-5 h-5 text-red-600" />
+            </div>
+            <p className="text-sm text-red-600">{errorTeachers}</p>
+          </div>
+        ) : !Array.isArray(teachers) || teachers.length === 0 ? (
+          <div className="text-center py-8">
+            <User className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm text-slate-500">No teachers found in this center</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {Array.isArray(teachers) && teachers.map((teacher) => (
+              <div
+                key={teacher.id}
+                className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                    <User className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">
+                      {teacher.full_name || `${teacher.first_name || ""} ${teacher.last_name || ""}`.trim() || teacher.username}
+                    </p>
+                    <div className="flex items-center gap-3 text-sm text-slate-500">
+                      <span>{teacher.email}</span>
+                      {teacher.teacher_code && (
+                        <>
+                          <span>•</span>
+                          <span>Code: {teacher.teacher_code}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700 rounded">
+                  Teacher
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Admins Section */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Shield className="w-5 h-5 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900">Admins ({Array.isArray(admins) ? admins.length : 0})</h3>
+          </div>
+          {isSuperAdmin && (
+            <button
+              onClick={() => setShowCreateAdminModal(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Create Admin
+            </button>
+          )}
+        </div>
+
+        {loadingAdmins ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+            <p className="text-sm text-slate-500">Loading admins...</p>
+          </div>
+        ) : errorAdmins ? (
+          <div className="text-center py-8">
+            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-2">
+              <X className="w-5 h-5 text-red-600" />
+            </div>
+            <p className="text-sm text-red-600">{errorAdmins}</p>
+          </div>
+        ) : !Array.isArray(admins) || admins.length === 0 ? (
+          <div className="text-center py-8">
+            <Shield className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm text-slate-500">No admins found in this center</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {Array.isArray(admins) && admins.map((admin) => (
+              <div
+                key={admin.id}
+                className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Shield className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">
+                      {admin.full_name || `${admin.first_name || ""} ${admin.last_name || ""}`.trim() || admin.username}
+                    </p>
+                    <div className="flex items-center gap-3 text-sm text-slate-500">
+                      <span>{admin.email}</span>
+                      {admin.phone && (
+                        <>
+                          <span>•</span>
+                          <span>{admin.phone}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded">
+                  Admin
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Create Teacher Modal */}
+      {showCreateTeacherModal && (
+        <CreateTeacherModal
+          centerId={centerId}
+          onClose={() => setShowCreateTeacherModal(false)}
+          onSuccess={() => {
+            setShowCreateTeacherModal(false);
+            handleRefetch();
+          }}
+        />
+      )}
+
+      {/* Create Admin Modal */}
+      {showCreateAdminModal && isSuperAdmin && (
+        <CreateAdminModal
+          centerId={centerId}
+          onClose={() => setShowCreateAdminModal(false)}
+          onSuccess={() => {
+            setShowCreateAdminModal(false);
+            handleRefetch();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Create Teacher Modal Component
+function CreateTeacherModal({
+  centerId,
+  onClose,
+  onSuccess,
+}: {
+  centerId: string | null;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone_number: '',
+    employee_id: '',
+    subjects: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [createdUser, setCreatedUser] = useState<any>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!centerId) {
+      setError('Center ID is required');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const payload: any = {
+        name: formData.name,
+        email: formData.email,
+        phone_number: formData.phone_number,
+      };
+      if (formData.employee_id) {
+        payload.employee_id = formData.employee_id;
+      }
+      if (formData.subjects) {
+        payload.subjects = formData.subjects;
+      }
+
+      const response = await api.post('/timetable/admin/teachers/create/', payload);
+      setCreatedUser(response.data);
+      setSuccess(true);
+      setTimeout(() => {
+        onSuccess();
+      }, 2000);
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to create teacher');
+      console.error('Error creating teacher:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (success && createdUser) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+          <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose} />
+          <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div className="bg-white px-6 py-4 border-b border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-900">Teacher Created Successfully</h3>
+            </div>
+            <div className="bg-white px-6 py-6">
+              <div className="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                <p className="text-sm text-green-800 font-medium mb-2">Teacher has been created successfully!</p>
+                {createdUser.username && (
+                  <div className="space-y-2 text-sm">
+                    <p><span className="font-medium">Username:</span> {createdUser.username}</p>
+                    {createdUser.password && (
+                      <p><span className="font-medium">Password:</span> {createdUser.password}</p>
+                    )}
+                    {createdUser.teacher_code && (
+                      <p><span className="font-medium">Teacher Code:</span> {createdUser.teacher_code}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose} />
+        <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+          <div className="bg-white px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Create Teacher</h3>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-500">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <form onSubmit={handleSubmit}>
+            <div className="bg-white px-6 py-6 space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Teacher Name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Email *</label>
+                <input
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="teacher@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number *</label>
+                <input
+                  type="tel"
+                  required
+                  value={formData.phone_number}
+                  onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="9876543212"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Employee ID (Optional)</label>
+                <input
+                  type="text"
+                  value={formData.employee_id}
+                  onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="EMP-001"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Subjects (Optional)</label>
+                <input
+                  type="text"
+                  value={formData.subjects}
+                  onChange={(e) => setFormData({ ...formData, subjects: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Physics, Chemistry"
+                />
+              </div>
+            </div>
+            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={loading}
+              >
+                {loading ? 'Creating...' : 'Create Teacher'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Create Admin Modal Component
+function CreateAdminModal({
+  centerId,
+  onClose,
+  onSuccess,
+}: {
+  centerId: string | null;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone_number: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [createdUser, setCreatedUser] = useState<any>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!centerId) {
+      setError('Center ID is required');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const payload = {
+        center_id: centerId,
+        name: formData.name,
+        email: formData.email,
+        phone_number: formData.phone_number,
+      };
+
+      const response = await api.post('/timetable/superadmin/admins/create/', payload);
+      setCreatedUser(response.data);
+      setSuccess(true);
+      setTimeout(() => {
+        onSuccess();
+      }, 2000);
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to create admin');
+      console.error('Error creating admin:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (success && createdUser) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+          <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose} />
+          <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div className="bg-white px-6 py-4 border-b border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-900">Admin Created Successfully</h3>
+            </div>
+            <div className="bg-white px-6 py-6">
+              <div className="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                <p className="text-sm text-green-800 font-medium mb-2">Admin has been created successfully!</p>
+                {createdUser.username && (
+                  <div className="space-y-2 text-sm">
+                    <p><span className="font-medium">Username:</span> {createdUser.username}</p>
+                    {createdUser.password && (
+                      <p><span className="font-medium">Password:</span> {createdUser.password}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose} />
+        <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+          <div className="bg-white px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Create Admin</h3>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-500">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <form onSubmit={handleSubmit}>
+            <div className="bg-white px-6 py-6 space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Admin Name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Email *</label>
+                <input
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="admin@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number *</label>
+                <input
+                  type="tel"
+                  required
+                  value={formData.phone_number}
+                  onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="9876543211"
+                />
+              </div>
+            </div>
+            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={loading}
+              >
+                {loading ? 'Creating...' : 'Create Admin'}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
