@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import {
   Building2,
   FileText,
-  Settings,
   Home,
   Users,
   GraduationCap,
@@ -19,124 +18,53 @@ import {
   Zap,
 } from "lucide-react";
 import { useAuthContext } from "../contexts/AuthContext";
+import { api } from "../hooks/useApi";
+import { useNavigate } from "react-router-dom";
 
-type SidebarTab = "home" | "exams" | "settings";
-type HomeSubTab = "centers" | "programs" | "peoples";
+type SidebarTab = "home" | "exams";
+type HomeSubTab = "centers" | "programs";
 
 interface Center {
-  id: number;
+  id: string;
   name: string;
-  code: string;
   city: string;
-  address: string;
-  contactEmail: string;
-  contactPhone: string;
-  website: string;
-  admins: number;
-  teachers: number;
-  staff: number;
-  students: number;
-  status: "active" | "inactive";
+  address?: string;
+  phone?: string;
+  email?: string;
+  institute?: string | {
+    id: string;
+    name: string;
+  };
+  created_at?: string;
 }
 
 interface Program {
-  id: number;
+  id: string;
   name: string;
-  type: string;
-  centers: string[];
-  batches: number;
-  students: number;
-  status: "active" | "inactive";
-}
-
-interface Person {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
   center: string;
-  status: "active" | "inactive";
+  center_id?: string;
+  description?: string;
+  category?: string;
+  is_active: boolean;
+  batches_count?: number;
+  created_at?: string;
+  updated_at?: string;
 }
-
-const mockCenters: Center[] = [
-  {
-    id: 1,
-    name: "Delhi Main Center",
-    code: "DEL-MAIN",
-    city: "New Delhi",
-    address: "123 Education Street, Delhi 110001",
-    contactEmail: "delhi@institute.com",
-    contactPhone: "+91-11-12345678",
-    website: "https://delhi.institute.com",
-    admins: 2,
-    teachers: 18,
-    staff: 6,
-    students: 320,
-    status: "active",
-  },
-  {
-    id: 2,
-    name: "Kota Residential",
-    code: "KOT-RES",
-    city: "Kota",
-    address: "456 Study Lane, Kota 324005",
-    contactEmail: "kota@institute.com",
-    contactPhone: "+91-744-9876543",
-    website: "https://kota.institute.com",
-    admins: 1,
-    teachers: 24,
-    staff: 10,
-    students: 540,
-    status: "active",
-  },
-];
-
-const mockPrograms: Program[] = [
-  {
-    id: 1,
-    name: "Super 30 – JEE Advanced",
-    type: "Flagship",
-    centers: ["Delhi Main Center", "Kota Residential"],
-    batches: 2,
-    students: 58,
-    status: "active",
-  },
-  {
-    id: 2,
-    name: "OnlyBoard – CBSE 12th",
-    type: "Board Focused",
-    centers: ["Delhi Main Center"],
-    batches: 2,
-    students: 85,
-    status: "active",
-  },
-];
-
-const mockPeoples: Person[] = [
-  {
-    id: 1,
-    name: "John Doe",
-    email: "john@institute.com",
-    role: "institute_admin",
-    center: "Delhi Main Center",
-    status: "active",
-  },
-  {
-    id: 2,
-    name: "Jane Smith",
-    email: "jane@institute.com",
-    role: "teacher",
-    center: "Kota Residential",
-    status: "active",
-  },
-];
 
 export default function SuperAdminDashboard() {
+  const { user, isAuthenticated, loading: authLoading } = useAuthContext();
+  const navigate = useNavigate();
+
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("home");
   const [homeSubTab, setHomeSubTab] = useState<HomeSubTab>("centers");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user } = useAuthContext();
+  
+  // State for centers and programs
+  const [centers, setCenters] = useState<Center[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [loadingCenters, setLoadingCenters] = useState(false);
+  const [loadingPrograms, setLoadingPrograms] = useState(false);
 
   // Modal states
   const [showAddCenterModal, setShowAddCenterModal] = useState(false);
@@ -146,7 +74,151 @@ export default function SuperAdminDashboard() {
   const [selectedCenter, setSelectedCenter] = useState<Center | null>(null);
 
   const [showAddProgramModal, setShowAddProgramModal] = useState(false);
-  const [showAddPersonModal, setShowAddPersonModal] = useState(false);
+  
+  // Check if user is super admin, if not redirect - but wait for auth to load
+  useEffect(() => {
+    // Don't redirect while auth is still loading
+    if (authLoading) {
+      return;
+    }
+    
+    if (!isAuthenticated) {
+      navigate('/login', { replace: true });
+      return;
+    }
+    
+    // Only redirect if user is definitely not a super admin
+    if (user && user.role !== 'super_admin' && user.role !== 'SUPER_ADMIN') {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, isAuthenticated, authLoading, navigate]);
+
+  // Fetch centers when Centers tab is opened
+  useEffect(() => {
+    const fetchCenters = async () => {
+      if (sidebarTab === "home" && homeSubTab === "centers") {
+        setLoadingCenters(true);
+        try {
+          const response = await api.get('/timetable/centers/');
+          if (response.data?.results) {
+            // Transform API response to match our Center interface
+            const centersData: Center[] = response.data.results.map((center: {
+              id: string;
+              name: string;
+              city: string;
+              address?: string;
+              phone?: string;
+              email?: string;
+              institute?: string | { id: string; name: string };
+              created_at?: string;
+            }) => ({
+              id: center.id,
+              name: center.name,
+              city: center.city,
+              address: center.address || undefined,
+              phone: center.phone || undefined,
+              email: center.email || undefined,
+              institute: typeof center.institute === 'object' ? center.institute.name : center.institute,
+              created_at: center.created_at || undefined,
+            }));
+            setCenters(centersData);
+          }
+        } catch (error) {
+          console.error('Error fetching centers:', error);
+        } finally {
+          setLoadingCenters(false);
+        }
+      }
+    };
+    fetchCenters();
+  }, [sidebarTab, homeSubTab]);
+
+  // Fetch programs
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      if (sidebarTab === "home" && homeSubTab === "programs") {
+        setLoadingPrograms(true);
+        try {
+          const response = await api.get('/timetable/programs/');
+          if (response.data?.programs) {
+            setPrograms(response.data.programs);
+          }
+        } catch (error) {
+          console.error('Error fetching programs:', error);
+        } finally {
+          setLoadingPrograms(false);
+        }
+      }
+    };
+    fetchPrograms();
+  }, [sidebarTab, homeSubTab]);
+
+  // Show loading while auth is loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated or not super admin
+  if (!isAuthenticated || (user && user.role !== 'super_admin' && user.role !== 'SUPER_ADMIN')) {
+    return null;
+  }
+
+  // Refresh centers after creation - fetch all centers from API
+  const refreshCenters = async () => {
+    setLoadingCenters(true);
+    try {
+      const response = await api.get('/timetable/centers/');
+      if (response.data?.results) {
+        // Transform API response to match our Center interface
+        const centersData: Center[] = response.data.results.map((center: {
+          id: string;
+          name: string;
+          city: string;
+          address?: string;
+          phone?: string;
+          email?: string;
+          institute?: string | { id: string; name: string };
+          created_at?: string;
+        }) => ({
+          id: center.id,
+          name: center.name,
+          city: center.city,
+          address: center.address || undefined,
+          phone: center.phone || undefined,
+          email: center.email || undefined,
+          institute: typeof center.institute === 'object' ? center.institute.name : center.institute,
+          created_at: center.created_at || undefined,
+        }));
+        setCenters(centersData);
+      }
+    } catch (error) {
+      console.error('Error fetching centers:', error);
+    } finally {
+      setLoadingCenters(false);
+    }
+  };
+
+  // Refresh programs after creation
+  const refreshPrograms = async () => {
+    setLoadingPrograms(true);
+    try {
+      const response = await api.get('/timetable/programs/');
+      if (response.data?.programs) {
+        setPrograms(response.data.programs);
+      }
+    } catch (error) {
+      console.error('Error fetching programs:', error);
+    } finally {
+      setLoadingPrograms(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50">
@@ -198,13 +270,6 @@ export default function SuperAdminDashboard() {
               onClick={() => setSidebarTab("exams")}
               collapsed={sidebarCollapsed}
             />
-            <SidebarNavItem
-              icon={Settings}
-              label="Settings"
-              active={sidebarTab === "settings"}
-              onClick={() => setSidebarTab("settings")}
-              collapsed={sidebarCollapsed}
-            />
           </nav>
 
           {/* Collapse Toggle */}
@@ -240,7 +305,6 @@ export default function SuperAdminDashboard() {
                 <h1 className="text-xl font-semibold text-slate-900">
                   {sidebarTab === "home" && "Home"}
                   {sidebarTab === "exams" && "Exams"}
-                  {sidebarTab === "settings" && "Settings"}
                 </h1>
               </div>
             </div>
@@ -275,11 +339,15 @@ export default function SuperAdminDashboard() {
                   setShowDeleteCenterModal(true);
                 }}
                 onAddProgram={() => setShowAddProgramModal(true)}
-                onAddPerson={() => setShowAddPersonModal(true)}
+                centers={centers}
+                programs={programs}
+                loadingCenters={loadingCenters}
+                loadingPrograms={loadingPrograms}
+                onRefreshCenters={refreshCenters}
+                onRefreshPrograms={refreshPrograms}
               />
             )}
             {sidebarTab === "exams" && <ExamsTab />}
-            {sidebarTab === "settings" && <SettingsTab />}
           </main>
         </div>
       </div>
@@ -317,16 +385,6 @@ export default function SuperAdminDashboard() {
                   }}
                   collapsed={false}
                 />
-                <SidebarNavItem
-                  icon={Settings}
-                  label="Settings"
-                  active={sidebarTab === "settings"}
-                  onClick={() => {
-                    setSidebarTab("settings");
-                    setMobileMenuOpen(false);
-                  }}
-                  collapsed={false}
-                />
               </nav>
             </div>
           </div>
@@ -334,7 +392,14 @@ export default function SuperAdminDashboard() {
       )}
 
       {/* Modals */}
-      {showAddCenterModal && <AddCenterModal onClose={() => setShowAddCenterModal(false)} />}
+      {showAddCenterModal && (
+        <AddCenterModal 
+          onClose={() => setShowAddCenterModal(false)} 
+          onSuccess={() => {
+            refreshCenters();
+          }}
+        />
+      )}
       {showEditCenterModal && selectedCenter && (
         <EditCenterModal center={selectedCenter} onClose={() => setShowEditCenterModal(false)} />
       )}
@@ -344,8 +409,13 @@ export default function SuperAdminDashboard() {
       {showDeleteCenterModal && selectedCenter && (
         <DeleteCenterModal center={selectedCenter} onClose={() => setShowDeleteCenterModal(false)} />
       )}
-      {showAddProgramModal && <AddProgramModal onClose={() => setShowAddProgramModal(false)} />}
-      {showAddPersonModal && <AddPersonModal onClose={() => setShowAddPersonModal(false)} />}
+      {showAddProgramModal && (
+        <AddProgramModal 
+          onClose={() => setShowAddProgramModal(false)} 
+          onSuccess={refreshPrograms}
+          centers={centers}
+        />
+      )}
     </div>
   );
 }
@@ -397,7 +467,10 @@ function HomeTab({
   onViewCenter,
   onDeleteCenter,
   onAddProgram,
-  onAddPerson,
+  centers,
+  programs,
+  loadingCenters,
+  loadingPrograms,
 }: {
   activeSubTab: HomeSubTab;
   onSubTabChange: (tab: HomeSubTab) => void;
@@ -406,7 +479,12 @@ function HomeTab({
   onViewCenter: (center: Center) => void;
   onDeleteCenter: (center: Center) => void;
   onAddProgram: () => void;
-  onAddPerson: () => void;
+  centers: Center[];
+  programs: Program[];
+  loadingCenters: boolean;
+  loadingPrograms: boolean;
+  onRefreshCenters: () => void;
+  onRefreshPrograms: () => void;
 }) {
   return (
     <div className="space-y-6">
@@ -433,16 +511,6 @@ function HomeTab({
           >
             Programs
           </button>
-          <button
-            onClick={() => onSubTabChange("peoples")}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeSubTab === "peoples"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-            }`}
-          >
-            Peoples
-          </button>
         </nav>
       </div>
 
@@ -453,10 +521,17 @@ function HomeTab({
           onEdit={onEditCenter}
           onView={onViewCenter}
           onDelete={onDeleteCenter}
+          centers={centers}
+          loading={loadingCenters}
         />
       )}
-      {activeSubTab === "programs" && <ProgramsSubTab onAdd={onAddProgram} />}
-      {activeSubTab === "peoples" && <PeoplesSubTab onAdd={onAddPerson} />}
+      {activeSubTab === "programs" && (
+        <ProgramsSubTab 
+          onAdd={onAddProgram} 
+          programs={programs}
+          loading={loadingPrograms}
+        />
+      )}
     </div>
   );
 }
@@ -467,20 +542,31 @@ function CentersSubTab({
   onEdit,
   onView,
   onDelete,
+  centers,
+  loading,
 }: {
   onAdd: () => void;
   onEdit: (center: Center) => void;
   onView: (center: Center) => void;
   onDelete: (center: Center) => void;
+  centers: Center[];
+  loading: boolean;
 }) {
-  const [centers] = useState<Center[]>(mockCenters);
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredCenters = centers.filter(
     (c) =>
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.code.toLowerCase().includes(searchQuery.toLowerCase())
+      c.city.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -500,7 +586,7 @@ function CentersSubTab({
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-lg shadow-blue-500/25"
         >
           <Plus className="w-4 h-4" />
-          Add Center
+          Create Center
         </button>
       </div>
 
@@ -555,7 +641,7 @@ function CenterCard({
           </div>
           <div>
             <h3 className="text-lg font-semibold text-slate-900">{center.name}</h3>
-            <p className="text-sm text-slate-500">{center.code}</p>
+            <p className="text-sm text-slate-500">{center.city}</p>
           </div>
         </div>
         <div className="relative" ref={menuRef}>
@@ -607,36 +693,19 @@ function CenterCard({
           <MapPin className="w-4 h-4" />
           <span>{center.city}</span>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-slate-500">Admins</p>
-            <p className="text-sm font-semibold text-slate-900">{center.admins}</p>
+        {center.address && (
+          <div className="text-sm text-slate-500">
+            {center.address}
           </div>
-          <div>
-            <p className="text-xs text-slate-500">Teachers</p>
-            <p className="text-sm font-semibold text-slate-900">{center.teachers}</p>
+        )}
+        {center.institute && (
+          <div className="text-sm text-slate-500">
+            Institute: {typeof center.institute === 'object' ? center.institute.name : center.institute}
           </div>
-          <div>
-            <p className="text-xs text-slate-500">Staff</p>
-            <p className="text-sm font-semibold text-slate-900">{center.staff}</p>
-          </div>
-          <div>
-            <p className="text-xs text-slate-500">Students</p>
-            <p className="text-sm font-semibold text-slate-900">{center.students}</p>
-          </div>
-        </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-        <span
-          className={`px-2 py-1 text-xs font-medium rounded ${
-            center.status === "active"
-              ? "bg-green-100 text-green-700"
-              : "bg-slate-100 text-slate-700"
-          }`}
-        >
-          {center.status}
-        </span>
         <button
           onClick={onView}
           className="text-sm font-medium text-blue-600 hover:text-blue-700"
@@ -649,8 +718,22 @@ function CenterCard({
 }
 
 // Programs Sub Tab
-function ProgramsSubTab({ onAdd }: { onAdd: () => void }) {
-  const [programs] = useState<Program[]>(mockPrograms);
+function ProgramsSubTab({ 
+  onAdd, 
+  programs, 
+  loading 
+}: { 
+  onAdd: () => void; 
+  programs: Program[];
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -661,7 +744,7 @@ function ProgramsSubTab({ onAdd }: { onAdd: () => void }) {
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-lg shadow-blue-500/25"
         >
           <Plus className="w-4 h-4" />
-          Add Program
+          Create Program
         </button>
       </div>
 
@@ -677,77 +760,43 @@ function ProgramsSubTab({ onAdd }: { onAdd: () => void }) {
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-slate-900">{program.name}</h3>
-                <p className="text-sm text-slate-500">{program.type}</p>
+                <p className="text-sm text-slate-500">{program.center}</p>
               </div>
             </div>
+            {program.description && (
+              <p className="text-sm text-slate-600 mb-3">{program.description}</p>
+            )}
             <div className="space-y-2">
+              {program.batches_count !== undefined && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Batches</span>
+                  <span className="font-medium text-slate-900">{program.batches_count}</span>
+                </div>
+              )}
+              {program.category && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Category</span>
+                  <span className="font-medium text-slate-900">{program.category}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Batches</span>
-                <span className="font-medium text-slate-900">{program.batches}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Students</span>
-                <span className="font-medium text-slate-900">{program.students}</span>
+                <span className="text-slate-500">Status</span>
+                <span className={`font-medium ${program.is_active ? 'text-green-600' : 'text-slate-500'}`}>
+                  {program.is_active ? 'Active' : 'Inactive'}
+                </span>
               </div>
             </div>
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-// Peoples Sub Tab
-function PeoplesSubTab({ onAdd }: { onAdd: () => void }) {
-  const [peoples] = useState<Person[]>(mockPeoples);
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-slate-900">Peoples</h2>
-        <button
-          onClick={onAdd}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-lg shadow-blue-500/25"
-        >
-          <Plus className="w-4 h-4" />
-          Add Person
-        </button>
-      </div>
-
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Role</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Center</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {peoples.map((person) => (
-              <tr key={person.id} className="hover:bg-slate-50">
-                <td className="px-6 py-4 text-sm font-medium text-slate-900">{person.name}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{person.email}</td>
-                <td className="px-6 py-4 text-sm text-slate-600 capitalize">{person.role.replace("_", " ")}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{person.center}</td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-2 py-1 text-xs font-medium rounded ${
-                      person.status === "active"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-slate-100 text-slate-700"
-                    }`}
-                  >
-                    {person.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      
+      {programs.length === 0 && !loading && (
+        <div className="text-center py-12 text-slate-500">
+          <GraduationCap className="w-12 h-12 mx-auto mb-4 text-slate-400" />
+          <p>No programs found</p>
+          <p className="text-sm mt-2">Click "Create Program" to create your first program</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -759,18 +808,6 @@ function ExamsTab() {
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <h2 className="text-xl font-semibold text-slate-900 mb-4">Exams Management</h2>
         <p className="text-slate-600">Exam management interface will be implemented here</p>
-      </div>
-    </div>
-  );
-}
-
-// Settings Tab
-function SettingsTab() {
-  return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <h2 className="text-xl font-semibold text-slate-900 mb-4">Settings</h2>
-        <p className="text-slate-600">System settings will be implemented here</p>
       </div>
     </div>
   );
@@ -808,24 +845,125 @@ function Modal({
   );
 }
 
-function AddCenterModal({ onClose }: { onClose: () => void }) {
+function AddCenterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess?: () => void }) {
+  const [formData, setFormData] = useState({
+    institute_name: '',
+    name: '',
+    city: '',
+    address: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await api.post('/timetable/superadmin/centers/create/', formData);
+      if (response.data) {
+        // Refresh centers list after successful creation
+        onSuccess?.();
+        onClose();
+        // Reset form
+        setFormData({
+          institute_name: '',
+          name: '',
+          city: '',
+          address: '',
+        });
+      }
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } };
+      setError(error.response?.data?.detail || 'Failed to create center');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <Modal isOpen={true} onClose={onClose} title="Add Center">
-      <p className="text-slate-600">Add center form will be implemented here</p>
-      <div className="flex justify-end gap-3 mt-6">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-        >
-          Create
-        </button>
-      </div>
+    <Modal isOpen={true} onClose={onClose} title="Create Center">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+        
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Institute Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            required
+            value={formData.institute_name}
+            onChange={(e) => setFormData({ ...formData, institute_name: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="e.g., Allen Coaching"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Center Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            required
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="e.g., Allen - Jaipur Center"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            City <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            required
+            value={formData.city}
+            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="e.g., Jaipur"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Address (Optional)
+          </label>
+          <textarea
+            value={formData.address}
+            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            rows={3}
+            placeholder="Full address of the center"
+          />
+        </div>
+
+        <div className="flex justify-end gap-3 mt-6">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {loading ? 'Creating...' : 'Create Center'}
+          </button>
+        </div>
+      </form>
     </Modal>
   );
 }
@@ -853,22 +991,101 @@ function EditCenterModal({ center, onClose }: { center: Center; onClose: () => v
 }
 
 function ViewCenterModal({ center, onClose }: { center: Center; onClose: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [centerDetails, setCenterDetails] = useState<Center | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchCenterDetails = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const response = await api.get(`/timetable/centers/${center.id}/`);
+        if (response.data) {
+          // Transform API response to match our Center interface
+          setCenterDetails({
+            id: response.data.id,
+            name: response.data.name,
+            city: response.data.city,
+            address: response.data.address || undefined,
+            phone: response.data.phone || undefined,
+            email: response.data.email || undefined,
+            institute: typeof response.data.institute === 'object' 
+              ? response.data.institute.name 
+              : response.data.institute,
+            created_at: response.data.created_at || undefined,
+          });
+        }
+      } catch (err: unknown) {
+        const error = err as { response?: { data?: { detail?: string } } };
+        setError(error.response?.data?.detail || 'Failed to load center details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCenterDetails();
+  }, [center.id]);
+
+  const displayCenter = centerDetails || center;
+  const instituteName = typeof displayCenter.institute === 'object' 
+    ? displayCenter.institute.name 
+    : displayCenter.institute;
+
   return (
     <Modal isOpen={true} onClose={onClose} title="Center Details">
-      <div className="space-y-4">
-        <div>
-          <p className="text-sm text-slate-500">Name</p>
-          <p className="text-base font-medium text-slate-900">{center.name}</p>
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
-        <div>
-          <p className="text-sm text-slate-500">Code</p>
-          <p className="text-base font-medium text-slate-900">{center.code}</p>
+      ) : error ? (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          {error}
         </div>
-        <div>
-          <p className="text-sm text-slate-500">City</p>
-          <p className="text-base font-medium text-slate-900">{center.city}</p>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm text-slate-500">Name</p>
+            <p className="text-base font-medium text-slate-900">{displayCenter.name}</p>
+          </div>
+          <div>
+            <p className="text-sm text-slate-500">City</p>
+            <p className="text-base font-medium text-slate-900">{displayCenter.city}</p>
+          </div>
+          {displayCenter.address && (
+            <div>
+              <p className="text-sm text-slate-500">Address</p>
+              <p className="text-base font-medium text-slate-900">{displayCenter.address}</p>
+            </div>
+          )}
+          {displayCenter.phone && (
+            <div>
+              <p className="text-sm text-slate-500">Phone</p>
+              <p className="text-base font-medium text-slate-900">{displayCenter.phone}</p>
+            </div>
+          )}
+          {displayCenter.email && (
+            <div>
+              <p className="text-sm text-slate-500">Email</p>
+              <p className="text-base font-medium text-slate-900">{displayCenter.email}</p>
+            </div>
+          )}
+          {instituteName && (
+            <div>
+              <p className="text-sm text-slate-500">Institute</p>
+              <p className="text-base font-medium text-slate-900">{instituteName}</p>
+            </div>
+          )}
+          {displayCenter.created_at && (
+            <div>
+              <p className="text-sm text-slate-500">Created At</p>
+              <p className="text-base font-medium text-slate-900">
+                {new Date(displayCenter.created_at).toLocaleDateString()}
+              </p>
+            </div>
+          )}
         </div>
-      </div>
+      )}
       <div className="flex justify-end gap-3 mt-6">
         <button
           onClick={onClose}
@@ -905,46 +1122,160 @@ function DeleteCenterModal({ center, onClose }: { center: Center; onClose: () =>
   );
 }
 
-function AddProgramModal({ onClose }: { onClose: () => void }) {
+function AddProgramModal({ 
+  onClose, 
+  onSuccess, 
+  centers 
+}: { 
+  onClose: () => void; 
+  onSuccess: () => void;
+  centers: Center[];
+}) {
+  const [formData, setFormData] = useState({
+    center_name: '',
+    name: '',
+    description: '',
+    category: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      // Prepare request body matching Postman collection format
+      const requestBody: {
+        center_name: string;
+        name: string;
+        description?: string;
+        category?: string;
+      } = {
+        center_name: formData.center_name,
+        name: formData.name,
+      };
+      
+      // Only include optional fields if they have values
+      if (formData.description) {
+        requestBody.description = formData.description;
+      }
+      if (formData.category) {
+        requestBody.category = formData.category;
+      }
+
+      const response = await api.post('/timetable/superadmin/programs/create/', requestBody);
+      if (response.data) {
+        onSuccess();
+        onClose();
+        // Reset form
+        setFormData({
+          center_name: '',
+          name: '',
+          description: '',
+          category: '',
+        });
+      }
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } };
+      setError(error.response?.data?.detail || 'Failed to create program');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <Modal isOpen={true} onClose={onClose} title="Add Program">
-      <p className="text-slate-600">Add program form will be implemented here</p>
-      <div className="flex justify-end gap-3 mt-6">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-        >
-          Create
-        </button>
-      </div>
+    <Modal isOpen={true} onClose={onClose} title="Create Program">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+        
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Center <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            required
+            value={formData.center_name}
+            onChange={(e) => setFormData({ ...formData, center_name: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="e.g., Allen - Jaipur Center"
+            list="centers-list"
+          />
+          {centers.length > 0 && (
+            <datalist id="centers-list">
+              {centers.map((center) => (
+                <option key={center.id} value={center.name} />
+              ))}
+            </datalist>
+          )}
+          <p className="text-xs text-slate-500 mt-1">Enter the exact center name</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Program Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            required
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="e.g., Super 30"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Category (Optional)
+          </label>
+          <input
+            type="text"
+            value={formData.category}
+            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="e.g., JEE Prep"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Description (Optional)
+          </label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            rows={3}
+            placeholder="Program description"
+          />
+        </div>
+
+        <div className="flex justify-end gap-3 mt-6">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {loading ? 'Creating...' : 'Create Program'}
+          </button>
+        </div>
+      </form>
     </Modal>
   );
 }
 
-function AddPersonModal({ onClose }: { onClose: () => void }) {
-  return (
-    <Modal isOpen={true} onClose={onClose} title="Add Person">
-      <p className="text-slate-600">Add person form will be implemented here</p>
-      <div className="flex justify-end gap-3 mt-6">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-        >
-          Create
-        </button>
-      </div>
-    </Modal>
-  );
-}

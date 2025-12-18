@@ -35,17 +35,72 @@ export default function Login() {
     setError('');
   };
 
+  // Helper function to get dashboard route based on role
+  const getDashboardRoute = (role: string): string => {
+    switch (role) {
+      case 'super_admin':
+      case 'SUPER_ADMIN':
+        return '/superadmin/dashboard';
+      case 'admin':
+      case 'ADMIN':
+      case 'institute_admin':
+        return '/center-admin/dashboard';
+      case 'teacher':
+      case 'TEACHER':
+        return '/teacher';
+      case 'student':
+      case 'STUDENT':
+        return '/student-dashboard';
+      default:
+        return '/dashboard';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      await login(formData.email, formData.password);
-      navigate('/dashboard');
+      let loggedInUser: any = null;
+      
+      // Try role-specific endpoints first (admin, super_admin, teacher)
+      const roleAttempts = ['admin', 'super_admin', 'teacher'];
+      let loginSuccess = false;
+      
+      for (const roleType of roleAttempts) {
+        try {
+          loggedInUser = await login(formData.email, formData.password, roleType);
+          loginSuccess = true;
+          break;
+        } catch (roleError) {
+          // Continue to next role
+          continue;
+        }
+      }
+      
+      // If role-specific login failed, try generic login
+      if (!loginSuccess) {
+        try {
+          loggedInUser = await login(formData.email, formData.password);
+        } catch (genericError: any) {
+          throw genericError;
+        }
+      }
+      
+      // Redirect based on user role
+      if (loggedInUser?.role) {
+        const dashboardRoute = getDashboardRoute(loggedInUser.role);
+        console.log('Login successful, redirecting to:', dashboardRoute, 'User role:', loggedInUser.role);
+        setLoading(false);
+        navigate(dashboardRoute);
+      } else {
+        console.warn('No role found in user data, redirecting to default dashboard', loggedInUser);
+        setLoading(false);
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
-    } finally {
       setLoading(false);
     }
   };
@@ -187,10 +242,10 @@ export default function Login() {
               )}
 
 
-              {/* Email Field */}
+              {/* Email/Username Field */}
               <div>
                 <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-2">
-                  Email Address
+                  Email, Username, or Teacher Code
                 </label>
                 <div className={`relative rounded-xl transition-all duration-200 ${
                   focusedField === 'email' ? 'ring-2 ring-blue-500/20' : ''
@@ -203,15 +258,15 @@ export default function Login() {
                   <input
                     id="email"
                     name="email"
-                    type="email"
-                    autoComplete="email"
+                    type="text"
+                    autoComplete="username"
                     required
                     value={formData.email}
                     onChange={handleInputChange}
                     onFocus={() => setFocusedField('email')}
                     onBlur={() => setFocusedField(null)}
                     className="block w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-                    placeholder="name@company.com"
+                    placeholder="email@company.com, username, or teacher code"
                   />
                 </div>
               </div>

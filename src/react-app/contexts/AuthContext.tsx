@@ -16,15 +16,18 @@ interface Institute {
 }
 
 interface User {
-  id: number;
+  id: number | string;
   email: string;
-  role: 'super_admin' | 'institute_admin' | 'exam_admin' | 'teacher' | 'student';
-  institute_id?: number;
+  role: 'super_admin' | 'SUPER_ADMIN' | 'institute_admin' | 'admin' | 'ADMIN' | 'exam_admin' | 'teacher' | 'TEACHER' | 'student' | 'STUDENT' | 'staff' | 'STAFF';
+  institute_id?: number | string;
   institute?: Institute; // Full institute object from API
   institute_name?: string;
   first_name?: string;
   last_name?: string;
+  full_name?: string; // From API response
   get_full_name?: string;
+  username?: string;
+  center_id?: string;
   // Add other user-related fields as needed
 }
 
@@ -42,7 +45,7 @@ interface JWTPayload {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string, role?: string) => Promise<User>;
   logout: () => void;
   isAuthenticated: boolean;
   loading: boolean;
@@ -101,15 +104,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
           
-          // Token is valid, fetch user data from API
+          // Token is valid, try to get user data from localStorage first, then API
+          try {
+            const storedUserData = localStorage.getItem('user_data');
+            if (storedUserData) {
+              const parsedUser = JSON.parse(storedUserData);
+              setUser(parsedUser);
+              setIsAuthenticated(true);
+              setLoading(false);
+              return;
+            }
+          } catch (localError) {
+            console.warn("Failed to parse stored user data:", localError);
+          }
+          
+          // If not in localStorage, try to fetch from API
           try {
             const userResponse = await api.get('/auth/profile/');
             setUser(userResponse.data);
+            localStorage.setItem('user_data', JSON.stringify(userResponse.data));
             setIsAuthenticated(true);
           } catch (apiError) {
             console.error("Failed to fetch user profile:", apiError);
             // If API call fails, try to use token data as fallback
-            setUser({
+            const fallbackUser = {
               id: decodedToken.user_id,
               email: decodedToken.email,
               role: (decodedToken.role as User['role']) || 'student',
@@ -118,7 +136,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               first_name: decodedToken.first_name,
               last_name: decodedToken.last_name,
               get_full_name: `${decodedToken.first_name || ''} ${decodedToken.last_name || ''}`.trim(),
-            });
+            };
+            setUser(fallbackUser);
+            localStorage.setItem('user_data', JSON.stringify(fallbackUser));
             setIsAuthenticated(true);
           }
         } catch (error) {
@@ -135,23 +155,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadUserFromTokens();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (identifier: string, password: string, role?: string) => {
     setLoading(true);
     try {
-      const response = await api.post('/auth/login/', { email, password });
-      const { access, refresh, user: userData } = response.data;
+      let response;
+      
+      // Determine which login endpoint to use based on role
+      if (role === 'super_admin' || role === 'SUPER_ADMIN') {
+        // Super Admin login endpoint - use timetable auth endpoint
+        response = await api.post('/timetable/auth/superadmin/login/', { 
+          username: identifier,  // Can be email or username
+          password 
+        });
+      } else if (role === 'admin' || role === 'institute_admin' || role === 'ADMIN') {
+        // Admin login endpoint - use timetable auth endpoint
+        response = await api.post('/timetable/auth/admin/login/', { 
+          username: identifier,  // Can be email or username
+          password 
+        });
+      } else if (role === 'teacher' || role === 'TEACHER') {
+        // Teacher login endpoint (supports teacher_code, email, or username) - use timetable auth endpoint
+        response = await api.post('/timetable/auth/teacher/login/', { 
+          username: identifier,  // Can be email, username, or teacher_code
+          password 
+        });
+      } else {
+        // Generic login endpoint (for student, staff, or if role not specified)
+        response = await api.post('/auth/login/', { 
+          email: identifier,  // Generic login requires email
+          password 
+        });
+      }
 
+      // Handle response format differences
+      let access, refresh, userData;
+      
+      if (response.data.tokens) {
+        // Role-based login returns { tokens: { access, refresh }, user: {...} }
+        access = response.data.tokens.access;
+        refresh = response.data.tokens.refresh;
+        userData = response.data.user;
+      } else {
+        // Generic login returns { access, refresh, user: {...} }
+        access = response.data.access;
+        refresh = response.data.refresh;
+        userData = response.data.user;
+      }
+
+      // Store tokens in localStorage
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
+      
+      // Store full user data in localStorage for easy access
+      localStorage.setItem('user_data', JSON.stringify(userData));
 
       setUser(userData);
       setIsAuthenticated(true);
       setLoading(false);
-    } catch (error) {
+      
+      return userData;
+    } catch (error: any) {
       console.error("Login failed:", error);
       logout(); // Ensure no stale tokens/user data
       setLoading(false);
-      throw error;
+      
+      // Extract error message from response
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.error || 
+                          error.message || 
+                          'Login failed. Please check your credentials.';
+      throw new Error(errorMessage);
     }
   };
 
@@ -167,6 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Clear all frontend storage
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user_data');
     localStorage.clear(); // Clear any other stored data
     
     // Clear session storage as well

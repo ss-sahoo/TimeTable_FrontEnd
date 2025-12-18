@@ -20,10 +20,12 @@ import {
   UserCheck,
   Activity,
   TrendingUp,
+  CalendarDays,
 } from "lucide-react";
 import { useAuthContext } from "../contexts/AuthContext";
+import Timetable from "./Timetable";
 
-type SidebarTab = "home" | "exams" | "batches";
+type SidebarTab = "home" | "exams" | "batches" | "timetable";
 
 interface Batch {
   id: number;
@@ -192,6 +194,13 @@ export default function CenterAdminDashboard() {
               onClick={() => setSidebarTab("batches")}
               collapsed={sidebarCollapsed}
             />
+            <SidebarNavItem
+              icon={CalendarDays}
+              label="Timetable"
+              active={sidebarTab === "timetable"}
+              onClick={() => setSidebarTab("timetable")}
+              collapsed={sidebarCollapsed}
+            />
           </nav>
 
           {/* Collapse Toggle */}
@@ -228,12 +237,13 @@ export default function CenterAdminDashboard() {
                   {sidebarTab === "home" && "Home"}
                   {sidebarTab === "exams" && "Exams"}
                   {sidebarTab === "batches" && "Batches"}
+                  {sidebarTab === "timetable" && "Timetable"}
                 </h1>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-slate-900">{user?.get_full_name || user?.email}</p>
+                <p className="text-sm font-medium text-slate-900">{user?.full_name || user?.get_full_name || user?.email}</p>
                 <p className="text-xs text-slate-500">Center Admin</p>
               </div>
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-blue-600 to-violet-600 rounded-xl flex items-center justify-center">
@@ -254,6 +264,7 @@ export default function CenterAdminDashboard() {
             {sidebarTab === "batches" && (
               <BatchesTab onCreateBatch={() => setShowCreateBatchModal(true)} />
             )}
+            {sidebarTab === "timetable" && <Timetable />}
           </main>
         </div>
       </div>
@@ -297,6 +308,16 @@ export default function CenterAdminDashboard() {
                   active={sidebarTab === "batches"}
                   onClick={() => {
                     setSidebarTab("batches");
+                    setMobileMenuOpen(false);
+                  }}
+                  collapsed={false}
+                />
+                <SidebarNavItem
+                  icon={CalendarDays}
+                  label="Timetable"
+                  active={sidebarTab === "timetable"}
+                  onClick={() => {
+                    setSidebarTab("timetable");
                     setMobileMenuOpen(false);
                   }}
                   collapsed={false}

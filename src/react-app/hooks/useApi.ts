@@ -3,16 +3,20 @@ import axios from 'axios';
 
 // Auto-detect API URL based on current host
 const getDefaultApiUrl = () => {
+  // Use production API URL
+  return 'https://exams.dashoapp.com/api';
+  
+  // Old logic for reference:
   // In production, use the same domain
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    // If not localhost, use the same protocol and host
-    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      return `${window.location.protocol}//${hostname}/api`;
-    }
-  }
-  // In development, hit backend directly
-  return 'http://localhost:8001/api';
+  // if (typeof window !== 'undefined') {
+  //   const hostname = window.location.hostname;
+  //   // If not localhost, use the same protocol and host
+  //   if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+  //     return `${window.location.protocol}//${hostname}/api`;
+  //   }
+  // }
+  // // In development, hit backend directly
+  // return 'http://localhost:8001/api';
 };
 
 const DEFAULT_API_BASE_URL = getDefaultApiUrl();

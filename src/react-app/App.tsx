@@ -155,9 +155,30 @@ function RoleProtectedRoute({
   return <Layout>{children}</Layout>;
 }
 
+// Helper function to get dashboard route based on role
+function getDashboardRoute(role: string | undefined): string {
+  switch (role) {
+    case 'super_admin':
+    case 'SUPER_ADMIN':
+      return '/superadmin/dashboard';
+    case 'admin':
+    case 'ADMIN':
+    case 'institute_admin':
+      return '/center-admin/dashboard';
+    case 'teacher':
+    case 'TEACHER':
+      return '/teacher';
+    case 'student':
+    case 'STUDENT':
+      return '/student-dashboard';
+    default:
+      return '/dashboard';
+  }
+}
+
 // Public Route Component (redirect to dashboard if authenticated)
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuthContext();
+  const { isAuthenticated, loading, user } = useAuthContext();
 
   if (loading) {
     return (
@@ -170,12 +191,12 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return isAuthenticated ? <Navigate to="/dashboard" /> : children;
+  return isAuthenticated ? <Navigate to={getDashboardRoute(user?.role)} replace /> : children;
 }
 
 // Landing Route Component (show landing page if not authenticated, dashboard if authenticated)
 function LandingRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuthContext();
+  const { isAuthenticated, loading, user } = useAuthContext();
 
   if (loading) {
     return (
@@ -188,7 +209,7 @@ function LandingRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return isAuthenticated ? <Navigate to="/dashboard" /> : children;
+  return isAuthenticated ? <Navigate to={getDashboardRoute(user?.role)} replace /> : children;
 }
 
 function AppRoutes() {
@@ -219,10 +240,18 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
-      {/* Static role dashboards (design-only, no backend wiring yet) – public for now */}
-      <Route path="/superadmin/dashboard" element={<SuperAdminDashboard />} />
+      {/* Role-specific dashboards */}
+      <Route path="/superadmin/dashboard" element={
+        <FullscreenProtectedRoute>
+          <SuperAdminDashboard />
+        </FullscreenProtectedRoute>
+      } />
       <Route path="/superadmin" element={<Navigate to="/superadmin/dashboard" replace />} />
-      <Route path="/center-admin/dashboard" element={<CenterAdminDashboard />} />
+      <Route path="/center-admin/dashboard" element={
+        <FullscreenProtectedRoute>
+          <CenterAdminDashboard />
+        </FullscreenProtectedRoute>
+      } />
       <Route path="/center-admin" element={<Navigate to="/center-admin/dashboard" replace />} />
       <Route path="/timetable" element={<Timetable />} />
 
@@ -475,7 +504,11 @@ function AppRoutes() {
       } />
       
       {/* Default redirect for authenticated users */}
-      <Route path="*" element={<Navigate to="/dashboard" />} />
+      <Route path="*" element={
+        <ProtectedRoute>
+          <SmartDashboard />
+        </ProtectedRoute>
+      } />
     </Routes>
   );
 }
