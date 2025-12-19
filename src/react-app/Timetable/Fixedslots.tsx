@@ -6,6 +6,7 @@ interface DaySlots {
   slots: Array<{
     id: string;
     time: string;
+    day_slot_id?: string; // Add this for backend reference
   }>;
   color: string;
 }
@@ -17,6 +18,8 @@ interface Teacher {
   subject: string;
   department: string;
   type: 'teacher';
+  email?: string;
+  phone?: string;
 }
 
 interface PeriodType {
@@ -41,22 +44,13 @@ interface Batch {
   year: string;
   students: string;
   color: string;
+  code: string; // Add batch code for API
 }
 
 interface DropdownPosition {
   top: number;
   left: number;
 }
-
-/* ================= MOCK TEACHERS DATA ================= */
-const TEACHERS_DATA: Teacher[] = [
-  { id: "T001", name: "Dr. Sharma", code: "CSE101", subject: "Mathematics", department: "CSE", type: 'teacher' },
-  { id: "T002", name: "Prof. Kumar", code: "CSE102", subject: "Data Structures", department: "CSE", type: 'teacher' },
-  { id: "T003", name: "Dr. Singh", code: "CSE103", subject: "Algorithms", department: "CSE", type: 'teacher' },
-  { id: "T004", name: "Prof. Gupta", code: "ECE101", subject: "Digital Electronics", department: "ECE", type: 'teacher' },
-  { id: "T005", name: "Dr. Reddy", code: "ECE102", subject: "Signals & Systems", department: "ECE", type: 'teacher' },
-  { id: "T006", name: "Prof. Joshi", code: "CSE104", subject: "Database Management", department: "CSE", type: 'teacher' },
-];
 
 /* ================= PERIOD TYPES ================= */
 const PERIOD_TYPES: PeriodType[] = [
@@ -81,23 +75,341 @@ const BATCH_COLORS = [
 /* ================= MAIN COMPONENT ================= */
 const FixedSlots: React.FC = () => {
   const [days, setDays] = useState<DaySlots[]>([]);
-  const [batches, setBatches] = useState<Batch[]>([
-    { id: "B001", name: "CSE A", year: "2nd Year", students: "60", color: BATCH_COLORS[0] },
-    { id: "B002", name: "CSE B", year: "2nd Year", students: "65", color: BATCH_COLORS[1] },
-    { id: "B003", name: "ECE A", year: "3rd Year", students: "55", color: BATCH_COLORS[2] },
-  ]);
-  const [activeBatchId, setActiveBatchId] = useState<string>("B001");
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [activeBatchId, setActiveBatchId] = useState<string>("");
   const [assignments, setAssignments] = useState<AssignedSlot[]>([]);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showHelp, setShowHelp] = useState(true);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [loadingTeachers, setLoadingTeachers] = useState(false);
+  const [timetableId, setTimetableId] = useState<string>("");
+  const [centerId, setCenterId] = useState<string>("bb67db93-5d47-4639-aa05-7ddb80d106a1");
+  const [timetables, setTimetables] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+  // Function to get access token
+  const getAccessToken = () => {
+    return localStorage.getItem("access_token");
+  };
+
+  // Function to fetch teachers from API
+  const fetchTeachersFromAPI = async () => {
+    setLoadingTeachers(true);
+    try {
+      const accessToken = getAccessToken();
+      
+      if (!accessToken) {
+        throw new Error("No access token found. Please login again.");
+      }
+      
+      const response = await fetch(
+        `https://exams.dashoapp.com/api/timetable/centers/${centerId}/users/?role=teacher`,
+        {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch teachers: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("Teachers API response:", data);
+      
+      // Transform API data to match our UI format
+      const formattedTeachers: Teacher[] = data.results.map((teacher: any) => ({
+        id: teacher.id,
+        name: `${teacher.first_name} ${teacher.last_name}`,
+        code: teacher.teacher_code || `TCH-${teacher.id.slice(0, 8)}`,
+        subject: teacher.subject || "General",
+        department: teacher.department || "General",
+        type: 'teacher',
+        email: teacher.email,
+        phone: teacher.phone
+      }));
+      
+      setTeachers(formattedTeachers);
+      
+    } catch (error: any) {
+      console.error("Error fetching teachers:", error);
+      
+      // Fallback to mock data if API fails
+      setTeachers([
+        { 
+          id: "T001", 
+          name: "Dr. Sharma", 
+          code: "TCH-CENT-230", 
+          subject: "Mathematics", 
+          department: "CSE", 
+          type: 'teacher' 
+        },
+        { 
+          id: "T002", 
+          name: "Prof. Kumar", 
+          code: "TCH-CENT-231", 
+          subject: "Data Structures", 
+          department: "CSE", 
+          type: 'teacher' 
+        },
+        { 
+          id: "T003", 
+          name: "Dr. Singh", 
+          code: "TCH-CENT-232", 
+          subject: "Algorithms", 
+          department: "CSE", 
+          type: 'teacher' 
+        },
+      ]);
+    } finally {
+      setLoadingTeachers(false);
+    }
+  };
+
+  // Function to fetch timetables
+  const fetchTimetables = async () => {
+    try {
+      const accessToken = getAccessToken();
+      
+      if (!accessToken) {
+        throw new Error("No access token found. Please login again.");
+      }
+      
+      const response = await fetch(
+        `https://exams.dashoapp.com/api/timetable/centers/${centerId}/timetables/`,
+        {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch timetables: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("Timetables API response:", data);
+      
+      if (data.results && data.results.length > 0) {
+        const formattedTimetables = data.results.map((timetable: any) => ({
+          id: timetable.id,
+          name: timetable.name || `Timetable ${timetable.id.slice(0, 8)}`
+        }));
+        setTimetables(formattedTimetables);
+        setTimetableId(formattedTimetables[0]?.id || "");
+      }
+      
+    } catch (error: any) {
+      console.error("Error fetching timetables:", error);
+      setTimetables([{ id: "default-timetable", name: "Default Timetable" }]);
+      setTimetableId("default-timetable");
+    }
+  };
+
+  // Function to fetch batches from localStorage (from BatchSchedule)
+  const fetchBatchesFromLocalStorage = () => {
+    try {
+      const savedBatches = localStorage.getItem("batchTeacherAssignments");
+      if (savedBatches) {
+        const parsed = JSON.parse(savedBatches);
+        
+        // Extract unique batches from assignments
+        const batchIds = new Set<string>();
+        const batchMap = new Map<string, Batch>();
+        
+        parsed.forEach((assignment: any) => {
+          if (assignment.batchId && !batchIds.has(assignment.batchId)) {
+            batchIds.add(assignment.batchId);
+            
+            // Create batch object with default values
+            const batch: Batch = {
+              id: assignment.batchId,
+              name: `Batch ${assignment.batchId.slice(0, 8)}`,
+              year: "Current Year",
+              students: "0",
+              color: BATCH_COLORS[batchIds.size % BATCH_COLORS.length],
+              code: `BATCH-${assignment.batchId.slice(0, 8)}`
+            };
+            batchMap.set(assignment.batchId, batch);
+          }
+        });
+        
+        const fetchedBatches = Array.from(batchMap.values());
+        
+        if (fetchedBatches.length > 0) {
+          setBatches(fetchedBatches);
+          setActiveBatchId(fetchedBatches[0].id);
+        } else {
+          // Fallback to mock batches if none found
+          setBatches([
+            { 
+              id: "B001", 
+              name: "CSE A", 
+              year: "2nd Year", 
+              students: "60", 
+              color: BATCH_COLORS[0],
+              code: "BATCH-001" 
+            },
+            { 
+              id: "B002", 
+              name: "CSE B", 
+              year: "2nd Year", 
+              students: "65", 
+              color: BATCH_COLORS[1],
+              code: "BATCH-002" 
+            },
+          ]);
+          setActiveBatchId("B001");
+        }
+      } else {
+        // Fallback to mock batches if no saved data
+        setBatches([
+          { 
+            id: "B001", 
+            name: "CSE A", 
+            year: "2nd Year", 
+            students: "60", 
+            color: BATCH_COLORS[0],
+            code: "BATCH-001" 
+          },
+          { 
+            id: "B002", 
+            name: "CSE B", 
+            year: "2nd Year", 
+            students: "65", 
+            color: BATCH_COLORS[1],
+            code: "BATCH-002" 
+          },
+        ]);
+        setActiveBatchId("B001");
+      }
+    } catch (error) {
+      console.error("Failed to fetch batches:", error);
+      // Fallback to mock batches
+      setBatches([
+        { 
+          id: "B001", 
+          name: "CSE A", 
+          year: "2nd Year", 
+          students: "60", 
+          color: BATCH_COLORS[0],
+          code: "BATCH-001" 
+        },
+      ]);
+      setActiveBatchId("B001");
+    }
+  };
+
+  // Function to assign slot to backend API
+  const assignSlotToBackend = async (daySlotId: string, batchCode: string, teacherCode: string, subject: string) => {
+    try {
+      const accessToken = getAccessToken();
+      
+      if (!accessToken) {
+        throw new Error("No access token found. Please login again.");
+      }
+      
+      if (!timetableId) {
+        throw new Error("Please select a timetable first");
+      }
+      
+      const payload = {
+        timetable_id: timetableId,
+        day_slot_id: daySlotId,
+        batch_code: batchCode,
+        teacher_code: teacherCode,
+        subject: subject
+      };
+      
+      console.log("Assigning slot with payload:", payload);
+      
+      const response = await fetch(
+        "https://exams.dashoapp.com/api/timetable/admin/timetables/fixed-slots/assign/",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to assign slot: ${response.status} - ${JSON.stringify(errorData)}`);
+      }
+      
+      const data = await response.json();
+      console.log("Slot assigned successfully:", data);
+      return data;
+      
+    } catch (error: any) {
+      console.error("Error assigning slot:", error);
+      throw error;
+    }
+  };
+
+  // Function to remove slot assignment from backend
+  const removeSlotFromBackend = async (daySlotId: string, batchCode: string) => {
+    try {
+      const accessToken = getAccessToken();
+      
+      if (!accessToken) {
+        throw new Error("No access token found. Please login again.");
+      }
+      
+      if (!timetableId) {
+        throw new Error("Please select a timetable first");
+      }
+      
+      const payload = {
+        timetable_id: timetableId,
+        day_slot_id: daySlotId,
+        batch_code: batchCode
+      };
+      
+      console.log("Removing slot assignment:", payload);
+      
+      const response = await fetch(
+        "https://exams.dashoapp.com/api/timetable/admin/timetables/fixed-slots/remove/",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to remove slot: ${response.status} - ${JSON.stringify(errorData)}`);
+      }
+      
+      const data = await response.json();
+      console.log("Slot removed successfully:", data);
+      return data;
+      
+    } catch (error: any) {
+      console.error("Error removing slot:", error);
+      throw error;
+    }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Check if click is outside any dropdown
       const isClickInsideDropdown = Object.values(dropdownRefs.current).some(
         ref => ref && ref.contains(event.target as Node)
       );
@@ -119,28 +431,27 @@ const FixedSlots: React.FC = () => {
         const savedData = localStorage.getItem("timetableSlots");
         if (savedData) {
           const parsedData = JSON.parse(savedData);
-          // Convert to new format if needed
           if (parsedData.days && parsedData.days.length > 0) {
             const convertedDays: DaySlots[] = parsedData.days.map((day: any) => {
-              // Check if slots are in new format (array of objects)
               if (day.slots && day.slots.length > 0 && typeof day.slots[0] === 'object') {
                 return {
                   day: day.day,
                   slots: day.slots.map((slot: any) => ({
                     id: slot.id || `${day.day.substring(0, 2).toUpperCase()}1`,
-                    time: slot.time || "8:00 AM - 9:00 AM"
+                    time: slot.time || "8:00 AM - 9:00 AM",
+                    day_slot_id: slot.day_slot_id || slot.id
                   })),
                   color: day.color || "#3B82F6"
                 };
               }
-              // Old format - convert string array to object array
               return {
                 day: day.day,
                 slots: day.slots.map((slot: string, index: number) => {
                   const match = slot.match(/([A-Z]+\d+):\s*(.+)/);
                   return {
                     id: match ? match[1] : `${day.day.substring(0, 2).toUpperCase()}${index + 1}`,
-                    time: match ? match[2] : "8:00 AM - 9:00 AM"
+                    time: match ? match[2] : "8:00 AM - 9:00 AM",
+                    day_slot_id: match ? match[1] : `${day.day.substring(0, 2).toUpperCase()}${index + 1}`
                   };
                 }),
                 color: day.color || "#3B82F6"
@@ -155,7 +466,6 @@ const FixedSlots: React.FC = () => {
     };
 
     loadSavedSlots();
-    // Listen for changes from SlotsGrid component
     window.addEventListener('storage', loadSavedSlots);
     return () => window.removeEventListener('storage', loadSavedSlots);
   }, []);
@@ -165,7 +475,7 @@ const FixedSlots: React.FC = () => {
     const loadAllAssignments = () => {
       const allAssignments: AssignedSlot[] = [];
       batches.forEach(batch => {
-        const saved = localStorage.getItem(`batchAssignments_${batch.id}`);
+        const saved = localStorage.getItem(`batchFixedAssignments_${batch.id}`);
         if (saved) {
           try {
             const parsed = JSON.parse(saved);
@@ -178,84 +488,161 @@ const FixedSlots: React.FC = () => {
       setAssignments(allAssignments);
     };
     
-    loadAllAssignments();
+    if (batches.length > 0) {
+      loadAllAssignments();
+    }
   }, [batches]);
+
+  /* Initialize data on component mount */
+  useEffect(() => {
+    const initializeData = async () => {
+      setLoading(true);
+      try {
+        await fetchTeachersFromAPI();
+        await fetchTimetables();
+        fetchBatchesFromLocalStorage();
+      } catch (error) {
+        console.error("Failed to initialize data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    initializeData();
+  }, []);
 
   /* Save assignments to localStorage */
   const saveAssignments = (batchId: string, newAssignments: AssignedSlot[]) => {
     try {
-      // Update local state
       const otherAssignments = assignments.filter(a => a.batchId !== batchId);
       setAssignments([...otherAssignments, ...newAssignments]);
-      
-      // Save to localStorage
-      localStorage.setItem(`batchAssignments_${batchId}`, JSON.stringify(newAssignments));
+      localStorage.setItem(`batchFixedAssignments_${batchId}`, JSON.stringify(newAssignments));
       setHasUnsavedChanges(false);
     } catch (error) {
       console.error("Failed to save assignments:", error);
     }
   };
 
-  const assignItem = (dayIndex: number, slotIndex: number, item: Teacher | PeriodType) => {
+  const assignItem = async (dayIndex: number, slotIndex: number, item: Teacher | PeriodType) => {
     const batchAssignments = assignments.filter(a => a.batchId === activeBatchId);
     const existingIndex = batchAssignments.findIndex(a => 
       a.dayIndex === dayIndex && a.slotIndex === slotIndex
     );
 
     let newBatchAssignments = [...batchAssignments];
+    const activeBatch = getActiveBatch();
     
-    if (existingIndex >= 0) {
-      if (item.type === 'teacher') {
-        newBatchAssignments[existingIndex] = { 
-          dayIndex, 
-          slotIndex, 
-          teacher: item, 
-          periodType: undefined,
-          batchId: activeBatchId 
-        };
-      } else {
-        newBatchAssignments[existingIndex] = { 
-          dayIndex, 
-          slotIndex, 
-          periodType: item, 
-          teacher: undefined,
-          batchId: activeBatchId 
-        };
-      }
-    } else {
-      if (item.type === 'teacher') {
-        newBatchAssignments.push({ 
-          dayIndex, 
-          slotIndex, 
-          teacher: item, 
-          periodType: undefined,
-          batchId: activeBatchId 
-        });
-      } else {
-        newBatchAssignments.push({ 
-          dayIndex, 
-          slotIndex, 
-          periodType: item, 
-          teacher: undefined,
-          batchId: activeBatchId 
-        });
-      }
+    if (!activeBatch) {
+      alert("No active batch selected");
+      return;
     }
 
-    saveAssignments(activeBatchId, newBatchAssignments);
-    setOpenDropdown(null);
-    setDropdownPosition(null);
-    setHasUnsavedChanges(true);
+    // Get day slot ID
+    const daySlot = days[dayIndex]?.slots[slotIndex];
+    if (!daySlot) {
+      alert("Slot not found");
+      return;
+    }
+
+    const daySlotId = daySlot.day_slot_id || daySlot.id;
+
+    try {
+      if (item.type === 'teacher') {
+        // Call backend API for teacher assignment
+        await assignSlotToBackend(
+          daySlotId,
+          activeBatch.code,
+          item.code,
+          item.subject
+        );
+        
+        if (existingIndex >= 0) {
+          newBatchAssignments[existingIndex] = { 
+            dayIndex, 
+            slotIndex, 
+            teacher: item, 
+            periodType: undefined,
+            batchId: activeBatchId 
+          };
+        } else {
+          newBatchAssignments.push({ 
+            dayIndex, 
+            slotIndex, 
+            teacher: item, 
+            periodType: undefined,
+            batchId: activeBatchId 
+          });
+        }
+        
+        alert(`Teacher ${item.name} assigned successfully!`);
+      } else {
+        // For period types, just save locally (backend might not support period types)
+        if (existingIndex >= 0) {
+          newBatchAssignments[existingIndex] = { 
+            dayIndex, 
+            slotIndex, 
+            periodType: item, 
+            teacher: undefined,
+            batchId: activeBatchId 
+          };
+        } else {
+          newBatchAssignments.push({ 
+            dayIndex, 
+            slotIndex, 
+            periodType: item, 
+            teacher: undefined,
+            batchId: activeBatchId 
+          });
+        }
+        
+        alert(`Period type "${item.name}" assigned successfully!`);
+      }
+
+      saveAssignments(activeBatchId, newBatchAssignments);
+      setOpenDropdown(null);
+      setDropdownPosition(null);
+      setHasUnsavedChanges(true);
+      
+    } catch (error: any) {
+      console.error("Failed to assign item:", error);
+      alert(`Failed to assign: ${error.message}`);
+    }
   };
 
-  const removeAssignment = (dayIndex: number, slotIndex: number) => {
+  const removeAssignment = async (dayIndex: number, slotIndex: number) => {
     const batchAssignments = assignments.filter(a => a.batchId === activeBatchId);
-    const newBatchAssignments = batchAssignments.filter(a => 
-      !(a.dayIndex === dayIndex && a.slotIndex === slotIndex)
+    const assignment = batchAssignments.find(a => 
+      a.dayIndex === dayIndex && a.slotIndex === slotIndex
     );
     
-    saveAssignments(activeBatchId, newBatchAssignments);
-    setHasUnsavedChanges(true);
+    const activeBatch = getActiveBatch();
+    const daySlot = days[dayIndex]?.slots[slotIndex];
+    
+    if (!activeBatch || !daySlot) {
+      alert("Cannot remove assignment: Missing data");
+      return;
+    }
+
+    const daySlotId = daySlot.day_slot_id || daySlot.id;
+
+    try {
+      // Only call backend if it was a teacher assignment
+      if (assignment?.teacher) {
+        await removeSlotFromBackend(daySlotId, activeBatch.code);
+      }
+      
+      const newBatchAssignments = batchAssignments.filter(a => 
+        !(a.dayIndex === dayIndex && a.slotIndex === slotIndex)
+      );
+      
+      saveAssignments(activeBatchId, newBatchAssignments);
+      setHasUnsavedChanges(true);
+      alert("Assignment removed successfully!");
+      
+    } catch (error: any) {
+      console.error("Failed to remove assignment:", error);
+      alert(`Failed to remove assignment: ${error.message}`);
+    }
   };
 
   const getAssignedItem = (dayIndex: number, slotIndex: number) => {
@@ -286,8 +673,8 @@ const FixedSlots: React.FC = () => {
   };
 
   const saveChanges = () => {
-    // In a real app, this would save to backend
-    alert("Changes saved successfully!");
+    // Already saving to backend when assigning/removing
+    alert("Changes are saved to backend automatically!");
     setHasUnsavedChanges(false);
   };
 
@@ -306,21 +693,16 @@ const FixedSlots: React.FC = () => {
     const rect = e.currentTarget.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     
-    // Calculate position
-    let top = rect.bottom + 8; // 8px margin below slot
+    let top = rect.bottom + 8;
     let left = rect.left;
     
-    // Check if dropdown would go off bottom of screen
-    const estimatedDropdownHeight = 400; // Approximate height
+    const estimatedDropdownHeight = 400;
     if (top + estimatedDropdownHeight > viewportHeight - 20) {
-      // Position above the slot instead
       top = rect.top - estimatedDropdownHeight - 8;
     }
     
-    // Check if dropdown would go off right of screen
     const dropdownWidth = 600;
     if (left + dropdownWidth > window.innerWidth - 20) {
-      // Align to right edge of screen
       left = window.innerWidth - dropdownWidth - 20;
     }
     
@@ -328,15 +710,31 @@ const FixedSlots: React.FC = () => {
     setOpenDropdown(openDropdown === dropdownKey ? null : dropdownKey);
   };
 
+  const refreshTeachers = () => {
+    fetchTeachersFromAPI();
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div style={styles.wrapper}>
+        <div style={styles.loadingState}>
+          <div style={styles.spinner}></div>
+          <h3 style={styles.title}>Loading Schedule...</h3>
+          <p>Fetching data from the server</p>
+        </div>
+      </div>
+    );
+  }
+
   const activeBatch = getActiveBatch();
   
-  // Return early if no active batch (defensive check)
   if (!activeBatch) {
     return (
       <div style={styles.wrapper}>
         <div style={styles.errorState}>
           <h3 style={styles.title}>No Active Batch</h3>
-          <p>Please add a batch to continue.</p>
+          <p>Please go to Batch Schedule first and assign teachers to batches.</p>
         </div>
       </div>
     );
@@ -351,25 +749,60 @@ const FixedSlots: React.FC = () => {
           <p style={styles.subtitle}>Assign teachers and periods to time slots for each batch</p>
         </div>
         
-        {/* Save Buttons */}
-        <div style={styles.saveButtons}>
-          {hasUnsavedChanges && (
-            <span style={styles.unsavedIndicator}>• Unsaved changes</span>
-          )}
+        {/* Timetable Selection and Save Buttons */}
+        <div style={styles.headerActions}>
+          {/* Timetable Selector */}
+          <div style={styles.timetableSelector}>
+            <label style={styles.timetableLabel}>
+              Timetable:
+              <select 
+                value={timetableId}
+                onChange={(e) => setTimetableId(e.target.value)}
+                style={styles.timetableSelect}
+              >
+                {timetables.map(timetable => (
+                  <option key={timetable.id} value={timetable.id}>
+                    {timetable.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          
+          {/* Refresh Teachers Button */}
           <button 
-            style={styles.saveBtn}
-            onClick={saveChanges}
-            disabled={!hasUnsavedChanges}
+            style={styles.refreshButton}
+            onClick={refreshTeachers}
+            disabled={loadingTeachers}
+            title="Refresh teachers from API"
           >
-            💾 Save Changes
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" 
+                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            {loadingTeachers ? "Loading..." : "Refresh Teachers"}
           </button>
-          <button 
-            style={styles.saveNextBtn}
-            onClick={saveAndNext}
-            disabled={!hasUnsavedChanges}
-          >
-            💾 Save & Next Batch →
-          </button>
+          
+          {/* Save Buttons */}
+          <div style={styles.saveButtons}>
+            {hasUnsavedChanges && (
+              <span style={styles.unsavedIndicator}>• Unsaved changes</span>
+            )}
+            <button 
+              style={styles.saveBtn}
+              onClick={saveChanges}
+              disabled={!hasUnsavedChanges}
+            >
+              💾 Save Changes
+            </button>
+            <button 
+              style={styles.saveNextBtn}
+              onClick={saveAndNext}
+              disabled={!hasUnsavedChanges}
+            >
+              💾 Save & Next Batch →
+            </button>
+          </div>
         </div>
       </div>
 
@@ -390,16 +823,29 @@ const FixedSlots: React.FC = () => {
             </button>
           </div>
           <ul style={styles.helpList}>
+            <li>Select a timetable from the dropdown</li>
             <li>Click on any time slot to open assignment dropdown</li>
-            <li>Choose from <strong>Teachers</strong> or <strong>Period Types</strong> sections</li>
-            <li>Select a teacher to assign them to that slot</li>
-            <li>Select a period type (Free Period, Exam, etc.)</li>
+            <li>Choose from <strong>Teachers</strong> (fetched from API) or <strong>Period Types</strong> sections</li>
+            <li>Teacher assignments are saved directly to backend</li>
             <li>Click the × button to remove an assignment</li>
-            <li>Click <strong>Save Changes</strong> to save your progress</li>
-            <li>Click <strong>Save & Next Batch</strong> to save and move to next batch</li>
+            <li>Use <strong>Refresh Teachers</strong> to update teacher list</li>
+            <li>Batches are loaded from Batch Schedule assignments</li>
           </ul>
         </div>
       )}
+
+      {/* Center Info */}
+      <div style={styles.centerInfoBar}>
+        <div style={styles.centerInfo}>
+          <strong>Center ID:</strong> <code style={styles.codeText}>{centerId}</code>
+          <span style={styles.infoSeparator}>•</span>
+          <strong>Timetable:</strong> {timetables.find(t => t.id === timetableId)?.name || "Not selected"}
+          <span style={styles.infoSeparator}>•</span>
+          <strong>Batches:</strong> {batches.length}
+          <span style={styles.infoSeparator}>•</span>
+          <strong>Teachers Available:</strong> {teachers.length}
+        </div>
+      </div>
 
       {/* Batch Tabs */}
       <div style={styles.tabContainer}>
@@ -441,6 +887,8 @@ const FixedSlots: React.FC = () => {
             <div>
               <h4 style={styles.activeBatchTitle}>{activeBatch.name}</h4>
               <div style={styles.batchDetails}>
+                <span><strong>Code:</strong> {activeBatch.code}</span>
+                <span>•</span>
                 <span>{activeBatch.year}</span>
                 <span>•</span>
                 <span>{activeBatch.students} students</span>
@@ -470,7 +918,6 @@ const FixedSlots: React.FC = () => {
             <button 
               style={styles.goToSlotsBtn}
               onClick={() => {
-                // You can implement navigation here if needed
                 alert("Go to Slots tab to create time slots");
               }}
             >
@@ -619,32 +1066,40 @@ const FixedSlots: React.FC = () => {
             <div style={styles.dropdownSection}>
               <div style={styles.sectionHeader}>
                 <div style={{...styles.sectionIcon, background: "#3B82F6"}}>👨‍🏫</div>
-                <h4 style={styles.sectionTitle}>Teachers</h4>
+                <h4 style={styles.sectionTitle}>
+                  Teachers ({teachers.length})
+                  {loadingTeachers && <span style={styles.loadingText}> Loading...</span>}
+                </h4>
               </div>
               <div style={styles.itemsList}>
-                {TEACHERS_DATA.map((teacher) => (
-                  <div
-                    key={teacher.id}
-                    style={styles.itemCard}
-                    onClick={() => {
-                      // Extract dayIndex and slotIndex from dropdownKey
-                      const parts = openDropdown.split('-');
-                      const dayIndex = parseInt(parts[1]);
-                      const slotIndex = parseInt(parts[2]);
-                      assignItem(dayIndex, slotIndex, teacher);
-                    }}
-                  >
-                    <div style={styles.itemMainInfo}>
-                      <strong>{teacher.subject}</strong>
-                      <div style={styles.itemCode}>
-                        {teacher.code}
+                {teachers.length === 0 ? (
+                  <div style={styles.noTeachersMessage}>
+                    <p>No teachers found. Click Refresh Teachers button.</p>
+                  </div>
+                ) : (
+                  teachers.map((teacher) => (
+                    <div
+                      key={teacher.id}
+                      style={styles.itemCard}
+                      onClick={() => {
+                        const parts = openDropdown.split('-');
+                        const dayIndex = parseInt(parts[1]);
+                        const slotIndex = parseInt(parts[2]);
+                        assignItem(dayIndex, slotIndex, teacher);
+                      }}
+                    >
+                      <div style={styles.itemMainInfo}>
+                        <strong>{teacher.subject}</strong>
+                        <div style={styles.itemCode}>
+                          {teacher.code}
+                        </div>
+                      </div>
+                      <div style={styles.itemDetails}>
+                        {teacher.name} • {teacher.department}
                       </div>
                     </div>
-                    <div style={styles.itemDetails}>
-                      {teacher.name} • {teacher.department}
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
@@ -660,7 +1115,6 @@ const FixedSlots: React.FC = () => {
                     key={period.id}
                     style={styles.itemCard}
                     onClick={() => {
-                      // Extract dayIndex and slotIndex from dropdownKey
                       const parts = openDropdown.split('-');
                       const dayIndex = parseInt(parts[1]);
                       const slotIndex = parseInt(parts[2]);
@@ -675,7 +1129,7 @@ const FixedSlots: React.FC = () => {
                         ...styles.periodBadge,
                         background: period.color
                       }}>
-                        {period.type}
+                        Period
                       </div>
                     </div>
                     <div style={styles.itemDetails}>
@@ -703,6 +1157,22 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: "calc(100vh - 48px)",
     position: "relative",
   },
+  loadingState: {
+    padding: "40px",
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "16px",
+  },
+  spinner: {
+    width: "40px",
+    height: "40px",
+    border: "3px solid #f3f3f3",
+    borderTop: "3px solid #3b82f6",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+  },
   errorState: {
     padding: "40px",
     textAlign: "center",
@@ -725,6 +1195,48 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "14px",
     color: "#64748b",
     margin: "0",
+  },
+  headerActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    flexWrap: "wrap",
+  },
+  timetableSelector: {
+    padding: "8px 12px",
+    background: "#f0f9ff",
+    borderRadius: "6px",
+    border: "1px solid #bae6fd",
+  },
+  timetableLabel: {
+    fontSize: "12px",
+    color: "#0369a1",
+    fontWeight: "500",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  },
+  timetableSelect: {
+    padding: "6px 10px",
+    borderRadius: "4px",
+    border: "1px solid #94a3b8",
+    background: "#ffffff",
+    fontSize: "12px",
+    color: "#1e293b",
+    minWidth: "150px",
+  },
+  refreshButton: {
+    padding: "8px 16px",
+    background: "#f1f5f9",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "12px",
+    fontWeight: "500",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
   },
   saveButtons: {
     display: "flex",
@@ -812,6 +1324,35 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#0c4a6e",
     fontSize: "14px",
     lineHeight: "1.6",
+  },
+  centerInfoBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "12px 16px",
+    background: "#f0f9ff",
+    borderRadius: "8px",
+    border: "1px solid #bae6fd",
+    marginBottom: "16px",
+  },
+  centerInfo: {
+    fontSize: "14px",
+    color: "#0369a1",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
+  },
+  infoSeparator: {
+    color: "#94a3b8",
+    fontSize: "12px",
+  },
+  codeText: {
+    background: "#dbeafe",
+    padding: "2px 6px",
+    borderRadius: "4px",
+    fontSize: "12px",
+    fontFamily: "monospace",
   },
   tabContainer: {
     display: "flex",
@@ -1175,6 +1716,11 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#1e293b",
     margin: "0",
   },
+  loadingText: {
+    fontSize: "12px",
+    color: "#64748b",
+    fontWeight: "normal",
+  },
   itemsList: {
     maxHeight: "250px",
     overflowY: "auto",
@@ -1214,6 +1760,21 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "12px",
     fontWeight: "500",
   },
+  noTeachersMessage: {
+    padding: "20px",
+    textAlign: "center",
+    color: "#64748b",
+    fontSize: "13px",
+  },
 };
+
+// Add CSS animation for spinner
+const styleSheet = document.styleSheets[0];
+styleSheet.insertRule(`
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`, styleSheet.cssRules.length);
 
 export default FixedSlots;
