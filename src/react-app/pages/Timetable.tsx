@@ -47,27 +47,8 @@ const Timetable: React.FC = () => {
 
   return (
     <div style={styles.page}>
-      <h2 style={styles.title}>Institute Timetable Management</h2>
+      <h2 style={styles.title}>Institute Timetable</h2>
       
-      {/* Dashboard Stats Cards */}
-      <div style={styles.statsContainer}>
-        <div style={styles.statCard}>
-          <p style={styles.statLabel}>Total Teachers</p>
-          <h3 style={styles.statValue}>0</h3>
-        </div>
-        <div style={styles.statCard}>
-          <p style={styles.statLabel}>Total Batches</p>
-          <h3 style={styles.statValue}>0</h3>
-        </div>
-        <div style={styles.statCard}>
-          <p style={styles.statLabel}>Total Slots</p>
-          <h3 style={styles.statValue}>0</h3>
-        </div>
-        <div style={styles.statCard}>
-          <p style={styles.statLabel}>Generated Feasibility</p>
-          <h3 style={styles.statValue}>0</h3>
-        </div>
-      </div>
 
       {/* Clickable Tabs */}
       <div style={styles.tabContainer}>
@@ -313,31 +294,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#1e293b",
   },
 
-  // Stats Cards
-  statsContainer: {
-    display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
-    gap: "16px",
-    marginBottom: "32px",
-  },
-  statCard: {
-    background: "#f8fafc",
-    padding: "20px",
-    borderRadius: "8px",
-    border: "1px solid #e2e8f0",
-    textAlign: "center",
-  },
-  statLabel: {
-    fontSize: "14px",
-    color: "#64748b",
-    margin: "0 0 8px 0",
-  },
-  statValue: {
-    fontSize: "28px",
-    fontWeight: "700",
-    color: "#0f172a",
-    margin: "0",
-  },
 
   // Tabs
   tabContainer: {

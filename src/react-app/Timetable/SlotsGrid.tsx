@@ -28,6 +28,8 @@ const TIME_OPTIONS = [
 
 interface DaySlots {
   day: string;
+  date: string; // YYYY-MM-DD format for tracking actual calendar date
+  dayIndex: number; // 1-based index in the calendar range (d1, d2, ..., d15, etc.)
   slots: Array<{
     id: string; // Fixed: M1, M2, etc.
     time: string; // Editable time: "8:00 AM - 9:00 AM"
@@ -62,6 +64,25 @@ interface SavedSlotsData {
 // Day selection mode
 type DaySelectionMode = "dropdown" | "calendar";
 
+// ===================== API HELPERS =====================
+// Convert day index (1-based) to backend key (d1, d2, ..., d15, etc.)
+const dayIndexToKey = (dayIndex: number): string => {
+  return `d${dayIndex}`;
+};
+
+// Convert "8:00 AM" → "08:00"
+const to24Hour = (time: string): string => {
+  const [t, modifier] = time.split(" ");
+  let [hours, minutes] = t.split(":").map(Number);
+
+  if (modifier === "PM" && hours !== 12) hours += 12;
+  if (modifier === "AM" && hours === 12) hours = 0;
+
+  return `${hours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")}`;
+};
+
 // Helper function to convert time string to index
 const timeToIndex = (time: string): number => {
   return TIME_OPTIONS.indexOf(time);
@@ -93,8 +114,10 @@ const SlotsGrid: React.FC = () => {
         // Convert old format to new format if needed
         if (parsedData.days && parsedData.days.length > 0 && typeof parsedData.days[0].slots[0] === 'string') {
           // Convert from string array to object array
-          return parsedData.days.map(day => ({
+          return parsedData.days.map((day, idx) => ({
             ...day,
+            dayIndex: idx + 1,
+            date: day.startDate || "",
             slots: (day.slots as unknown as string[]).map((slot, index) => {
               const match = (slot as string).match(/([A-Z]+\d+):\s*(.+)/);
               return {
@@ -105,7 +128,9 @@ const SlotsGrid: React.FC = () => {
           }));
         }
         return parsedData.days || [{ 
-          day: "Monday", 
+          day: "Monday",
+          date: new Date().toISOString().split('T')[0],
+          dayIndex: 1,
           slots: [{ id: "M1", time: "8:00 AM - 9:00 AM" }], 
           color: DAY_COLORS[0] 
         }];
@@ -115,7 +140,9 @@ const SlotsGrid: React.FC = () => {
     }
     // Default initial state
     return [{ 
-      day: "Monday", 
+      day: "Monday",
+      date: new Date().toISOString().split('T')[0],
+      dayIndex: 1,
       slots: [{ id: "M1", time: "8:00 AM - 9:00 AM" }], 
       color: DAY_COLORS[0] 
     }];
@@ -218,7 +245,50 @@ const SlotsGrid: React.FC = () => {
     return { from: nextStartTime, to: nextEndTime };
   };
 
-  // Get days from date range
+  // Get days from date range with their indices
+  const getDaysFromDateRangeWithIndices = (startDate: string, endDate: string): Array<{dayName: string, date: string, index: number}> => {
+    if (!startDate || !endDate) return [];
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const daysInRange: Array<{dayName: string, date: string, index: number}> = [];
+    
+    // Create a map of weekday indices to names
+    const dayIndexMap: Record<number, string> = {
+      1: "Monday",
+      2: "Tuesday",
+      3: "Wednesday",
+      4: "Thursday",
+      5: "Friday",
+      6: "Saturday",
+      0: "Sunday"
+    };
+    
+    // Iterate through each day in the range
+    let dayCounter = 1;
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      const dayOfWeek = currentDate.getDay();
+      const dayName = dayIndexMap[dayOfWeek];
+      const dateStr = currentDate.toISOString().split('T')[0];
+      
+      if (dayName) {
+        daysInRange.push({
+          dayName,
+          date: dateStr,
+          index: dayCounter
+        });
+        dayCounter++;
+      }
+      
+      // Move to next day
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    return daysInRange;
+  };
+
+  // Get days from date range (for display)
   const getDaysFromDateRange = (startDate: string, endDate: string): string[] => {
     if (!startDate || !endDate) return [];
     
@@ -258,21 +328,22 @@ const SlotsGrid: React.FC = () => {
 
   // Add specific day from dropdown
   const addSpecificDay = (dayName: string) => {
-    const dayIndex = ALL_DAYS.indexOf(dayName);
+    const dayColorIndex = ALL_DAYS.indexOf(dayName);
+    const nextDayIndex = Math.max(...days.map(d => d.dayIndex), 0) + 1;
     const newDay: DaySlots = {
       day: dayName,
+      date: "", // No specific date for dropdown selection
+      dayIndex: nextDayIndex,
       slots: [{ 
         id: generateSlotId(dayName, 1), 
         time: "8:00 AM - 9:00 AM" 
       }],
-      color: DAY_COLORS[dayIndex],
+      color: DAY_COLORS[dayColorIndex],
       startDate: calendarRange.startDate,
       endDate: calendarRange.endDate
     };
 
-    setDays([...days, newDay].sort((a, b) => 
-      ALL_DAYS.indexOf(a.day) - ALL_DAYS.indexOf(b.day)
-    ));
+    setDays([...days, newDay].sort((a, b) => a.dayIndex - b.dayIndex));
     setShowDayDropdown(null);
     setDropdownPosition(null);
   };
@@ -299,43 +370,233 @@ const SlotsGrid: React.FC = () => {
 
   // Add days based on selection mode
   const addSelectedDays = () => {
-    let daysToAdd: string[] = [];
-    
+    let newDays: DaySlots[] = [];
+
     if (selectionMode === "dropdown") {
-      // Use selected days from dropdown
-      daysToAdd = selectedDays.filter(dayName => !days.some(d => d.day === dayName));
+      // Use selected days from dropdown - append and assign sequential indices
+      const daysToAdd = selectedDays.filter(dayName => !days.some(d => d.day === dayName));
+      const nextIndex = Math.max(...days.map(d => d.dayIndex), 0) + 1;
+
+      newDays = daysToAdd.map((dayName, offset) => {
+        const dayColorIndex = ALL_DAYS.indexOf(dayName);
+        return {
+          day: dayName,
+          date: "", // No specific date for dropdown selection
+          dayIndex: nextIndex + offset,
+          slots: [{
+            id: generateSlotId(dayName, 1),
+            time: "8:00 AM - 9:00 AM"
+          }],
+          color: DAY_COLORS[dayColorIndex],
+          startDate: calendarRange.startDate,
+          endDate: calendarRange.endDate
+        };
+      });
+
+      const updatedDays = [...days, ...newDays].sort((a, b) => a.dayIndex - b.dayIndex);
+      setDays(updatedDays);
     } else {
-      // Use days from calendar range
-      daysToAdd = getDaysFromDateRange(calendarRange.startDate, calendarRange.endDate)
-        .filter(dayName => !days.some(d => d.day === dayName));
+      // Use days from calendar range with sequential indices starting at 1
+      const daysWithIndices = getDaysFromDateRangeWithIndices(calendarRange.startDate, calendarRange.endDate);
+
+      newDays = daysWithIndices.map((dayInfo, idx) => {
+        const dayColorIndex = ALL_DAYS.indexOf(dayInfo.dayName);
+        return {
+          day: dayInfo.dayName,
+          date: dayInfo.date,
+          dayIndex: idx + 1, // start from 1 for the selected range
+          slots: [{
+            id: generateSlotId(dayInfo.dayName, 1),
+            time: "8:00 AM - 9:00 AM"
+          }],
+          color: DAY_COLORS[dayColorIndex],
+          startDate: calendarRange.startDate,
+          endDate: calendarRange.endDate
+        };
+      });
+
+      // Replace existing days with the calendar range sequence
+      setDays(newDays);
     }
 
-    const newDays: DaySlots[] = daysToAdd.map(dayName => {
-      const dayIndex = ALL_DAYS.indexOf(dayName);
-      return {
-        day: dayName,
-        slots: [{ 
-          id: generateSlotId(dayName, 1), 
-          time: "8:00 AM - 9:00 AM" 
-        }],
-        color: DAY_COLORS[dayIndex],
-        startDate: calendarRange.startDate,
-        endDate: calendarRange.endDate
-      };
-    });
-
-    const updatedDays = [...days, ...newDays].sort((a, b) => 
-      ALL_DAYS.indexOf(a.day) - ALL_DAYS.indexOf(b.day)
-    );
-    
-    setDays(updatedDays);
     setShowAddDayModal(false);
   };
 
-  // Save data to localStorage - Updated version
+  // ===================== API PAYLOAD BUILDERS =====================
+  const buildWeeklySlots = () => {
+    const weeklySlots: any = {};
+
+    days.forEach((day) => {
+      const dayKey = dayIndexToKey(day.dayIndex);
+      if (!dayKey) return;
+
+      // Ensure slots is a valid array
+      if (!Array.isArray(day.slots)) {
+        console.error(`Invalid slots for day ${day.day}:`, day.slots);
+        return;
+      }
+
+      const slotArray = day.slots.map((slot, index) => {
+        const [from, to] = slot.time.split(" - ");
+        return {
+          code: `${dayKey}_s${index + 1}`,
+          start: to24Hour(from),
+          end: to24Hour(to),
+          is_free_class: false,
+        };
+      });
+
+      // Validate that slotArray is an array before assigning
+      if (Array.isArray(slotArray)) {
+        weeklySlots[dayKey] = slotArray;
+      } else {
+        console.error(`Invalid slotArray for ${dayKey}:`, slotArray);
+      }
+    });
+
+    console.log("Built weeklySlots:", JSON.stringify(weeklySlots, null, 2));
+    return weeklySlots;
+  };
+
+  const [fetchedSlots, setFetchedSlots] = useState<any[] | null>(null);
+const [fetchingSlots, setFetchingSlots] = useState<boolean>(false);
+
+// Add this function to fetch timetable slots after creation
+const fetchTimetableSlots = async (timetableId: string) => {
+  setFetchingSlots(true);
+  try {
+    const accessToken = localStorage.getItem("access_token");
+    
+    if (!accessToken) {
+      throw new Error("No access token found. Please login again.");
+    }
+    
+    const response = await fetch(
+      `https://exams.dashoapp.com/api/timetable/timetables/${timetableId}/slots/`,
+      {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch slots: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    setFetchedSlots(data);
+    return data;
+  } catch (error) {
+    console.error("Error fetching slots:", error);
+    throw error;
+  } finally {
+    setFetchingSlots(false);
+  }
+};
+
+  const buildTimetablePayload = () => {
+    const payload = {
+      from_date: calendarRange.startDate,
+      to_date: calendarRange.endDate,
+      free_classes_count: 0,
+      weekly_slots: buildWeeklySlots(),
+      holidays: [],
+    };
+
+    // Validate payload structure
+    console.log("=== Payload Validation ===");
+    console.log("from_date:", payload.from_date);
+    console.log("to_date:", payload.to_date);
+    console.log("free_classes_count:", payload.free_classes_count);
+    console.log("holidays:", payload.holidays);
+    
+    if (payload.weekly_slots) {
+      console.log("weekly_slots keys:", Object.keys(payload.weekly_slots));
+      for (const [key, value] of Object.entries(payload.weekly_slots)) {
+        if (!Array.isArray(value)) {
+          console.error(`Invalid value for key ${key}:`, value);
+          throw new Error(`Payload validation failed: ${key} is not an array`);
+        }
+        console.log(`${key}: ${value.length} slots`);
+        // Validate each slot
+        value.forEach((slot: any, idx: number) => {
+          if (!slot.code || !slot.start || !slot.end) {
+            console.error(`Invalid slot at ${key}[${idx}]:`, slot);
+            throw new Error(`Invalid slot structure at ${key}[${idx}]`);
+          }
+        });
+      }
+    }
+
+    console.log("=== Final Payload ===");
+    console.log(JSON.stringify(payload, null, 2));
+    return payload;
+  };
+
+  // ===================== API CALL =====================
+  const createTimetable = async () => {
+  const payload = buildTimetablePayload();
+  
+  // Get the access_token from localStorage
+  const accessToken = localStorage.getItem("access_token");
+  
+  if (!accessToken) {
+    throw new Error("No access token found. Please login again.");
+  }
+
+  console.log("Sending payload to API:", JSON.stringify(payload, null, 2));
+  
+  const response = await fetch(
+    "https://exams.dashoapp.com/api/timetable/admin/timetables/create/",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("API Error Response:", errorText);
+    throw new Error(`API Error: ${response.status} - ${errorText}`);
+  }
+  
+  return response.json();
+};
+
+  // Save data to localStorage + API call - UPDATED version
   const saveSlots = async () => {
+    // Validation check
+    if (!calendarRange.startDate || !calendarRange.endDate) {
+      setSaveMessage("Please select start and end dates first");
+      setSaveStatus("error");
+      setTimeout(() => {
+        setSaveMessage("");
+        setSaveStatus("idle");
+      }, 3000);
+      return;
+    }
+
+    if (days.length === 0) {
+      setSaveMessage("Please add at least one day with slots");
+      setSaveStatus("error");
+      setTimeout(() => {
+        setSaveMessage("");
+        setSaveStatus("idle");
+      }, 3000);
+      return;
+    }
+
     setIsSaving(true);
+    setSaveStatus("saving");
     try {
+      // 1️⃣ Save locally (existing functionality)
       const dataToSave: SavedSlotsData = {
         days,
         lastSaved: new Date().toLocaleString(),
@@ -346,29 +607,35 @@ const SlotsGrid: React.FC = () => {
         }
       };
       
-      localStorage.setItem("timetableSlots", JSON.stringify(dataToSave));
       
+      // 2️⃣ Call API (NEW functionality)
+      console.log("Calling API to create timetable...");
+      const apiResponse = await createTimetable();
+      console.log("API Response:", apiResponse);
+      localStorage.setItem("timetable_id", JSON.stringify(apiResponse.timetable_id));
+
       // Show success state
-      setSaveMessage("Slots saved successfully!");
+      setSaveMessage(`Timetable created successfully! ID: ${apiResponse.timetable_id}`);
       setLastSavedTime(dataToSave.lastSaved);
       setSaveStatus("saved");
+      fetchTimetableSlots(apiResponse.timetable_id);
       
-      // Reset message after 3 seconds
+      // Reset message after 5 seconds
       setTimeout(() => {
         setSaveMessage("");
         setSaveStatus("idle");
-      }, 3000);
+      }, 5000);
       
-    } catch (error) {
-      console.error("Failed to save data:", error);
-      setSaveMessage("Error saving slots");
+    } catch (error: any) {
+      console.error("Failed to create timetable:", error);
+      setSaveMessage(error.message || "Error creating timetable");
       setSaveStatus("error");
       
-      // Reset error after 3 seconds
+      // Reset error after 5 seconds to see full message
       setTimeout(() => {
         setSaveMessage("");
         setSaveStatus("idle");
-      }, 3000);
+      }, 5000);
     } finally {
       setIsSaving(false);
     }
@@ -442,7 +709,9 @@ const SlotsGrid: React.FC = () => {
   const resetToDefault = () => {
     if (window.confirm("Are you sure you want to reset all slots? This cannot be undone.")) {
       setDays([{ 
-        day: "Monday", 
+        day: "Monday",
+        date: new Date().toISOString().split('T')[0],
+        dayIndex: 1,
         slots: [{ id: "M1", time: "8:00 AM - 9:00 AM" }], 
         color: DAY_COLORS[0] 
       }]);
@@ -588,6 +857,7 @@ const SlotsGrid: React.FC = () => {
             <li><strong>New slots automatically add with 1-hour intervals</strong></li>
             <li>Use <strong>Calendar Range</strong> mode to add days by date range</li>
             <li>Don't forget to click <strong>"Save Slots"</strong> to save your changes</li>
+            <li><strong>Note:</strong> "Save Slots" now saves to both local storage and backend API</li>
           </ul>
         </div>
       )}
@@ -812,14 +1082,21 @@ const SlotsGrid: React.FC = () => {
         {/* Days & Slots Grid */}
         <div style={styles.grid}>
           {days.map((day, dayIndex) => (
-            <div key={day.day} style={styles.dayRow}>
+            <div key={`${day.day}-${day.date}-${day.dayIndex}`} style={styles.dayRow}>
               {/* Day Column */}
               <div style={styles.dayColumn}>
                 <div style={styles.dayCell}>
                   <div 
                     style={{...styles.dayColorDot, backgroundColor: day.color}} 
                   />
-                  <span style={styles.dayName}>{day.day}</span>
+                  <div>
+                    <span style={styles.dayName}>{day.day}</span>
+                    {day.date && (
+                      <span style={{...styles.dayDate}}>
+                        {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    )}
+                  </div>
                   <span style={styles.daySlotCount}>
                     ({day.slots.length} slots)
                   </span>
@@ -1006,7 +1283,7 @@ const SlotsGrid: React.FC = () => {
   );
 };
 
-/* ================= UPDATED STYLES ================= */
+/* ================= STYLES (UNCHANGED) ================= */
 const styles: Record<string, React.CSSProperties> = {
   wrapper: {
     background: "#ffffff",
@@ -1157,7 +1434,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "14px",
     lineHeight: "1.6",
   },
-  // Modal Styles
   modalOverlay: {
     position: "fixed",
     top: "0",
@@ -1471,7 +1747,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "14px",
     fontWeight: "500",
   },
-  // Grid Container
   gridContainer: {
     background: "#ffffff",
     position: "relative",
@@ -1527,6 +1802,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "16px",
     fontWeight: "600",
     color: "#1e293b",
+  },
+  dayDate: {
+    fontSize: "12px",
+    color: "#64748b",
+    display: "block",
+    marginTop: "2px",
   },
   daySlotCount: {
     fontSize: "13px",
@@ -1724,7 +2005,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: "500",
     transition: "all 0.2s",
   },
-  // Dropdown styles - Fixed
   dayDropdown: {
     width: "180px",
     background: "#ffffff",
