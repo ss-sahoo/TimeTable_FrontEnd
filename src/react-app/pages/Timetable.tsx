@@ -6,6 +6,7 @@ import Teachers from "../Timetable/Teachers";
 import Feasibility from "../Timetable/Feasibility";
 import GeneratedTimetable from "../Timetable/GeneratedTimetable";
 import UpdateSlots from "../Timetable/UpdateSlots";
+import { JSX } from "react";
 
 
 
@@ -71,7 +72,7 @@ const Timetable: React.FC = () => {
         {activeTab === "instructions" && <Instructions />}
         {activeTab === "slots" && <Slots />}
         {activeTab === "batches" && <Batches />}
-        {activeTab === "teachers" && <Teachers />}
+        {activeTab === "teachers" && <TeachersWrapper />}
         {activeTab === "fixedSlots" && <FixedSlots />}
         {activeTab === "feasibility" && <Feasibility />}
         {activeTab === "generate" && <GeneratedTimetable />}
@@ -110,9 +111,47 @@ const Instructions = () => {
 
 // Slots Tab
 const Slots = () => {
+  const [slotsData, setSlotsData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  React.useEffect(() => {
+    const fetchSlots = async () => {
+      const rawTimetableId = localStorage.getItem('timetable_id');
+      
+      if (!rawTimetableId) {
+        setError('No timetable ID found in localStorage');
+        return;
+      }
+
+      // Clean the timetable ID - remove any quotes or extra characters
+      const timetableId = rawTimetableId.replace(/"/g, '').trim();
+      console.log('Original timetable ID:', rawTimetableId);
+      console.log('Cleaned timetable ID:', timetableId);
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const { fetchTimetableSlots } = await import('../AllApi');
+        const data = await fetchTimetableSlots(timetableId);
+        setSlotsData(data);
+      } catch (err) {
+        setError(err.message || 'Failed to fetch slots');
+        console.error('Error fetching slots:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSlots();
+  }, []);
+
   return (
     <div style={styles.tabContent}>
-      <SlotsGrid />
+      {loading && <div style={styles.loadingText}>Loading slots...</div>}
+      {error && <div style={styles.errorText}>Error: {error}</div>}
+      <SlotsGrid slotsData={slotsData} />
     </div>
   );
 };
@@ -122,6 +161,16 @@ const Batches = () => {
   return (
     <div style={styles.tabContent}>
       <BatchSchedule />
+    </div>
+  );
+};
+
+// Teachers Wrapper Tab
+const TeachersWrapper = () => {
+  console.log('TeachersWrapper component rendered - Teachers tab is active');
+  return (
+    <div style={styles.tabContent}>
+      <Teachers />
     </div>
   );
 };
@@ -541,6 +590,24 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#64748b",
     fontSize: "14px",
     margin: "0",
+  },
+
+  // Loading and Error States
+  loadingText: {
+    color: "#3b82f6",
+    fontSize: "14px",
+    padding: "16px",
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  errorText: {
+    color: "#dc2626",
+    fontSize: "14px",
+    padding: "16px",
+    backgroundColor: "#fee2e2",
+    borderRadius: "6px",
+    marginBottom: "16px",
+    border: "1px solid #fecaca",
   },
 };
 
