@@ -599,7 +599,7 @@ function PeoplesTab({ centerId }: { centerId: string | null }) {
       setLoadingTeachers(true);
       setErrorTeachers(null);
       try {
-        const teachersResponse = await api.get(`/timetable/centers/${centerId}/users/?role=TEACHER`);
+        const teachersResponse = await api.get(`/timetable/centers/${centerId}/users/?role=teacher`);
         // Handle both paginated response (results) and direct array response
         const teachersData = teachersResponse.data?.results || teachersResponse.data || [];
         setTeachers(Array.isArray(teachersData) ? teachersData : []);

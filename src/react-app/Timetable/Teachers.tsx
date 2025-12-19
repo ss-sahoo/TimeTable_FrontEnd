@@ -1,474 +1,209 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { fetchTeacherWiseAvailability, updateTeacherAvailability, cleanTimetableId } from "../AllApi";
 
 /* ================= TYPES ================= */
-
-interface Slot {
-  id: string;
-  time: string;
-}
-
-interface DaySlots {
-  day: string;
-  slots: Slot[];
-  color: string;
-}
-
-interface Teacher {
-  id: string;
-  name: string;
-  code: string;
-  subject: string;
-  department: string;
-}
-
-interface AvailabilityMap {
-  [teacherId: string]: {
-    [day: string]: {
-      [slotId: string]: boolean;
-    };
-  };
-}
-
-interface TeacherAvailabilityRecord {
-  teacher_code: string;
-  day_slot_id: string;
+interface SlotData {
+  slot_id: string;
+  slot_code: string;
+  start_time: string;
+  end_time: string;
+  is_free_class: boolean;
   is_available: boolean;
 }
 
-/* ================= MOCK TEACHERS ================= */
+interface DayData {
+  day: string;
+  day_number: number;
+  date: string;
+  slots: SlotData[];
+}
 
-const TEACHERS_DATA: Teacher[] = [
-  { id: "T001", name: "Dr. Sharma", code: "TCH-CSE-001", subject: "Mathematics", department: "CSE" },
-  { id: "T002", name: "Prof. Kumar", code: "TCH-CSE-002", subject: "Data Structures", department: "CSE" },
-  { id: "T003", name: "Dr. Singh", code: "TCH-CSE-003", subject: "Algorithms", department: "CSE" },
-  { id: "T004", name: "Prof. Gupta", code: "TCH-ECE-001", subject: "Digital Electronics", department: "ECE" },
-  { id: "T005", name: "Dr. Reddy", code: "TCH-ECE-002", subject: "Signals & Systems", department: "ECE" },
-  { id: "T006", name: "Prof. Joshi", code: "TCH-CSE-004", subject: "Database Management", department: "CSE" },
-];
+interface TeacherData {
+  teacher_code: string;
+  teacher_name: string;
+  teacher_id: string;
+  days: DayData[];
+}
+
+interface ApiResponse {
+  timetable_id: string;
+  timetable: string;
+  center: string;
+  from_date: string;
+  to_date: string;
+  teachers: TeacherData[];
+}
+
+interface UniqueDayInfo {
+  day: string;
+  date: string;
+  day_number: number;
+}
 
 /* ================= DAY COLORS ================= */
-const DAY_COLORS = [
-  "#3B82F6", // Monday - Blue
-  "#10B981", // Tuesday - Green
-  "#8B5CF6", // Wednesday - Purple
-  "#F59E0B", // Thursday - Amber
-  "#EF4444", // Friday - Red
-  "#EC4899", // Saturday - Pink
-  "#06B6D4", // Sunday - Cyan
-];
-
-/* ================= API CONFIGURATION ================= */
-const API_BASE_URL = "https://exams.dashoapp.com/api/timetable";
-
-// Get access token from localStorage or use provided one
-const getAuthToken = () => {
-  return localStorage.getItem("access_token") || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY2MTI1ODQ3LCJpYXQiOjE3NjYwNDU1NTgsImp0aSI6ImJiM2RiYmM0NGU4ZTRlNjVhZTg3OWEwYzJlNDIwNzg3IiwidXNlcl9pZCI6Mjl9.KmEgpihnyKOhcnpf2iewZl_EZarQPZ2ZIu4r4xBno9w";
+const DAY_COLORS: { [key: string]: string } = {
+  "Monday": "#3B82F6",
+  "Tuesday": "#10B981",
+  "Wednesday": "#8B5CF6",
+  "Thursday": "#F59E0B",
+  "Friday": "#EF4444",
+  "Saturday": "#EC4899",
+  "Sunday": "#06B6D4",
 };
 
 /* ================= MAIN COMPONENT ================= */
-
 const TeachersAvailability: React.FC = () => {
-  const [days, setDays] = useState<DaySlots[]>([]);
-  const [availability, setAvailability] = useState<AvailabilityMap>({});
-  const [selectedTeacher, setSelectedTeacher] = useState<string | null>(null);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [timetableId, setTimetableId] = useState<string | null>(null);
-  const [daySlotMap, setDaySlotMap] = useState<{[day: string]: {[slotId: string]: string}}>({});
+  const [apiData, setApiData] = useState<ApiResponse | null>(null);
+  const [teachers, setTeachers] = useState<TeacherData[]>([]);
+  const [updatingSlot, setUpdatingSlot] = useState<string | null>(null);
 
-  /* Get timetable ID from localStorage and clean it */
+  /* Get timetable ID from localStorage */
   useEffect(() => {
-    const loadTimetableId = () => {
-      try {
-        const id = localStorage.getItem("timetable_id");
-        if (id) {
-          // Clean the ID - remove any quotes or extra characters
-          const cleanId = id.replace(/"/g, '').trim();
-          console.log("Original timetable ID:", id);
-          console.log("Cleaned timetable ID:", cleanId);
-          setTimetableId(cleanId);
-        } else {
-          setError("No timetable ID found in localStorage. Please create a timetable first.");
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error("Failed to load timetable ID:", error);
-        setError("Failed to load timetable ID from localStorage.");
-        setLoading(false);
-      }
-    };
-
-    loadTimetableId();
-  }, []);
-
-  /* Load slots from localStorage and create day_slot_id mapping */
-  useEffect(() => {
-    const loadSlots = () => {
-      try {
-        const saved = localStorage.getItem("timetableSlots");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed?.days) {
-            // Map colors to days and ensure unique days
-            const uniqueDays = new Map<string, DaySlots>();
-            parsed.days.forEach((day: any, index: number) => {
-              if (!uniqueDays.has(day.day)) {
-                uniqueDays.set(day.day, {
-                  ...day,
-                  color: DAY_COLORS[index % DAY_COLORS.length]
-                });
-              }
-            });
-            
-            const daysWithColors = Array.from(uniqueDays.values());
-            setDays(daysWithColors);
-            
-            // Create mapping of day+slot to day_slot_id
-            const newDaySlotMap: {[day: string]: {[slotId: string]: string}} = {};
-            daysWithColors.forEach((day: DaySlots) => {
-              newDaySlotMap[day.day] = {};
-              day.slots.forEach((slot: Slot) => {
-                // Create day_slot_id - adjust format as needed
-                newDaySlotMap[day.day][slot.id] = `${day.day}_${slot.time.replace(/:/g, '')}`;
-              });
-            });
-            setDaySlotMap(newDaySlotMap);
-            console.log("Day slot map created:", newDaySlotMap);
-          }
-        } else {
-          setError("No time slots found. Please create time slots first.");
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error("Failed to load slots:", error);
-        setError("Failed to load time slots.");
-        setLoading(false);
-      }
-    };
-
-    loadSlots();
-    window.addEventListener('storage', loadSlots);
-    return () => window.removeEventListener('storage', loadSlots);
-  }, []);
-
-  /* Fetch availability from API */
-  const fetchAvailability = useCallback(async () => {
-    if (!timetableId) {
+    const rawId = localStorage.getItem("timetable_id");
+    if (rawId) {
+      const cleanId = cleanTimetableId(rawId);
+      console.log("Timetable ID loaded:", cleanId);
+      setTimetableId(cleanId);
+    } else {
+      setError("No timetable ID found. Please create a timetable first.");
       setLoading(false);
-      return;
     }
+  }, []);
+
+  /* Fetch teacher availability when timetableId is available */
+  const loadAvailability = useCallback(async () => {
+    if (!timetableId) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      console.log(`Fetching availability for timetable ID: ${timetableId}`);
-      
-      const authToken = getAuthToken();
-      const response = await fetch(
-        `${API_BASE_URL}/timetables/${timetableId}/teacher-availability/`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-          },
-        }
-      );
+      console.log("Fetching teacher availability for:", timetableId);
+      const data: ApiResponse = await fetchTeacherWiseAvailability(timetableId);
+      console.log("API Response:", data);
 
-      console.log(`API Response Status: ${response.status}`);
-      
-      if (response.status === 404) {
-        console.log("No existing availability found, initializing...");
-        initializeDefaultAvailability();
-        return;
-      }
-      
-      if (response.status === 401) {
-        throw new Error("Authentication failed. Please check your access token.");
-      }
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`API Error Response: ${errorText}`);
-        throw new Error(`Failed to fetch availability: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("API Response Data:", data);
-      
-      // Parse the response based on expected format
-      if (data && Array.isArray(data)) {
-        // Transform array of {teacher_code, day_slot_id, is_available} to AvailabilityMap
-        const transformedAvailability: AvailabilityMap = {};
-        
-        data.forEach((record: TeacherAvailabilityRecord) => {
-          // Find which day and slot this day_slot_id corresponds to
-          let foundDay = '';
-          let foundSlotId = '';
-          
-          // Search through daySlotMap to find matching day_slot_id
-          Object.keys(daySlotMap).forEach(day => {
-            Object.keys(daySlotMap[day]).forEach(slotId => {
-              if (daySlotMap[day][slotId] === record.day_slot_id) {
-                foundDay = day;
-                foundSlotId = slotId;
-              }
-            });
-          });
-          
-          if (foundDay && foundSlotId) {
-            // Find teacher by code
-            const teacher = TEACHERS_DATA.find(t => t.code === record.teacher_code);
-            if (teacher) {
-              if (!transformedAvailability[teacher.id]) {
-                transformedAvailability[teacher.id] = {};
-              }
-              if (!transformedAvailability[teacher.id][foundDay]) {
-                transformedAvailability[teacher.id][foundDay] = {};
-              }
-              transformedAvailability[teacher.id][foundDay][foundSlotId] = record.is_available;
-            }
-          }
-        });
-        
-        console.log("Transformed Availability:", transformedAvailability);
-        setAvailability(transformedAvailability);
+      if (data && data.teachers && Array.isArray(data.teachers)) {
+        setApiData(data);
+        setTeachers(data.teachers);
+        console.log("Teachers loaded:", data.teachers.length);
       } else {
-        console.log("Unexpected API response format, initializing default availability");
-        initializeDefaultAvailability();
+        console.log("No teachers in response:", data);
+        setTeachers([]);
       }
-      
-    } catch (error) {
-      console.error("Failed to fetch availability:", error);
-      setError(error instanceof Error ? error.message : "Failed to load teacher availability from server. Using default availability.");
-      
-      // Initialize with default availability
-      initializeDefaultAvailability();
+    } catch (err: any) {
+      console.error("Failed to fetch availability:", err);
+      setError(err.message || "Failed to load teacher availability");
     } finally {
       setLoading(false);
     }
-  }, [timetableId, daySlotMap]);
+  }, [timetableId]);
 
-  /* Initialize default availability (all slots available) */
-  const initializeDefaultAvailability = () => {
-    const defaultAvailability: AvailabilityMap = {};
-    
-    TEACHERS_DATA.forEach(teacher => {
-      defaultAvailability[teacher.id] = {};
-      days.forEach(day => {
-        defaultAvailability[teacher.id][day.day] = {};
-        day.slots.forEach(slot => {
-          defaultAvailability[teacher.id][day.day][slot.id] = true; // Default to available
-        });
-      });
-    });
-    
-    console.log("Initialized default availability:", defaultAvailability);
-    setAvailability(defaultAvailability);
-  };
-
-  /* Load availability on component mount and when timetableId changes */
+  /* Load availability when timetableId changes */
   useEffect(() => {
-    if (timetableId && days.length > 0) {
-      console.log("Timetable ID and days available, fetching availability...");
-      fetchAvailability();
-    } else if (days.length === 0) {
-      setLoading(false);
+    if (timetableId) {
+      loadAvailability();
     }
-  }, [timetableId, days.length, fetchAvailability]);
+  }, [timetableId, loadAvailability]);
 
-  /* Toggle availability for a single slot */
-  const toggleAvailability = async (teacherId: string, day: string, slotId: string) => {
-    const teacher = TEACHERS_DATA.find(t => t.id === teacherId);
-    if (!teacher || !timetableId) return;
-
-    const newAvailableStatus = !(availability[teacherId]?.[day]?.[slotId] ?? true);
-    const daySlotId = daySlotMap[day]?.[slotId];
-    
-    if (!daySlotId) {
-      console.error(`No day_slot_id found for ${day} - ${slotId}`);
-      return;
-    }
-
-    // Update local state immediately for responsive UI
-    const newAvailability = {
-      ...availability,
-      [teacherId]: {
-        ...(availability[teacherId] || {}),
-        [day]: {
-          ...(availability[teacherId]?.[day] || {}),
-          [slotId]: newAvailableStatus,
-        },
-      },
-    };
-    
-    setAvailability(newAvailability);
-
-    // Send API request
-    try {
-      const authToken = getAuthToken();
-      const payload = {
-        teacher_code: teacher.code,
-        day_slot_id: daySlotId,
-        is_available: newAvailableStatus
-      };
-
-      console.log("Sending availability update:", payload);
-      
-      const response = await fetch(
-        `${API_BASE_URL}/timetables/${timetableId}/teacher-availability/`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Update API Error: ${errorText}`);
-        // Revert the change if API call fails
-        setAvailability(availability); // Revert to previous state
-        setError("Failed to save change. Please try again.");
-      } else {
-        const result = await response.json();
-        console.log("Update successful:", result);
-      }
-    } catch (error) {
-      console.error("Failed to update availability:", error);
-      // Revert the change if API call fails
-      setAvailability(availability); // Revert to previous state
-      setError("Network error. Please check your connection.");
-    }
-  };
-
-  /* Toggle all slots for a teacher in a day */
-  const toggleDayAvailability = async (teacherId: string, day: string, makeAvailable: boolean) => {
-    const teacher = TEACHERS_DATA.find(t => t.id === teacherId);
-    const dayData = days.find(d => d.day === day);
-    if (!teacher || !dayData || !timetableId) return;
-
-    // Update local state
-    const newAvailability = {
-      ...availability,
-      [teacherId]: {
-        ...(availability[teacherId] || {}),
-        [day]: {},
-      },
-    };
-
-    // Set all slots for this day to the same availability
-    dayData.slots.forEach(slot => {
-      newAvailability[teacherId][day][slot.id] = makeAvailable;
-    });
-
-    setAvailability(newAvailability);
-
-    // Send API requests for all slots
-    const updatePromises = dayData.slots.map(async (slot) => {
-      const daySlotId = daySlotMap[day]?.[slot.id];
-      if (!daySlotId) return;
-
-      const authToken = getAuthToken();
-      const payload = {
-        teacher_code: teacher.code,
-        day_slot_id: daySlotId,
-        is_available: makeAvailable
-      };
-
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/timetables/${timetableId}/teacher-availability/`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${authToken}`,
-            },
-            body: JSON.stringify(payload),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to update slot ${slot.id}`);
-        }
-      } catch (error) {
-        console.error(`Error updating slot ${slot.id}:`, error);
-        throw error;
-      }
-    });
-
-    // Handle all promises
-    try {
-      await Promise.all(updatePromises);
-      console.log(`All slots updated for ${teacher.name} on ${day}`);
-    } catch (error) {
-      console.error("Failed to update some slots:", error);
-      setError("Failed to update some slots. Please try again.");
-      // Revert to previous state
-      setAvailability(availability);
-    }
-  };
-
-  /* Check if a slot is available (default to true) */
-  const isAvailable = (teacherId: string, day: string, slotId: string) => {
-    return availability?.[teacherId]?.[day]?.[slotId] ?? true;
-  };
-
-  /* Calculate availability statistics */
-  const getTeacherStats = (teacherId: string) => {
-    let availableSlots = 0;
-    let totalSlots = 0;
-
-    days.forEach(day => {
-      day.slots.forEach(slot => {
-        totalSlots++;
-        if (isAvailable(teacherId, day.day, slot.id)) {
-          availableSlots++;
+  /* Get unique days with dates from all teachers */
+  const getUniqueDays = (): UniqueDayInfo[] => {
+    const daysMap = new Map<string, UniqueDayInfo>();
+    teachers.forEach(teacher => {
+      if (!teacher.days) return;
+      teacher.days.forEach(dayData => {
+        const key = `${dayData.date}-${dayData.day}`;
+        if (!daysMap.has(key)) {
+          daysMap.set(key, {
+            day: dayData.day,
+            date: dayData.date,
+            day_number: dayData.day_number
+          });
         }
       });
     });
-
-    return { availableSlots, totalSlots, percentage: totalSlots > 0 ? Math.round((availableSlots / totalSlots) * 100) : 0 };
+    // Sort by day_number (chronological order)
+    return Array.from(daysMap.values()).sort((a, b) => a.day_number - b.day_number);
   };
 
-  const getOverallStats = () => {
-    let totalAvailable = 0;
-    let totalSlots = 0;
-    
-    TEACHERS_DATA.forEach(teacher => {
-      const stats = getTeacherStats(teacher.id);
-      totalAvailable += stats.availableSlots;
-      totalSlots += stats.totalSlots;
-    });
-
-    return {
-      totalAvailable,
-      totalSlots,
-      percentage: totalSlots > 0 ? Math.round((totalAvailable / totalSlots) * 100) : 0
-    };
+  /* Get slots for a teacher on a specific day/date */
+  const getTeacherSlotsForDay = (teacher: TeacherData, date: string): SlotData[] => {
+    if (!teacher.days) return [];
+    const dayData = teacher.days.find(d => d.date === date);
+    if (!dayData || !dayData.slots) return [];
+    return dayData.slots.sort((a, b) => a.start_time.localeCompare(b.start_time));
   };
 
-  const overallStats = getOverallStats();
-
-  const handleSaveAndNext = () => {
-    alert("Availability is saved automatically when you click slots. Next page would open here.");
+  /* Format time for display */
+  const formatTime = (time: string): string => {
+    const [hours, minutes] = time.split(':');
+    return `${hours}:${minutes}`;
   };
 
-  const handleRetry = () => {
-    if (timetableId) {
-      fetchAvailability();
+  /* Toggle availability for a slot */
+  const handleToggleAvailability = async (
+    teacherCode: string,
+    slotId: string,
+    currentStatus: boolean
+  ) => {
+    if (!timetableId || updatingSlot) return;
+
+    const newStatus = !currentStatus;
+    const slotKey = `${teacherCode}-${slotId}`;
+    setUpdatingSlot(slotKey);
+
+    // Optimistic update
+    setTeachers(prev =>
+      prev.map(teacher =>
+        teacher.teacher_code === teacherCode
+          ? {
+              ...teacher,
+              days: teacher.days.map(day => ({
+                ...day,
+                slots: day.slots.map(slot =>
+                  slot.slot_id === slotId
+                    ? { ...slot, is_available: newStatus }
+                    : slot
+                )
+              }))
+            }
+          : teacher
+      )
+    );
+
+    try {
+      console.log("Updating availability:", { timetableId, slotId, teacherCode, newStatus });
+      await updateTeacherAvailability(timetableId, slotId, teacherCode, newStatus);
+      console.log("Update successful");
+    } catch (err: any) {
+      console.error("Failed to update:", err);
+      // Revert on error
+      setTeachers(prev =>
+        prev.map(teacher =>
+          teacher.teacher_code === teacherCode
+            ? {
+                ...teacher,
+                days: teacher.days.map(day => ({
+                  ...day,
+                  slots: day.slots.map(slot =>
+                    slot.slot_id === slotId
+                      ? { ...slot, is_available: currentStatus }
+                      : slot
+                  )
+                }))
+              }
+            : teacher
+        )
+      );
+      setError("Failed to update. Please try again.");
+    } finally {
+      setUpdatingSlot(null);
     }
   };
 
-  const clearError = () => {
-    setError(null);
-  };
+  const uniqueDays = getUniqueDays();
 
   if (loading) {
     return (
@@ -487,300 +222,176 @@ const TeachersAvailability: React.FC = () => {
       <div style={styles.header}>
         <div>
           <h3 style={styles.title}>Teachers Availability</h3>
-          <p style={styles.subtitle}>Set availability for each teacher across all time slots</p>
-          {timetableId && (
-            <div style={styles.timetableInfo}>
-              <span style={styles.timetableBadge}>Timetable ID: {timetableId}</span>
+          <p style={styles.subtitle}>Click on slots to toggle availability</p>
+          {apiData && (
+            <div style={styles.infoRow}>
+              <span style={styles.infoBadge}>{apiData.center}</span>
+              <span style={styles.infoBadge}>{apiData.from_date} to {apiData.to_date}</span>
+              <span style={styles.infoBadge}>{teachers.length} Teachers</span>
             </div>
           )}
         </div>
-        
-        {/* Action Buttons */}
-        <div style={styles.headerActions}>
-          <div style={styles.stats}>
-            <div style={styles.statItem}>
-              <span style={styles.statNumber}>{overallStats.percentage}%</span>
-              <span style={styles.statLabel}>Overall Available</span>
-            </div>
-            <div style={styles.statItem}>
-              <span style={styles.statNumber}>{overallStats.totalAvailable}/{overallStats.totalSlots}</span>
-              <span style={styles.statLabel}>Total Slots</span>
-            </div>
-          </div>
-          
-          <div style={styles.actionButtons}>
-            <button
-              style={{
-                ...styles.primaryButton,
-                // Fix: Use separate border properties
-                borderWidth: '0px',
-                borderStyle: 'none',
-              }}
-              onClick={handleSaveAndNext}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M9 18l6-6-6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Next
-            </button>
-          </div>
-        </div>
+       
       </div>
 
       {/* Error Display */}
       {error && (
         <div style={styles.errorAlert}>
-          <span style={styles.errorAlertText}>{error}</span>
-          <button style={styles.errorAlertButton} onClick={clearError}>
-            ×
-          </button>
+          <span>{error}</span>
+          <button style={styles.errorCloseBtn} onClick={() => setError(null)}>×</button>
         </div>
       )}
 
-      {/* Help Section */}
-      <div style={styles.helpSection}>
-        <p style={styles.helpTitle}>💡 How to use:</p>
-        <ul style={styles.helpList}>
-          <li>Click on any <strong>AVL/UNVL tab</strong> to toggle status (saves automatically)</li>
-          <li>Use <strong>quick action buttons</strong> for each day to set all slots at once</li>
-          <li>Green indicates available time slot (AVL)</li>
-          <li>Red indicates unavailable time slot (UNVL)</li>
-          <li>Changes are saved automatically to the server</li>
-          {timetableId && (
-            <li>Connected to timetable: <strong>{timetableId}</strong></li>
-          )}
-        </ul>
-      </div>
-
-      {days.length === 0 ? (
+      {/* No Data State */}
+      {teachers.length === 0 && !error ? (
         <div style={styles.emptyState}>
           <div style={styles.emptyIcon}>📅</div>
-          <p style={styles.emptyText}>No time slots found</p>
-          <p style={styles.emptySubtext}>Please create time slots in the Slots tab first</p>
+          <p style={styles.emptyText}>No teacher availability data found</p>
+          <p style={styles.emptySubtext}>Please ensure teachers and slots are configured</p>
         </div>
       ) : (
+        /* Data Table */
         <div style={styles.tableContainer}>
-          {/* Table Wrapper */}
           <div style={styles.tableWrapper}>
-            <div style={styles.table}>
-              {/* Header Row - Days */}
-              <div style={styles.tableHeader}>
-                <div style={styles.teacherHeaderColumn}>
-                  <div style={styles.teacherHeaderContent}>
-                    <span style={styles.headerTitle}>Teachers</span>
-                    <span style={styles.headerSubtitle}>({TEACHERS_DATA.length} teachers)</span>
+            {/* Header Row */}
+            <div style={styles.tableHeader}>
+              <div style={styles.teacherColumn}>
+                <span style={styles.columnTitle}>Teacher ({teachers.length})</span>
+              </div>
+              {uniqueDays.map(dayInfo => (
+                <div
+                  key={`${dayInfo.date}-${dayInfo.day}`}
+                  style={{
+                    ...styles.dayColumn,
+                    backgroundColor: `${DAY_COLORS[dayInfo.day] || '#6B7280'}15`
+                  }}
+                >
+                  <div style={{
+                    ...styles.dayDot,
+                    backgroundColor: DAY_COLORS[dayInfo.day] || '#6B7280'
+                  }} />
+                  <div style={styles.dayInfo}>
+                    <span style={styles.dayName}>{dayInfo.day}</span>
+                    <span style={styles.dayDate}>{dayInfo.date}</span>
                   </div>
                 </div>
-                
-                {days.map((day, index) => (
-                  <div 
-                    key={`${day.day}-${index}`} // Fix: Use unique key
-                    style={{
-                      ...styles.dayHeaderColumn,
-                      backgroundColor: `${day.color}15`
-                    }}
-                  >
-                    <div style={styles.dayHeaderContent}>
-                      <div style={styles.dayHeaderTop}>
-                        <div style={{...styles.dayColorDot, backgroundColor: day.color}} />
-                        <span style={styles.dayName}>{day.day.substring(0, 3)}</span>
-                      </div>
-                      <div style={styles.slotCount}>{day.slots.length} slots</div>
-                    </div>
+              ))}
+            </div>
+
+            {/* Teacher Rows */}
+            {teachers.map(teacher => (
+              <div key={teacher.teacher_code} style={styles.teacherRow}>
+                {/* Teacher Info */}
+                <div style={styles.teacherInfoCell}>
+                  <div style={styles.teacherAvatar}>
+                    {teacher.teacher_name.charAt(0).toUpperCase()}
                   </div>
-                ))}
-              </div>
+                  <div style={styles.teacherDetails}>
+                    <div style={styles.teacherName}>{teacher.teacher_name}</div>
+                    <div style={styles.teacherCode}>{teacher.teacher_code}</div>
+                    <div style={styles.slotCount}>{teacher.days.length} days</div>
+                  </div>
+                </div>
 
-              {/* Teacher Rows */}
-              {TEACHERS_DATA.map(teacher => {
-                const teacherStats = getTeacherStats(teacher.id);
-                const isTeacherSelected = selectedTeacher === teacher.id;
-
-                return (
-                  <div 
-                    key={teacher.id} 
-                    style={{
-                      ...styles.teacherRow,
-                      backgroundColor: isTeacherSelected ? '#f0f9ff' : '#ffffff'
-                    }}
-                    onClick={() => setSelectedTeacher(teacher.id)}
-                  >
-                    {/* Teacher Info Column */}
-                    <div style={styles.teacherInfoColumn}>
-                      <div style={styles.teacherInfo}>
-                        <div style={styles.teacherAvatar}>
-                          {teacher.name.charAt(0)}
-                        </div>
-                        <div style={styles.teacherDetails}>
-                          <div style={styles.teacherName}>{teacher.name}</div>
-                          <div style={styles.teacherSubject}>{teacher.subject}</div>
-                          <div style={styles.teacherCodeDept}>
-                            <span style={styles.teacherCode}>{teacher.code}</span>
-                            <span style={styles.teacherDept}>{teacher.department}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div style={styles.teacherStats}>
-                        <div style={styles.statBadge}>
-                          <span style={styles.statBadgeValue}>{teacherStats.percentage}%</span>
-                          <span style={styles.statBadgeLabel}>available</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Availability Columns */}
-                    {days.map((day, dayIndex) => (
-                      <div 
-                        key={`${teacher.id}-${day.day}-${dayIndex}`} // Fix: Use unique key
-                        style={{
-                          ...styles.dayColumn,
-                          backgroundColor: isTeacherSelected ? '#f0f9ff' : '#ffffff'
-                        }}
-                      >
-                        {/* Quick Action Buttons */}
-                        <div style={styles.dayActions}>
-                          <div style={styles.quickActions}>
-                            <button
-                              style={{
-                                ...styles.quickActionBtn,
-                                // Fix: Use separate border properties
-                                borderWidth: '1px',
-                                borderStyle: 'solid',
-                                borderColor: '#93c5fd',
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleDayAvailability(teacher.id, day.day, true);
-                              }}
-                              title="Mark all available"
-                            >
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M20 6L9 17l-5-5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                              All
-                            </button>
-                            <button
-                              style={{
-                                ...styles.quickActionBtnUnavailable,
-                                // Fix: Use separate border properties
-                                borderWidth: '1px',
-                                borderStyle: 'solid',
-                                borderColor: '#fca5a5',
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleDayAvailability(teacher.id, day.day, false);
-                              }}
-                              title="Mark all unavailable"
-                            >
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M6 18L18 6M6 6l12 12" strokeWidth="2" strokeLinecap="round"/>
-                              </svg>
-                              None
-                            </button>
-                          </div>
-                        </div>
-                        
-                        {/* Slot IDs and Availability Tabs in One Line */}
-                        <div style={styles.slotsContainer}>
-                          {day.slots.map(slot => {
-                            const available = isAvailable(teacher.id, day.day, slot.id);
+                {/* Slots for each day */}
+                {uniqueDays.map(dayInfo => {
+                  const daySlots = getTeacherSlotsForDay(teacher, dayInfo.date);
+                  return (
+                    <div key={`${teacher.teacher_code}-${dayInfo.date}`} style={styles.slotsCell}>
+                      {daySlots.length > 0 ? (
+                        <div style={styles.slotsGrid}>
+                          {daySlots.map(slot => {
+                            const isUpdating = updatingSlot === `${teacher.teacher_code}-${slot.slot_id}`;
                             return (
-                              <div key={`${teacher.id}-${day.day}-${slot.id}`} style={styles.slotWrapper}>
-                                {/* Slot ID */}
-                                <div style={styles.slotId}>
-                                  {slot.id}
-                                </div>
-                                {/* Availability Tab */}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleAvailability(teacher.id, day.day, slot.id);
-                                  }}
-                                  style={{
-                                    ...styles.availabilityTab,
-                                    backgroundColor: available ? '#d1fae5' : '#fee2e2',
-                                    color: available ? '#065f46' : '#991b1b',
-                                    borderWidth: '1px',
-                                    borderStyle: 'solid',
-                                    borderColor: available ? '#a7f3d0' : '#fecaca',
-                                    borderRadius: "4px",
-                                  }}
-                                  title={`${teacher.name} - ${day.day} - ${slot.id}: ${slot.time}\nClick to ${available ? 'mark unavailable (false)' : 'mark available (true)'}`}
-                                >
-                                  {available ? 'AVL' : 'UNVL'}
-                                </button>
-                              </div>
+                              <button
+                                key={slot.slot_id}
+                                onClick={() => handleToggleAvailability(
+                                  teacher.teacher_code,
+                                  slot.slot_id,
+                                  slot.is_available
+                                )}
+                                disabled={isUpdating}
+                                style={{
+                                  ...styles.slotButton,
+                                  backgroundColor: slot.is_available ? '#d1fae5' : '#fee2e2',
+                                  color: slot.is_available ? '#065f46' : '#991b1b',
+                                  borderColor: slot.is_available ? '#a7f3d0' : '#fecaca',
+                                  opacity: isUpdating ? 0.5 : 1,
+                                  cursor: isUpdating ? 'wait' : 'pointer'
+                                }}
+                                title={`${formatTime(slot.start_time)} - ${formatTime(slot.end_time)}\nSlot: ${slot.slot_code}\nID: ${slot.slot_id}\nClick to ${slot.is_available ? 'mark unavailable' : 'mark available'}`}
+                              >
+                                <span style={styles.slotTime}>
+                                  {formatTime(slot.start_time)}-{formatTime(slot.end_time)}
+                                </span>
+                                <span style={styles.slotCode}>{slot.slot_code}</span>
+                                <span style={styles.slotStatus}>
+                                  {isUpdating ? '...' : (slot.is_available ? 'AVL' : 'UNVL')}
+                                </span>
+                              </button>
                             );
                           })}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Legend & Info */}
-          <div style={styles.footer}>
-            <div style={styles.legend}>
-              <div style={styles.legendItem}>
-                <div style={styles.legendTabAvailable}>
-                  <span style={styles.legendTabText}>AVL</span>
-                </div>
-                <span>Available Slot (true)</span>
+                      ) : (
+                        <span style={styles.noSlots}>-</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <div style={styles.legendItem}>
-                <div style={styles.legendTabUnavailable}>
-                  <span style={styles.legendTabText}>UNVL</span>
-                </div>
-                <span>Unavailable Slot (false)</span>
-              </div>
-              <div style={styles.legendHint}>
-                Click tabs to toggle • Changes saved automatically
-              </div>
-            </div>
-            
-            <div style={styles.footerActions}>
-              <button
-                style={{
-                  ...styles.footerPrimaryButton,
-                  // Fix: Use separate border properties
-                  borderWidth: '0px',
-                  borderStyle: 'none',
-                }}
-                onClick={handleSaveAndNext}
-              >
-                Proceed to Next
-              </button>
-            </div>
+            ))}
           </div>
         </div>
       )}
+
+      {/* Legend */}
+      <div style={styles.legend}>
+        <div style={styles.legendItem}>
+          <div style={{...styles.legendBox, backgroundColor: '#d1fae5', borderColor: '#a7f3d0', color: '#065f46'}}>AVL</div>
+          <span>Available</span>
+        </div>
+        <div style={styles.legendItem}>
+          <div style={{...styles.legendBox, backgroundColor: '#fee2e2', borderColor: '#fecaca', color: '#991b1b'}}>UNVL</div>
+          <span>Unavailable</span>
+        </div>
+        <span style={styles.legendHint}>Click on any slot to toggle availability</span>
+      </div>
     </div>
   );
 };
 
 /* ================= STYLES ================= */
-const styles: Record<string, React.CSSProperties> = {
+const styles: { [key: string]: React.CSSProperties } = {
   wrapper: {
-    background: "#ffffff",
-    padding: "24px",
-    borderRadius: "12px",
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: '#e2e8f0',
-    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)",
-    minHeight: "calc(100vh - 48px)",
+    padding: "20px",
+    backgroundColor: "#f8fafc",
+    minHeight: "400px",
+  },
+  loadingContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "60px",
+  },
+  spinner: {
+    width: "40px",
+    height: "40px",
+    border: "4px solid #e2e8f0",
+    borderTop: "4px solid #3b82f6",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+  },
+  loadingText: {
+    marginTop: "16px",
+    color: "#64748b",
+    fontSize: "14px",
   },
   header: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: "24px",
-    flexWrap: "wrap",
-    gap: "16px",
+    marginBottom: "20px",
   },
   title: {
     fontSize: "20px",
@@ -791,119 +402,56 @@ const styles: Record<string, React.CSSProperties> = {
   subtitle: {
     fontSize: "14px",
     color: "#64748b",
-    margin: "0",
+    margin: "0 0 12px 0",
   },
-  timetableInfo: {
-    marginTop: "8px",
-  },
-  timetableBadge: {
-    fontSize: "12px",
-    color: "#3b82f6",
-    background: "#dbeafe",
-    padding: "4px 8px",
-    borderRadius: "4px",
-    fontWeight: "500",
-  },
-  headerActions: {
-    display: "flex",
-    alignItems: "center",
-    gap: "20px",
-    flexWrap: "wrap",
-  },
-  stats: {
-    display: "flex",
-    gap: "12px",
-  },
-  statItem: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    padding: "8px 12px",
-    background: "#f1f5f9",
-    borderRadius: "8px",
-    minWidth: "60px",
-  },
-  statNumber: {
-    fontSize: "20px",
-    fontWeight: "600",
-    color: "#1e293b",
-  },
-  statLabel: {
-    fontSize: "12px",
-    color: "#64748b",
-    marginTop: "2px",
-  },
-  actionButtons: {
+  infoRow: {
     display: "flex",
     gap: "8px",
-    flexWrap: "wrap",
+    flexWrap: "wrap" as const,
   },
-  primaryButton: {
-    padding: "10px 20px",
-    background: "#10b981",
-    color: "#ffffff",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "500",
-    fontSize: "14px",
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    transition: "all 0.2s",
-  },
-  footerPrimaryButton: {
-    padding: "10px 20px",
-    background: "#8b5cf6",
-    color: "#ffffff",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "500",
-    fontSize: "14px",
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    transition: "all 0.2s",
-  },
-  retryButton: {
-    padding: "10px 20px",
-    background: "#3b82f6",
-    color: "#ffffff",
-    borderWidth: '0px',
-    borderStyle: 'none',
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "500",
-    fontSize: "14px",
-    marginTop: "12px",
-  },
-  spinningIcon: {
-    animation: "spin 1s linear infinite",
-  },
-  helpSection: {
-    marginBottom: "24px",
-    padding: "16px",
-    background: "#f0f9ff",
-    borderRadius: "8px",
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: '#bae6fd',
-  },
-  helpTitle: {
-    fontWeight: "600",
+  infoBadge: {
+    padding: "4px 10px",
+    backgroundColor: "#e0f2fe",
     color: "#0369a1",
-    margin: "0 0 8px 0",
+    borderRadius: "4px",
+    fontSize: "12px",
+    fontWeight: "500",
   },
-  helpList: {
-    margin: "0",
-    paddingLeft: "20px",
-    color: "#0c4a6e",
+  refreshBtn: {
+    padding: "8px 16px",
+    backgroundColor: "#ffffff",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    cursor: "pointer",
     fontSize: "14px",
-    lineHeight: "1.6",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  },
+  errorAlert: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "12px 16px",
+    backgroundColor: "#fee2e2",
+    border: "1px solid #fecaca",
+    borderRadius: "6px",
+    marginBottom: "16px",
+    color: "#991b1b",
+  },
+  errorCloseBtn: {
+    background: "none",
+    border: "none",
+    fontSize: "20px",
+    cursor: "pointer",
+    color: "#991b1b",
   },
   emptyState: {
-    padding: "48px 24px",
-    textAlign: "center",
-    color: "#64748b",
+    textAlign: "center" as const,
+    padding: "60px 20px",
+    backgroundColor: "#ffffff",
+    borderRadius: "8px",
+    border: "2px dashed #e2e8f0",
   },
   emptyIcon: {
     fontSize: "48px",
@@ -911,424 +459,170 @@ const styles: Record<string, React.CSSProperties> = {
   },
   emptyText: {
     fontSize: "16px",
-    fontWeight: "500",
-    color: "#1e293b",
+    color: "#475569",
     margin: "0 0 8px 0",
   },
   emptySubtext: {
     fontSize: "14px",
+    color: "#94a3b8",
     margin: "0",
   },
-  loadingContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "60px 24px",
-    textAlign: "center",
-  },
-  spinner: {
-    width: "40px",
-    height: "40px",
-    borderWidth: '4px',
-    borderStyle: 'solid',
-    borderColor: '#e2e8f0',
-    borderTopColor: "#3b82f6",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-    marginBottom: "16px",
-  },
-  loadingText: {
-    fontSize: "16px",
-    color: "#64748b",
-  },
-  errorContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "60px 24px",
-    textAlign: "center",
-  },
-  errorIcon: {
-    fontSize: "48px",
-    marginBottom: "16px",
-  },
-  errorText: {
-    fontSize: "16px",
-    color: "#dc2626",
-    margin: "0 0 16px 0",
-    maxWidth: "500px",
-  },
-  errorAlert: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "12px 16px",
-    background: "#fef2f2",
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: '#fecaca',
-    borderRadius: "8px",
-    marginBottom: "24px",
-  },
-  errorAlertText: {
-    fontSize: "14px",
-    color: "#dc2626",
-    flex: "1",
-  },
-  errorAlertButton: {
-    background: "none",
-    borderWidth: '0px',
-    borderStyle: 'none',
-    color: "#dc2626",
-    fontSize: "18px",
-    cursor: "pointer",
-    padding: "0 8px",
-  },
   tableContainer: {
-    overflowX: "auto",
+    backgroundColor: "#ffffff",
     borderRadius: "8px",
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: '#e2e8f0',
+    border: "1px solid #e2e8f0",
+    overflow: "hidden",
   },
   tableWrapper: {
-    minWidth: "fit-content",
-  },
-  table: {
-    minWidth: "100%",
-    borderCollapse: "collapse",
+    overflowX: "auto" as const,
   },
   tableHeader: {
     display: "flex",
-    background: "#f8fafc",
-    borderBottomWidth: '2px',
-    borderBottomStyle: 'solid',
-    borderBottomColor: '#e2e8f0',
+    borderBottom: "2px solid #e2e8f0",
+    backgroundColor: "#f8fafc",
+    minWidth: "fit-content",
   },
-  teacherHeaderColumn: {
-    width: "280px",
-    minWidth: "280px",
-    padding: "16px",
-    borderRightWidth: '1px',
-    borderRightStyle: 'solid',
-    borderRightColor: '#e2e8f0',
+  teacherColumn: {
+    minWidth: "200px",
+    padding: "12px 16px",
+    fontWeight: "600",
+    color: "#475569",
+    borderRight: "1px solid #e2e8f0",
   },
-  teacherHeaderContent: {
+  columnTitle: {
+    fontSize: "14px",
+  },
+  dayColumn: {
+    minWidth: "150px",
+    padding: "12px 16px",
     display: "flex",
-    flexDirection: "column",
-    gap: "2px",
+    alignItems: "center",
+    gap: "8px",
+    borderRight: "1px solid #e2e8f0",
   },
-  headerTitle: {
+  dayDot: {
+    width: "8px",
+    height: "8px",
+    borderRadius: "50%",
+  },
+  dayInfo: {
+    display: "flex",
+    flexDirection: "column" as const,
+  },
+  dayName: {
     fontSize: "14px",
     fontWeight: "600",
     color: "#475569",
   },
-  headerSubtitle: {
-    fontSize: "12px",
-    color: "#94a3b8",
-  },
-  dayHeaderColumn: {
-    flex: "1",
-    minWidth: "180px",
-    padding: "12px 8px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRightWidth: '1px',
-    borderRightStyle: 'solid',
-    borderRightColor: '#e2e8f0',
-  },
-  dayHeaderContent: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "6px",
-  },
-  dayHeaderTop: {
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-  },
-  dayColorDot: {
-    width: "10px",
-    height: "10px",
-    borderRadius: "50%",
-  },
-  dayName: {
-    fontSize: "13px",
-    fontWeight: "600",
-    color: "#1e293b",
-  },
-  slotCount: {
+  dayDate: {
     fontSize: "11px",
-    color: "#64748b",
-    background: "rgba(255,255,255,0.9)",
-    padding: "2px 6px",
-    borderRadius: "10px",
+    color: "#94a3b8",
   },
   teacherRow: {
     display: "flex",
-    borderBottomWidth: '1px',
-    borderBottomStyle: 'solid',
-    borderBottomColor: '#f1f5f9',
-    transition: "background-color 0.2s",
-    cursor: "pointer",
-    minHeight: "100px",
+    borderBottom: "1px solid #e2e8f0",
+    minWidth: "fit-content",
   },
-  teacherInfoColumn: {
-    width: "280px",
-    minWidth: "280px",
+  teacherInfoCell: {
+    minWidth: "200px",
     padding: "12px 16px",
-    borderRightWidth: '1px',
-    borderRightStyle: 'solid',
-    borderRightColor: '#e2e8f0',
-    background: "#f8fafc",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-  },
-  teacherInfo: {
     display: "flex",
     alignItems: "center",
     gap: "12px",
-    marginBottom: "8px",
+    borderRight: "1px solid #e2e8f0",
+    backgroundColor: "#ffffff",
   },
   teacherAvatar: {
-    width: "36px",
-    height: "36px",
-    borderRadius: "8px",
-    background: "#3b82f6",
+    width: "40px",
+    height: "40px",
+    borderRadius: "50%",
+    backgroundColor: "#3b82f6",
     color: "#ffffff",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     fontWeight: "600",
-    fontSize: "14px",
+    fontSize: "16px",
   },
   teacherDetails: {
-    flex: "1",
+    flex: 1,
   },
   teacherName: {
-    fontSize: "13px",
-    fontWeight: "600",
-    color: "#1e293b",
-    marginBottom: "2px",
-  },
-  teacherSubject: {
-    fontSize: "11px",
-    color: "#475569",
-    marginBottom: "4px",
-  },
-  teacherCodeDept: {
-    display: "flex",
-    gap: "6px",
-    alignItems: "center",
-  },
-  teacherCode: {
-    fontSize: "10px",
-    color: "#3b82f6",
-    background: "#dbeafe",
-    padding: "1px 4px",
-    borderRadius: "3px",
-    fontWeight: "500",
-  },
-  teacherDept: {
-    fontSize: "10px",
-    color: "#64748b",
-    background: "#f1f5f9",
-    padding: "1px 4px",
-    borderRadius: "3px",
-  },
-  teacherStats: {
-    display: "flex",
-    justifyContent: "center",
-  },
-  statBadge: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    background: "#ffffff",
-    padding: "4px 8px",
-    borderRadius: "6px",
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: '#e2e8f0',
-    width: "100%",
-  },
-  statBadgeValue: {
     fontSize: "14px",
     fontWeight: "600",
     color: "#1e293b",
   },
-  statBadgeLabel: {
-    fontSize: "9px",
+  teacherCode: {
+    fontSize: "12px",
     color: "#64748b",
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
   },
-  dayColumn: {
-    flex: "1",
-    minWidth: "180px",
-    padding: "8px 4px",
-    borderRightWidth: '1px',
-    borderRightStyle: 'solid',
-    borderRightColor: '#e2e8f0',
+  slotCount: {
+    fontSize: "11px",
+    color: "#94a3b8",
+  },
+  slotsCell: {
+    minWidth: "150px",
+    padding: "8px",
+    borderRight: "1px solid #e2e8f0",
+    backgroundColor: "#ffffff",
+  },
+  slotsGrid: {
     display: "flex",
-    flexDirection: "column",
+    flexDirection: "column" as const,
     gap: "4px",
   },
-  dayActions: {
-    display: "flex",
-    justifyContent: "center",
-    marginBottom: "2px",
-  },
-  quickActions: {
-    display: "flex",
-    gap: "4px",
-  },
-  quickActionBtn: {
-    padding: "2px 6px",
-    fontSize: "9px",
-    background: "#dbeafe",
-    color: "#1d4ed8",
+  slotButton: {
+    padding: "6px 8px",
     borderRadius: "4px",
-    cursor: "pointer",
-    fontWeight: "500",
+    border: "1px solid",
+    fontSize: "11px",
     display: "flex",
+    flexDirection: "column" as const,
     alignItems: "center",
     gap: "2px",
-    whiteSpace: "nowrap",
+    transition: "all 0.2s",
   },
-  quickActionBtnUnavailable: {
-    padding: "2px 6px",
+  slotTime: {
+    fontWeight: "500",
+  },
+  slotCode: {
     fontSize: "9px",
-    background: "#fee2e2",
-    color: "#991b1b",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontWeight: "500",
-    display: "flex",
-    alignItems: "center",
-    gap: "2px",
-    whiteSpace: "nowrap",
+    color: "#6b7280",
   },
-  slotsContainer: {
-    display: "flex",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: "6px",
-    padding: "4px 2px",
-  },
-  slotWrapper: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "2px",
-    minWidth: "40px",
-  },
-  slotId: {
+  slotStatus: {
     fontSize: "10px",
     fontWeight: "600",
-    color: "#475569",
-    textAlign: "center",
-    padding: "1px 2px",
-    minWidth: "30px",
-    background: "rgba(255,255,255,0.8)",
-    borderRadius: "3px",
   },
-  availabilityTab: {
-    width: "100%",
-    minWidth: "36px",
-    height: "24px",
-    padding: "0 2px",
-    borderRadius: "4px",
-    cursor: "pointer",
-    transition: "all 0.2s ease",
-    fontSize: "9px",
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    textAlign: "center",
-    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-  },
-  footer: {
-    padding: "16px",
-    background: "#f8fafc",
-    borderTopWidth: '1px',
-    borderTopStyle: 'solid',
-    borderTopColor: '#e2e8f0',
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: "16px",
+  noSlots: {
+    color: "#cbd5e1",
+    fontSize: "14px",
   },
   legend: {
     display: "flex",
     alignItems: "center",
-    gap: "16px",
-    fontSize: "12px",
-    color: "#475569",
+    gap: "20px",
+    marginTop: "16px",
+    padding: "12px 16px",
+    backgroundColor: "#ffffff",
+    borderRadius: "6px",
+    border: "1px solid #e2e8f0",
   },
   legendItem: {
     display: "flex",
     alignItems: "center",
     gap: "8px",
   },
-  legendTabAvailable: {
-    width: "36px",
-    height: "20px",
-    backgroundColor: "#d1fae5",
-    color: "#065f46",
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: '#a7f3d0',
+  legendBox: {
+    padding: "4px 8px",
     borderRadius: "4px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "9px",
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-  },
-  legendTabUnavailable: {
-    width: "36px",
-    height: "20px",
-    backgroundColor: "#fee2e2",
-    color: "#991b1b",
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: '#fecaca',
-    borderRadius: "4px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "9px",
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-  },
-  legendTabText: {
-    fontSize: "9px",
+    border: "1px solid",
+    fontSize: "11px",
     fontWeight: "600",
   },
   legendHint: {
-    fontSize: "11px",
-    color: "#64748b",
-    fontStyle: "italic",
-  },
-  footerActions: {
-    display: "flex",
-    gap: "8px",
-    flexWrap: "wrap",
+    marginLeft: "auto",
+    fontSize: "12px",
+    color: "#94a3b8",
   },
 };
 
