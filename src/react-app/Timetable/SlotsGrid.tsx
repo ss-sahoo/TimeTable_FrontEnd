@@ -152,7 +152,7 @@ const SlotsGrid: React.FC = () => {
   const [editingSlot, setEditingSlot] = useState<{dayIndex: number, slotIndex: number} | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [lastSavedTime, setLastSavedTime] = useState<string>("");
-  const [showDayDropdown, setShowDayDropdown] = useState<number | null>(null);
+  // const [showDayDropdown, setShowDayDropdown] = useState<number | null>(null);
   const [showAddDayModal, setShowAddDayModal] = useState(false);
   const [selectionMode, setSelectionMode] = useState<DaySelectionMode>("dropdown");
   const [selectedDays, setSelectedDays] = useState<string[]>(["Monday"]);
@@ -161,14 +161,14 @@ const SlotsGrid: React.FC = () => {
     endDate: ""
   });
   const [editingTime, setEditingTime] = useState<{from: string, to: string}>({ from: "8:00 AM", to: "9:00 AM" });
-  const [dropdownPosition, setDropdownPosition] = useState<{top: number, left: number} | null>(null);
+  // const [dropdownPosition, setDropdownPosition] = useState<{top: number, left: number} | null>(null);
   const [showHelp, setShowHelp] = useState(true);
   
   // Add the missing state variables
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string>("");
   
-  const dropdownRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // const dropdownRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // Load settings on mount
   useEffect(() => {
@@ -191,26 +191,26 @@ const SlotsGrid: React.FC = () => {
   }, []);
 
   // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showDayDropdown !== null) {
-        // Check if click is outside all dropdowns
-        const clickedOutside = dropdownRefs.current.every(
-          (ref, index) => index !== showDayDropdown || !ref?.contains(event.target as Node)
-        );
+  // useEffect(() => {
+  //   const handleClickOutside = (event: MouseEvent) => {
+  //     if (showDayDropdown !== null) {
+  //       // Check if click is outside all dropdowns
+  //       const clickedOutside = dropdownRefs.current.every(
+  //         (ref, index) => index !== showDayDropdown || !ref?.contains(event.target as Node)
+  //       );
         
-        if (clickedOutside && event.target) {
-          setShowDayDropdown(null);
-          setDropdownPosition(null);
-        }
-      }
-    };
+  //       if (clickedOutside && event.target) {
+  //         setShowDayDropdown(null);
+  //         setDropdownPosition(null);
+  //       }
+  //     }
+  //   };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showDayDropdown]);
+  //   document.addEventListener('mousedown', handleClickOutside);
+  //   return () => {
+  //     document.removeEventListener('mousedown', handleClickOutside);
+  //   };
+  // }, [showDayDropdown]);
 
   // Get available days (days not yet added)
   const getAvailableDays = () => {
@@ -349,24 +349,24 @@ const SlotsGrid: React.FC = () => {
   };
 
   // Handle day dropdown button click
-  const handleDayDropdownClick = (e: React.MouseEvent, dayIndex: number) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
+  // const handleDayDropdownClick = (e: React.MouseEvent, dayIndex: number) => {
+  //   e.stopPropagation();
+  //   const rect = e.currentTarget.getBoundingClientRect();
+  //   const viewportWidth = window.innerWidth;
     
-    // Calculate position for dropdown
-    let left = rect.right + 8; // Position to the right of button
-    let top = rect.top;
+  //   // Calculate position for dropdown
+  //   let left = rect.right + 8; // Position to the right of button
+  //   let top = rect.top;
     
-    // If dropdown would go off right of screen, position to left instead
-    const dropdownWidth = 180;
-    if (left + dropdownWidth > viewportWidth - 20) {
-      left = rect.left - dropdownWidth - 8;
-    }
+  //   // If dropdown would go off right of screen, position to left instead
+  //   const dropdownWidth = 180;
+  //   if (left + dropdownWidth > viewportWidth - 20) {
+  //     left = rect.left - dropdownWidth - 8;
+  //   }
     
-    setDropdownPosition({ top, left });
-    setShowDayDropdown(showDayDropdown === dayIndex ? null : dayIndex);
-  };
+  //   setDropdownPosition({ top, left });
+  //   setShowDayDropdown(showDayDropdown === dayIndex ? null : dayIndex);
+  // };
 
   // Add days based on selection mode
   const addSelectedDays = () => {
@@ -1104,13 +1104,13 @@ const fetchTimetableSlots = async (timetableId: string) => {
                   {/* Action Buttons */}
                   <div style={styles.dayActionButtons}>
                     {/* Dropdown Button */}
-                    <button
+                    {/* <button
                       style={styles.dayDropdownBtn}
                       onClick={(e) => handleDayDropdownClick(e, dayIndex)}
                       title="Add another day"
                     >
                       ▼
-                    </button>
+                    </button> */}
                     
                     {/* Delete Day Button */}
                     {days.length > 1 && (
@@ -1233,7 +1233,7 @@ const fetchTimetableSlots = async (timetableId: string) => {
       </div>
 
       {/* Day Dropdown Portal */}
-      {showDayDropdown !== null && dropdownPosition && (
+      {/* {showDayDropdown !== null && dropdownPosition && (
         <div
           ref={el => dropdownRefs.current[showDayDropdown] = el}
           style={{
@@ -1278,7 +1278,7 @@ const fetchTimetableSlots = async (timetableId: string) => {
             })}
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 };
