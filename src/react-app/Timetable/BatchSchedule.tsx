@@ -13,12 +13,24 @@ interface Teacher {
   maxLecturesPerWeek: number;
 }
 
-interface Batch {
+interface Program {
   id: string;
   name: string;
-  year: string;
-  students: string;
-  color: string;
+}
+
+interface Batch {
+  id: string;
+  code: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  program: Program;
+  student_count: number;
+  teacher_count: number;
+  created_at: string;
+  color?: string; // Added for UI styling
+  year?: string; // Added for UI compatibility
+  students?: string; // Added for UI compatibility
 }
 
 /* ================= MOCK TEACHERS DATA ================= */
@@ -51,14 +63,18 @@ const BATCH_COLORS = [
 
 /* ================= MAIN COMPONENT ================= */
 const BatchSchedule: React.FC = () => {
-  const [batches, setBatches] = useState<Batch[]>([
-    { id: "B001", name: "CSE A", year: "2nd Year", students: "60", color: BATCH_COLORS[0] },
-    { id: "B002", name: "CSE B", year: "2nd Year", students: "65", color: BATCH_COLORS[1] },
-    { id: "B003", name: "ECE A", year: "3rd Year", students: "55", color: BATCH_COLORS[2] },
-  ]);
+  // State for center ID (you might want to get this from context or props)
+  const [centerId, setCenterId] = useState<string>("bb67db93-5d47-4639-aa05-7ddb80d106a1");
+  const [centerName, setCenterName] = useState<string>("Center Test");
   
-  const [activeBatch, setActiveBatch] = useState<string>("B001");
+  // State for batches from API
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [activeBatch, setActiveBatch] = useState<string>("");
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  
+  // Loading and error states
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Add Batch State
   const [showAddBatch, setShowAddBatch] = useState(false);
@@ -73,16 +89,116 @@ const BatchSchedule: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [showHelp, setShowHelp] = useState(true);
 
+  // ===================== API FUNCTIONS =====================
+  
+  // Function to fetch batches from API
+  const fetchBatchesFromAPI = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const accessToken = localStorage.getItem("access_token");
+      
+      if (!accessToken) {
+        throw new Error("No access token found. Please login again.");
+      }
+      
+      const response = await fetch(
+        `https://exams.dashoapp.com/api/timetable/centers/${centerId}/batches/`,
+        {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch batches: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("Batches API response:", data);
+      
+      // Transform API data to match our UI format
+      const formattedBatches: Batch[] = data.results.map((batch: any, index: number) => ({
+        id: batch.id,
+        code: batch.code,
+        name: batch.name,
+        start_date: batch.start_date,
+        end_date: batch.end_date,
+        program: batch.program,
+        student_count: batch.student_count,
+        teacher_count: batch.teacher_count,
+        created_at: batch.created_at,
+        color: BATCH_COLORS[index % BATCH_COLORS.length],
+        year: extractYearFromBatchName(batch.name) || `${new Date(batch.start_date).getFullYear()} Year`,
+        students: batch.student_count.toString()
+      }));
+      
+      setBatches(formattedBatches);
+      setCenterName(data.center_name || "Center Test");
+      
+      // Set first batch as active if available
+      if (formattedBatches.length > 0 && !activeBatch) {
+        setActiveBatch(formattedBatches[0].id);
+      }
+      
+    } catch (error: any) {
+      console.error("Error fetching batches:", error);
+      setError(error.message || "Failed to load batches");
+      
+      // Fallback to mock data if API fails
+      setBatches([
+        { 
+          id: "12a1eb2d-58e0-4696-adeb-bdaf57c3d399", 
+          code: "HDTN-1A-ZA1", 
+          name: "Super 30 - Batch A (2025)", 
+          start_date: "2025-01-01", 
+          end_date: "2025-03-31", 
+          program: { id: "2858f78d-74e6-42d2-a443-1ac1f10e3a29", name: "JEE Main 2025" }, 
+          student_count: 0, 
+          teacher_count: 0, 
+          created_at: "2025-12-18T11:58:42.245735+00:00",
+          color: BATCH_COLORS[0],
+          year: "2025 Year",
+          students: "0"
+        }
+      ]);
+      
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper function to extract year from batch name
+  const extractYearFromBatchName = (batchName: string): string => {
+    const yearMatch = batchName.match(/\((\d{4})\)/);
+    if (yearMatch && yearMatch[1]) {
+      return `${yearMatch[1]} Year`;
+    }
+    return "";
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return dateString;
+    }
+  };
+
   /* Load saved data from localStorage */
   useEffect(() => {
     const loadSavedData = () => {
       try {
-        const savedBatches = localStorage.getItem("batchScheduleBatches");
-        if (savedBatches) {
-          const parsed = JSON.parse(savedBatches);
-          setBatches(parsed);
-        }
-
         const savedAssignments = localStorage.getItem("batchTeacherAssignments");
         if (savedAssignments) {
           setTeacherAssignments(JSON.parse(savedAssignments));
@@ -95,11 +211,15 @@ const BatchSchedule: React.FC = () => {
     loadSavedData();
   }, []);
 
+  /* Fetch batches on component mount */
+  useEffect(() => {
+    fetchBatchesFromAPI();
+  }, [centerId]);
+
   /* Save data to localStorage */
   useEffect(() => {
-    localStorage.setItem("batchScheduleBatches", JSON.stringify(batches));
     localStorage.setItem("batchTeacherAssignments", JSON.stringify(teacherAssignments));
-  }, [batches, teacherAssignments]);
+  }, [teacherAssignments]);
 
   const getBatchAssignments = (batchId: string) => {
     return teacherAssignments.find(a => a.batchId === batchId)?.teachers || [];
@@ -145,44 +265,41 @@ const BatchSchedule: React.FC = () => {
     updateBatchAssignments(activeBatch, updatedTeachers);
   };
 
+  // Note: Since batches are fetched from API, we'll disable adding new batches
+  // unless you have a POST endpoint for creating batches
   const addNewBatch = () => {
     if (!newBatchName.trim()) return;
     
-    const newId = `B${String(batches.length + 1).padStart(3, '0')}`;
-    const newBatch: Batch = {
-      id: newId,
-      name: newBatchName,
-      year: newBatchYear,
-      students: newBatchStudents || "0",
-      color: BATCH_COLORS[batches.length % BATCH_COLORS.length]
-    };
+    // This is a mock function since we don't have a POST endpoint
+    alert("Batch creation would require a POST API endpoint. Currently, batches are fetched from the backend.");
     
-    setBatches([...batches, newBatch]);
-    setActiveBatch(newId);
+    // If you had a POST endpoint, you would call it here
+    // Example:
+    // const newBatch = await createBatchAPI(newBatchName, newBatchYear, newBatchStudents);
+    // setBatches([...batches, newBatch]);
+    
     setNewBatchName("");
     setNewBatchYear("2nd Year");
     setNewBatchStudents("");
     setShowAddBatch(false);
   };
 
+  // Note: Batch deletion would also require a DELETE API endpoint
   const deleteBatch = (batchId: string) => {
     if (batches.length <= 1) {
       alert("You must have at least one batch");
       return;
     }
     
-    if (window.confirm("Are you sure you want to delete this batch? All teacher assignments will be lost.")) {
-      // Remove from batches array
-      const newBatches = batches.filter(b => b.id !== batchId);
-      setBatches(newBatches);
+    if (window.confirm("Are you sure you want to delete this batch? This would require a DELETE API call to the backend.")) {
+      // This is a mock function since we don't have a DELETE endpoint
+      alert("Batch deletion would require a DELETE API endpoint. Currently, batches are managed by the backend.");
       
-      // If deleting active batch, switch to another
-      if (batchId === activeBatch) {
-        setActiveBatch(newBatches[0].id);
-      }
-      
-      // Remove assignments
-      setTeacherAssignments(prev => prev.filter(a => a.batchId !== batchId));
+      // If you had a DELETE endpoint, you would call it here
+      // Example:
+      // await deleteBatchAPI(batchId);
+      // Then refresh the batches list
+      // fetchBatchesFromAPI();
     }
   };
 
@@ -237,19 +354,66 @@ const BatchSchedule: React.FC = () => {
     alert("Saved! Next page would open here.");
   };
 
+  const refreshBatches = () => {
+    fetchBatchesFromAPI();
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div style={styles.wrapper}>
+        <div style={styles.loadingState}>
+          <div style={styles.spinner}></div>
+          <h3 style={styles.title}>Loading Batches...</h3>
+          <p>Fetching batch data from the server</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && batches.length === 0) {
+    return (
+      <div style={styles.wrapper}>
+        <div style={styles.errorState}>
+          <h3 style={styles.title}>Error Loading Batches</h3>
+          <p>{error}</p>
+          <button 
+            style={styles.retryButton}
+            onClick={refreshBatches}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const activeBatchObj = getActiveBatch();
   
+  if (!activeBatchObj && batches.length > 0) {
+    setActiveBatch(batches[0].id);
+    return (
+      <div style={styles.wrapper}>
+        <div style={styles.loadingState}>
+          <div style={styles.spinner}></div>
+          <p>Setting up batch...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!activeBatchObj) {
     return (
       <div style={styles.wrapper}>
         <div style={styles.errorState}>
-          <h3 style={styles.title}>No Active Batch</h3>
-          <p>Please add a batch to continue.</p>
+          <h3 style={styles.title}>No Batches Available</h3>
+          <p>No batches found for this center.</p>
           <button 
-            style={styles.addBatchBtn}
-            onClick={() => setShowAddBatch(true)}
+            style={styles.retryButton}
+            onClick={refreshBatches}
           >
-            + Add New Batch
+            Refresh
           </button>
         </div>
       </div>
@@ -265,17 +429,24 @@ const BatchSchedule: React.FC = () => {
       <div style={styles.header}>
         <div>
           <h3 style={styles.title}>Batch Teachers Assignment</h3>
-          <p style={styles.subtitle}>Assign teachers and set lecture limits for each batch</p>
+          <p style={styles.subtitle}>
+            Assign teachers and set lecture limits for batches in <strong>{centerName}</strong>
+          </p>
         </div>
         
         {/* Action Buttons */}
         <div style={styles.headerActions}>
-          {/* Add Batch Button */}
+          {/* Refresh Button */}
           <button 
-            style={styles.addBatchBtn}
-            onClick={() => setShowAddBatch(true)}
+            style={styles.refreshButton}
+            onClick={refreshBatches}
+            title="Refresh batches"
           >
-            + Add New Batch
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" 
+                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Refresh
           </button>
           
           <div style={styles.actionButtons}>
@@ -345,63 +516,40 @@ const BatchSchedule: React.FC = () => {
             </button>
           </div>
           <ul style={styles.helpList}>
+            <li>Batches are fetched from the backend API for <strong>{centerName}</strong></li>
             <li>Click "Add Teacher" to select teachers from the dropdown</li>
             <li>Set daily and weekly lecture limits for each teacher</li>
             <li>Click the × button to remove a teacher from the batch</li>
-            <li>Use "Save Changes" to save assignments</li>
+            <li>Use "Save Changes" to save assignments locally</li>
             <li>Each batch maintains its own list of teachers</li>
+            <li>Click "Refresh" to reload batches from the server</li>
           </ul>
         </div>
       )}
 
-      {/* Add Batch Form */}
-      {showAddBatch && (
-        <div style={styles.addBatchForm}>
-          <h4 style={styles.formTitle}>Add New Batch</h4>
-          <div style={styles.formRow}>
-            <input
-              type="text"
-              placeholder="Batch Name (e.g., CSE C)"
-              value={newBatchName}
-              onChange={(e) => setNewBatchName(e.target.value)}
-              style={styles.formInput}
-            />
-            <select
-              value={newBatchYear}
-              onChange={(e) => setNewBatchYear(e.target.value)}
-              style={styles.formSelect}
-            >
-              <option value="1st Year">1st Year</option>
-              <option value="2nd Year">2nd Year</option>
-              <option value="3rd Year">3rd Year</option>
-              <option value="4th Year">4th Year</option>
-            </select>
-            <input
-              type="number"
-              placeholder="Number of Students"
-              value={newBatchStudents}
-              onChange={(e) => setNewBatchStudents(e.target.value)}
-              style={styles.formInput}
-              min="1"
-            />
-          </div>
-          <div style={styles.formActions}>
-            <button 
-              style={styles.cancelBtn}
-              onClick={() => setShowAddBatch(false)}
-            >
-              Cancel
-            </button>
-            <button 
-              style={styles.saveBtn}
-              onClick={addNewBatch}
-              disabled={!newBatchName.trim()}
-            >
-              Add Batch
-            </button>
-          </div>
+      {/* Center Info Bar */}
+      <div style={styles.centerInfoBar}>
+        <div style={styles.centerInfo}>
+          <strong>Center:</strong> {centerName}
+          <span style={styles.infoSeparator}>•</span>
+          <strong>Batches:</strong> {batches.length}
+          <span style={styles.infoSeparator}>•</span>
+          <strong>Center ID:</strong> <code style={styles.codeText}>{centerId}</code>
         </div>
-      )}
+        <button
+          style={styles.smallButton}
+          onClick={() => {
+            // You can add functionality to change center ID here
+            const newCenterId = prompt("Enter Center ID:", centerId);
+            if (newCenterId && newCenterId !== centerId) {
+              setCenterId(newCenterId);
+            }
+          }}
+          title="Change Center ID"
+        >
+          Change Center
+        </button>
+      </div>
 
       {/* Batch Tabs */}
       <div style={styles.tabContainer}>
@@ -416,30 +564,26 @@ const BatchSchedule: React.FC = () => {
                 style={{
                   ...styles.batchTab,
                   ...(isActive ? styles.activeBatchTab : {}),
-                  borderLeftColor: batch.color
+                  borderLeftColor: batch.color || BATCH_COLORS[0]
                 }}
               >
                 <div style={styles.tabContent}>
                   <div style={styles.tabLeft}>
-                    <div style={{...styles.batchDot, backgroundColor: batch.color}}></div>
-                    <span style={styles.batchTabName}>{batch.name}</span>
+                    <div style={{...styles.batchDot, backgroundColor: batch.color || BATCH_COLORS[0]}}></div>
+                    <div style={styles.batchInfoCompact}>
+                      <span style={styles.batchTabName}>{batch.name}</span>
+                      <div style={styles.batchMeta}>
+                        <span style={styles.batchCode}>{batch.code}</span>
+                        <span style={styles.separator}>•</span>
+                        <span style={styles.batchProgram}>{batch.program.name}</span>
+                      </div>
+                    </div>
                   </div>
                   <div style={styles.tabStats}>
                     <span style={styles.statBadge}>{batchStats.teachers} teachers</span>
                   </div>
                 </div>
               </button>
-              
-              {/* Delete Button */}
-              {batches.length > 1 && (
-                <button
-                  style={styles.deleteTabBtn}
-                  onClick={() => deleteBatch(batch.id)}
-                  title={`Delete ${batch.name}`}
-                >
-                  ×
-                </button>
-              )}
             </div>
           );
         })}
@@ -450,15 +594,19 @@ const BatchSchedule: React.FC = () => {
         {/* Batch Info Header */}
         <div style={styles.batchInfoHeader}>
           <div style={styles.batchInfo}>
-            <div style={{...styles.batchColorDot, backgroundColor: activeBatchObj.color}}></div>
+            <div style={{...styles.batchColorDot, backgroundColor: activeBatchObj.color || BATCH_COLORS[0]}}></div>
             <div>
               <h4 style={styles.activeBatchTitle}>{activeBatchObj.name}</h4>
               <div style={styles.batchDetails}>
-                <span>{activeBatchObj.year}</span>
+                <span><strong>Code:</strong> {activeBatchObj.code}</span>
                 <span>•</span>
-                <span>{activeBatchObj.students} students</span>
+                <span><strong>Program:</strong> {activeBatchObj.program.name}</span>
                 <span>•</span>
-                <span>{activeBatchTeachers.length} teachers</span>
+                <span><strong>Dates:</strong> {formatDate(activeBatchObj.start_date)} to {formatDate(activeBatchObj.end_date)}</span>
+                <span>•</span>
+                <span><strong>Students:</strong> {activeBatchObj.student_count}</span>
+                <span>•</span>
+                <span><strong>Teachers:</strong> {activeBatchTeachers.length}</span>
               </div>
             </div>
           </div>
@@ -723,9 +871,39 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)",
     minHeight: "calc(100vh - 48px)",
   },
+  loadingState: {
+    padding: "40px",
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "16px",
+  },
+  spinner: {
+    width: "40px",
+    height: "40px",
+    border: "3px solid #f3f3f3",
+    borderTop: "3px solid #3b82f6",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+  },
   errorState: {
     padding: "40px",
     textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "16px",
+  },
+  retryButton: {
+    padding: "10px 20px",
+    background: "#3b82f6",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: "500",
+    fontSize: "14px",
   },
   header: {
     display: "flex",
@@ -756,16 +934,29 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     gap: "8px",
   },
-  addBatchBtn: {
+  refreshButton: {
     padding: "10px 20px",
-    background: "#3b82f6",
-    color: "#ffffff",
-    border: "none",
+    background: "#f1f5f9",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
     borderRadius: "8px",
     cursor: "pointer",
     fontWeight: "500",
     fontSize: "14px",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
     transition: "all 0.2s",
+  },
+  smallButton: {
+    padding: "6px 12px",
+    background: "#f1f5f9",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "12px",
+    fontWeight: "500",
   },
   saveButton: {
     padding: "10px 20px",
@@ -799,63 +990,34 @@ const styles: Record<string, React.CSSProperties> = {
   spinningIcon: {
     animation: "spin 1s linear infinite",
   },
-  addBatchForm: {
-    background: "#f0f9ff",
-    padding: "20px",
-    borderRadius: "8px",
-    marginBottom: "20px",
-    border: "1px solid #bae6fd",
-  },
-  formTitle: {
-    fontSize: "16px",
-    fontWeight: "600",
-    color: "#0369a1",
-    margin: "0 0 16px 0",
-  },
-  formRow: {
+  centerInfoBar: {
     display: "flex",
-    gap: "12px",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "12px 16px",
+    background: "#f0f9ff",
+    borderRadius: "8px",
+    border: "1px solid #bae6fd",
     marginBottom: "16px",
   },
-  formInput: {
-    flex: "1",
-    padding: "10px 12px",
-    borderRadius: "6px",
-    border: "1px solid #cbd5e1",
+  centerInfo: {
     fontSize: "14px",
-  },
-  formSelect: {
-    flex: "1",
-    padding: "10px 12px",
-    borderRadius: "6px",
-    border: "1px solid #cbd5e1",
-    fontSize: "14px",
-    background: "#ffffff",
-  },
-  formActions: {
+    color: "#0369a1",
     display: "flex",
-    justifyContent: "flex-end",
-    gap: "12px",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
   },
-  cancelBtn: {
-    padding: "10px 20px",
-    background: "#ffffff",
-    color: "#475569",
-    border: "1px solid #e2e8f0",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "14px",
-    fontWeight: "500",
+  infoSeparator: {
+    color: "#94a3b8",
+    fontSize: "12px",
   },
-  saveBtn: {
-    padding: "10px 20px",
-    background: "#10b981",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "14px",
-    fontWeight: "500",
+  codeText: {
+    background: "#dbeafe",
+    padding: "2px 6px",
+    borderRadius: "4px",
+    fontSize: "12px",
+    fontFamily: "monospace",
   },
   helpSection: {
     marginBottom: "24px",
@@ -947,9 +1109,33 @@ const styles: Record<string, React.CSSProperties> = {
     height: "8px",
     borderRadius: "50%",
   },
+  batchInfoCompact: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "2px",
+  },
   batchTabName: {
     fontSize: "14px",
     fontWeight: "500",
+  },
+  batchMeta: {
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    fontSize: "11px",
+    color: "rgba(255,255,255,0.8)",
+  },
+  batchCode: {
+    background: "rgba(255,255,255,0.2)",
+    padding: "1px 4px",
+    borderRadius: "2px",
+    fontSize: "10px",
+  },
+  separator: {
+    fontSize: "10px",
+  },
+  batchProgram: {
+    fontSize: "10px",
   },
   tabStats: {
     fontSize: "12px",
@@ -960,21 +1146,6 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "12px",
     fontSize: "11px",
     fontWeight: "500",
-  },
-  deleteTabBtn: {
-    width: "24px",
-    height: "24px",
-    borderRadius: "50%",
-    border: "1px solid #fca5a5",
-    background: "#fef2f2",
-    color: "#dc2626",
-    cursor: "pointer",
-    fontSize: "14px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: "-8px",
-    zIndex: "1",
   },
   batchContent: {
     background: "#f8fafc",
@@ -1010,8 +1181,9 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     gap: "8px",
     alignItems: "center",
-    fontSize: "14px",
+    fontSize: "13px",
     color: "#64748b",
+    flexWrap: "wrap",
   },
   batchStats: {
     display: "flex",
@@ -1354,5 +1526,14 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#1e293b",
   },
 };
+
+// Add CSS animation for spinner
+const styleSheet = document.styleSheets[0];
+styleSheet.insertRule(`
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`, styleSheet.cssRules.length);
 
 export default BatchSchedule;
