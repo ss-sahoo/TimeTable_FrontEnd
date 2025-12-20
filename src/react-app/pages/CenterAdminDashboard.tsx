@@ -343,7 +343,7 @@ export default function CenterAdminDashboard() {
         />
       )}
       {showCreateBatchModal && (
-        <CreateBatchModal programs={mockPrograms} onClose={() => setShowCreateBatchModal(false)} />
+        <CreateBatchModal onClose={() => setShowCreateBatchModal(false)} />
       )}
     </div>
   );
@@ -1548,83 +1548,211 @@ function CreateExamModal({
   );
 }
 
+// API Program interface
+interface ApiProgram {
+  id: string;
+  name: string;
+  center: string;
+  center_id: string;
+  description?: string;
+  category?: string;
+  is_active: boolean;
+  batches_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 function CreateBatchModal({
-  programs,
   onClose,
 }: {
-  programs: Program[];
   onClose: () => void;
 }) {
   const [formData, setFormData] = useState({
     name: "",
+    code: "",
     programId: "",
+    programName: "",
     startDate: "",
     endDate: "",
   });
+  const [programs, setPrograms] = useState<ApiProgram[]>([]);
+  const [loadingPrograms, setLoadingPrograms] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  // Fetch programs on mount
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      try {
+        const response = await api.get('/timetable/programs/');
+        const programsData = response.data?.programs || response.data || [];
+        setPrograms(Array.isArray(programsData) ? programsData : []);
+      } catch (err) {
+        console.error('Error fetching programs:', err);
+        setError('Failed to load programs');
+      } finally {
+        setLoadingPrograms(false);
+      }
+    };
+    fetchPrograms();
+  }, []);
+
+  const handleProgramChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedId = e.target.value;
+    const selectedProgram = programs.find(p => p.id === selectedId);
+    setFormData({
+      ...formData,
+      programId: selectedId,
+      programName: selectedProgram?.name || "",
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.programId || !formData.name || !formData.code || !formData.startDate || !formData.endDate) {
+      setError("Please fill in all required fields");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const payload = {
+        program_id: formData.programId,
+        program_name: formData.programName,
+        code: formData.code,
+        name: formData.name,
+        start_date: formData.startDate,
+        end_date: formData.endDate,
+      };
+
+      const response = await api.post('/timetable/admin/batches/create/', payload);
+      
+      if (response.data) {
+        setSuccess(true);
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to create batch');
+      console.error('Error creating batch:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <Modal isOpen={true} onClose={onClose} title="Batch Created">
+        <div className="text-center py-6">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <GraduationCap className="w-8 h-8 text-green-600" />
+          </div>
+          <p className="text-lg font-medium text-slate-900 mb-2">Batch Created Successfully!</p>
+          <p className="text-sm text-slate-500">The batch "{formData.name}" has been created.</p>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal isOpen={true} onClose={onClose} title="Create Batch">
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Program</label>
-          <select
-            value={formData.programId}
-            onChange={(e) => setFormData({ ...formData, programId: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      <form onSubmit={handleSubmit}>
+        <div className="space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Program *</label>
+            {loadingPrograms ? (
+              <div className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500">
+                Loading programs...
+              </div>
+            ) : (
+              <select
+                value={formData.programId}
+                onChange={handleProgramChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              >
+                <option value="">Select Program</option>
+                {programs.map((program) => (
+                  <option key={program.id} value={program.id}>
+                    {program.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Batch Code *</label>
+            <input
+              type="text"
+              value={formData.code}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="e.g., BATCH-0054"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Batch Name *</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="e.g., JEE Batch 1"
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Start Date *</label>
+              <input
+                type="date"
+                value={formData.startDate}
+                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">End Date *</label>
+              <input
+                type="date"
+                value={formData.endDate}
+                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 mt-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+            disabled={loading}
           >
-            <option value="">Select Program</option>
-            {programs.map((program) => (
-              <option key={program.id} value={program.id}>
-                {program.name}
-              </option>
-            ))}
-          </select>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loading || loadingPrograms}
+          >
+            {loading ? 'Creating...' : 'Create Batch'}
+          </button>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Batch Name</label>
-          <input
-            type="text"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="e.g., Super 30 – 2027 Foundation"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
-            <input
-              type="date"
-              value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
-            <input
-              type="date"
-              value={formData.endDate}
-              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-      </div>
-      <div className="flex justify-end gap-3 mt-6">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-        >
-          Create Batch
-        </button>
-      </div>
+      </form>
     </Modal>
   );
 }
