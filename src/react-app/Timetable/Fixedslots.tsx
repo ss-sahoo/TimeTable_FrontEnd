@@ -699,8 +699,8 @@ const FixedSlots: React.FC = () => {
                                     onClick={(e) => !isFixed && handleSlotClick(e, dropdownKey)}
                                     style={{
                                       ...styles.slotCell,
-                                      backgroundColor: isFixed ? '#fef3c7' : isAssigned ? '#d1fae5' : '#ffffff',
-                                      borderColor: isFixed ? '#fcd34d' : isAssigned ? '#a7f3d0' : '#e2e8f0',
+                                      backgroundColor: isFixed ? '#fef3c7' : '#ffffff',
+                                      borderColor: isFixed ? '#fcd34d' : '#e2e8f0',
                                       opacity: isUpdating ? 0.5 : 1,
                                       cursor: isUpdating ? 'wait' : isFixed ? 'default' : 'pointer'
                                     }}
@@ -713,24 +713,22 @@ const FixedSlots: React.FC = () => {
                                       {isFixed && <span style={styles.fixedBadge}>FIXED</span>}
                                     </div>
                                     
-                                    {isAssigned ? (
+                                    {isFixed ? (
                                       <div style={styles.assignedInfo}>
-                                        <strong style={styles.teacherName}>{slot.teacher_name}</strong>
-                                        <span style={styles.teacherCode}>{slot.teacher_code}</span>
-                                        <span style={styles.subjectText}>{slot.subject}</span>
-                                        {isFixed && (
-                                          <button
-                                            style={styles.removeButton}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleRemoveAssignment(slot);
-                                            }}
-                                            disabled={isUpdating}
-                                            title="Remove fixed slot assignment"
-                                          >
-                                            ×
-                                          </button>
-                                        )}
+                                        <strong style={styles.teacherName}>{slot.teacher_name || slot.subject}</strong>
+                                        {slot.teacher_code && <span style={styles.teacherCode}>{slot.teacher_code}</span>}
+                                        {slot.teacher_name && slot.subject && <span style={styles.subjectText}>{slot.subject}</span>}
+                                        <button
+                                          style={styles.removeButton}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRemoveAssignment(slot);
+                                          }}
+                                          disabled={isUpdating}
+                                          title="Remove fixed slot assignment"
+                                        >
+                                          ×
+                                        </button>
                                       </div>
                                     ) : (
                                       <div style={styles.assignPrompt}>
