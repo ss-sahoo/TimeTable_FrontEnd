@@ -355,8 +355,6 @@ const SlotsGrid: React.FC = () => {
     };
 
     setDays([...days, newDay].sort((a, b) => a.dayIndex - b.dayIndex));
-    setShowDayDropdown(null);
-    setDropdownPosition(null);
   };
 
   // Handle day dropdown button click
@@ -469,44 +467,142 @@ const SlotsGrid: React.FC = () => {
     return weeklySlots;
   };
 
-  const [fetchedSlots, setFetchedSlots] = useState<any[] | null>(null);
-const [fetchingSlots, setFetchingSlots] = useState<boolean>(false);
+  const [fetchedSlots, setFetchedSlots] = useState<any | null>(null);
+  const [fetchingSlots, setFetchingSlots] = useState<boolean>(false);
+  const [isEditMode, setIsEditMode] = useState<boolean>(false); // Track if editing existing timetable
 
-// Add this function to fetch timetable slots after creation
-const fetchTimetableSlots = async (timetableId: string) => {
-  setFetchingSlots(true);
-  try {
-    const accessToken = localStorage.getItem("access_token");
-    
-    if (!accessToken) {
-      throw new Error("No access token found. Please login again.");
-    }
-    
-    const response = await fetch(
-      `https://exams.dashoapp.com/api/timetable/timetables/${timetableId}/slots/`,
-      {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
+  // Convert "08:00" → "8:00 AM"
+  const to12Hour = (time24: string): string => {
+    const [hoursStr, minutes] = time24.split(":");
+    let hours = parseInt(hoursStr, 10);
+    const modifier = hours >= 12 ? "PM" : "AM";
+    if (hours === 0) hours = 12;
+    else if (hours > 12) hours -= 12;
+    return `${hours}:${minutes} ${modifier}`;
+  };
+
+  // Convert API response format to component's internal format
+  const convertApiSlotsToComponentFormat = (apiData: any): DaySlots[] => {
+    if (!apiData || !apiData.slots) return [];
+
+    const dayIndexMap: Record<number, string> = {
+      1: "Monday",
+      2: "Tuesday",
+      3: "Wednesday",
+      4: "Thursday",
+      5: "Friday",
+      6: "Saturday",
+      0: "Sunday"
+    };
+
+    const convertedDays: DaySlots[] = [];
+
+    // Iterate through each day key (d1, d2, d3, etc.)
+    Object.keys(apiData.slots).forEach((dayKey) => {
+      const daySlots = apiData.slots[dayKey];
+      if (!Array.isArray(daySlots) || daySlots.length === 0) return;
+
+      // Get day info from first slot
+      const firstSlot = daySlots[0];
+      const actualDate = firstSlot.actual_date;
+      const dayIndex = firstSlot.day_index;
+      
+      // Get day name from actual_date
+      const dateObj = new Date(actualDate);
+      const dayOfWeek = dateObj.getDay();
+      const dayName = dayIndexMap[dayOfWeek];
+      const dayColorIndex = ALL_DAYS.indexOf(dayName);
+
+      // Convert slots
+      const slots = daySlots.map((slot: any, idx: number) => ({
+        id: generateSlotId(dayName, idx + 1),
+        time: `${to12Hour(slot.start_time)} - ${to12Hour(slot.end_time)}`
+      }));
+
+      convertedDays.push({
+        day: dayName,
+        date: actualDate,
+        dayIndex: dayIndex,
+        slots: slots,
+        color: DAY_COLORS[dayColorIndex >= 0 ? dayColorIndex : 0],
+        startDate: apiData.from_date,
+        endDate: apiData.to_date
+      });
+    });
+
+    // Sort by dayIndex
+    return convertedDays.sort((a, b) => a.dayIndex - b.dayIndex);
+  };
+
+  // Fetch timetable slots from API
+  const fetchTimetableSlots = async (timetableId: string) => {
+    setFetchingSlots(true);
+    try {
+      const accessToken = localStorage.getItem("access_token");
+      
+      if (!accessToken) {
+        throw new Error("No access token found. Please login again.");
       }
-    );
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch slots: ${response.status}`);
+      
+      const response = await fetch(
+        `https://exams.dashoapp.com/api/timetable/timetables/${timetableId}/slots/`,
+        {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch slots: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setFetchedSlots(data);
+      
+      // Convert and set the days state
+      const convertedDays = convertApiSlotsToComponentFormat(data);
+      if (convertedDays.length > 0) {
+        setDays(convertedDays);
+        setIsEditMode(true); // We're editing an existing timetable
+        // Update calendar range from API response
+        if (data.from_date && data.to_date) {
+          setCalendarRange({
+            startDate: data.from_date,
+            endDate: data.to_date
+          });
+        }
+      }
+      
+      return data;
+    } catch (error) {
+      console.error("Error fetching slots:", error);
+      throw error;
+    } finally {
+      setFetchingSlots(false);
     }
+  };
+
+  // Load slots from API on component mount if timetable_id exists
+  useEffect(() => {
+    const loadSlotsFromApi = async () => {
+      try {
+        const storedTimetableId = localStorage.getItem("timetable_id");
+        if (storedTimetableId) {
+          const timetableId = JSON.parse(storedTimetableId);
+          if (timetableId) {
+            await fetchTimetableSlots(timetableId);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load slots from API:", error);
+      }
+    };
     
-    const data = await response.json();
-    setFetchedSlots(data);
-    return data;
-  } catch (error) {
-    console.error("Error fetching slots:", error);
-    throw error;
-  } finally {
-    setFetchingSlots(false);
-  }
-};
+    loadSlotsFromApi();
+  }, []);
 
   const buildTimetablePayload = () => {
     const payload = {
@@ -547,41 +643,76 @@ const fetchTimetableSlots = async (timetableId: string) => {
     return payload;
   };
 
-  // ===================== API CALL =====================
+  // ===================== API CALLS =====================
   const createTimetable = async () => {
-  const payload = buildTimetablePayload();
-  
-  // Get the access_token from localStorage
-  const accessToken = localStorage.getItem("access_token");
-  
-  if (!accessToken) {
-    throw new Error("No access token found. Please login again.");
-  }
-
-  console.log("Sending payload to API:", JSON.stringify(payload, null, 2));
-  
-  const response = await fetch(
-    "https://exams.dashoapp.com/api/timetable/admin/timetables/create/",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(payload),
+    const payload = buildTimetablePayload();
+    
+    const accessToken = localStorage.getItem("access_token");
+    
+    if (!accessToken) {
+      throw new Error("No access token found. Please login again.");
     }
-  );
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("API Error Response:", errorText);
-    throw new Error(`API Error: ${response.status} - ${errorText}`);
-  }
-  
-  return response.json();
-};
 
-  // Save data to localStorage + API call - UPDATED version
+    console.log("Creating new timetable with payload:", JSON.stringify(payload, null, 2));
+    
+    const response = await fetch(
+      "https://exams.dashoapp.com/api/timetable/admin/timetables/create/",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API Error Response:", errorText);
+      throw new Error(`API Error: ${response.status} - ${errorText}`);
+    }
+    
+    return response.json();
+  };
+
+  const updateTimetable = async (timetableId: string) => {
+    const payload = {
+      ...buildTimetablePayload(),
+      is_active: true,
+      description: "",
+    };
+    
+    const accessToken = localStorage.getItem("access_token");
+    
+    if (!accessToken) {
+      throw new Error("No access token found. Please login again.");
+    }
+
+    console.log("Updating timetable with payload:", JSON.stringify(payload, null, 2));
+    
+    const response = await fetch(
+      `https://exams.dashoapp.com/api/timetable/admin/timetables/${timetableId}/update/`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API Error Response:", errorText);
+      throw new Error(`API Error: ${response.status} - ${errorText}`);
+    }
+    
+    return response.json();
+  };
+
+  // Save data to localStorage + API call - handles both create and update
   const saveSlots = async () => {
     // Validation check
     if (!calendarRange.startDate || !calendarRange.endDate) {
@@ -607,39 +738,42 @@ const fetchTimetableSlots = async (timetableId: string) => {
     setIsSaving(true);
     setSaveStatus("saving");
     try {
-      // 1️⃣ Save locally (existing functionality)
-      const dataToSave: SavedSlotsData = {
-        days,
-        lastSaved: new Date().toLocaleString(),
-        settings: {
-          selectedDays,
-          startDate: calendarRange.startDate,
-          endDate: calendarRange.endDate
-        }
-      };
+      // Check if we're editing an existing timetable or creating new
+      const storedTimetableId = localStorage.getItem("timetable_id");
+      const existingTimetableId = storedTimetableId ? JSON.parse(storedTimetableId) : null;
       
+      let apiResponse;
       
-      // 2️⃣ Call API (NEW functionality)
-      console.log("Calling API to create timetable...");
-      const apiResponse = await createTimetable();
-      console.log("API Response:", apiResponse);
-      localStorage.setItem("timetable_id", JSON.stringify(apiResponse.timetable_id));
-
-      // Show success state
-      setSaveMessage(`Timetable created successfully!`);
+      if (isEditMode && existingTimetableId) {
+        // UPDATE existing timetable
+        console.log("Updating existing timetable:", existingTimetableId);
+        apiResponse = await updateTimetable(existingTimetableId);
+        console.log("Update API Response:", apiResponse);
+        setSaveMessage(`Timetable updated successfully!`);
+      } else {
+        // CREATE new timetable
+        console.log("Creating new timetable...");
+        apiResponse = await createTimetable();
+        console.log("Create API Response:", apiResponse);
+        localStorage.setItem("timetable_id", JSON.stringify(apiResponse.timetable_id));
+        setIsEditMode(true); // Now we're in edit mode
+        setSaveMessage(`Timetable created successfully!`);
+      }
       
-      // Reset message after 5 seconds
+      setSaveStatus("saved");
+      
+      // Reset message after 4 seconds
       setTimeout(() => {
         setSaveMessage("");
         setSaveStatus("idle");
       }, 4000);
       
     } catch (error: any) {
-      console.error("Failed to create timetable:", error);
-      setSaveMessage(error.message || "Error creating timetable");
+      console.error("Failed to save timetable:", error);
+      setSaveMessage(error.message || "Error saving timetable");
       setSaveStatus("error");
       
-      // Reset error after 5 seconds to see full message
+      // Reset error after 5 seconds
       setTimeout(() => {
         setSaveMessage("");
         setSaveStatus("idle");
@@ -730,6 +864,29 @@ const fetchTimetableSlots = async (timetableId: string) => {
     }
   };
 
+  // Create new timetable - clears localStorage and resets state
+  const createNewTimetable = () => {
+    if (window.confirm("Create a new timetable? This will clear the current selection.")) {
+      // Clear timetable_id from localStorage
+      localStorage.removeItem("timetable_id");
+      
+      // Reset all state
+      setDays([{ 
+        day: "Monday",
+        date: new Date().toISOString().split('T')[0],
+        dayIndex: 1,
+        slots: [{ id: "M1", time: "8:00 AM - 9:00 AM" }], 
+        color: DAY_COLORS[0] 
+      }]);
+      setSelectedDays(["Monday"]);
+      setCalendarRange({ startDate: "", endDate: "" });
+      setSaveStatus("idle");
+      setSaveMessage("");
+      setIsEditMode(false); // Switch to create mode
+      setFetchedSlots(null);
+    }
+  };
+
   // Toggle day selection
   const toggleDaySelection = (dayName: string) => {
     if (selectedDays.includes(dayName)) {
@@ -799,6 +956,18 @@ const fetchTimetableSlots = async (timetableId: string) => {
           
           {/* Save Button */}
           <div style={styles.saveSection}>
+            {/* Mode indicator */}
+            <span style={{
+              fontSize: "12px",
+              padding: "4px 8px",
+              borderRadius: "4px",
+              background: isEditMode ? "#dbeafe" : "#dcfce7",
+              color: isEditMode ? "#1d4ed8" : "#16a34a",
+              fontWeight: "500"
+            }}>
+              {isEditMode ? "📝 Edit Mode" : "✨ Create Mode"}
+            </span>
+            
             {saveMessage && (
               <span style={{
                 ...styles.saveMessage,
@@ -817,7 +986,7 @@ const fetchTimetableSlots = async (timetableId: string) => {
               onClick={saveSlots}
               disabled={isSaving}
             >
-              {isSaving ? "Saving..." : "💾 Save Slots"}
+              {isSaving ? "Saving..." : isEditMode ? "💾 Update Slots" : "💾 Save Slots"}
             </button>
             
             {/* Add Days Button */}
@@ -837,11 +1006,11 @@ const fetchTimetableSlots = async (timetableId: string) => {
               Reset
             </button>
             <button
-              style={styles.createButton}
-              // onClick={resetToDefault}
-              title="Reset to default"
+              style={styles.createNewButton}
+              onClick={createNewTimetable}
+              title="Create a new timetable"
             >
-              Creeate New Timetable
+              + Create New Timetable
             </button>
           </div>
         </div>
@@ -1400,9 +1569,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "14px",
     fontWeight: "500",
   },
-  createButton: {
+  createNewButton: {
     padding: "10px 20px",
-    background: "#3b82f6",
+    background: "#8b5cf6",
     color: "#ffffff",
     border: "none",
     borderRadius: "8px",

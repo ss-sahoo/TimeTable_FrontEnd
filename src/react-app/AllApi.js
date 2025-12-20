@@ -106,31 +106,63 @@ export const fetchBatchAssignments = async (timetableId) => {
 // ==================== FIXED SLOTS APIs ====================
 
 /**
- * Assign a fixed slot to a teacher for a batch
+ * Assign a fixed slot to a teacher for a batch (or special slot like Exam/Free Period)
  * POST /api/timetable/admin/timetables/fixed-slots/assign/
  */
 export const assignFixedSlot = async (timetableId, slotCode, batchCode, teacherCode, subject) => {
   const cleanId = cleanTimetableId(timetableId)
+  const payload = {
+    timetable_id: cleanId,
+    slot_code: slotCode,
+    batch_code: batchCode,
+    subject: subject,
+  }
+  // Only include teacher_code if provided (for Exam/Free Period, it's null)
+  if (teacherCode) {
+    payload.teacher_code = teacherCode
+  }
   const response = await Fetch("/api/timetable/admin/timetables/fixed-slots/assign/", {
     method: "POST",
-    body: JSON.stringify({
-      timetable_id: cleanId,
-      slot_code: slotCode,
-      batch_code: batchCode,
-      teacher_code: teacherCode,
-      subject: subject,
-    }),
+    body: JSON.stringify(payload),
   })
   return response.json()
 }
 
 /**
- * Remove a fixed slot assignment
+ * Remove a fixed slot assignment by ID
+ * DELETE /api/timetable/admin/timetables/fixed-slots/{fixed_slot_id}/delete/
+ */
+export const deleteFixedSlotById = async (fixedSlotId) => {
+  const response = await Fetch(`/api/timetable/admin/timetables/fixed-slots/${fixedSlotId}/delete/`, {
+    method: "DELETE",
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to delete fixed slot: ${response.status}`)
+  }
+  // DELETE might return empty response
+  const text = await response.text()
+  return text ? JSON.parse(text) : { success: true }
+}
+
+/**
+ * Fetch all fixed slots for a timetable
+ * GET /api/timetable/timetables/{timetable_id}/fixed-slots/
+ */
+export const fetchFixedSlots = async (timetableId) => {
+  const cleanId = cleanTimetableId(timetableId)
+  const response = await Fetch(`/api/timetable/timetables/${cleanId}/fixed-slots/`, {
+    method: "GET",
+  })
+  return response.json()
+}
+
+/**
+ * Remove a fixed slot assignment (legacy - by slot_code and batch_code)
  * POST /api/timetable/admin/timetables/fixed-slots/remove/
  */
 export const removeFixedSlot = async (timetableId, slotCode, batchCode) => {
   const cleanId = cleanTimetableId(timetableId)
-  const response = await Fetch("/api/timetable/admin/timetables/fixed-slots/remove/", {
+  const response = await Fetch("/api/timetable/admin/timetables/fixed-slots/delete/", {
     method: "POST",
     body: JSON.stringify({
       timetable_id: cleanId,
@@ -181,6 +213,50 @@ export const fetchPrograms = async () => {
   return response.json()
 }
 
+// ==================== TIMETABLE CRUD APIs ====================
+
+/**
+ * Fetch all timetables for a center
+ * GET /api/timetable/timetables/?center_name={center_name}
+ */
+export const fetchAllTimetables = async (centerName) => {
+  const url = centerName 
+    ? `/api/timetable/timetables/?center_name=${encodeURIComponent(centerName)}`
+    : "/api/timetable/timetables/"
+  const response = await Fetch(url, {
+    method: "GET",
+  })
+  return response.json()
+}
+
+/**
+ * Update an existing timetable
+ * PUT /api/timetable/admin/timetables/{timetable_id}/update/
+ */
+export const updateTimetable = async (timetableId, data) => {
+  const cleanId = cleanTimetableId(timetableId)
+  const response = await Fetch(`/api/timetable/admin/timetables/${cleanId}/update/`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  })
+  return response.json()
+}
+
+/**
+ * Update free classes count for a timetable
+ * POST /api/timetable/admin/timetables/{timetable_id}/free-classes/
+ */
+export const updateFreeClassesCount = async (timetableId, freeClassesCount) => {
+  const cleanId = cleanTimetableId(timetableId)
+  const response = await Fetch(`/api/timetable/admin/timetables/${cleanId}/free-classes/`, {
+    method: "POST",
+    body: JSON.stringify({
+      free_classes_count: freeClassesCount,
+    }),
+  })
+  return response.json()
+}
+
 // ==================== EXPORT ====================
 
 export default {
@@ -194,7 +270,12 @@ export default {
   fetchBatchAssignments,
   assignFixedSlot,
   removeFixedSlot,
+  deleteFixedSlotById,
+  fetchFixedSlots,
   fetchCenterTeachers,
   createBatch,
   fetchPrograms,
+  fetchAllTimetables,
+  updateTimetable,
+  updateFreeClassesCount,
 }

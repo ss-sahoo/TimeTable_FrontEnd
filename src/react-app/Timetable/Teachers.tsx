@@ -9,6 +9,11 @@ interface SlotData {
   end_time: string;
   is_free_class: boolean;
   is_available: boolean;
+  is_busy?: boolean;
+  batch_code?: string;
+  batch_name?: string;
+  subject_code?: string;
+  subject_name?: string;
 }
 
 interface DayData {
@@ -302,31 +307,60 @@ const TeachersAvailability: React.FC = () => {
                         <div style={styles.slotsGrid}>
                           {daySlots.map(slot => {
                             const isUpdating = updatingSlot === `${teacher.teacher_code}-${slot.slot_id}`;
+                            const isBusy = slot.is_busy === true;
+                            
+                            // Determine slot style based on status
+                            let bgColor = '#d1fae5';  // Available - green
+                            let textColor = '#065f46';
+                            let borderColor = '#a7f3d0';
+                            let statusText = 'AVL';
+                            
+                            if (isBusy) {
+                              bgColor = '#dbeafe';  // Busy - blue
+                              textColor = '#1e40af';
+                              borderColor = '#93c5fd';
+                              statusText = 'BUSY';
+                            } else if (!slot.is_available) {
+                              bgColor = '#fee2e2';  // Unavailable - red
+                              textColor = '#991b1b';
+                              borderColor = '#fecaca';
+                              statusText = 'UNVL';
+                            }
+                            
+                            const batchInfo = slot.batch_name || slot.batch_code || '';
+                            const subjectInfo = slot.subject_name || slot.subject_code || '';
+                            
                             return (
                               <button
                                 key={slot.slot_id}
-                                onClick={() => handleToggleAvailability(
+                                onClick={() => !isBusy && handleToggleAvailability(
                                   teacher.teacher_code,
                                   slot.slot_id,
                                   slot.is_available
                                 )}
-                                disabled={isUpdating}
+                                disabled={isUpdating || isBusy}
                                 style={{
                                   ...styles.slotButton,
-                                  backgroundColor: slot.is_available ? '#d1fae5' : '#fee2e2',
-                                  color: slot.is_available ? '#065f46' : '#991b1b',
-                                  borderColor: slot.is_available ? '#a7f3d0' : '#fecaca',
+                                  backgroundColor: bgColor,
+                                  color: textColor,
+                                  borderColor: borderColor,
                                   opacity: isUpdating ? 0.5 : 1,
-                                  cursor: isUpdating ? 'wait' : 'pointer'
+                                  cursor: isBusy ? 'not-allowed' : (isUpdating ? 'wait' : 'pointer')
                                 }}
-                                title={`${formatTime(slot.start_time)} - ${formatTime(slot.end_time)}\nSlot: ${slot.slot_code}\nID: ${slot.slot_id}\nClick to ${slot.is_available ? 'mark unavailable' : 'mark available'}`}
+                                title={isBusy 
+                                  ? `BUSY: ${batchInfo}${subjectInfo ? ' - ' + subjectInfo : ''}\n${formatTime(slot.start_time)} - ${formatTime(slot.end_time)}\nSlot: ${slot.slot_code}`
+                                  : `${formatTime(slot.start_time)} - ${formatTime(slot.end_time)}\nSlot: ${slot.slot_code}\nID: ${slot.slot_id}\nClick to ${slot.is_available ? 'mark unavailable' : 'mark available'}`
+                                }
                               >
                                 <span style={styles.slotTime}>
                                   {formatTime(slot.start_time)}-{formatTime(slot.end_time)}
                                 </span>
+                                {isBusy && batchInfo && (
+                                  <span style={styles.batchInfo}>{batchInfo}</span>
+                                )}
                                 <span style={styles.slotCode}>{slot.slot_code}</span>
                                 <span style={styles.slotStatus}>
-                                  {isUpdating ? '...' : (slot.is_available ? 'AVL' : 'UNVL')}
+                                  {isUpdating ? '...' : statusText}
                                 </span>
                               </button>
                             );
@@ -354,7 +388,11 @@ const TeachersAvailability: React.FC = () => {
           <div style={{...styles.legendBox, backgroundColor: '#fee2e2', borderColor: '#fecaca', color: '#991b1b'}}>UNVL</div>
           <span>Unavailable</span>
         </div>
-        <span style={styles.legendHint}>Click on any slot to toggle availability</span>
+        <div style={styles.legendItem}>
+          <div style={{...styles.legendBox, backgroundColor: '#dbeafe', borderColor: '#93c5fd', color: '#1e40af'}}>BUSY</div>
+          <span>Has Class</span>
+        </div>
+        <span style={styles.legendHint}>Click on AVL/UNVL slots to toggle (BUSY slots are locked)</span>
       </div>
     </div>
   );
@@ -592,6 +630,14 @@ const styles: { [key: string]: React.CSSProperties } = {
   slotStatus: {
     fontSize: "10px",
     fontWeight: "600",
+  },
+  batchInfo: {
+    fontSize: "9px",
+    fontWeight: "600",
+    maxWidth: "80px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
   },
   noSlots: {
     color: "#cbd5e1",
