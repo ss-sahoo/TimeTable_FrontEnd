@@ -117,7 +117,7 @@ const Timetable: React.FC = () => {
     <div style={styles.page}>
       <h2 style={styles.title}>Institute Timetable</h2>
       
-      {/* Timetable Dropdown Selector */}
+      {/* Timetable Dropdown Selector
       <div style={styles.timetableSelector}>
         <div style={styles.selectorRow}>
           <label style={styles.dropdownLabel}>📅 Select Timetable:</label>
@@ -146,7 +146,7 @@ const Timetable: React.FC = () => {
             </span>
           )}
         </div>
-      </div>
+      </div> */}
 
       {/* Clickable Tabs */}
       <div style={styles.tabContainer}>

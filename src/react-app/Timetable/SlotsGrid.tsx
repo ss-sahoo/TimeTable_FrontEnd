@@ -957,16 +957,7 @@ const SlotsGrid: React.FC = () => {
           {/* Save Button */}
           <div style={styles.saveSection}>
             {/* Mode indicator */}
-            <span style={{
-              fontSize: "12px",
-              padding: "4px 8px",
-              borderRadius: "4px",
-              background: isEditMode ? "#dbeafe" : "#dcfce7",
-              color: isEditMode ? "#1d4ed8" : "#16a34a",
-              fontWeight: "500"
-            }}>
-              {isEditMode ? "📝 Edit Mode" : "✨ Create Mode"}
-            </span>
+            
             
             {saveMessage && (
               <span style={{

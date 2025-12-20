@@ -30,6 +30,26 @@ interface FeasibilityResult {
   };
 }
 
+interface OptimizationSettings {
+  max_retries: number;
+  max_try_for_slot_assign: number;
+  weight_power_fector: number;
+  max_one_subject_repetation_per_day: number;
+  max_one_subject_repetation_per_day_penalty_fector: number;
+  weight_penalty_consu_sub_repetation: number[];
+  clear_existing: boolean;
+}
+
+const DEFAULT_SETTINGS: OptimizationSettings = {
+  max_retries: 1000,
+  max_try_for_slot_assign: 100,
+  weight_power_fector: 3,
+  max_one_subject_repetation_per_day: 2,
+  max_one_subject_repetation_per_day_penalty_fector: 0,
+  weight_penalty_consu_sub_repetation: [0.01, 0, 0, 0, 0],
+  clear_existing: true
+};
+
 const Feasibility: React.FC = () => {
   const [timetableId, setTimetableId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -40,6 +60,9 @@ const Feasibility: React.FC = () => {
   const [hasRun, setHasRun] = useState(false);
   const [generatedTimetable, setGeneratedTimetable] = useState<any>(null);
   const [payload, setPayload] = useState<any>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState<OptimizationSettings>(DEFAULT_SETTINGS);
+  const [settingsChanged, setSettingsChanged] = useState(false);
 
   /* Get timetable ID from localStorage */
   useEffect(() => {
@@ -113,10 +136,17 @@ const Feasibility: React.FC = () => {
     setError(null);
 
     try {
-      console.log("Generating timetable (optimize)...");
+      console.log("Generating timetable (optimize) with settings:", settings);
+      
+      // Create payload with settings
+      const optimizationPayload = {
+        ...payload,
+        settings: settings
+      };
+
       const optimizeResponse = await Fetch(`/api/timetable/timetables/${timetableId}/optimize/`, {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: JSON.stringify(optimizationPayload),
       });
 
       if (!optimizeResponse.ok) {
@@ -132,7 +162,7 @@ const Feasibility: React.FC = () => {
     } finally {
       setGenerating(false);
     }
-  }, [timetableId, payload]);
+  }, [timetableId, payload, settings]);
 
   /* Save generated timetable */
   const handleSaveTimetable = useCallback(async () => {
@@ -166,6 +196,39 @@ const Feasibility: React.FC = () => {
     }
   }, [timetableId, generatedTimetable]);
 
+  /* Settings handlers */
+  const handleSettingsChange = (key: keyof OptimizationSettings, value: any) => {
+    setSettings(prev => ({
+      ...prev,
+      [key]: value
+    }));
+    setSettingsChanged(true);
+  };
+
+  const handleResetToDefault = () => {
+    setSettings(DEFAULT_SETTINGS);
+    setSettingsChanged(false);
+  };
+
+  const handleApplySettings = () => {
+    // Settings are automatically applied when generating
+    setShowSettings(false);
+    alert("Settings saved. They will be used in the next generation.");
+  };
+
+  const handleNumberArrayChange = (index: number, value: string) => {
+    const newArray = [...settings.weight_penalty_consu_sub_repetation];
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue)) {
+      newArray[index] = numValue;
+      setSettings(prev => ({
+        ...prev,
+        weight_penalty_consu_sub_repetation: newArray
+      }));
+      setSettingsChanged(true);
+    }
+  };
+
   /* Get violation count for a rule */
   const getViolationCount = (ruleKey: string): number => {
     if (!result?.violations) return 0;
@@ -173,13 +236,149 @@ const Feasibility: React.FC = () => {
     return violations?.length || 0;
   };
 
-  /* Get rule status */
-  const getRuleStatus = (ruleKey: string): "ok" | "error" => {
-    return getViolationCount(ruleKey) > 0 ? "error" : "ok";
-  };
-
   return (
     <div style={styles.wrapper}>
+      {/* Settings Modal */}
+      {showSettings && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <div style={styles.modalHeader}>
+              <h3 style={styles.modalTitle}>Optimization Settings</h3>
+              <button 
+                style={styles.modalCloseBtn}
+                onClick={() => setShowSettings(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={styles.settingsGrid}>
+              {/* Integer Inputs */}
+              <div style={styles.settingField}>
+                <label style={styles.settingLabel}>
+                  Max Retries
+                  <span style={styles.settingDescription}>Maximum number of optimization attempts</span>
+                </label>
+                <input
+                  type="number"
+                  value={settings.max_retries}
+                  onChange={(e) => handleSettingsChange("max_retries", parseInt(e.target.value) || 0)}
+                  style={styles.numberInput}
+                  min="1"
+                />
+              </div>
+
+              <div style={styles.settingField}>
+                <label style={styles.settingLabel}>
+                  Max Try for Slot Assignment
+                  <span style={styles.settingDescription}>Max attempts per slot assignment</span>
+                </label>
+                <input
+                  type="number"
+                  value={settings.max_try_for_slot_assign}
+                  onChange={(e) => handleSettingsChange("max_try_for_slot_assign", parseInt(e.target.value) || 0)}
+                  style={styles.numberInput}
+                  min="1"
+                />
+              </div>
+
+              <div style={styles.settingField}>
+                <label style={styles.settingLabel}>
+                  Weight Power Factor
+                  <span style={styles.settingDescription}>Power factor for weight calculations</span>
+                </label>
+                <input
+                  type="number"
+                  value={settings.weight_power_fector}
+                  onChange={(e) => handleSettingsChange("weight_power_fector", parseInt(e.target.value) || 0)}
+                  style={styles.numberInput}
+                  min="0"
+                  step="1"
+                />
+              </div>
+
+              <div style={styles.settingField}>
+                <label style={styles.settingLabel}>
+                  Max Subject Repetition Per Day
+                  <span style={styles.settingDescription}>Maximum times a subject can repeat in a day</span>
+                </label>
+                <input
+                  type="number"
+                  value={settings.max_one_subject_repetation_per_day}
+                  onChange={(e) => handleSettingsChange("max_one_subject_repetation_per_day", parseInt(e.target.value) || 0)}
+                  style={styles.numberInput}
+                  min="0"
+                />
+              </div>
+
+              <div style={styles.settingField}>
+                <label style={styles.settingLabel}>
+                  Repetition Penalty Factor
+                  <span style={styles.settingDescription}>Penalty factor for subject repetition</span>
+                </label>
+                <input
+                  type="number"
+                  value={settings.max_one_subject_repetation_per_day_penalty_fector}
+                  onChange={(e) => handleSettingsChange("max_one_subject_repetation_per_day_penalty_fector", parseFloat(e.target.value) || 0)}
+                  style={styles.numberInput}
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              
+
+              {/* Weight Penalty Array */}
+              <div style={styles.settingFieldFull}>
+                <label style={styles.settingLabel}>
+                  Weight Penalty for Consecutive Subject Repetition
+                  <span style={styles.settingDescription}>Penalties for consecutive days (0-4 days)</span>
+                </label>
+                <div style={styles.arrayInputs}>
+                  {settings.weight_penalty_consu_sub_repetation.map((value, index) => (
+                    <div key={index} style={styles.arrayInputWrapper}>
+                      <span style={styles.arrayLabel}>Day {index}</span>
+                      <input
+                        type="number"
+                        value={value}
+                        onChange={(e) => handleNumberArrayChange(index, e.target.value)}
+                        style={styles.arrayInput}
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={styles.modalFooter}>
+              <button 
+                style={styles.defaultBtn}
+                onClick={handleResetToDefault}
+                disabled={!settingsChanged}
+              >
+                Reset to Default
+              </button>
+              <div style={styles.modalActions}>
+                <button 
+                  style={styles.cancelBtn}
+                  onClick={() => setShowSettings(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  style={styles.applyBtn}
+                  onClick={handleApplySettings}
+                >
+                  Apply Settings
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div style={styles.header}>
         <div>
@@ -365,6 +564,17 @@ const Feasibility: React.FC = () => {
                 </svg>
                 Run Again
               </button>
+
+              <button 
+                style={styles.secondaryBtn}
+                onClick={() => setShowSettings(true)}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Settings
+              </button>
               
               {result.feasible && !generatedTimetable && (
                 <button 
@@ -447,7 +657,185 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid #e2e8f0",
     boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)",
     minHeight: "calc(100vh - 48px)",
+    position: "relative",
   },
+  // ... (keep all existing styles as they were) ...
+  
+  // Modal Styles
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+    padding: "20px",
+  },
+  modalContent: {
+    background: "#ffffff",
+    borderRadius: "12px",
+    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+    maxWidth: "800px",
+    width: "100%",
+    maxHeight: "90vh",
+    overflow: "auto",
+  },
+  modalHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "24px 24px 16px",
+    borderBottom: "1px solid #e2e8f0",
+  },
+  modalTitle: {
+    fontSize: "18px",
+    fontWeight: "600",
+    color: "#1e293b",
+    margin: 0,
+  },
+  modalCloseBtn: {
+    background: "none",
+    border: "none",
+    fontSize: "24px",
+    color: "#64748b",
+    cursor: "pointer",
+    width: "32px",
+    height: "32px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "4px",
+  },
+  settingsGrid: {
+    padding: "24px",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+    gap: "20px",
+  },
+  settingField: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+  settingFieldFull: {
+    gridColumn: "1 / -1",
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+  },
+  settingLabel: {
+    fontSize: "14px",
+    fontWeight: "500",
+    color: "#1e293b",
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  },
+  settingDescription: {
+    fontSize: "12px",
+    color: "#64748b",
+    fontWeight: "400",
+  },
+  numberInput: {
+    padding: "8px 12px",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    fontSize: "14px",
+    color: "#1e293b",
+    background: "#ffffff",
+  },
+  checkboxContainer: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  },
+  checkbox: {
+    marginRight: "8px",
+  },
+  checkboxLabel: {
+    fontSize: "14px",
+    color: "#1e293b",
+    fontWeight: "500",
+  },
+  checkboxDescription: {
+    fontSize: "12px",
+    color: "#64748b",
+    marginLeft: "24px",
+  },
+  arrayInputs: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+    gap: "12px",
+    marginTop: "8px",
+  },
+  arrayInputWrapper: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  },
+  arrayLabel: {
+    fontSize: "12px",
+    color: "#64748b",
+  },
+  arrayInput: {
+    padding: "8px 12px",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    fontSize: "14px",
+    color: "#1e293b",
+    background: "#ffffff",
+  },
+  modalFooter: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "16px 24px",
+    borderTop: "1px solid #e2e8f0",
+    background: "#f8fafc",
+  },
+  defaultBtn: {
+    padding: "8px 16px",
+    background: "#f1f5f9",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+    opacity: 0.7,
+    transition: "all 0.2s",
+  },
+  modalActions: {
+    display: "flex",
+    gap: "12px",
+  },
+  cancelBtn: {
+    padding: "8px 16px",
+    background: "#ffffff",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+  },
+  applyBtn: {
+    padding: "8px 20px",
+    background: "#8b5cf6",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+  },
+  // ... (keep all other existing styles) ...
+
+  // The rest of your existing styles remain exactly the same...
   header: {
     display: "flex",
     justifyContent: "space-between",
@@ -786,5 +1174,15 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: "400px",
   },
 };
+
+// Add CSS animation
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(style);
 
 export default Feasibility;

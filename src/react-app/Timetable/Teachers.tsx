@@ -64,6 +64,7 @@ const TeachersAvailability: React.FC = () => {
   const [apiData, setApiData] = useState<ApiResponse | null>(null);
   const [teachers, setTeachers] = useState<TeacherData[]>([]);
   const [updatingSlot, setUpdatingSlot] = useState<string | null>(null);
+  const [expandedTeacher, setExpandedTeacher] = useState<string | null>(null);
 
   /* Get timetable ID from localStorage */
   useEffect(() => {
@@ -227,7 +228,7 @@ const TeachersAvailability: React.FC = () => {
       <div style={styles.header}>
         <div>
           <h3 style={styles.title}>Teachers Availability</h3>
-          <p style={styles.subtitle}>Click on slots to toggle availability</p>
+          <p style={styles.subtitle}>Click on slots to toggle availability status</p>
           {apiData && (
             <div style={styles.infoRow}>
               <span style={styles.infoBadge}>{apiData.center}</span>
@@ -236,7 +237,20 @@ const TeachersAvailability: React.FC = () => {
             </div>
           )}
         </div>
-       
+        
+        {/* Header Actions */}
+        <div style={styles.headerActions}>
+          <button 
+            style={styles.refreshBtn}
+            onClick={loadAvailability}
+            disabled={loading}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Error Display */}
@@ -285,7 +299,13 @@ const TeachersAvailability: React.FC = () => {
 
             {/* Teacher Rows */}
             {teachers.map(teacher => (
-              <div key={teacher.teacher_code} style={styles.teacherRow}>
+              <div 
+                key={teacher.teacher_code} 
+                style={{
+                  ...styles.teacherRow,
+                  backgroundColor: expandedTeacher === teacher.teacher_code ? '#f0f9ff' : '#ffffff'
+                }}
+              >
                 {/* Teacher Info */}
                 <div style={styles.teacherInfoCell}>
                   <div style={styles.teacherAvatar}>
@@ -294,71 +314,69 @@ const TeachersAvailability: React.FC = () => {
                   <div style={styles.teacherDetails}>
                     <div style={styles.teacherName}>{teacher.teacher_name}</div>
                     <div style={styles.teacherCode}>{teacher.teacher_code}</div>
-                    <div style={styles.slotCount}>{teacher.days.length} days</div>
+                    <div style={styles.slotCount}>
+                      <button 
+                        style={styles.expandBtn}
+                        onClick={() => setExpandedTeacher(
+                          expandedTeacher === teacher.teacher_code ? null : teacher.teacher_code
+                        )}
+                      >
+                        {expandedTeacher === teacher.teacher_code ? '▼' : '▶'} 
+                        {teacher.days.length} days
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                {/* Slots for each day */}
+                {/* Slots for each day - Compact Grid View */}
                 {uniqueDays.map(dayInfo => {
                   const daySlots = getTeacherSlotsForDay(teacher, dayInfo.date);
                   return (
                     <div key={`${teacher.teacher_code}-${dayInfo.date}`} style={styles.slotsCell}>
                       {daySlots.length > 0 ? (
-                        <div style={styles.slotsGrid}>
+                        <div style={styles.compactGrid}>
                           {daySlots.map(slot => {
                             const isUpdating = updatingSlot === `${teacher.teacher_code}-${slot.slot_id}`;
-                            const isBusy = slot.is_busy === true;
-                            
-                            // Determine slot style based on status
+
+                            // Determine slot style based on availability only
                             let bgColor = '#d1fae5';  // Available - green
                             let textColor = '#065f46';
                             let borderColor = '#a7f3d0';
-                            let statusText = 'AVL';
-                            
-                            if (isBusy) {
-                              bgColor = '#dbeafe';  // Busy - blue
-                              textColor = '#1e40af';
-                              borderColor = '#93c5fd';
-                              statusText = 'BUSY';
-                            } else if (!slot.is_available) {
+                            let statusText = 'A';
+
+                            if (!slot.is_available) {
                               bgColor = '#fee2e2';  // Unavailable - red
                               textColor = '#991b1b';
                               borderColor = '#fecaca';
-                              statusText = 'UNVL';
+                              statusText = 'U';
                             }
-                            
+
                             const batchInfo = slot.batch_name || slot.batch_code || '';
                             const subjectInfo = slot.subject_name || slot.subject_code || '';
-                            
+
                             return (
                               <button
                                 key={slot.slot_id}
-                                onClick={() => !isBusy && handleToggleAvailability(
+                                onClick={() => handleToggleAvailability(
                                   teacher.teacher_code,
                                   slot.slot_id,
                                   slot.is_available
                                 )}
-                                disabled={isUpdating || isBusy}
+                                disabled={isUpdating}
                                 style={{
-                                  ...styles.slotButton,
+                                  ...styles.slotPill,
                                   backgroundColor: bgColor,
                                   color: textColor,
                                   borderColor: borderColor,
                                   opacity: isUpdating ? 0.5 : 1,
-                                  cursor: isBusy ? 'not-allowed' : (isUpdating ? 'wait' : 'pointer')
+                                  cursor: isUpdating ? 'wait' : 'pointer',
+                                  transform: isUpdating ? 'scale(0.95)' : 'scale(1)'
                                 }}
-                                title={isBusy 
-                                  ? `BUSY: ${batchInfo}${subjectInfo ? ' - ' + subjectInfo : ''}\n${formatTime(slot.start_time)} - ${formatTime(slot.end_time)}\nSlot: ${slot.slot_code}`
-                                  : `${formatTime(slot.start_time)} - ${formatTime(slot.end_time)}\nSlot: ${slot.slot_code}\nID: ${slot.slot_id}\nClick to ${slot.is_available ? 'mark unavailable' : 'mark available'}`
-                                }
+                                title={`${formatTime(slot.start_time)} - ${formatTime(slot.end_time)}\n${slot.slot_code}\nClick to toggle`}
                               >
-                                <span style={styles.slotTime}>
-                                  {formatTime(slot.start_time)}-{formatTime(slot.end_time)}
+                                <span style={styles.slotTimeShort}>
+                                  {formatTime(slot.start_time).replace(':', '')}
                                 </span>
-                                {isBusy && batchInfo && (
-                                  <span style={styles.batchInfo}>{batchInfo}</span>
-                                )}
-                                <span style={styles.slotCode}>{slot.slot_code}</span>
                                 <span style={styles.slotStatus}>
                                   {isUpdating ? '...' : statusText}
                                 </span>
@@ -367,7 +385,7 @@ const TeachersAvailability: React.FC = () => {
                           })}
                         </div>
                       ) : (
-                        <span style={styles.noSlots}>-</span>
+                        <div style={styles.noSlots}>-</div>
                       )}
                     </div>
                   );
@@ -378,21 +396,143 @@ const TeachersAvailability: React.FC = () => {
         </div>
       )}
 
-      {/* Legend */}
-      <div style={styles.legend}>
-        <div style={styles.legendItem}>
-          <div style={{...styles.legendBox, backgroundColor: '#d1fae5', borderColor: '#a7f3d0', color: '#065f46'}}>AVL</div>
-          <span>Available</span>
+      {/* Expanded View Modal */}
+      {expandedTeacher && teachers.find(t => t.teacher_code === expandedTeacher) && (
+        <div style={styles.modalOverlay} onClick={() => setExpandedTeacher(null)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <div style={styles.modalTeacherInfo}>
+                <div style={{...styles.teacherAvatar, width: '48px', height: '48px', fontSize: '18px'}}>
+                  {teachers.find(t => t.teacher_code === expandedTeacher)!.teacher_name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 style={styles.modalTitle}>
+                    {teachers.find(t => t.teacher_code === expandedTeacher)!.teacher_name}
+                  </h3>
+                  <p style={styles.modalSubtitle}>
+                    {teachers.find(t => t.teacher_code === expandedTeacher)!.teacher_code}
+                  </p>
+                </div>
+              </div>
+              <button style={styles.closeModalBtn} onClick={() => setExpandedTeacher(null)}>×</button>
+            </div>
+            
+            <div style={styles.modalGrid}>
+              {uniqueDays.map(dayInfo => {
+                const teacher = teachers.find(t => t.teacher_code === expandedTeacher)!;
+                const daySlots = getTeacherSlotsForDay(teacher, dayInfo.date);
+                
+                return (
+                  <div key={dayInfo.date} style={styles.modalDayCard}>
+                    <div style={styles.modalDayHeader}>
+                      <div style={{
+                        ...styles.dayDot,
+                        backgroundColor: DAY_COLORS[dayInfo.day] || '#6B7280'
+                      }} />
+                      <div>
+                        <div style={styles.modalDayName}>{dayInfo.day}</div>
+                        <div style={styles.modalDayDate}>{dayInfo.date}</div>
+                      </div>
+                    </div>
+                    
+                    {daySlots.length > 0 ? (
+                      <div style={styles.modalSlotsGrid}>
+                        {daySlots.map(slot => {
+                          const isUpdating = updatingSlot === `${teacher.teacher_code}-${slot.slot_id}`;
+
+                          let bgColor = '#d1fae5';
+                          let textColor = '#065f46';
+                          let statusText = 'Available';
+
+                          if (!slot.is_available) {
+                            bgColor = '#fee2e2';
+                            textColor = '#991b1b';
+                            statusText = 'Unavailable';
+                          }
+
+                          return (
+                            <div key={slot.slot_id} style={{
+                              ...styles.modalSlotCard,
+                              backgroundColor: bgColor,
+                              borderColor: bgColor
+                            }}>
+                              <div style={styles.modalSlotHeader}>
+                                <span style={{color: textColor, fontWeight: '600'}}>{slot.slot_code}</span>
+                                <span style={{color: textColor, fontSize: '12px'}}>
+                                  {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
+                                </span>
+                              </div>
+                              <div style={styles.modalSlotInfo}>
+                                <span style={{color: textColor, fontSize: '11px'}}>
+                                  {(slot.batch_name || slot.subject_name) ? (
+                                    <>{slot.batch_name} {slot.subject_name && `- ${slot.subject_name}`}</>
+                                  ) : statusText}
+                                </span>
+                                <button
+                                  onClick={() => handleToggleAvailability(
+                                    teacher.teacher_code,
+                                    slot.slot_id,
+                                    slot.is_available
+                                  )}
+                                  disabled={isUpdating}
+                                  style={{
+                                    ...styles.toggleBtn,
+                                    backgroundColor: slot.is_available ? '#ef4444' : '#10b981',
+                                    color: '#ffffff'
+                                  }}
+                                >
+                                  {isUpdating ? '...' : (slot.is_available ? 'Mark Unavailable' : 'Mark Available')}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={styles.modalNoSlots}>No slots scheduled</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
-        <div style={styles.legendItem}>
-          <div style={{...styles.legendBox, backgroundColor: '#fee2e2', borderColor: '#fecaca', color: '#991b1b'}}>UNVL</div>
-          <span>Unavailable</span>
+      )}
+
+      {/* Legend and Stats */}
+      <div style={styles.footer}>
+        <div style={styles.legend}>
+          <div style={styles.legendItem}>
+            <div style={styles.legendDotAvailable}></div>
+            <span>A = Available</span>
+          </div>
+          <div style={styles.legendItem}>
+            <div style={styles.legendDotUnavailable}></div>
+            <span>U = Unavailable</span>
+          </div>
+          {/* Busy state removed from UI */}
         </div>
-        <div style={styles.legendItem}>
-          <div style={{...styles.legendBox, backgroundColor: '#dbeafe', borderColor: '#93c5fd', color: '#1e40af'}}>BUSY</div>
-          <span>Has Class</span>
+        
+        <div style={styles.statsInfo}>
+          <div style={styles.statsItem}>
+            <span style={styles.statsValue}>{teachers.reduce((acc, t) => acc + (t.days?.length || 0), 0)}</span>
+            <span style={styles.statsLabel}>Total Days</span>
+          </div>
+          <div style={styles.statsItem}>
+            <span style={styles.statsValue}>
+              {teachers.reduce((acc, t) => acc + (t.days?.reduce((dayAcc, d) => dayAcc + (d.slots?.length || 0), 0) || 0), 0)}
+            </span>
+            <span style={styles.statsLabel}>Total Slots</span>
+          </div>
+          <div style={styles.statsItem}>
+            <button 
+              style={styles.expandAllBtn}
+              onClick={() => setExpandedTeacher(null)}
+            >
+              Show All Details
+            </button>
+          </div>
         </div>
-        <span style={styles.legendHint}>Click on AVL/UNVL slots to toggle (BUSY slots are locked)</span>
       </div>
     </div>
   );
@@ -401,9 +541,12 @@ const TeachersAvailability: React.FC = () => {
 /* ================= STYLES ================= */
 const styles: { [key: string]: React.CSSProperties } = {
   wrapper: {
-    padding: "20px",
-    backgroundColor: "#f8fafc",
-    minHeight: "400px",
+    backgroundColor: "#ffffff",
+    padding: "24px",
+    borderRadius: "12px",
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)",
+    minHeight: "calc(100vh - 48px)",
   },
   loadingContainer: {
     display: "flex",
@@ -429,7 +572,9 @@ const styles: { [key: string]: React.CSSProperties } = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: "20px",
+    marginBottom: "24px",
+    flexWrap: "wrap",
+    gap: "16px",
   },
   title: {
     fontSize: "20px",
@@ -455,16 +600,23 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: "12px",
     fontWeight: "500",
   },
+  headerActions: {
+    display: "flex",
+    gap: "8px",
+    alignItems: "center",
+  },
   refreshBtn: {
     padding: "8px 16px",
     backgroundColor: "#ffffff",
+    color: "#475569",
     border: "1px solid #e2e8f0",
-    borderRadius: "6px",
+    borderRadius: "8px",
     cursor: "pointer",
     fontSize: "14px",
     display: "flex",
     alignItems: "center",
     gap: "6px",
+    transition: "all 0.2s",
   },
   errorAlert: {
     display: "flex",
@@ -487,7 +639,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   emptyState: {
     textAlign: "center" as const,
     padding: "60px 20px",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8fafc",
     borderRadius: "8px",
     border: "2px dashed #e2e8f0",
   },
@@ -510,6 +662,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     borderRadius: "8px",
     border: "1px solid #e2e8f0",
     overflow: "hidden",
+    marginBottom: "24px",
   },
   tableWrapper: {
     overflowX: "auto" as const,
@@ -521,7 +674,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     minWidth: "fit-content",
   },
   teacherColumn: {
-    minWidth: "200px",
+    minWidth: "220px",
     padding: "12px 16px",
     fontWeight: "600",
     color: "#475569",
@@ -531,8 +684,8 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: "14px",
   },
   dayColumn: {
-    minWidth: "150px",
-    padding: "12px 16px",
+    minWidth: "120px",
+    padding: "12px 8px",
     display: "flex",
     alignItems: "center",
     gap: "8px",
@@ -548,7 +701,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     flexDirection: "column" as const,
   },
   dayName: {
-    fontSize: "14px",
+    fontSize: "12px",
     fontWeight: "600",
     color: "#475569",
   },
@@ -560,9 +713,10 @@ const styles: { [key: string]: React.CSSProperties } = {
     display: "flex",
     borderBottom: "1px solid #e2e8f0",
     minWidth: "fit-content",
+    transition: "background-color 0.2s",
   },
   teacherInfoCell: {
-    minWidth: "200px",
+    minWidth: "220px",
     padding: "12px 16px",
     display: "flex",
     alignItems: "center",
@@ -573,7 +727,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   teacherAvatar: {
     width: "40px",
     height: "40px",
-    borderRadius: "50%",
+    borderRadius: "8px",
     backgroundColor: "#3b82f6",
     color: "#ffffff",
     display: "flex",
@@ -589,86 +743,265 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: "14px",
     fontWeight: "600",
     color: "#1e293b",
+    marginBottom: "2px",
   },
   teacherCode: {
     fontSize: "12px",
     color: "#64748b",
+    marginBottom: "4px",
   },
   slotCount: {
-    fontSize: "11px",
+    fontSize: "12px",
     color: "#94a3b8",
   },
+  expandBtn: {
+    background: "none",
+    border: "none",
+    color: "#3b82f6",
+    cursor: "pointer",
+    fontSize: "11px",
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    padding: "0",
+  },
   slotsCell: {
-    minWidth: "150px",
-    padding: "8px",
+    minWidth: "120px",
+    padding: "8px 4px",
     borderRight: "1px solid #e2e8f0",
     backgroundColor: "#ffffff",
   },
-  slotsGrid: {
-    display: "flex",
-    flexDirection: "column" as const,
+  compactGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(32px, 1fr))",
     gap: "4px",
   },
-  slotButton: {
-    padding: "6px 8px",
-    borderRadius: "4px",
+  slotPill: {
+    width: "32px",
+    height: "32px",
+    borderRadius: "6px",
     border: "1px solid",
-    fontSize: "11px",
     display: "flex",
     flexDirection: "column" as const,
     alignItems: "center",
-    gap: "2px",
+    justifyContent: "center",
+    fontSize: "10px",
+    fontWeight: "600",
     transition: "all 0.2s",
+    padding: "0",
   },
-  slotTime: {
-    fontWeight: "500",
-  },
-  slotCode: {
+  slotTimeShort: {
     fontSize: "9px",
-    color: "#6b7280",
+    fontWeight: "500",
+    lineHeight: 1,
   },
   slotStatus: {
     fontSize: "10px",
     fontWeight: "600",
-  },
-  batchInfo: {
-    fontSize: "9px",
-    fontWeight: "600",
-    maxWidth: "80px",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap" as const,
+    lineHeight: 1,
   },
   noSlots: {
     color: "#cbd5e1",
     fontSize: "14px",
+    textAlign: "center" as const,
+    padding: "8px 0",
+  },
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+    padding: "20px",
+  },
+  modalContent: {
+    backgroundColor: "#ffffff",
+    borderRadius: "12px",
+    width: "90%",
+    maxWidth: "1200px",
+    maxHeight: "80vh",
+    overflow: "auto",
+    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
+  },
+  modalHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "20px 24px",
+    backgroundColor: "#f8fafc",
+    borderBottom: "1px solid #e2e8f0",
+  },
+  modalTeacherInfo: {
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+  },
+  modalTitle: {
+    fontSize: "18px",
+    fontWeight: "600",
+    color: "#1e293b",
+    margin: "0 0 4px 0",
+  },
+  modalSubtitle: {
+    fontSize: "14px",
+    color: "#64748b",
+    margin: "0",
+  },
+  closeModalBtn: {
+    width: "32px",
+    height: "32px",
+    borderRadius: "6px",
+    border: "1px solid #d1d5db",
+    background: "#ffffff",
+    cursor: "pointer",
+    fontSize: "18px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+    gap: "16px",
+    padding: "24px",
+  },
+  modalDayCard: {
+    backgroundColor: "#f8fafc",
+    borderRadius: "8px",
+    border: "1px solid #e2e8f0",
+    padding: "16px",
+  },
+  modalDayHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    marginBottom: "16px",
+  },
+  modalDayName: {
+    fontSize: "14px",
+    fontWeight: "600",
+    color: "#1e293b",
+  },
+  modalDayDate: {
+    fontSize: "12px",
+    color: "#64748b",
+  },
+  modalSlotsGrid: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+  modalSlotCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: "6px",
+    border: "1px solid",
+    padding: "12px",
+  },
+  modalSlotHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "8px",
+  },
+  modalSlotInfo: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  toggleBtn: {
+    padding: "4px 8px",
+    fontSize: "11px",
+    borderRadius: "4px",
+    border: "none",
+    cursor: "pointer",
+    fontWeight: "500",
+  },
+  modalNoSlots: {
+    color: "#94a3b8",
+    fontSize: "14px",
+    textAlign: "center",
+    padding: "12px",
+  },
+  footer: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "16px",
+    backgroundColor: "#f8fafc",
+    borderRadius: "8px",
+    border: "1px solid #e2e8f0",
+    flexWrap: "wrap",
+    gap: "16px",
   },
   legend: {
     display: "flex",
-    alignItems: "center",
     gap: "20px",
-    marginTop: "16px",
-    padding: "12px 16px",
-    backgroundColor: "#ffffff",
-    borderRadius: "6px",
-    border: "1px solid #e2e8f0",
+    alignItems: "center",
+    flexWrap: "wrap",
   },
   legendItem: {
     display: "flex",
     alignItems: "center",
     gap: "8px",
-  },
-  legendBox: {
-    padding: "4px 8px",
-    borderRadius: "4px",
-    border: "1px solid",
-    fontSize: "11px",
-    fontWeight: "600",
-  },
-  legendHint: {
-    marginLeft: "auto",
     fontSize: "12px",
-    color: "#94a3b8",
+    color: "#475569",
+  },
+  legendDotAvailable: {
+    width: "12px",
+    height: "12px",
+    borderRadius: "4px",
+    backgroundColor: "#d1fae5",
+    border: "1px solid #a7f3d0",
+  },
+  legendDotUnavailable: {
+    width: "12px",
+    height: "12px",
+    borderRadius: "4px",
+    backgroundColor: "#fee2e2",
+    border: "1px solid #fecaca",
+  },
+  legendDotBusy: {
+    width: "12px",
+    height: "12px",
+    borderRadius: "4px",
+    backgroundColor: "#dbeafe",
+    border: "1px solid #93c5fd",
+  },
+  statsInfo: {
+    display: "flex",
+    gap: "24px",
+    alignItems: "center",
+  },
+  statsItem: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+  },
+  statsValue: {
+    fontSize: "18px",
+    fontWeight: "600",
+    color: "#1e293b",
+  },
+  statsLabel: {
+    fontSize: "11px",
+    color: "#64748b",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+  },
+  expandAllBtn: {
+    padding: "8px 16px",
+    backgroundColor: "#ffffff",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "13px",
+    fontWeight: "500",
   },
 };
 
