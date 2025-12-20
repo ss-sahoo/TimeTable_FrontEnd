@@ -35,10 +35,7 @@ interface Batch {
   students?: string;
 }
 
-interface Timetable {
-  id: string;
-  name: string;
-}
+
 
 /* ================= BATCH COLORS ================= */
 const BATCH_COLORS = [
@@ -92,14 +89,107 @@ const BatchSchedule: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [showHelp, setShowHelp] = useState(true);
   
-  // State for timetable selection
-  const [timetables, setTimetables] = useState<Timetable[]>([]);
+  // State for timetable name (display only)
+  const [timetableName, setTimetableName] = useState<string>("");
 
   // ===================== API FUNCTIONS =====================
   
   // Function to get access token
   const getAccessToken = () => {
     return localStorage.getItem("access_token");
+  };
+
+  // Function to fetch assigned batches for a timetable
+  const fetchAssignedBatches = async (ttId: string) => {
+    try {
+      const accessToken = getAccessToken();
+      
+      if (!accessToken) {
+        throw new Error("No access token found. Please login again.");
+      }
+      
+      if (!ttId) {
+        console.log("No timetable ID provided");
+        return { batches: [] };
+      }
+      
+      const response = await fetch(
+        `https://exams.dashoapp.com/api/timetable/timetables/${ttId}/batch-assignments/`,
+        {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        // Handle 404 as empty result (no assignments yet)
+        if (response.status === 404) {
+          console.log("No batch assignments found for this timetable");
+          return { batches: [] };
+        }
+        throw new Error(`Failed to fetch assigned batches: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("Assigned batches API response:", data);
+      
+      // Handle null or undefined response
+      if (!data) {
+        return { batches: [] };
+      }
+      
+      return data;
+      
+    } catch (error: any) {
+      console.error("Error fetching assigned batches:", error);
+      return { batches: [] };
+    }
+  };
+
+  // Function to assign batch to timetable
+  const assignBatchToTimetable = async (ttId: string, batchCode: string) => {
+    try {
+      const accessToken = getAccessToken();
+      
+      if (!accessToken) {
+        throw new Error("No access token found. Please login again.");
+      }
+      
+      const payload = {
+        timetable_id: ttId,
+        batch_code: batchCode,
+      };
+      
+      console.log("Assigning batch with payload:", payload);
+      
+      const response = await fetch(
+        "https://exams.dashoapp.com/api/timetable/admin/timetables/assign-batch/",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to assign batch: ${response.status} - ${JSON.stringify(errorData)}`);
+      }
+      
+      const data = await response.json();
+      console.log("Batch assigned successfully:", data);
+      return data;
+      
+    } catch (error: any) {
+      console.error("Error assigning batch:", error);
+      throw error;
+    }
   };
 
   // Function to fetch teachers from API
@@ -243,17 +333,17 @@ const BatchSchedule: React.FC = () => {
     }
   };
   
-  // Function to fetch timetables
-  const fetchTimetables = async () => {
+  // Function to fetch timetable details (for display name)
+  const fetchTimetableDetails = async (ttId: string) => {
     try {
       const accessToken = getAccessToken();
       
-      if (!accessToken) {
-        throw new Error("No access token found. Please login again.");
+      if (!accessToken || !ttId) {
+        return;
       }
       
       const response = await fetch(
-        `https://exams.dashoapp.com/api/timetable/centers/${centerId}/timetables/`,
+        `https://exams.dashoapp.com/api/timetable/timetables/${ttId}/`,
         {
           method: "GET",
           headers: {
@@ -263,27 +353,14 @@ const BatchSchedule: React.FC = () => {
         }
       );
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch timetables: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log("Timetables API response:", data);
-      
-      if (data.results && data.results.length > 0) {
-        const formattedTimetables: Timetable[] = data.results.map((timetable: any) => ({
-          id: timetable.id,
-          name: timetable.name || `Timetable ${timetable.id.slice(0, 8)}`
-        }));
-        setTimetables(formattedTimetables);
-        setTimetableId(formattedTimetables[0]?.id || "");
+      if (response.ok) {
+        const data = await response.json();
+        setTimetableName(data.name || `Timetable ${ttId.slice(0, 8)}`);
       }
       
     } catch (error: any) {
-      console.error("Error fetching timetables:", error);
-      // Fallback to mock timetable
-      setTimetables([{ id: "default-timetable", name: "Default Timetable" }]);
-      setTimetableId("default-timetable");
+      console.error("Error fetching timetable details:", error);
+      setTimetableName(`Timetable ${ttId.slice(0, 8)}`);
     }
   };
 
@@ -350,7 +427,7 @@ const BatchSchedule: React.FC = () => {
     }
   };
 
-  // Function to fetch initial batches (for display)
+  // Function to fetch initial batches (for display) - now fetches assigned batches
   const fetchBatchesFromAPI = async () => {
     setLoading(true);
     setError(null);
@@ -362,7 +439,8 @@ const BatchSchedule: React.FC = () => {
         throw new Error("No access token found. Please login again.");
       }
       
-      const response = await fetch(
+      // First fetch all batches for the center (for the "Add Batch" dropdown)
+      const allBatchesResponse = await fetch(
         `https://exams.dashoapp.com/api/timetable/centers/${centerId}/batches/`,
         {
           method: "GET",
@@ -373,15 +451,15 @@ const BatchSchedule: React.FC = () => {
         }
       );
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch batches: ${response.status}`);
+      if (!allBatchesResponse.ok) {
+        throw new Error(`Failed to fetch batches: ${allBatchesResponse.status}`);
       }
       
-      const data = await response.json();
-      console.log("Batches API response:", data);
+      const allBatchesData = await allBatchesResponse.json();
+      console.log("All Batches API response:", allBatchesData);
       
       // Transform API data to match our UI format
-      const formattedBatches: Batch[] = data.results.map((batch: any, index: number) => ({
+      const formattedAllBatches: Batch[] = (allBatchesData.results || []).map((batch: any, index: number) => ({
         id: batch.id,
         code: batch.code,
         name: batch.name,
@@ -396,47 +474,123 @@ const BatchSchedule: React.FC = () => {
         students: batch.student_count.toString()
       }));
       
-      // Initially show all batches
-      setBatches(formattedBatches);
-      setAllBatchesFromAPI(formattedBatches);
-      setCenterName(data.center_name || "Center Test");
+      setAllBatchesFromAPI(formattedAllBatches);
+      setCenterName(allBatchesData.center_name || "Center Test");
       
-      // Set first batch as active if available
-      if (formattedBatches.length > 0 && !activeBatch) {
-        setActiveBatch(formattedBatches[0].id);
+      // Now fetch assigned batches for the current timetable
+      if (timetableId) {
+        await loadAssignedBatches(timetableId, formattedAllBatches);
+      } else {
+        // No timetable selected, show empty
+        setBatches([]);
       }
       
     } catch (error: any) {
       console.error("Error fetching batches:", error);
       setError(error.message || "Failed to load batches");
-      
-      // Fallback to mock data if API fails
-      setBatches([
-        { 
-          id: "12a1eb2d-58e0-4696-adeb-bdaf57c3d399", 
-          code: "HDTN-1A-ZA1", 
-          name: "Super 30 - Batch A (2025)", 
-          start_date: "2025-01-01", 
-          end_date: "2025-03-31", 
-          program: { id: "2858f78d-74e6-42d2-a443-1ac1f10e3a29", name: "JEE Main 2025" }, 
-          student_count: 0, 
-          teacher_count: 0, 
-          created_at: "2025-12-18T11:58:42.245735+00:00",
-          color: BATCH_COLORS[0],
-          year: "2025 Year",
-          students: "0"
-        }
-      ]);
+      setBatches([]);
       
     } finally {
       setLoading(false);
     }
   };
 
-  // Function to add a batch to the current view
-  const addBatchToView = () => {
+  // Function to load assigned batches for a timetable
+  const loadAssignedBatches = async (ttId: string, allBatches?: Batch[]) => {
+    try {
+      const assignedData = await fetchAssignedBatches(ttId);
+      console.log("Assigned batches data:", assignedData);
+      
+      const batchesSource = allBatches || allBatchesFromAPI;
+      
+      // Handle the new API response format: { batches: [...] }
+      const batchesArray = assignedData?.batches || assignedData?.results || [];
+      
+      if (!batchesArray || batchesArray.length === 0) {
+        console.log("No batches assigned to this timetable");
+        setBatches([]);
+        setActiveBatch("");
+        return;
+      }
+      
+      // Get the batch codes that are assigned
+      const assignedBatchCodes: string[] = batchesArray.map((assignment: any) => 
+        assignment.batch_code
+      ).filter(Boolean);
+      
+      console.log("Assigned batch codes:", assignedBatchCodes);
+      
+      // Filter all batches to only show assigned ones
+      const assignedBatches = batchesSource.filter(batch => 
+        assignedBatchCodes.includes(batch.code)
+      ).map((batch, index) => ({
+        ...batch,
+        color: BATCH_COLORS[index % BATCH_COLORS.length]
+      }));
+      
+      console.log("Filtered assigned batches:", assignedBatches);
+      
+      setBatches(assignedBatches);
+      
+      // Load teacher assignments from the API response
+      const newTeacherAssignments: {batchId: string, teachers: Teacher[], timetableId?: string}[] = [];
+      
+      for (const batchAssignment of batchesArray) {
+        const batchCode = batchAssignment.batch_code;
+        const batchObj = assignedBatches.find(b => b.code === batchCode);
+        
+        if (batchObj && batchAssignment.teachers && batchAssignment.teachers.length > 0) {
+          const teachers: Teacher[] = batchAssignment.teachers.map((t: any) => ({
+            id: t.teacher_id || t.teacher_code,
+            name: t.teacher_name || "Unknown",
+            code: t.teacher_code,
+            subject: t.subject || "General",
+            department: "General",
+            minLecturesPerDay: t.min_lectures_per_day || 1,
+            maxLecturesPerDay: t.max_lectures_per_day || 2,
+            minLecturesPerWeek: t.total_lectures || 4,
+            maxLecturesPerWeek: t.max_lectures_per_week || 8,
+          }));
+          
+          newTeacherAssignments.push({
+            batchId: batchObj.id,
+            teachers,
+            timetableId: ttId
+          });
+        }
+      }
+      
+      if (newTeacherAssignments.length > 0) {
+        console.log("Loaded teacher assignments from API:", newTeacherAssignments);
+        setTeacherAssignments(prev => {
+          // Merge with existing assignments, preferring API data for this timetable
+          const otherAssignments = prev.filter(a => a.timetableId !== ttId);
+          return [...otherAssignments, ...newTeacherAssignments];
+        });
+      }
+      
+      // Set first batch as active if available
+      if (assignedBatches.length > 0 && !activeBatch) {
+        setActiveBatch(assignedBatches[0].id);
+      } else if (assignedBatches.length === 0) {
+        setActiveBatch("");
+      }
+      
+    } catch (error: any) {
+      console.error("Error loading assigned batches:", error);
+      setBatches([]);
+    }
+  };
+
+  // Function to add a batch to the current view (calls assign-batch API)
+  const addBatchToView = async () => {
     if (!selectedBatchToAdd) {
       alert("Please select a batch to add");
+      return;
+    }
+    
+    if (!timetableId) {
+      alert("Please select a timetable first");
       return;
     }
     
@@ -449,28 +603,36 @@ const BatchSchedule: React.FC = () => {
     
     // Check if batch is already added
     if (batches.some(batch => batch.id === batchToAdd.id)) {
-      alert("This batch is already added to your view");
+      alert("This batch is already assigned to this timetable");
       return;
     }
     
-    // Add the batch with a new color
-    const newBatch = {
-      ...batchToAdd,
-      color: BATCH_COLORS[batches.length % BATCH_COLORS.length]
-    };
-    
-    setBatches(prev => [...prev, newBatch]);
-    
-    // If no batch is active, set this as active
-    if (!activeBatch) {
-      setActiveBatch(newBatch.id);
+    try {
+      // Call the assign-batch API
+      await assignBatchToTimetable(timetableId, batchToAdd.code);
+      
+      // Add the batch with a new color
+      const newBatch = {
+        ...batchToAdd,
+        color: BATCH_COLORS[batches.length % BATCH_COLORS.length]
+      };
+      
+      setBatches(prev => [...prev, newBatch]);
+      
+      // If no batch is active, set this as active
+      if (!activeBatch) {
+        setActiveBatch(newBatch.id);
+      }
+      
+      // Close the selector
+      setShowBatchSelector(false);
+      setSelectedBatchToAdd("");
+      
+      alert(`Batch "${newBatch.name}" assigned successfully!`);
+      
+    } catch (error: any) {
+      alert(`Failed to assign batch: ${error.message}`);
     }
-    
-    // Close the selector
-    setShowBatchSelector(false);
-    setSelectedBatchToAdd("");
-    
-    alert(`Batch "${newBatch.name}" added successfully!`);
   };
 
   // Function to remove a batch from view
@@ -707,13 +869,31 @@ const BatchSchedule: React.FC = () => {
   /* Fetch data on component mount */
   useEffect(() => {
     const fetchAllData = async () => {
-      await fetchBatchesFromAPI();
+      // Get timetable_id from localStorage
+      const storedTimetableId = localStorage.getItem('timetable_id');
+      if (storedTimetableId) {
+        const cleanId = storedTimetableId.replace(/"/g, '').trim();
+        console.log("Found timetable_id in localStorage:", cleanId);
+        setTimetableId(cleanId);
+        await fetchTimetableDetails(cleanId);
+      } else {
+        console.log("No timetable_id found in localStorage");
+        setError("No timetable selected. Please select a timetable from the Slots tab first.");
+      }
+      
       await fetchTeachersFromAPI();
-      await fetchTimetables();
     };
     
     fetchAllData();
   }, [centerId]);
+
+  /* Fetch batches when timetable changes */
+  useEffect(() => {
+    if (timetableId) {
+      console.log("Timetable changed, fetching batches for:", timetableId);
+      fetchBatchesFromAPI();
+    }
+  }, [timetableId, centerId]);
 
   /* Save data to localStorage */
   useEffect(() => {
@@ -762,6 +942,11 @@ const BatchSchedule: React.FC = () => {
 
   const activeBatchObj = getActiveBatch();
   
+  // Get available batches for adding (batches not already assigned)
+  const availableBatches = allBatchesFromAPI.filter(
+    apiBatch => !batches.some(viewBatch => viewBatch.id === apiBatch.id)
+  );
+  
   if (!activeBatchObj && batches.length > 0) {
     // Show loading while setting active batch
     return (
@@ -777,27 +962,149 @@ const BatchSchedule: React.FC = () => {
   if (!activeBatchObj) {
     return (
       <div style={styles.wrapper}>
-        <div style={styles.errorState}>
-          <h3 style={styles.title}>No Batches Available</h3>
-          <p>No batches found for this center.</p>
-          <button 
-            style={styles.retryButton}
-            onClick={refreshBatches}
-          >
-            Refresh
-          </button>
+        {/* Header */}
+        <div style={styles.header}>
+          <div>
+            <h3 style={styles.title}>Batch Teachers Assignment</h3>
+            <p style={styles.subtitle}>
+              Assign teachers and set lecture limits for batches in <strong>{centerName}</strong>
+            </p>
+          </div>
         </div>
+
+        {/* Timetable Info (Read-only) */}
+        {timetableId && (
+          <div style={styles.timetableSelector}>
+            <div style={styles.timetableLabel}>
+              <strong>Current Timetable:</strong> {timetableName || `Timetable ${timetableId.slice(0, 8)}`}
+            </div>
+            <div style={styles.timetableInfo}>
+              <span>ID: </span>
+              <code style={styles.codeText}>{timetableId}</code>
+            </div>
+          </div>
+        )}
+
+        {/* Empty State */}
+        <div style={styles.emptyState}>
+          <div style={styles.emptyIcon}>📋</div>
+          <h3 style={styles.emptyTitle}>No Batches Assigned</h3>
+          <p style={styles.emptyText}>
+            {!timetableId 
+              ? "No timetable selected. Please select a timetable from the Slots tab first."
+              : "No batches are assigned to this timetable yet. Click 'Add Batch' to assign one."
+            }
+          </p>
+          {timetableId && (
+            <button
+              style={styles.addBatchButtonLarge}
+              onClick={openBatchSelector}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 5v14M5 12h14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Add Batch to Timetable
+            </button>
+          )}
+        </div>
+
+        {/* Batch Selector Modal */}
+        {showBatchSelector && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <div style={styles.modalHeader}>
+                <h3 style={styles.modalTitle}>Assign Batch to Timetable</h3>
+                <button
+                  style={styles.modalClose}
+                  onClick={() => setShowBatchSelector(false)}
+                  title="Close"
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div style={styles.modalBody}>
+                {loadingAllBatches ? (
+                  <div style={styles.loadingState}>
+                    <div style={styles.spinner}></div>
+                    <p>Loading available batches...</p>
+                  </div>
+                ) : availableBatches.length === 0 ? (
+                  <div style={styles.noBatchesMessage}>
+                    <p>No additional batches available to assign.</p>
+                    <p>All batches are already assigned to this timetable.</p>
+                  </div>
+                ) : (
+                  <>
+                    <p style={styles.modalText}>
+                      Select a batch to assign to this timetable:
+                    </p>
+                    
+                    <div style={styles.batchSelector}>
+                      <select
+                        value={selectedBatchToAdd}
+                        onChange={(e) => setSelectedBatchToAdd(e.target.value)}
+                        style={styles.batchSelect}
+                      >
+                        <option value="">-- Select Batch --</option>
+                        {availableBatches.map(batch => (
+                          <option key={batch.id} value={batch.id}>
+                            {batch.name} ({batch.code}) - {batch.program.name}
+                          </option>
+                        ))}
+                      </select>
+                      
+                      {selectedBatchToAdd && (
+                        <div style={styles.selectedBatchInfo}>
+                          <div style={styles.batchInfoRow}>
+                            <span style={styles.batchInfoLabel}>Batch:</span>
+                            <span style={styles.batchInfoValue}>
+                              {availableBatches.find(b => b.id === selectedBatchToAdd)?.name}
+                            </span>
+                          </div>
+                          <div style={styles.batchInfoRow}>
+                            <span style={styles.batchInfoLabel}>Code:</span>
+                            <span style={styles.batchInfoValue}>
+                              {availableBatches.find(b => b.id === selectedBatchToAdd)?.code}
+                            </span>
+                          </div>
+                          <div style={styles.batchInfoRow}>
+                            <span style={styles.batchInfoLabel}>Program:</span>
+                            <span style={styles.batchInfoValue}>
+                              {availableBatches.find(b => b.id === selectedBatchToAdd)?.program.name}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+              
+              <div style={styles.modalFooter}>
+                <button
+                  style={styles.modalCancel}
+                  onClick={() => setShowBatchSelector(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  style={styles.modalAdd}
+                  onClick={addBatchToView}
+                  disabled={loadingAllBatches || !selectedBatchToAdd}
+                >
+                  Assign to Timetable
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   const activeBatchTeachers = getBatchAssignments(activeBatch);
   const stats = getBatchStats(activeBatch);
-
-  // Get available batches for adding (batches not already in view)
-  const availableBatches = allBatchesFromAPI.filter(
-    apiBatch => !batches.some(viewBatch => viewBatch.id === apiBatch.id)
-  );
 
   return (
     <div style={styles.wrapper}>
@@ -915,28 +1222,15 @@ const BatchSchedule: React.FC = () => {
         </div>
       </div>
 
-      {/* Timetable Selection */}
+      {/* Timetable Info (Read-only) */}
       <div style={styles.timetableSelector}>
-        <label style={styles.timetableLabel}>
-          Select Timetable:
-          <select 
-            value={timetableId}
-            onChange={(e) => setTimetableId(e.target.value)}
-            style={styles.timetableSelect}
-          >
-            {timetables.map(timetable => (
-              <option key={timetable.id} value={timetable.id}>
-                {timetable.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {timetableId && (
-          <div style={styles.timetableInfo}>
-            <span>Timetable ID: </span>
-            <code style={styles.codeText}>{timetableId}</code>
-          </div>
-        )}
+        <div style={styles.timetableLabel}>
+          <strong>Current Timetable:</strong> {timetableName || `Timetable ${timetableId.slice(0, 8)}`}
+        </div>
+        <div style={styles.timetableInfo}>
+          <span>ID: </span>
+          <code style={styles.codeText}>{timetableId}</code>
+        </div>
       </div>
 
       {/* Help Section */}
@@ -953,15 +1247,13 @@ const BatchSchedule: React.FC = () => {
             </button>
           </div>
           <ul style={styles.helpList}>
-            <li>Select a timetable before assigning teachers</li>
-            <li>Batches are fetched from the backend API for <strong>{centerName}</strong></li>
-            <li>Use "Add Batch" button to add more batches to your view</li>
-            <li>Click "×" on batch tabs to remove them from view</li>
+            <li><strong>Select a timetable first</strong> - batches assigned to that timetable will be shown</li>
+            <li>Use "Add Batch" button to assign a batch to the selected timetable</li>
+            <li>Only batches assigned to the timetable are displayed</li>
             <li>Teachers are fetched from the teacher API</li>
             <li>Click "Add Teacher" to select teachers from the dropdown</li>
             <li>The "Min/Week" field is sent as "total_lectures" to backend</li>
-            <li>Click "Save to Backend" to save assignments to server</li>
-            <li>Click "Load Saved" to reload assignments from localStorage</li>
+            <li>Click "Save to Backend" to save teacher assignments to server</li>
             <li>Each batch maintains its own list of teachers</li>
             <li>Use refresh buttons to reload data from server</li>
           </ul>
@@ -1495,6 +1787,47 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: "500",
     fontSize: "14px",
   },
+  emptyState: {
+    padding: "60px 40px",
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "16px",
+    background: "#f8fafc",
+    borderRadius: "12px",
+    border: "2px dashed #cbd5e1",
+    marginTop: "20px",
+  },
+  emptyIcon: {
+    fontSize: "48px",
+  },
+  emptyTitle: {
+    fontSize: "20px",
+    fontWeight: "600",
+    color: "#1e293b",
+    margin: "0",
+  },
+  emptyText: {
+    fontSize: "14px",
+    color: "#64748b",
+    margin: "0",
+    maxWidth: "400px",
+  },
+  addBatchButtonLarge: {
+    padding: "12px 24px",
+    background: "#3b82f6",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: "500",
+    fontSize: "14px",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    marginTop: "8px",
+  },
   header: {
     display: "flex",
     justifyContent: "space-between",
@@ -1630,15 +1963,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: "8px",
   },
-  timetableSelect: {
-    padding: "8px 12px",
-    borderRadius: "6px",
-    border: "1px solid #94a3b8",
-    background: "#ffffff",
-    fontSize: "14px",
-    color: "#1e293b",
-    minWidth: "200px",
-  },
+
   timetableInfo: {
     fontSize: "12px",
     color: "#475569",
