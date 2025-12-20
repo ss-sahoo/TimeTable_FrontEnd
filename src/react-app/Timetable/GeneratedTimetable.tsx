@@ -61,6 +61,7 @@ interface TimetableResponse {
 }
 
 type ViewMode = "batch" | "teacher";
+type DisplayMode = "all" | "single";
 
 /* ================= CONSTANTS ================= */
 const SUBJECT_COLORS: { [key: string]: { bg: string; text: string; border: string } } = {
@@ -84,6 +85,16 @@ const DAY_COLORS: { [key: string]: string } = {
   "d7": "#06b6d4",
 };
 
+const DAY_NAMES: { [key: string]: string } = {
+  "d1": "Monday",
+  "d2": "Tuesday",
+  "d3": "Wednesday",
+  "d4": "Thursday",
+  "d5": "Friday",
+  "d6": "Saturday",
+  "d7": "Sunday",
+};
+
 const BATCH_COLORS = [
   { bg: "#eff6ff", border: "#3b82f6", text: "#1e40af" },
   { bg: "#f0fdf4", border: "#22c55e", text: "#166534" },
@@ -104,6 +115,8 @@ const GeneratedTimetable: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("batch");
+  const [displayMode, setDisplayMode] = useState<DisplayMode>("all");
+  
   const [timetableInfo, setTimetableInfo] = useState<{
     timetable: string;
     from_date: string;
@@ -147,13 +160,17 @@ const GeneratedTimetable: React.FC = () => {
           to_date: data.to_date,
         });
         setBatches(data.batches || []);
+        // Auto-select first batch if in single mode
+        if (data.batches && data.batches.length > 0 && displayMode === "single") {
+          setSelectedBatchId(data.batches[0].batch_id);
+        }
       }
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [timetableId]);
+  }, [timetableId, displayMode]);
 
   // Load teachers data
   const loadTeachersData = useCallback(async () => {
@@ -174,13 +191,17 @@ const GeneratedTimetable: React.FC = () => {
           to_date: data.to_date,
         });
         setTeachers(data.teachers || []);
+        // Auto-select first teacher if in single mode
+        if (data.teachers && data.teachers.length > 0 && displayMode === "single") {
+          setSelectedTeacherId(data.teachers[0].teacher_id);
+        }
       }
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [timetableId]);
+  }, [timetableId, displayMode]);
 
   // Load data based on view mode
   useEffect(() => {
@@ -256,17 +277,39 @@ const GeneratedTimetable: React.FC = () => {
       <div style={styles.viewTabs}>
         <button
           style={viewMode === "batch" ? styles.viewTabActive : styles.viewTab}
-          onClick={() => { setViewMode("batch"); setSelectedBatchId("all"); }}
+          onClick={() => { setViewMode("batch"); setSelectedBatchId("all"); setDisplayMode("all"); }}
         >
           <span style={styles.tabIcon}>📚</span>
           Batch-wise View
         </button>
         <button
           style={viewMode === "teacher" ? styles.viewTabActive : styles.viewTab}
-          onClick={() => { setViewMode("teacher"); setSelectedTeacherId("all"); }}
+          onClick={() => { setViewMode("teacher"); setSelectedTeacherId("all"); setDisplayMode("all"); }}
         >
           <span style={styles.tabIcon}>👨‍🏫</span>
           Teacher-wise View
+        </button>
+      </div>
+
+      {/* Display Mode Toggle */}
+      <div style={styles.displayModeToggle}>
+        <button
+          style={displayMode === "all" ? styles.displayModeActive : styles.displayModeBtn}
+          onClick={() => {
+            setDisplayMode("all");
+            if (viewMode === "batch") setSelectedBatchId("all");
+            else setSelectedTeacherId("all");
+          }}
+        >
+          <span style={styles.displayModeIcon}>📋</span>
+          All {viewMode === "batch" ? "Batches" : "Teachers"}
+        </button>
+        <button
+          style={displayMode === "single" ? styles.displayModeActive : styles.displayModeBtn}
+          onClick={() => setDisplayMode("single")}
+        >
+          <span style={styles.displayModeIcon}>👤</span>
+          Single {viewMode === "batch" ? "Batch" : "Teacher"}
         </button>
       </div>
 
@@ -301,19 +344,46 @@ const GeneratedTimetable: React.FC = () => {
         )}
       </div>
 
-      {/* Filter Row */}
-      <div style={styles.filterRow}>
-        <span style={styles.filterLabel}>Filter by {viewMode === "batch" ? "Batch" : "Teacher"}:</span>
-        
-        {viewMode === "batch" ? (
-          <>
-            <button
-              style={selectedBatchId === "all" ? styles.filterActive : styles.filterBtn}
-              onClick={() => setSelectedBatchId("all")}
+      {/* Filter Row - Only show in single display mode */}
+      {displayMode === "single" && (
+        <div style={styles.filterRow}>
+          <span style={styles.filterLabel}>
+            Select {viewMode === "batch" ? "Batch" : "Teacher"}:
+          </span>
+          {viewMode === "batch" ? (
+            <select
+              style={styles.filterSelect}
+              value={selectedBatchId}
+              onChange={(e) => setSelectedBatchId(e.target.value)}
             >
-              All Batches
-            </button>
-            {batches.map((b, i) => (
+              {batches.map((b) => (
+                <option key={b.batch_id} value={b.batch_id}>
+                  {b.batch_name} ({b.batch_code})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              style={styles.filterSelect}
+              value={selectedTeacherId}
+              onChange={(e) => setSelectedTeacherId(e.target.value)}
+            >
+              {teachers.map((t) => (
+                <option key={t.teacher_id} value={t.teacher_id}>
+                  {t.teacher_name} ({t.teacher_code})
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
+      {/* All View Buttons - Only show in all display mode */}
+      {displayMode === "all" && (
+        <div style={styles.filterRow}>
+          <span style={styles.filterLabel}>View all {viewMode === "batch" ? "batches" : "teachers"}:</span>
+          {viewMode === "batch" ? (
+            batches.map((b, i) => (
               <button
                 key={b.batch_id}
                 style={{
@@ -324,17 +394,9 @@ const GeneratedTimetable: React.FC = () => {
               >
                 {b.batch_name}
               </button>
-            ))}
-          </>
-        ) : (
-          <>
-            <button
-              style={selectedTeacherId === "all" ? styles.filterActive : styles.filterBtn}
-              onClick={() => setSelectedTeacherId("all")}
-            >
-              All Teachers
-            </button>
-            {teachers.map((t, i) => (
+            ))
+          ) : (
+            teachers.map((t, i) => (
               <button
                 key={t.teacher_id}
                 style={{
@@ -345,41 +407,47 @@ const GeneratedTimetable: React.FC = () => {
               >
                 {t.teacher_name}
               </button>
-            ))}
-          </>
-        )}
-      </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* Content */}
       {viewMode === "batch" ? (
         batches.length === 0 ? (
           <EmptyState message="No batch timetable data available" />
+        ) : displayMode === "single" ? (
+          <SingleTimetableView
+            type="batch"
+            entities={filteredBatches}
+            getEntityColor={getBatchColor}
+            getSubjectColor={getSubjectColor}
+          />
         ) : (
-          <div style={styles.tablesContainer}>
-            {filteredBatches.map((batch, idx) => (
-              <BatchTable
-                key={batch.batch_id}
-                batch={batch}
-                color={getBatchColor(idx)}
-                getSubjectColor={getSubjectColor}
-              />
-            ))}
-          </div>
+          <AllTimetablesView
+            type="batch"
+            entities={filteredBatches}
+            getEntityColor={getBatchColor}
+            getSubjectColor={getSubjectColor}
+          />
         )
       ) : (
         teachers.length === 0 ? (
           <EmptyState message="No teacher timetable data available" />
+        ) : displayMode === "single" ? (
+          <SingleTimetableView
+            type="teacher"
+            entities={filteredTeachers}
+            getEntityColor={getTeacherColor}
+            getSubjectColor={getSubjectColor}
+          />
         ) : (
-          <div style={styles.tablesContainer}>
-            {filteredTeachers.map((teacher, idx) => (
-              <TeacherTable
-                key={teacher.teacher_id}
-                teacher={teacher}
-                color={getTeacherColor(idx)}
-                getSubjectColor={getSubjectColor}
-              />
-            ))}
-          </div>
+          <AllTimetablesView
+            type="teacher"
+            entities={filteredTeachers}
+            getEntityColor={getTeacherColor}
+            getSubjectColor={getSubjectColor}
+          />
         )
       )}
     </div>
@@ -393,6 +461,71 @@ const EmptyState: React.FC<{ message: string }> = ({ message }) => (
     <p>{message}</p>
   </div>
 );
+
+/* ================= SINGLE TIMETABLE VIEW ================= */
+interface SingleTimetableViewProps {
+  type: "batch" | "teacher";
+  entities: any[];
+  getEntityColor: (idx: number) => { bg: string; border: string; text: string };
+  getSubjectColor: (s: string | null) => { bg: string; text: string; border: string };
+}
+
+const SingleTimetableView: React.FC<SingleTimetableViewProps> = ({
+  type,
+  entities,
+  getEntityColor,
+  getSubjectColor,
+}) => {
+  if (entities.length === 0) return <EmptyState message={`No ${type} selected`} />;
+  
+  const entity = entities[0];
+  const color = getEntityColor(0);
+  
+  if (type === "batch") {
+    return <BatchTable batch={entity} color={color} getSubjectColor={getSubjectColor} />;
+  } else {
+    return <TeacherTable teacher={entity} color={color} getSubjectColor={getSubjectColor} />;
+  }
+};
+
+/* ================= ALL TIMETABLES VIEW ================= */
+interface AllTimetablesViewProps {
+  type: "batch" | "teacher";
+  entities: any[];
+  getEntityColor: (idx: number) => { bg: string; border: string; text: string };
+  getSubjectColor: (s: string | null) => { bg: string; text: string; border: string };
+}
+
+const AllTimetablesView: React.FC<AllTimetablesViewProps> = ({
+  type,
+  entities,
+  getEntityColor,
+  getSubjectColor,
+}) => {
+  if (entities.length === 0) return <EmptyState message={`No ${type}s available`} />;
+  
+  return (
+    <div style={styles.allTablesContainer}>
+      {entities.map((entity, idx) =>
+        type === "batch" ? (
+          <CompactBatchTable
+            key={entity.batch_id}
+            batch={entity}
+            color={getEntityColor(idx)}
+            getSubjectColor={getSubjectColor}
+          />
+        ) : (
+          <CompactTeacherTable
+            key={entity.teacher_id}
+            teacher={entity}
+            color={getEntityColor(idx)}
+            getSubjectColor={getSubjectColor}
+          />
+        )
+      )}
+    </div>
+  );
+};
 
 /* ================= BATCH TABLE ================= */
 interface BatchTableProps {
@@ -428,13 +561,15 @@ const BatchTable: React.FC<BatchTableProps> = ({ batch, color, getSubjectColor }
         </div>
       </div>
 
-      <TimetableGrid
-        slots={batch.slots}
-        dayKeys={dayKeys}
-        timeSlots={timeSlots}
-        getSubjectColor={getSubjectColor}
-        showBatch={false}
-      />
+      <div style={styles.timetableContainer}>
+        <StandardTimetableGrid
+          slots={batch.slots}
+          dayKeys={dayKeys}
+          timeSlots={timeSlots}
+          getSubjectColor={getSubjectColor}
+          showBatch={false}
+        />
+      </div>
     </div>
   );
 };
@@ -476,31 +611,103 @@ const TeacherTable: React.FC<TeacherTableProps> = ({ teacher, color, getSubjectC
         </div>
       </div>
 
-      {hasSlots ? (
-        <TimetableGrid
+      <div style={styles.timetableContainer}>
+        {hasSlots ? (
+          <StandardTimetableGrid
+            slots={teacher.slots}
+            dayKeys={dayKeys}
+            timeSlots={timeSlots}
+            getSubjectColor={getSubjectColor}
+            showBatch={true}
+          />
+        ) : (
+          <div style={styles.noSlotsMessage}>
+            <span style={{ fontSize: 24 }}>📭</span>
+            <p>No scheduled classes yet</p>
+            {teacher.batches && teacher.batches.length > 0 && (
+              <p style={styles.assignedBatchesText}>
+                Assigned to: {teacher.batches.join(", ")}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ================= COMPACT BATCH TABLE ================= */
+const CompactBatchTable: React.FC<BatchTableProps> = ({ batch, color, getSubjectColor }) => {
+  const dayKeys = Object.keys(batch.slots || {}).sort();
+  const timeSlots = getUniqueTimeSlots(batch.slots, dayKeys);
+
+  return (
+    <div style={styles.compactTableCard}>
+      <div style={{ ...styles.compactHeader, borderLeftColor: color.border }}>
+        <div style={styles.compactEntityInfo}>
+          <div style={{ ...styles.compactAvatar, backgroundColor: color.border }}>
+            {batch.batch_name.charAt(0)}
+          </div>
+          <div style={styles.compactEntityDetails}>
+            <h4 style={{ ...styles.compactName, color: color.text }}>{batch.batch_name}</h4>
+            <p style={styles.compactMeta}>{batch.batch_code} • {dayKeys.length} days</p>
+          </div>
+        </div>
+        <div style={styles.compactBadge}>
+          {batch.total_classes} classes
+        </div>
+      </div>
+      
+      <div style={styles.compactTimetable}>
+        <CompactTimetableGrid
+          slots={batch.slots}
+          dayKeys={dayKeys}
+          timeSlots={timeSlots}
+          getSubjectColor={getSubjectColor}
+          showBatch={false}
+        />
+      </div>
+    </div>
+  );
+};
+
+/* ================= COMPACT TEACHER TABLE ================= */
+const CompactTeacherTable: React.FC<TeacherTableProps> = ({ teacher, color, getSubjectColor }) => {
+  const dayKeys = Object.keys(teacher.slots || {}).sort();
+  const timeSlots = getUniqueTimeSlots(teacher.slots, dayKeys);
+
+  return (
+    <div style={styles.compactTableCard}>
+      <div style={{ ...styles.compactHeader, borderLeftColor: color.border }}>
+        <div style={styles.compactEntityInfo}>
+          <div style={{ ...styles.compactAvatar, backgroundColor: color.border }}>
+            👨‍🏫
+          </div>
+          <div style={styles.compactEntityDetails}>
+            <h4 style={{ ...styles.compactName, color: color.text }}>{teacher.teacher_name}</h4>
+            <p style={styles.compactMeta}>{teacher.teacher_code}</p>
+          </div>
+        </div>
+        <div style={styles.compactBadge}>
+          {teacher.total_classes} classes
+        </div>
+      </div>
+      
+      <div style={styles.compactTimetable}>
+        <CompactTimetableGrid
           slots={teacher.slots}
           dayKeys={dayKeys}
           timeSlots={timeSlots}
           getSubjectColor={getSubjectColor}
           showBatch={true}
         />
-      ) : (
-        <div style={styles.noSlotsMessage}>
-          <span style={{ fontSize: 24 }}>📭</span>
-          <p>No scheduled classes yet</p>
-          {teacher.batches && teacher.batches.length > 0 && (
-            <p style={styles.assignedBatchesText}>
-              Assigned to: {teacher.batches.join(", ")}
-            </p>
-          )}
-        </div>
-      )}
+      </div>
     </div>
   );
 };
 
-/* ================= TIMETABLE GRID ================= */
-interface TimetableGridProps {
+/* ================= STANDARD TIMETABLE GRID ================= */
+interface StandardTimetableGridProps {
   slots: { [dayKey: string]: SlotData[] };
   dayKeys: string[];
   timeSlots: { start: string; end: string }[];
@@ -508,27 +715,22 @@ interface TimetableGridProps {
   showBatch: boolean;
 }
 
-const TimetableGrid: React.FC<TimetableGridProps> = ({
+const StandardTimetableGrid: React.FC<StandardTimetableGridProps> = ({
   slots,
   dayKeys,
   timeSlots,
   getSubjectColor,
   showBatch,
 }) => {
-  // Helper to get display name from teacher (string or object)
   const getTeacherName = (teacher: string | TeacherInfo | null): string | null => {
     if (!teacher) return null;
     if (typeof teacher === "string") return teacher;
     return teacher.teacher_name || teacher.teacher_code || null;
   };
 
-  // Helper to get display name from batch (string or object, or direct fields)
   const getBatchDisplayName = (slot: SlotData): string | null => {
-    // First check direct batch_name field (used in teacher view)
     if (slot.batch_name) return slot.batch_name;
     if (slot.batch_code) return slot.batch_code;
-    
-    // Then check nested batch object
     if (!slot.batch) return null;
     if (typeof slot.batch === "string") return slot.batch;
     return slot.batch.batch_name || slot.batch.batch_code || null;
@@ -539,87 +741,175 @@ const TimetableGrid: React.FC<TimetableGridProps> = ({
       <table style={styles.table}>
         <thead>
           <tr>
-            <th style={styles.thDay}>Day / Date</th>
-            {timeSlots.map((time, i) => (
-              <th key={i} style={styles.thTime}>
-                <div style={styles.timeHead}>
-                  <span style={styles.timeMain}>{time.start}</span>
-                  <span style={styles.timeTo}>to</span>
-                  <span style={styles.timeSub}>{time.end}</span>
+            <th style={styles.thTime}>Time</th>
+            {dayKeys.map((dk) => (
+              <th key={dk} style={styles.thDay}>
+                <div style={styles.dayHeader}>
+                  <div style={{ ...styles.dayDot, backgroundColor: DAY_COLORS[dk] || "#64748b" }}></div>
+                  <div style={styles.dayHeaderContent}>
+                    <span style={styles.dayName}>{DAY_NAMES[dk] || `Day ${dk.replace("d", "")}`}</span>
+                    {slots[dk]?.[0]?.actual_date && (
+                      <span style={styles.dayDate}>{slots[dk][0].actual_date}</span>
+                    )}
+                  </div>
                 </div>
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {dayKeys.map((dk) => {
-            const daySlots = slots[dk] || [];
-            const firstSlot = daySlots[0];
-            const dayColor = DAY_COLORS[dk] || "#64748b";
+          {timeSlots.map((time, timeIdx) => (
+            <tr key={`time-${timeIdx}`}>
+              <td style={styles.timeCell}>
+                <div style={styles.timeSlotDisplay}>
+                  <span style={styles.timeStart}>{time.start}</span>
+                  <span style={styles.timeSeparator}>-</span>
+                  <span style={styles.timeEnd}>{time.end}</span>
+                </div>
+              </td>
+              {dayKeys.map((dk) => {
+                const slot = (slots[dk] || []).find(
+                  (s) => s.start_time === time.start && s.end_time === time.end
+                );
+                
+                if (!slot) {
+                  return <td key={`${dk}-${timeIdx}`} style={styles.emptyCell}></td>;
+                }
 
-            return (
-              <tr key={dk}>
-                <td style={styles.tdDayCell}>
-                  <div style={styles.dayBox}>
-                    <div style={{ ...styles.dayDot, backgroundColor: dayColor }}></div>
-                    <div style={styles.dayInfo}>
-                      <span style={styles.dayLabel}>Day {dk.replace("d", "")}</span>
-                      {firstSlot && (
-                        <span style={styles.dayDate}>{firstSlot.actual_date}</span>
-                      )}
-                    </div>
-                  </div>
-                </td>
-                {timeSlots.map((time, i) => {
-                  const slot = daySlots.find(
-                    (s) => s.start_time === time.start && s.end_time === time.end
-                  );
-                  if (!slot) return <td key={i} style={styles.tdEmpty}>—</td>;
-
-                  const sc = getSubjectColor(slot.subject);
-                  const teacherName = getTeacherName(slot.teacher);
-                  const batchName = getBatchDisplayName(slot);
-                  
-                  return (
-                    <td key={i} style={styles.tdSlot}>
-                      <div
-                        style={{
-                          ...styles.slotBox,
-                          backgroundColor: sc.bg,
-                          borderColor: sc.border,
-                        }}
-                      >
-                        <div style={{ ...styles.slotSubject, color: sc.text }}>
-                          {slot.subject || "No Subject"}
-                        </div>
+                const sc = getSubjectColor(slot.subject);
+                const teacherName = getTeacherName(slot.teacher);
+                const batchName = getBatchDisplayName(slot);
+                
+                return (
+                  <td key={`${dk}-${timeIdx}`} style={styles.slotCell}>
+                    <div
+                      style={{
+                        ...styles.slotCard,
+                        backgroundColor: sc.bg,
+                        borderColor: sc.border,
+                      }}
+                    >
+                      <div style={styles.slotHeader}>
+                        <span style={{ ...styles.slotSubject, color: sc.text }}>
+                          {slot.subject || "Free"}
+                        </span>
+                        <span style={styles.slotCode}>{slot.slot_code}</span>
+                      </div>
+                      
+                      <div style={styles.slotContent}>
                         {showBatch ? (
-                          batchName ? (
-                            <div style={styles.slotBatch}>📚 {batchName}</div>
-                          ) : (
-                            <div style={styles.slotNoBatch}>No batch</div>
+                          batchName && (
+                            <div style={styles.slotBatch}>
+                              <span style={styles.slotIcon}>📚</span>
+                              {batchName}
+                            </div>
                           )
                         ) : (
-                          teacherName ? (
-                            <div style={styles.slotTeacher}>👨‍🏫 {teacherName}</div>
-                          ) : (
-                            <div style={styles.slotNoTeacher}>No teacher</div>
+                          teacherName && (
+                            <div style={styles.slotTeacher}>
+                              <span style={styles.slotIcon}>👨‍🏫</span>
+                              {teacherName}
+                            </div>
                           )
                         )}
-                        <div style={styles.slotFooter}>
-                          <span style={styles.slotCode}>{slot.slot_code}</span>
-                          {slot.room_number && (
-                            <span style={styles.slotRoom}>🏠 {slot.room_number}</span>
-                          )}
-                        </div>
+                        
+                        {slot.room_number && (
+                          <div style={styles.slotRoom}>
+                            <span style={styles.slotIcon}>🏠</span>
+                            {slot.room_number}
+                          </div>
+                        )}
                       </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
         </tbody>
       </table>
+    </div>
+  );
+};
+
+/* ================= COMPACT TIMETABLE GRID ================= */
+const CompactTimetableGrid: React.FC<StandardTimetableGridProps> = ({
+  slots,
+  dayKeys,
+  timeSlots,
+  getSubjectColor,
+  showBatch,
+}) => {
+  const getTeacherName = (teacher: string | TeacherInfo | null): string | null => {
+    if (!teacher) return null;
+    if (typeof teacher === "string") return teacher;
+    return teacher.teacher_name || teacher.teacher_code || null;
+  };
+
+  const getBatchDisplayName = (slot: SlotData): string | null => {
+    if (slot.batch_name) return slot.batch_name;
+    if (slot.batch_code) return slot.batch_code;
+    if (!slot.batch) return null;
+    if (typeof slot.batch === "string") return slot.batch;
+    return slot.batch.batch_name || slot.batch.batch_code || null;
+  };
+
+  return (
+    <div style={styles.compactGrid}>
+      {dayKeys.map((dk) => (
+        <div key={dk} style={styles.compactDayColumn}>
+          <div style={styles.compactDayHeader}>
+            <div style={{ ...styles.compactDayDot, backgroundColor: DAY_COLORS[dk] || "#64748b" }}></div>
+            <span style={styles.compactDayName}>
+              {DAY_NAMES[dk]?.substring(0, 3) || dk.replace("d", "")}
+            </span>
+          </div>
+          
+          <div style={styles.compactDaySlots}>
+            {timeSlots.map((time) => {
+              const slot = (slots[dk] || []).find(
+                (s) => s.start_time === time.start && s.end_time === time.end
+              );
+              
+              if (!slot) return null;
+
+              const sc = getSubjectColor(slot.subject);
+              const teacherName = getTeacherName(slot.teacher);
+              const batchName = getBatchDisplayName(slot);
+              
+              return (
+                <div
+                  key={`${dk}-${time.start}`}
+                  style={{
+                    ...styles.compactSlot,
+                    backgroundColor: sc.bg,
+                    borderColor: sc.border,
+                  }}
+                >
+                  <div style={styles.compactSlotTime}>{time.start}</div>
+                  <div style={{ ...styles.compactSlotSubject, color: sc.text }}>
+                    {slot.subject?.substring(0, 6) || "Free"}
+                  </div>
+                  <div style={styles.compactSlotInfo}>
+                    {showBatch ? (
+                      batchName && (
+                        <span style={styles.compactSlotText}>📚</span>
+                      )
+                    ) : (
+                      teacherName && (
+                        <span style={styles.compactSlotText}>👨‍🏫</span>
+                      )
+                    )}
+                    {slot.room_number && (
+                      <span style={styles.compactSlotText}>🏠{slot.room_number}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 };
@@ -639,7 +929,6 @@ function getUniqueTimeSlots(
   });
   return timeSlots.sort((a, b) => a.start.localeCompare(b.start));
 }
-
 
 /* ================= STYLES ================= */
 const styles: Record<string, React.CSSProperties> = {
@@ -721,7 +1010,7 @@ const styles: Record<string, React.CSSProperties> = {
   viewTabs: {
     display: "flex",
     gap: 8,
-    marginBottom: 20,
+    marginBottom: 16,
     background: "#fff",
     padding: 6,
     borderRadius: 12,
@@ -759,6 +1048,47 @@ const styles: Record<string, React.CSSProperties> = {
   tabIcon: {
     fontSize: 16,
   },
+  displayModeToggle: {
+    display: "flex",
+    gap: 8,
+    marginBottom: 20,
+    background: "#fff",
+    padding: 6,
+    borderRadius: 12,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+    width: "fit-content",
+  },
+  displayModeBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "10px 20px",
+    background: "transparent",
+    border: "none",
+    borderRadius: 8,
+    cursor: "pointer",
+    fontWeight: 500,
+    fontSize: 13,
+    color: "#64748b",
+    transition: "all 0.2s",
+  },
+  displayModeActive: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "10px 20px",
+    background: "linear-gradient(135deg, #8b5cf6, #7c3aed)",
+    border: "none",
+    borderRadius: 8,
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: 13,
+    color: "#fff",
+    boxShadow: "0 4px 12px rgba(139, 92, 246, 0.3)",
+  },
+  displayModeIcon: {
+    fontSize: 14,
+  },
   statsRow: {
     display: "flex",
     gap: 16,
@@ -788,7 +1118,7 @@ const styles: Record<string, React.CSSProperties> = {
   filterRow: {
     display: "flex",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     marginBottom: 24,
     flexWrap: "wrap",
   },
@@ -796,6 +1126,20 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 14,
     fontWeight: 600,
     color: "#475569",
+    minWidth: "fit-content",
+  },
+  filterSelect: {
+    padding: "10px 16px",
+    background: "#fff",
+    border: "2px solid #e2e8f0",
+    borderRadius: 8,
+    fontSize: 14,
+    color: "#475569",
+    fontWeight: 500,
+    minWidth: 250,
+    cursor: "pointer",
+    outline: "none",
+    transition: "border-color 0.2s",
   },
   filterBtn: {
     padding: "8px 16px",
@@ -805,6 +1149,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontWeight: 500,
     fontSize: 13,
+    color: "#475569",
     transition: "all 0.2s",
   },
   filterActive: {
@@ -828,10 +1173,10 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 16,
     border: "2px dashed #e2e8f0",
   },
-  tablesContainer: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 32,
+  allTablesContainer: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))",
+    gap: 20,
   },
   tableCard: {
     background: "#fff",
@@ -839,6 +1184,20 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: "hidden",
     boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
     border: "1px solid #e2e8f0",
+  },
+  compactTableCard: {
+    background: "#fff",
+    borderRadius: 12,
+    overflow: "hidden",
+    boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
+    border: "1px solid #e2e8f0",
+  },
+  timetableContainer: {
+    padding: 20,
+  },
+  compactTimetable: {
+    padding: 16,
+    paddingTop: 0,
   },
   tableHeader: {
     display: "flex",
@@ -849,10 +1208,22 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: "wrap",
     gap: 16,
   },
+  compactHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "16px",
+    borderLeft: "4px solid",
+  },
   entityInfo: {
     display: "flex",
     alignItems: "center",
     gap: 16,
+  },
+  compactEntityInfo: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
   },
   entityAvatar: {
     width: 48,
@@ -865,15 +1236,40 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     fontSize: 20,
   },
+  compactAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 700,
+    fontSize: 16,
+  },
   entityName: {
     fontSize: 18,
     fontWeight: 700,
+    margin: 0,
+  },
+  compactName: {
+    fontSize: 16,
+    fontWeight: 600,
     margin: 0,
   },
   entityMeta: {
     fontSize: 13,
     color: "#64748b",
     margin: "4px 0 0",
+  },
+  compactMeta: {
+    fontSize: 12,
+    color: "#64748b",
+    margin: "2px 0 0",
+  },
+  compactEntityDetails: {
+    display: "flex",
+    flexDirection: "column",
   },
   entityBadges: {
     display: "flex",
@@ -887,78 +1283,59 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: "#475569",
   },
+  compactBadge: {
+    padding: "4px 10px",
+    background: "#f1f5f9",
+    borderRadius: 16,
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#475569",
+  },
   tableScroll: {
     overflowX: "auto",
+    borderRadius: 8,
   },
   table: {
     width: "100%",
     borderCollapse: "collapse",
-    minWidth: 700,
-  },
-  thDay: {
-    padding: "16px 20px",
-    background: "#f8fafc",
-    fontSize: 13,
-    fontWeight: 700,
-    color: "#475569",
-    textAlign: "left",
-    borderBottom: "2px solid #e2e8f0",
-    width: 140,
-    position: "sticky",
-    left: 0,
-    zIndex: 1,
+    minWidth: 800,
   },
   thTime: {
-    padding: "14px 12px",
+    padding: "16px",
     background: "#f8fafc",
-    borderBottom: "2px solid #e2e8f0",
-    minWidth: 150,
-    textAlign: "center",
-  },
-  timeHead: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 2,
-  },
-  timeMain: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 700,
-    color: "#0f172a",
-  },
-  timeTo: {
-    fontSize: 10,
-    color: "#94a3b8",
-  },
-  timeSub: {
-    fontSize: 13,
-    color: "#64748b",
-  },
-  tdDayCell: {
-    padding: "12px 16px",
-    borderBottom: "1px solid #f1f5f9",
-    background: "#fafbfc",
+    color: "#475569",
+    textAlign: "center",
+    border: "1px solid #e2e8f0",
+    width: 100,
     position: "sticky",
     left: 0,
     zIndex: 1,
   },
-  dayBox: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
+  thDay: {
+    padding: "12px",
+    background: "#f8fafc",
+    border: "1px solid #e2e8f0",
+    textAlign: "center",
   },
-  dayDot: {
-    width: 12,
-    height: 12,
-    borderRadius: "50%",
-    flexShrink: 0,
-  },
-  dayInfo: {
+  dayHeader: {
     display: "flex",
     flexDirection: "column",
-    gap: 2,
+    alignItems: "center",
+    gap: 4,
   },
-  dayLabel: {
+  dayDot: {
+    width: 10,
+    height: 10,
+    borderRadius: "50%",
+  },
+  dayHeaderContent: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+  },
+  dayName: {
     fontSize: 14,
     fontWeight: 700,
     color: "#0f172a",
@@ -967,68 +1344,168 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     color: "#64748b",
   },
-  tdEmpty: {
-    padding: 12,
-    borderBottom: "1px solid #f1f5f9",
+  timeCell: {
+    padding: "12px",
+    background: "#fafbfc",
+    border: "1px solid #e2e8f0",
     textAlign: "center",
-    color: "#cbd5e1",
-    fontSize: 14,
+    position: "sticky",
+    left: 0,
+    zIndex: 1,
   },
-  tdSlot: {
-    padding: 8,
-    borderBottom: "1px solid #f1f5f9",
+  timeSlotDisplay: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 2,
+  },
+  timeStart: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "#0f172a",
+  },
+  timeSeparator: {
+    fontSize: 10,
+    color: "#94a3b8",
+  },
+  timeEnd: {
+    fontSize: 12,
+    color: "#64748b",
+  },
+  emptyCell: {
+    padding: "12px",
+    background: "#fafbfc",
+    border: "1px solid #e2e8f0",
+    textAlign: "center",
+  },
+  slotCell: {
+    padding: "8px",
+    border: "1px solid #e2e8f0",
     verticalAlign: "top",
   },
-  slotBox: {
-    padding: 14,
-    borderRadius: 12,
+  slotCard: {
+    padding: "12px",
+    borderRadius: 8,
     border: "2px solid",
-    minHeight: 90,
+    minHeight: 80,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
   },
-  slotSubject: {
-    fontSize: 15,
-    fontWeight: 700,
+  slotHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 8,
   },
-  slotTeacher: {
-    fontSize: 12,
-    color: "#475569",
-    marginBottom: 10,
-  },
-  slotNoTeacher: {
-    fontSize: 11,
-    color: "#94a3b8",
-    fontStyle: "italic",
-    marginBottom: 10,
-  },
-  slotBatch: {
-    fontSize: 12,
-    color: "#475569",
-    marginBottom: 10,
-  },
-  slotNoBatch: {
-    fontSize: 11,
-    color: "#94a3b8",
-    fontStyle: "italic",
-    marginBottom: 10,
-  },
-  slotFooter: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    flexWrap: "wrap",
+  slotSubject: {
+    fontSize: 14,
+    fontWeight: 700,
+    flex: 1,
   },
   slotCode: {
     fontSize: 10,
     fontWeight: 600,
     color: "#64748b",
     background: "rgba(255,255,255,0.6)",
-    padding: "3px 8px",
-    borderRadius: 6,
+    padding: "2px 6px",
+    borderRadius: 4,
+  },
+  slotContent: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+  },
+  slotTeacher: {
+    fontSize: 12,
+    color: "#475569",
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+  },
+  slotBatch: {
+    fontSize: 12,
+    color: "#475569",
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
   },
   slotRoom: {
-    fontSize: 10,
+    fontSize: 11,
     color: "#64748b",
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+  },
+  slotIcon: {
+    fontSize: 10,
+  },
+  compactGrid: {
+    display: "flex",
+    gap: 8,
+    overflowX: "auto",
+    paddingBottom: 8,
+  },
+  compactDayColumn: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    minWidth: 70,
+  },
+  compactDayHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "8px",
+    background: "#f8fafc",
+    borderRadius: 6,
+    justifyContent: "center",
+  },
+  compactDayDot: {
+    width: 8,
+    height: 8,
+    borderRadius: "50%",
+  },
+  compactDayName: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#0f172a",
+  },
+  compactDaySlots: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+  },
+  compactSlot: {
+    padding: "8px",
+    borderRadius: 6,
+    border: "1px solid",
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+    alignItems: "center",
+    textAlign: "center",
+  },
+  compactSlotTime: {
+    fontSize: 10,
+    fontWeight: 600,
+    color: "#475569",
+  },
+  compactSlotSubject: {
+    fontSize: 11,
+    fontWeight: 700,
+  },
+  compactSlotInfo: {
+    display: "flex",
+    gap: 4,
+    fontSize: 9,
+    color: "#64748b",
+    alignItems: "center",
+  },
+  compactSlotText: {
+    display: "flex",
+    alignItems: "center",
+    gap: 1,
   },
   noSlotsMessage: {
     display: "flex",
@@ -1049,5 +1526,14 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 4,
   },
 };
+
+// Add CSS animation
+const styleSheet = document.styleSheets[0];
+styleSheet.insertRule(`
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`, styleSheet.cssRules.length);
 
 export default GeneratedTimetable;
