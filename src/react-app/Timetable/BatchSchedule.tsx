@@ -967,12 +967,11 @@ const BatchSchedule: React.FC = () => {
           <div>
             <h3 style={styles.title}>Batch Teachers Assignment</h3>
             <p style={styles.subtitle}>
-              Assign teachers and set lecture limits for batches in <strong>{centerName}</strong>
             </p>
           </div>
         </div>
 
-        {/* Timetable Info (Read-only) */}
+        {/* Timetable Info (Read-only)
         {timetableId && (
           <div style={styles.timetableSelector}>
             <div style={styles.timetableLabel}>
@@ -983,7 +982,7 @@ const BatchSchedule: React.FC = () => {
               <code style={styles.codeText}>{timetableId}</code>
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Empty State */}
         <div style={styles.emptyState}>
@@ -1121,55 +1120,19 @@ const BatchSchedule: React.FC = () => {
         <div style={styles.headerActions}>
           {/* Refresh Buttons */}
           <div style={styles.refreshButtons}>
-            <button 
-              style={styles.refreshButton}
-              onClick={refreshBatches}
-              title="Refresh batches"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" 
-                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Refresh Batches
-            </button>
-            
-            <button 
-              style={styles.refreshButton}
-              onClick={refreshTeachers}
-              title="Refresh teachers"
-              disabled={loadingTeachers}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" 
-                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              {loadingTeachers ? "Loading..." : "Refresh Teachers"}
-            </button>
-
-            <button 
-              style={styles.loadButton}
-              onClick={() => {
-                const saved = localStorage.getItem("batchTeacherAssignments");
-                if (saved) {
-                  setTeacherAssignments(JSON.parse(saved));
-                  alert("Loaded saved assignments!");
-                  console.log("Loaded from localStorage:", saved);
-                } else {
-                  alert("No saved assignments found!");
-                }
-              }}
-              title="Load saved data"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <polyline points="7 10 12 15 17 10" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <line x1="12" y1="15" x2="12" y2="3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Load Saved
-            </button>
           </div>
           
           <div style={styles.actionButtons}>
+            <button
+            style={styles.addBatchButton}
+            onClick={openBatchSelector}
+            title="Add Batch from API"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 5v14M5 12h14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Add Batch
+          </button>
             <button
               style={styles.saveButton}
               onClick={saveAssignments}
@@ -1203,26 +1166,17 @@ const BatchSchedule: React.FC = () => {
                     <path d="M17 21v-8H7v8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     <path d="M7 3v5h8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  Save to Backend
+                  Save Batch
                 </>
               )}
             </button>
             
-            <button
-              style={styles.primaryButton}
-              onClick={handleSaveAndNext}
-              disabled={saveStatus === "saving"}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M9 18l6-6-6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Save & Next
-            </button>
+          
           </div>
         </div>
       </div>
 
-      {/* Timetable Info (Read-only) */}
+      {/* Timetable Info (Read-only)
       <div style={styles.timetableSelector}>
         <div style={styles.timetableLabel}>
           <strong>Current Timetable:</strong> {timetableName || `Timetable ${timetableId.slice(0, 8)}`}
@@ -1231,7 +1185,7 @@ const BatchSchedule: React.FC = () => {
           <span>ID: </span>
           <code style={styles.codeText}>{timetableId}</code>
         </div>
-      </div>
+      </div> */}
 
       {/* Help Section */}
       {showHelp && (
@@ -1247,58 +1201,16 @@ const BatchSchedule: React.FC = () => {
             </button>
           </div>
           <ul style={styles.helpList}>
-            <li><strong>Select a timetable first</strong> - batches assigned to that timetable will be shown</li>
             <li>Use "Add Batch" button to assign a batch to the selected timetable</li>
             <li>Only batches assigned to the timetable are displayed</li>
-            <li>Teachers are fetched from the teacher API</li>
             <li>Click "Add Teacher" to select teachers from the dropdown</li>
-            <li>The "Min/Week" field is sent as "total_lectures" to backend</li>
-            <li>Click "Save to Backend" to save teacher assignments to server</li>
-            <li>Each batch maintains its own list of teachers</li>
-            <li>Use refresh buttons to reload data from server</li>
+            <li>Select Daily limits and Weekly limits</li>
+            <li>Select Minimum Classes and Maximum Classes </li>
+            <li>Click "Save Batch" to save teacher assignments</li>
           </ul>
         </div>
       )}
 
-      {/* Center Info Bar */}
-      <div style={styles.centerInfoBar}>
-        <div style={styles.centerInfo}>
-          <strong>Center:</strong> {centerName}
-          <span style={styles.infoSeparator}>•</span>
-          <strong>Batches in View:</strong> {batches.length}
-          <span style={styles.infoSeparator}>•</span>
-          <strong>Total Batches Available:</strong> {allBatchesFromAPI.length}
-          <span style={styles.infoSeparator}>•</span>
-          <strong>Teachers Available:</strong> {teachers.length}
-          <span style={styles.infoSeparator}>•</span>
-          <strong>Center ID:</strong> <code style={styles.codeText}>{centerId}</code>
-        </div>
-        <div style={styles.centerActions}>
-          <button
-            style={styles.smallButton}
-            onClick={() => {
-              const newCenterId = prompt("Enter Center ID:", centerId);
-              if (newCenterId && newCenterId !== centerId) {
-                setCenterId(newCenterId);
-              }
-            }}
-            title="Change Center ID"
-          >
-            Change Center
-          </button>
-          
-          <button
-            style={styles.addBatchButton}
-            onClick={openBatchSelector}
-            title="Add Batch from API"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M12 5v14M5 12h14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Add Batch
-          </button>
-        </div>
-      </div>
 
       {/* Batch Selector Modal */}
       {showBatchSelector && (

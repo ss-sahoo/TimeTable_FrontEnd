@@ -50,6 +50,17 @@ const DAY_COLORS = [
   "#06B6D4", // Sunday - Cyan
 ];
 
+const DAY_GRADIENTS: Record<string, string> = {
+  Monday:    "linear-gradient(135deg, #E8F0FE 0%, #F5F9FF 100%)",
+  Tuesday:   "linear-gradient(135deg, #E6F9F1 0%, #F3FCF8 100%)",
+  Wednesday: "linear-gradient(135deg, #EFEAFF 0%, #F7F5FF 100%)",
+  Thursday:  "linear-gradient(135deg, #FFF3D6 0%, #FFFBF0 100%)",
+  Friday:    "linear-gradient(135deg, #FFE4E6 0%, #FFF1F2 100%)",
+  Saturday:  "linear-gradient(135deg, #FCE7F3 0%, #FFF5FA 100%)",
+  Sunday:    "linear-gradient(135deg, #DFF7FB 0%, #F1FCFE 100%)",
+};
+
+
 // Define the structure for saved data
 interface SavedSlotsData {
   days: DaySlots[];
@@ -615,16 +626,13 @@ const fetchTimetableSlots = async (timetableId: string) => {
       localStorage.setItem("timetable_id", JSON.stringify(apiResponse.timetable_id));
 
       // Show success state
-      setSaveMessage(`Timetable created successfully! ID: ${apiResponse.timetable_id}`);
-      setLastSavedTime(dataToSave.lastSaved);
-      setSaveStatus("saved");
-      fetchTimetableSlots(apiResponse.timetable_id);
+      setSaveMessage(`Timetable created successfully!`);
       
       // Reset message after 5 seconds
       setTimeout(() => {
         setSaveMessage("");
         setSaveStatus("idle");
-      }, 5000);
+      }, 4000);
       
     } catch (error: any) {
       console.error("Failed to create timetable:", error);
@@ -828,6 +836,13 @@ const fetchTimetableSlots = async (timetableId: string) => {
             >
               Reset
             </button>
+            <button
+              style={styles.createButton}
+              // onClick={resetToDefault}
+              title="Reset to default"
+            >
+              Creeate New Timetable
+            </button>
           </div>
         </div>
       </div>
@@ -850,14 +865,13 @@ const fetchTimetableSlots = async (timetableId: string) => {
           </div>
           <ul style={styles.helpList}>
             <li>Click "Add Days" to select multiple days at once</li>
-            <li>Click the <strong>▼ button</strong> next to any day to add specific days</li>
-            <li>Click the <strong>✎ button</strong> on any slot to change the time range</li>
-            <li>Click the <strong>× button</strong> to delete slots or days</li>
-            <li><strong>Slot IDs (M1, TU2, etc.) are fixed</strong> - cannot be changed</li>
-            <li><strong>New slots automatically add with 1-hour intervals</strong></li>
             <li>Use <strong>Calendar Range</strong> mode to add days by date range</li>
+            <li>Click the <strong>+ Add slot</strong> next to any day to add a new slot</li>
+            <li>Click the <strong>✎ button</strong> on any slot to change the time range</li>
+            <li><strong>New slots automatically add with 1-hour intervals</strong></li>
+            <li>Click the <strong>× button</strong> to delete slots or days</li>
+            <li><strong>The (M1, TU2, etc.) are fixed</strong> - cannot be changed (its like the periods)</li>
             <li>Don't forget to click <strong>"Save Slots"</strong> to save your changes</li>
-            <li><strong>Note:</strong> "Save Slots" now saves to both local storage and backend API</li>
           </ul>
         </div>
       )}
@@ -1084,7 +1098,7 @@ const fetchTimetableSlots = async (timetableId: string) => {
           {days.map((day, dayIndex) => (
             <div key={`${day.day}-${day.date}-${day.dayIndex}`} style={styles.dayRow}>
               {/* Day Column */}
-              <div style={styles.dayColumn}>
+              <div style={{...styles.dayColumn, background: DAY_GRADIENTS[day.day]}}>
                 <div style={styles.dayCell}>
                   <div 
                     style={{...styles.dayColorDot, backgroundColor: day.color}} 
@@ -1385,6 +1399,16 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontSize: "14px",
     fontWeight: "500",
+  },
+  createButton: {
+    padding: "10px 20px",
+    background: "#3b82f6",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: "500",
+    fontSize: "14px",
   },
   helpSection: {
     marginBottom: "24px",
@@ -1782,22 +1806,26 @@ const styles: Record<string, React.CSSProperties> = {
     position: "relative",
     overflow: "visible",
   },
-  dayColumn: {
-    padding: "16px",
-    background: "#f8fafc",
-    borderRight: "1px solid #e2e8f0",
-  },
+ dayColumn: {
+  padding: "16px",
+  borderRight: "1px solid #e2e8f0",
+  borderRadius: "12px",
+},
+
   dayCell: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    position: "relative",
-  },
-  dayColorDot: {
-    width: "12px",
-    height: "12px",
-    borderRadius: "50%",
-  },
+  display: "grid",
+  // gridTemplateColumns: "1fr 1fr",
+  gap: "8px",
+  position: "relative",
+},
+
+dayColorDot: {
+  width: "10px",
+  height: "10px",
+  borderRadius: "50%",
+  boxShadow: "0 0 0 2px white",
+},
+
   dayName: {
     fontSize: "16px",
     fontWeight: "600",
