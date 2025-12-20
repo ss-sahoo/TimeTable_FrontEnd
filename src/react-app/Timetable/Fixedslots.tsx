@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { assignFixedSlot, removeFixedSlot, fetchCenterTeachers, cleanTimetableId } from "../AllApi";
+import { assignFixedSlot, deleteFixedSlotById, fetchFixedSlots, fetchCenterTeachers, cleanTimetableId } from "../AllApi";
 import { Fetch } from "../usefetch";
 
 /* ================= TYPES ================= */
@@ -14,6 +14,8 @@ interface SlotData {
   teacher_code: string | null;
   teacher_name: string | null;
   is_fixed: boolean;
+  fixed_slot_id?: string;
+  id?: string;  // API might return 'id' instead of 'fixed_slot_id'
 }
 
 interface DayData {
@@ -103,6 +105,8 @@ const FixedSlots: React.FC = () => {
   const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition | null>(null);
   const [updatingSlot, setUpdatingSlot] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(true);
+  // Map to store fixed slot IDs: key = "batch_code|slot_code", value = fixed_slot_id
+  const [fixedSlotsMap, setFixedSlotsMap] = useState<Map<string, string>>(new Map());
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const centerId = "bb67db93-5d47-4639-aa05-7ddb80d106a1";
 
@@ -221,13 +225,35 @@ const FixedSlots: React.FC = () => {
     }
   }, [centerId]);
 
+  /* Load fixed slots to get their IDs for deletion */
+  const loadFixedSlotsMap = useCallback(async () => {
+    if (!timetableId) return;
+    try {
+      console.log("Fetching fixed slots for mapping:", timetableId);
+      const data = await fetchFixedSlots(timetableId);
+      const fixedSlots = data.fixed_slots || [];
+      
+      // Create a map: "batch_code|slot_code" -> fixed_slot_id
+      const newMap = new Map<string, string>();
+      fixedSlots.forEach((fs: any) => {
+        const key = `${fs.batch_code}|${fs.slot_code}`;
+        newMap.set(key, fs.id);
+      });
+      setFixedSlotsMap(newMap);
+      console.log("Fixed slots map loaded:", newMap.size, "entries");
+    } catch (err: any) {
+      console.error("Failed to fetch fixed slots map:", err);
+    }
+  }, [timetableId]);
+
   /* Load batch list when timetableId changes */
   useEffect(() => {
     if (timetableId) {
       loadBatchList();
       loadTeachers();
+      loadFixedSlotsMap();
     }
-  }, [timetableId, loadBatchList, loadTeachers]);
+  }, [timetableId, loadBatchList, loadTeachers, loadFixedSlotsMap]);
 
   /* Load batch details when active batch changes */
   useEffect(() => {
@@ -295,9 +321,10 @@ const FixedSlots: React.FC = () => {
 
     try {
       console.log("Assigning fixed slot:", { timetableId, slotCode, activeBatchCode, teacher });
-      await assignFixedSlot(timetableId, slotCode, activeBatchCode, teacher.code, teacher.subject);
+      const response = await assignFixedSlot(timetableId, slotCode, activeBatchCode, teacher.code, teacher.subject);
       
-      // Optimistic update
+      // Optimistic update with returned ID
+      const fixedSlotId = response?.id || response?.fixed_slot_id;
       if (activeBatchData) {
         setActiveBatchData({
           ...activeBatchData,
@@ -311,7 +338,9 @@ const FixedSlots: React.FC = () => {
                     is_fixed: true,
                     teacher_code: teacher.code, 
                     teacher_name: teacher.name, 
-                    subject: teacher.subject 
+                    subject: teacher.subject,
+                    id: fixedSlotId,
+                    fixed_slot_id: fixedSlotId
                   }
                 : slot
             )
@@ -321,7 +350,21 @@ const FixedSlots: React.FC = () => {
       
       setOpenDropdown(null);
       setDropdownPosition(null);
-      console.log("Fixed slot assignment successful");
+      console.log("Fixed slot assignment successful, ID:", fixedSlotId);
+      
+      // Update fixedSlotsMap with new ID
+      if (fixedSlotId) {
+        const mapKey = `${activeBatchCode}|${slotCode}`;
+        const newMap = new Map(fixedSlotsMap);
+        newMap.set(mapKey, fixedSlotId);
+        setFixedSlotsMap(newMap);
+      }
+      
+      // Refresh to get the latest data with IDs
+      if (activeBatchId) {
+        loadBatchDetails(activeBatchId);
+        loadFixedSlotsMap();
+      }
     } catch (err: any) {
       console.error("Failed to assign:", err);
       setError("Failed to assign teacher. Please try again.");
@@ -330,18 +373,20 @@ const FixedSlots: React.FC = () => {
     }
   };
 
-  /* Remove fixed slot assignment */
-  const handleRemoveAssignment = async (slotCode: string) => {
+  /* Assign special slot (Exam or Free Period) without teacher */
+  const handleAssignSpecialSlot = async (slotCode: string, slotType: 'Exam' | 'Free Period') => {
     if (!timetableId || updatingSlot) return;
 
     const slotKey = `${activeBatchCode}-${slotCode}`;
     setUpdatingSlot(slotKey);
 
     try {
-      console.log("Removing fixed slot:", { timetableId, slotCode, activeBatchCode });
-      await removeFixedSlot(timetableId, slotCode, activeBatchCode);
+      console.log("Assigning special slot:", { timetableId, slotCode, activeBatchCode, slotType });
+      // Call API without teacher_code - just timetable_id, slot_code, batch_code, and subject
+      const response = await assignFixedSlot(timetableId, slotCode, activeBatchCode, null, slotType);
       
-      // Optimistic update
+      // Optimistic update with returned ID
+      const fixedSlotId = response?.id || response?.fixed_slot_id;
       if (activeBatchData) {
         setActiveBatchData({
           ...activeBatchData,
@@ -351,13 +396,97 @@ const FixedSlots: React.FC = () => {
               slot.slot_code === slotCode
                 ? { 
                     ...slot, 
+                    is_assigned: true,
+                    is_fixed: true,
+                    teacher_code: null, 
+                    teacher_name: slotType, 
+                    subject: slotType,
+                    id: fixedSlotId,
+                    fixed_slot_id: fixedSlotId
+                  }
+                : slot
+            )
+          }))
+        });
+      }
+      
+      setOpenDropdown(null);
+      setDropdownPosition(null);
+      console.log("Special slot assignment successful, ID:", fixedSlotId);
+      
+      // Update fixedSlotsMap with new ID
+      if (fixedSlotId) {
+        const mapKey = `${activeBatchCode}|${slotCode}`;
+        const newMap = new Map(fixedSlotsMap);
+        newMap.set(mapKey, fixedSlotId);
+        setFixedSlotsMap(newMap);
+      }
+      
+      // Refresh to get the latest data with IDs
+      if (activeBatchId) {
+        loadBatchDetails(activeBatchId);
+        loadFixedSlotsMap();
+      }
+    } catch (err: any) {
+      console.error("Failed to assign special slot:", err);
+      setError("Failed to assign slot. Please try again.");
+    } finally {
+      setUpdatingSlot(null);
+    }
+  };
+
+  /* Remove fixed slot assignment */
+  const handleRemoveAssignment = async (slot: SlotData) => {
+    if (!timetableId || updatingSlot) return;
+
+    const slotKey = `${activeBatchCode}|${slot.slot_code}`;
+    setUpdatingSlot(slotKey);
+
+    try {
+      // Get fixed slot ID from multiple sources:
+      // 1. From slot data (if available)
+      // 2. From fixedSlotsMap (fetched from fixed-slots API)
+      const fixedSlotId = slot.fixed_slot_id || slot.id || fixedSlotsMap.get(slotKey);
+      
+      if (!fixedSlotId) {
+        // Refresh the fixed slots map and try again
+        await loadFixedSlotsMap();
+        const refreshedId = fixedSlotsMap.get(slotKey);
+        if (!refreshedId) {
+          setError("Cannot find fixed slot ID. Please refresh the page and try again.");
+          setUpdatingSlot(null);
+          return;
+        }
+      }
+      
+      const idToDelete = fixedSlotId || fixedSlotsMap.get(slotKey);
+      console.log("Removing fixed slot by ID:", { fixedSlotId: idToDelete, slotCode: slot.slot_code, batchCode: activeBatchCode });
+      await deleteFixedSlotById(idToDelete!);
+      
+      // Update the fixedSlotsMap
+      const newMap = new Map(fixedSlotsMap);
+      newMap.delete(slotKey);
+      setFixedSlotsMap(newMap);
+      
+      // Optimistic update
+      if (activeBatchData) {
+        setActiveBatchData({
+          ...activeBatchData,
+          days: activeBatchData.days.map(day => ({
+            ...day,
+            slots: day.slots.map(s =>
+              s.slot_code === slot.slot_code
+                ? { 
+                    ...s, 
                     is_assigned: false,
                     is_fixed: false,
                     teacher_code: null, 
                     teacher_name: null, 
-                    subject: null 
+                    subject: null,
+                    fixed_slot_id: undefined,
+                    id: undefined
                   }
-                : slot
+                : s
             )
           }))
         });
@@ -594,9 +723,10 @@ const FixedSlots: React.FC = () => {
                                             style={styles.removeButton}
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              handleRemoveAssignment(slot.slot_code);
+                                              handleRemoveAssignment(slot);
                                             }}
                                             disabled={isUpdating}
+                                            title="Remove fixed slot assignment"
                                           >
                                             ×
                                           </button>
@@ -638,7 +768,7 @@ const FixedSlots: React.FC = () => {
           }}
         >
           <div style={styles.dropdownHeader}>
-            <span style={styles.dropdownTitle}>Select Teacher</span>
+            <span style={styles.dropdownTitle}>Assign Slot</span>
             <button
               style={styles.closeDropdown}
               onClick={() => { setOpenDropdown(null); setDropdownPosition(null); }}
@@ -646,6 +776,37 @@ const FixedSlots: React.FC = () => {
               ×
             </button>
           </div>
+          
+          {/* Special Slots Section */}
+          <div style={styles.specialSlotsSection}>
+            <div style={styles.sectionLabel}>Quick Assign</div>
+            <div style={styles.specialSlotsRow}>
+              <button
+                style={styles.examButton}
+                onClick={() => {
+                  const slotCode = openDropdown.split('|')[1];
+                  handleAssignSpecialSlot(slotCode, 'Exam');
+                }}
+              >
+                📝 Exam
+              </button>
+              <button
+                style={styles.freeButton}
+                onClick={() => {
+                  const slotCode = openDropdown.split('|')[1];
+                  handleAssignSpecialSlot(slotCode, 'Free Period');
+                }}
+              >
+                ☕ Free Period
+              </button>
+            </div>
+          </div>
+          
+          {/* Divider */}
+          <div style={styles.dropdownDivider}>
+            <span style={styles.dividerText}>or select a teacher</span>
+          </div>
+          
           <div style={styles.itemsList}>
             {loadingTeachers ? (
               <div style={styles.loadingText}>Loading teachers...</div>
@@ -1448,6 +1609,63 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: "center",
     color: "#64748b",
     fontSize: "13px",
+  },
+  specialSlotsSection: {
+    padding: "12px 16px",
+    borderBottom: "1px solid #e2e8f0",
+  },
+  sectionLabel: {
+    fontSize: "11px",
+    fontWeight: "600",
+    color: "#64748b",
+    textTransform: "uppercase",
+    marginBottom: "8px",
+  },
+  specialSlotsRow: {
+    display: "flex",
+    gap: "8px",
+  },
+  examButton: {
+    flex: 1,
+    padding: "10px 16px",
+    background: "#fef3c7",
+    color: "#92400e",
+    border: "1px solid #fcd34d",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "13px",
+    fontWeight: "600",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
+    transition: "all 0.2s",
+  },
+  freeButton: {
+    flex: 1,
+    padding: "10px 16px",
+    background: "#d1fae5",
+    color: "#065f46",
+    border: "1px solid #a7f3d0",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "13px",
+    fontWeight: "600",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
+    transition: "all 0.2s",
+  },
+  dropdownDivider: {
+    padding: "8px 16px",
+    background: "#f8fafc",
+    textAlign: "center",
+  },
+  dividerText: {
+    fontSize: "11px",
+    color: "#94a3b8",
+    textTransform: "uppercase",
   },
 };
 

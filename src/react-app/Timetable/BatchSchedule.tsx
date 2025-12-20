@@ -91,12 +91,62 @@ const BatchSchedule: React.FC = () => {
   
   // State for timetable name (display only)
   const [timetableName, setTimetableName] = useState<string>("");
+  
+  // State for free classes count
+  const [freeClassesCount, setFreeClassesCount] = useState<number>(0);
 
   // ===================== API FUNCTIONS =====================
   
   // Function to get access token
   const getAccessToken = () => {
     return localStorage.getItem("access_token");
+  };
+  
+  // Function to fetch free classes count for timetable
+  const fetchFreeClassesCount = async (ttId: string) => {
+    try {
+      const accessToken = getAccessToken();
+      if (!accessToken || !ttId) return;
+      
+      const response = await fetch(
+        `https://exams.dashoapp.com/api/timetable/timetables/${ttId}/`,
+        {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        const count = data.free_classes_count || 0;
+        console.log("Free classes count:", count);
+        setFreeClassesCount(count);
+      }
+    } catch (error) {
+      console.error("Error fetching free classes count:", error);
+    }
+  };
+  
+  // Generate FREE slots based on free_classes_count
+  const generateFreeSlots = (): Teacher[] => {
+    const freeSlots: Teacher[] = [];
+    for (let i = 1; i <= freeClassesCount; i++) {
+      freeSlots.push({
+        id: `FREE${i}`,
+        name: `Free Period ${i}`,
+        code: `FREE${i}`,
+        subject: "Free Period",
+        department: "Free",
+        minLecturesPerDay: 0,
+        maxLecturesPerDay: 1,
+        minLecturesPerWeek: 2,
+        maxLecturesPerWeek: 5,
+      });
+    }
+    return freeSlots;
   };
 
   // Function to fetch assigned batches for a timetable
@@ -876,6 +926,7 @@ const BatchSchedule: React.FC = () => {
         console.log("Found timetable_id in localStorage:", cleanId);
         setTimetableId(cleanId);
         await fetchTimetableDetails(cleanId);
+        await fetchFreeClassesCount(cleanId);
       } else {
         console.log("No timetable_id found in localStorage");
         setError("No timetable selected. Please select a timetable from the Slots tab first.");
@@ -1418,7 +1469,7 @@ const BatchSchedule: React.FC = () => {
               {openDropdown === "add-teacher" && (
                 <div style={styles.teachersDropdown}>
                   <div style={styles.dropdownHeader}>
-                    <span>Select Teacher ({teachers.length} available)</span>
+                    <span>Select Teacher or Free Period ({teachers.length + freeClassesCount} available)</span>
                     <button
                       style={styles.closeDropdown}
                       onClick={() => setOpenDropdown(null)}
@@ -1427,7 +1478,41 @@ const BatchSchedule: React.FC = () => {
                     </button>
                   </div>
                   <div style={styles.teachersList}>
-                    {teachers.length === 0 ? (
+                    {/* Free Period Slots */}
+                    {freeClassesCount > 0 && (
+                      <>
+                        <div style={styles.sectionDivider}>
+                          <span style={styles.sectionLabel}>☕ Free Periods ({freeClassesCount})</span>
+                        </div>
+                        {generateFreeSlots().map((freeSlot) => (
+                          <div
+                            key={freeSlot.id}
+                            style={{...styles.teacherItem, ...styles.freeSlotItem}}
+                            onClick={() => assignTeacher(freeSlot)}
+                          >
+                            <div style={styles.teacherMainInfo}>
+                              <strong style={styles.freeSlotName}>{freeSlot.name}</strong>
+                              <div style={styles.freeSlotCode}>
+                                {freeSlot.code}
+                              </div>
+                            </div>
+                            <div style={styles.teacherDetails}>
+                              Free Period • No Teacher Required
+                            </div>
+                            <div style={styles.teacherLimits}>
+                              Day: {freeSlot.minLecturesPerDay}-{freeSlot.maxLecturesPerDay} • 
+                              Week: {freeSlot.minLecturesPerWeek}-{freeSlot.maxLecturesPerWeek}
+                            </div>
+                          </div>
+                        ))}
+                        <div style={styles.sectionDivider}>
+                          <span style={styles.sectionLabel}>👨‍🏫 Teachers ({teachers.length})</span>
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Regular Teachers */}
+                    {teachers.length === 0 && freeClassesCount === 0 ? (
                       <div style={styles.noTeachersMessage}>
                         <p>No teachers available. Please refresh or check your API connection.</p>
                       </div>
@@ -2574,6 +2659,33 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "11px",
     color: "#94a3b8",
     marginTop: "4px",
+  },
+  // Free Slot Styles
+  sectionDivider: {
+    padding: "8px 16px",
+    background: "#f8fafc",
+    borderBottom: "1px solid #e2e8f0",
+  },
+  sectionLabel: {
+    fontSize: "12px",
+    fontWeight: "600",
+    color: "#64748b",
+    textTransform: "uppercase",
+  },
+  freeSlotItem: {
+    background: "#f0fdf4",
+    borderLeft: "3px solid #10b981",
+  },
+  freeSlotName: {
+    color: "#059669",
+  },
+  freeSlotCode: {
+    fontSize: "11px",
+    color: "#059669",
+    background: "#d1fae5",
+    padding: "2px 6px",
+    borderRadius: "4px",
+    fontWeight: "600",
   },
   summarySection: {
     display: "flex",
