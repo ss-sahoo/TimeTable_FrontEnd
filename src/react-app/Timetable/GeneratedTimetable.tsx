@@ -28,6 +28,18 @@ interface SlotData {
   // Direct batch fields (used in teacher view)
   batch_code?: string;
   batch_name?: string;
+  // New fields for available teachers
+  available_teachers?: AvailableTeacher[];
+  show_available_teachers?: boolean;
+}
+
+interface AvailableTeacher {
+  teacher_id: string;
+  teacher_code: string;
+  teacher_name: string;
+  subject_specializations?: string[];
+  is_available: boolean;
+  current_assignment?: string;
 }
 
 interface BatchData {
@@ -46,7 +58,7 @@ interface TeacherData {
   department?: string;
   slots: { [dayKey: string]: SlotData[] };
   total_classes: number;
-  batches?: string[]; // List of batch names assigned to this teacher
+  batches?: string[];
 }
 
 interface TimetableResponse {
@@ -61,7 +73,6 @@ interface TimetableResponse {
 }
 
 type ViewMode = "batch" | "teacher";
-type DisplayMode = "all" | "single";
 
 /* ================= CONSTANTS ================= */
 const SUBJECT_COLORS: { [key: string]: { bg: string; text: string; border: string } } = {
@@ -115,8 +126,6 @@ const GeneratedTimetable: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("batch");
-  const [displayMode, setDisplayMode] = useState<DisplayMode>("all");
-  
   const [timetableInfo, setTimetableInfo] = useState<{
     timetable: string;
     from_date: string;
@@ -130,6 +139,9 @@ const GeneratedTimetable: React.FC = () => {
   // Teacher view state
   const [teachers, setTeachers] = useState<TeacherData[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("all");
+
+  // Available teachers state
+  const [loadingAvailableTeachers, setLoadingAvailableTeachers] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
     const rawId = localStorage.getItem("timetable_id");
@@ -160,17 +172,13 @@ const GeneratedTimetable: React.FC = () => {
           to_date: data.to_date,
         });
         setBatches(data.batches || []);
-        // Auto-select first batch if in single mode
-        if (data.batches && data.batches.length > 0 && displayMode === "single") {
-          setSelectedBatchId(data.batches[0].batch_id);
-        }
       }
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [timetableId, displayMode]);
+  }, [timetableId]);
 
   // Load teachers data
   const loadTeachersData = useCallback(async () => {
@@ -191,17 +199,40 @@ const GeneratedTimetable: React.FC = () => {
           to_date: data.to_date,
         });
         setTeachers(data.teachers || []);
-        // Auto-select first teacher if in single mode
-        if (data.teachers && data.teachers.length > 0 && displayMode === "single") {
-          setSelectedTeacherId(data.teachers[0].teacher_id);
-        }
       }
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [timetableId, displayMode]);
+  }, [timetableId]);
+
+  // Load available teachers for a specific slot
+  const loadAvailableTeachers = useCallback(async (slotId: string) => {
+    if (!timetableId) return null;
+    
+    setLoadingAvailableTeachers(prev => ({ ...prev, [slotId]: true }));
+    
+    try {
+      const response = await Fetch(
+        `/api/timetable/timetables/${timetableId}/slots/${slotId}/available-teachers/`,
+        { method: "GET" }
+      );
+      
+      if (!response.ok) {
+        console.warn(`Failed to load available teachers for slot ${slotId}: ${response.status}`);
+        return null;
+      }
+      
+      const data = await response.json();
+      return data.available_teachers || [];
+    } catch (err: any) {
+      console.warn(`Error loading available teachers for slot ${slotId}:`, err.message);
+      return null;
+    } finally {
+      setLoadingAvailableTeachers(prev => ({ ...prev, [slotId]: false }));
+    }
+  }, [timetableId]);
 
   // Load data based on view mode
   useEffect(() => {
@@ -213,6 +244,100 @@ const GeneratedTimetable: React.FC = () => {
       }
     }
   }, [timetableId, viewMode, loadBatchesData, loadTeachersData]);
+
+  // Toggle available teachers for a slot
+  const toggleAvailableTeachers = useCallback(async (slotId: string, dayKey: string, timeSlot: string, entityId: string, entityType: 'batch' | 'teacher') => {
+    // Update the state based on entity type
+    if (entityType === 'batch') {
+      setBatches(prev => prev.map(batch => {
+        if (batch.batch_id === entityId) {
+          const updatedSlots = { ...batch.slots };
+          if (updatedSlots[dayKey]) {
+            updatedSlots[dayKey] = updatedSlots[dayKey].map(slot => {
+              if (slot.slot_id === slotId) {
+                const shouldShow = !slot.show_available_teachers;
+                
+                // If we need to show and haven't loaded yet, load the data
+                if (shouldShow && !slot.available_teachers) {
+                  loadAvailableTeachers(slotId).then(teachers => {
+                    if (teachers) {
+                      setBatches(prevBatches => prevBatches.map(b => {
+                        if (b.batch_id === entityId) {
+                          const updated = { ...b };
+                          if (updated.slots[dayKey]) {
+                            updated.slots[dayKey] = updated.slots[dayKey].map(s => {
+                              if (s.slot_id === slotId) {
+                                return { ...s, available_teachers: teachers, show_available_teachers: true };
+                              }
+                              return s;
+                            });
+                          }
+                          return updated;
+                        }
+                        return b;
+                      }));
+                    }
+                  });
+                }
+                
+                return {
+                  ...slot,
+                  show_available_teachers: shouldShow
+                };
+              }
+              return slot;
+            });
+          }
+          return { ...batch, slots: updatedSlots };
+        }
+        return batch;
+      }));
+    } else {
+      setTeachers(prev => prev.map(teacher => {
+        if (teacher.teacher_id === entityId) {
+          const updatedSlots = { ...teacher.slots };
+          if (updatedSlots[dayKey]) {
+            updatedSlots[dayKey] = updatedSlots[dayKey].map(slot => {
+              if (slot.slot_id === slotId) {
+                const shouldShow = !slot.show_available_teachers;
+                
+                // If we need to show and haven't loaded yet, load the data
+                if (shouldShow && !slot.available_teachers) {
+                  loadAvailableTeachers(slotId).then(teachers => {
+                    if (teachers) {
+                      setTeachers(prevTeachers => prevTeachers.map(t => {
+                        if (t.teacher_id === entityId) {
+                          const updated = { ...t };
+                          if (updated.slots[dayKey]) {
+                            updated.slots[dayKey] = updated.slots[dayKey].map(s => {
+                              if (s.slot_id === slotId) {
+                                return { ...s, available_teachers: teachers, show_available_teachers: true };
+                              }
+                              return s;
+                            });
+                          }
+                          return updated;
+                        }
+                        return t;
+                      }));
+                    }
+                  });
+                }
+                
+                return {
+                  ...slot,
+                  show_available_teachers: shouldShow
+                };
+              }
+              return slot;
+            });
+          }
+          return { ...teacher, slots: updatedSlots };
+        }
+        return teacher;
+      }));
+    }
+  }, [loadAvailableTeachers]);
 
   const getSubjectColor = (subject: string | null) =>
     subject ? SUBJECT_COLORS[subject] || SUBJECT_COLORS.default : SUBJECT_COLORS.default;
@@ -259,6 +384,7 @@ const GeneratedTimetable: React.FC = () => {
   return (
     <div style={styles.wrapper}>
       {/* Header */}
+      
       <div style={styles.header}>
         <div>
           <h2 style={styles.title}>📅 Generated Timetable</h2>
@@ -268,66 +394,48 @@ const GeneratedTimetable: React.FC = () => {
             </p>
           )}
         </div>
+        
         <div style={styles.headerActions}>
+          {viewMode === "batch" && (
+            <div style={styles.headerStatsInline}>
+              <button style={styles.headerStatBtn} onClick={() => setViewMode("batch")}>
+                <div style={styles.headerStatNum}>{batches.length}</div>
+                <div style={styles.headerStatLabel}>Total Batches</div>
+              </button>
+              <button style={styles.headerStatBtn} onClick={() => setViewMode("batch")}>
+                <div style={styles.headerStatNum}>{batches.reduce((sum, b) => sum + b.total_classes, 0)}</div>
+                <div style={styles.headerStatLabel}>Total Classes</div>
+              </button>
+            </div>
+          )}
           <button style={styles.exportBtn}>📥 Export PDF</button>
         </div>
       </div>
+
+      
 
       {/* View Mode Tabs */}
       <div style={styles.viewTabs}>
         <button
           style={viewMode === "batch" ? styles.viewTabActive : styles.viewTab}
-          onClick={() => { setViewMode("batch"); setSelectedBatchId("all"); setDisplayMode("all"); }}
+          onClick={() => { setViewMode("batch"); setSelectedBatchId("all"); }}
         >
           <span style={styles.tabIcon}>📚</span>
           Batch-wise View
         </button>
         <button
           style={viewMode === "teacher" ? styles.viewTabActive : styles.viewTab}
-          onClick={() => { setViewMode("teacher"); setSelectedTeacherId("all"); setDisplayMode("all"); }}
+          onClick={() => { setViewMode("teacher"); setSelectedTeacherId("all"); }}
         >
           <span style={styles.tabIcon}>👨‍🏫</span>
           Teacher-wise View
         </button>
       </div>
 
-      {/* Display Mode Toggle */}
-      <div style={styles.displayModeToggle}>
-        <button
-          style={displayMode === "all" ? styles.displayModeActive : styles.displayModeBtn}
-          onClick={() => {
-            setDisplayMode("all");
-            if (viewMode === "batch") setSelectedBatchId("all");
-            else setSelectedTeacherId("all");
-          }}
-        >
-          <span style={styles.displayModeIcon}>📋</span>
-          All {viewMode === "batch" ? "Batches" : "Teachers"}
-        </button>
-        <button
-          style={displayMode === "single" ? styles.displayModeActive : styles.displayModeBtn}
-          onClick={() => setDisplayMode("single")}
-        >
-          <span style={styles.displayModeIcon}>👤</span>
-          Single {viewMode === "batch" ? "Batch" : "Teacher"}
-        </button>
-      </div>
-
       {/* Stats Row */}
       <div style={styles.statsRow}>
         {viewMode === "batch" ? (
-          <>
-            <div style={styles.statCard}>
-              <span style={styles.statNum}>{batches.length}</span>
-              <span style={styles.statLabel}>Total Batches</span>
-            </div>
-            <div style={styles.statCard}>
-              <span style={styles.statNum}>
-                {batches.reduce((sum, b) => sum + b.total_classes, 0)}
-              </span>
-              <span style={styles.statLabel}>Total Classes</span>
-            </div>
-          </>
+          <></>
         ) : (
           <>
             <div style={styles.statCard}>
@@ -344,46 +452,19 @@ const GeneratedTimetable: React.FC = () => {
         )}
       </div>
 
-      {/* Filter Row - Only show in single display mode */}
-      {displayMode === "single" && (
-        <div style={styles.filterRow}>
-          <span style={styles.filterLabel}>
-            Select {viewMode === "batch" ? "Batch" : "Teacher"}:
-          </span>
-          {viewMode === "batch" ? (
-            <select
-              style={styles.filterSelect}
-              value={selectedBatchId}
-              onChange={(e) => setSelectedBatchId(e.target.value)}
+      {/* Filter Row */}
+      <div style={styles.filterRow}>
+        <span style={styles.filterLabel}>Filter by {viewMode === "batch" ? "Batch" : "Teacher"}:</span>
+        
+        {viewMode === "batch" ? (
+          <>
+            <button
+              style={selectedBatchId === "all" ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSelectedBatchId("all")}
             >
-              {batches.map((b) => (
-                <option key={b.batch_id} value={b.batch_id}>
-                  {b.batch_name} ({b.batch_code})
-                </option>
-              ))}
-            </select>
-          ) : (
-            <select
-              style={styles.filterSelect}
-              value={selectedTeacherId}
-              onChange={(e) => setSelectedTeacherId(e.target.value)}
-            >
-              {teachers.map((t) => (
-                <option key={t.teacher_id} value={t.teacher_id}>
-                  {t.teacher_name} ({t.teacher_code})
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-      )}
-
-      {/* All View Buttons - Only show in all display mode */}
-      {displayMode === "all" && (
-        <div style={styles.filterRow}>
-          <span style={styles.filterLabel}>View all {viewMode === "batch" ? "batches" : "teachers"}:</span>
-          {viewMode === "batch" ? (
-            batches.map((b, i) => (
+              All Batches
+            </button>
+            {batches.map((b, i) => (
               <button
                 key={b.batch_id}
                 style={{
@@ -394,9 +475,17 @@ const GeneratedTimetable: React.FC = () => {
               >
                 {b.batch_name}
               </button>
-            ))
-          ) : (
-            teachers.map((t, i) => (
+            ))}
+          </>
+        ) : (
+          <>
+            <button
+              style={selectedTeacherId === "all" ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSelectedTeacherId("all")}
+            >
+              All Teachers
+            </button>
+            {teachers.map((t, i) => (
               <button
                 key={t.teacher_id}
                 style={{
@@ -407,47 +496,53 @@ const GeneratedTimetable: React.FC = () => {
               >
                 {t.teacher_name}
               </button>
-            ))
-          )}
-        </div>
-      )}
+            ))}
+          </>
+        )}
+      </div>
+
+      {/* Info Banner */}
+      <div style={styles.infoBanner}>
+        <span style={styles.infoIcon}>ℹ️</span>
+        <span>
+          Click on any class slot to view available teachers for that time period
+        </span>
+      </div>
 
       {/* Content */}
       {viewMode === "batch" ? (
         batches.length === 0 ? (
           <EmptyState message="No batch timetable data available" />
-        ) : displayMode === "single" ? (
-          <SingleTimetableView
-            type="batch"
-            entities={filteredBatches}
-            getEntityColor={getBatchColor}
-            getSubjectColor={getSubjectColor}
-          />
         ) : (
-          <AllTimetablesView
-            type="batch"
-            entities={filteredBatches}
-            getEntityColor={getBatchColor}
-            getSubjectColor={getSubjectColor}
-          />
+          <div style={styles.tablesContainer}>
+            {filteredBatches.map((batch, idx) => (
+              <BatchTable
+                key={batch.batch_id}
+                batch={batch}
+                color={getBatchColor(idx)}
+                getSubjectColor={getSubjectColor}
+                toggleAvailableTeachers={toggleAvailableTeachers}
+                loadingAvailableTeachers={loadingAvailableTeachers}
+              />
+            ))}
+          </div>
         )
       ) : (
         teachers.length === 0 ? (
           <EmptyState message="No teacher timetable data available" />
-        ) : displayMode === "single" ? (
-          <SingleTimetableView
-            type="teacher"
-            entities={filteredTeachers}
-            getEntityColor={getTeacherColor}
-            getSubjectColor={getSubjectColor}
-          />
         ) : (
-          <AllTimetablesView
-            type="teacher"
-            entities={filteredTeachers}
-            getEntityColor={getTeacherColor}
-            getSubjectColor={getSubjectColor}
-          />
+          <div style={styles.tablesContainer}>
+            {filteredTeachers.map((teacher, idx) => (
+              <TeacherTable
+                key={teacher.teacher_id}
+                teacher={teacher}
+                color={getTeacherColor(idx)}
+                getSubjectColor={getSubjectColor}
+                toggleAvailableTeachers={toggleAvailableTeachers}
+                loadingAvailableTeachers={loadingAvailableTeachers}
+              />
+            ))}
+          </div>
         )
       )}
     </div>
@@ -462,79 +557,22 @@ const EmptyState: React.FC<{ message: string }> = ({ message }) => (
   </div>
 );
 
-/* ================= SINGLE TIMETABLE VIEW ================= */
-interface SingleTimetableViewProps {
-  type: "batch" | "teacher";
-  entities: any[];
-  getEntityColor: (idx: number) => { bg: string; border: string; text: string };
-  getSubjectColor: (s: string | null) => { bg: string; text: string; border: string };
-}
-
-const SingleTimetableView: React.FC<SingleTimetableViewProps> = ({
-  type,
-  entities,
-  getEntityColor,
-  getSubjectColor,
-}) => {
-  if (entities.length === 0) return <EmptyState message={`No ${type} selected`} />;
-  
-  const entity = entities[0];
-  const color = getEntityColor(0);
-  
-  if (type === "batch") {
-    return <BatchTable batch={entity} color={color} getSubjectColor={getSubjectColor} />;
-  } else {
-    return <TeacherTable teacher={entity} color={color} getSubjectColor={getSubjectColor} />;
-  }
-};
-
-/* ================= ALL TIMETABLES VIEW ================= */
-interface AllTimetablesViewProps {
-  type: "batch" | "teacher";
-  entities: any[];
-  getEntityColor: (idx: number) => { bg: string; border: string; text: string };
-  getSubjectColor: (s: string | null) => { bg: string; text: string; border: string };
-}
-
-const AllTimetablesView: React.FC<AllTimetablesViewProps> = ({
-  type,
-  entities,
-  getEntityColor,
-  getSubjectColor,
-}) => {
-  if (entities.length === 0) return <EmptyState message={`No ${type}s available`} />;
-  
-  return (
-    <div style={styles.allTablesContainer}>
-      {entities.map((entity, idx) =>
-        type === "batch" ? (
-          <CompactBatchTable
-            key={entity.batch_id}
-            batch={entity}
-            color={getEntityColor(idx)}
-            getSubjectColor={getSubjectColor}
-          />
-        ) : (
-          <CompactTeacherTable
-            key={entity.teacher_id}
-            teacher={entity}
-            color={getEntityColor(idx)}
-            getSubjectColor={getSubjectColor}
-          />
-        )
-      )}
-    </div>
-  );
-};
-
 /* ================= BATCH TABLE ================= */
 interface BatchTableProps {
   batch: BatchData;
   color: { bg: string; border: string; text: string };
   getSubjectColor: (s: string | null) => { bg: string; text: string; border: string };
+  toggleAvailableTeachers: (slotId: string, dayKey: string, timeSlot: string, entityId: string, entityType: 'batch' | 'teacher') => void;
+  loadingAvailableTeachers: {[key: string]: boolean};
 }
 
-const BatchTable: React.FC<BatchTableProps> = ({ batch, color, getSubjectColor }) => {
+const BatchTable: React.FC<BatchTableProps> = ({
+  batch,
+  color,
+  getSubjectColor,
+  toggleAvailableTeachers,
+  loadingAvailableTeachers
+}) => {
   const dayKeys = Object.keys(batch.slots || {}).sort(
     (a, b) => parseInt(a.replace("d", "")) - parseInt(b.replace("d", ""))
   );
@@ -568,6 +606,10 @@ const BatchTable: React.FC<BatchTableProps> = ({ batch, color, getSubjectColor }
           timeSlots={timeSlots}
           getSubjectColor={getSubjectColor}
           showBatch={false}
+          entityId={batch.batch_id}
+          entityType="batch"
+          toggleAvailableTeachers={toggleAvailableTeachers}
+          loadingAvailableTeachers={loadingAvailableTeachers}
         />
       </div>
     </div>
@@ -579,9 +621,17 @@ interface TeacherTableProps {
   teacher: TeacherData;
   color: { bg: string; border: string; text: string };
   getSubjectColor: (s: string | null) => { bg: string; text: string; border: string };
+  toggleAvailableTeachers: (slotId: string, dayKey: string, timeSlot: string, entityId: string, entityType: 'batch' | 'teacher') => void;
+  loadingAvailableTeachers: {[key: string]: boolean};
 }
 
-const TeacherTable: React.FC<TeacherTableProps> = ({ teacher, color, getSubjectColor }) => {
+const TeacherTable: React.FC<TeacherTableProps> = ({
+  teacher,
+  color,
+  getSubjectColor,
+  toggleAvailableTeachers,
+  loadingAvailableTeachers
+}) => {
   const dayKeys = Object.keys(teacher.slots || {}).sort(
     (a, b) => parseInt(a.replace("d", "")) - parseInt(b.replace("d", ""))
   );
@@ -619,6 +669,10 @@ const TeacherTable: React.FC<TeacherTableProps> = ({ teacher, color, getSubjectC
             timeSlots={timeSlots}
             getSubjectColor={getSubjectColor}
             showBatch={true}
+            entityId={teacher.teacher_id}
+            entityType="teacher"
+            toggleAvailableTeachers={toggleAvailableTeachers}
+            loadingAvailableTeachers={loadingAvailableTeachers}
           />
         ) : (
           <div style={styles.noSlotsMessage}>
@@ -636,76 +690,6 @@ const TeacherTable: React.FC<TeacherTableProps> = ({ teacher, color, getSubjectC
   );
 };
 
-/* ================= COMPACT BATCH TABLE ================= */
-const CompactBatchTable: React.FC<BatchTableProps> = ({ batch, color, getSubjectColor }) => {
-  const dayKeys = Object.keys(batch.slots || {}).sort();
-  const timeSlots = getUniqueTimeSlots(batch.slots, dayKeys);
-
-  return (
-    <div style={styles.compactTableCard}>
-      <div style={{ ...styles.compactHeader, borderLeftColor: color.border }}>
-        <div style={styles.compactEntityInfo}>
-          <div style={{ ...styles.compactAvatar, backgroundColor: color.border }}>
-            {batch.batch_name.charAt(0)}
-          </div>
-          <div style={styles.compactEntityDetails}>
-            <h4 style={{ ...styles.compactName, color: color.text }}>{batch.batch_name}</h4>
-            <p style={styles.compactMeta}>{batch.batch_code} • {dayKeys.length} days</p>
-          </div>
-        </div>
-        <div style={styles.compactBadge}>
-          {batch.total_classes} classes
-        </div>
-      </div>
-      
-      <div style={styles.compactTimetable}>
-        <CompactTimetableGrid
-          slots={batch.slots}
-          dayKeys={dayKeys}
-          timeSlots={timeSlots}
-          getSubjectColor={getSubjectColor}
-          showBatch={false}
-        />
-      </div>
-    </div>
-  );
-};
-
-/* ================= COMPACT TEACHER TABLE ================= */
-const CompactTeacherTable: React.FC<TeacherTableProps> = ({ teacher, color, getSubjectColor }) => {
-  const dayKeys = Object.keys(teacher.slots || {}).sort();
-  const timeSlots = getUniqueTimeSlots(teacher.slots, dayKeys);
-
-  return (
-    <div style={styles.compactTableCard}>
-      <div style={{ ...styles.compactHeader, borderLeftColor: color.border }}>
-        <div style={styles.compactEntityInfo}>
-          <div style={{ ...styles.compactAvatar, backgroundColor: color.border }}>
-            👨‍🏫
-          </div>
-          <div style={styles.compactEntityDetails}>
-            <h4 style={{ ...styles.compactName, color: color.text }}>{teacher.teacher_name}</h4>
-            <p style={styles.compactMeta}>{teacher.teacher_code}</p>
-          </div>
-        </div>
-        <div style={styles.compactBadge}>
-          {teacher.total_classes} classes
-        </div>
-      </div>
-      
-      <div style={styles.compactTimetable}>
-        <CompactTimetableGrid
-          slots={teacher.slots}
-          dayKeys={dayKeys}
-          timeSlots={timeSlots}
-          getSubjectColor={getSubjectColor}
-          showBatch={true}
-        />
-      </div>
-    </div>
-  );
-};
-
 /* ================= STANDARD TIMETABLE GRID ================= */
 interface StandardTimetableGridProps {
   slots: { [dayKey: string]: SlotData[] };
@@ -713,6 +697,10 @@ interface StandardTimetableGridProps {
   timeSlots: { start: string; end: string }[];
   getSubjectColor: (s: string | null) => { bg: string; text: string; border: string };
   showBatch: boolean;
+  entityId: string;
+  entityType: 'batch' | 'teacher';
+  toggleAvailableTeachers: (slotId: string, dayKey: string, timeSlot: string, entityId: string, entityType: 'batch' | 'teacher') => void;
+  loadingAvailableTeachers: {[key: string]: boolean};
 }
 
 const StandardTimetableGrid: React.FC<StandardTimetableGridProps> = ({
@@ -721,6 +709,10 @@ const StandardTimetableGrid: React.FC<StandardTimetableGridProps> = ({
   timeSlots,
   getSubjectColor,
   showBatch,
+  entityId,
+  entityType,
+  toggleAvailableTeachers,
+  loadingAvailableTeachers
 }) => {
   const getTeacherName = (teacher: string | TeacherInfo | null): string | null => {
     if (!teacher) return null;
@@ -734,6 +726,10 @@ const StandardTimetableGrid: React.FC<StandardTimetableGridProps> = ({
     if (!slot.batch) return null;
     if (typeof slot.batch === "string") return slot.batch;
     return slot.batch.batch_name || slot.batch.batch_code || null;
+  };
+
+  const handleSlotClick = (slot: SlotData, dayKey: string) => {
+    toggleAvailableTeachers(slot.slot_id, dayKey, `${slot.start_time}-${slot.end_time}`, entityId, entityType);
   };
 
   return (
@@ -779,6 +775,7 @@ const StandardTimetableGrid: React.FC<StandardTimetableGridProps> = ({
                 const sc = getSubjectColor(slot.subject);
                 const teacherName = getTeacherName(slot.teacher);
                 const batchName = getBatchDisplayName(slot);
+                const isLoading = loadingAvailableTeachers[slot.slot_id];
                 
                 return (
                   <td key={`${dk}-${timeIdx}`} style={styles.slotCell}>
@@ -787,7 +784,11 @@ const StandardTimetableGrid: React.FC<StandardTimetableGridProps> = ({
                         ...styles.slotCard,
                         backgroundColor: sc.bg,
                         borderColor: sc.border,
+                        cursor: 'pointer',
+                        position: 'relative'
                       }}
+                      onClick={() => handleSlotClick(slot, dk)}
+                      title="Click to view available teachers"
                     >
                       <div style={styles.slotHeader}>
                         <span style={{ ...styles.slotSubject, color: sc.text }}>
@@ -820,7 +821,79 @@ const StandardTimetableGrid: React.FC<StandardTimetableGridProps> = ({
                           </div>
                         )}
                       </div>
+
+                      {/* Available teachers toggle indicator */}
+                      <div style={styles.availableTeachersIndicator}>
+                        {isLoading ? (
+                          <span style={styles.loadingIndicator}>⏳</span>
+                        ) : slot.show_available_teachers ? (
+                          <span style={styles.indicatorOpen}>▼</span>
+                        ) : (
+                          <span style={styles.indicatorClosed}>▶</span>
+                        )}
+                        <span style={styles.indicatorText}>
+                          {slot.available_teachers?.length || 0} available
+                        </span>
+                      </div>
                     </div>
+
+                    {/* Available teachers panel */}
+                    {slot.show_available_teachers && (
+                      <div style={styles.availableTeachersPanel}>
+                        <div style={styles.availableTeachersHeader}>
+                          <span style={styles.availableTeachersTitle}>
+                            👨‍🏫 Available Teachers ({time.start} - {time.end})
+                          </span>
+                        </div>
+                        
+                        {isLoading ? (
+                          <div style={styles.loadingTeachers}>
+                            <div style={styles.smallSpinner}></div>
+                            <span>Loading available teachers...</span>
+                          </div>
+                        ) : slot.available_teachers && slot.available_teachers.length > 0 ? (
+                          <div style={styles.teachersList}>
+                            {slot.available_teachers.map((teacher, idx) => (
+                              <div
+                                key={teacher.teacher_id}
+                                style={{
+                                  ...styles.teacherItem,
+                                  backgroundColor: teacher.is_available ? '#f0fdf4' : '#fef2f2',
+                                  borderLeft: `4px solid ${teacher.is_available ? '#22c55e' : '#ef4444'}`
+                                }}
+                              >
+                                <div style={styles.teacherInfo}>
+                                  <span style={styles.teacherName}>{teacher.teacher_name}</span>
+                                  <span style={styles.teacherCode}>({teacher.teacher_code})</span>
+                                </div>
+                                <div style={styles.teacherStatus}>
+                                  {teacher.is_available ? (
+                                    <span style={styles.statusAvailable}>✅ Available</span>
+                                  ) : (
+                                    <span style={styles.statusUnavailable}>❌ Unavailable</span>
+                                  )}
+                                </div>
+                                {teacher.subject_specializations && teacher.subject_specializations.length > 0 && (
+                                  <div style={styles.teacherSubjects}>
+                                    <span style={styles.subjectsLabel}>Subjects: </span>
+                                    {teacher.subject_specializations.join(", ")}
+                                  </div>
+                                )}
+                                {teacher.current_assignment && (
+                                  <div style={styles.currentAssignment}>
+                                    Currently: {teacher.current_assignment}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={styles.noTeachersMessage}>
+                            <span>No available teachers found for this time slot</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </td>
                 );
               })}
@@ -828,88 +901,6 @@ const StandardTimetableGrid: React.FC<StandardTimetableGridProps> = ({
           ))}
         </tbody>
       </table>
-    </div>
-  );
-};
-
-/* ================= COMPACT TIMETABLE GRID ================= */
-const CompactTimetableGrid: React.FC<StandardTimetableGridProps> = ({
-  slots,
-  dayKeys,
-  timeSlots,
-  getSubjectColor,
-  showBatch,
-}) => {
-  const getTeacherName = (teacher: string | TeacherInfo | null): string | null => {
-    if (!teacher) return null;
-    if (typeof teacher === "string") return teacher;
-    return teacher.teacher_name || teacher.teacher_code || null;
-  };
-
-  const getBatchDisplayName = (slot: SlotData): string | null => {
-    if (slot.batch_name) return slot.batch_name;
-    if (slot.batch_code) return slot.batch_code;
-    if (!slot.batch) return null;
-    if (typeof slot.batch === "string") return slot.batch;
-    return slot.batch.batch_name || slot.batch.batch_code || null;
-  };
-
-  return (
-    <div style={styles.compactGrid}>
-      {dayKeys.map((dk) => (
-        <div key={dk} style={styles.compactDayColumn}>
-          <div style={styles.compactDayHeader}>
-            <div style={{ ...styles.compactDayDot, backgroundColor: DAY_COLORS[dk] || "#64748b" }}></div>
-            <span style={styles.compactDayName}>
-              {DAY_NAMES[dk]?.substring(0, 3) || dk.replace("d", "")}
-            </span>
-          </div>
-          
-          <div style={styles.compactDaySlots}>
-            {timeSlots.map((time) => {
-              const slot = (slots[dk] || []).find(
-                (s) => s.start_time === time.start && s.end_time === time.end
-              );
-              
-              if (!slot) return null;
-
-              const sc = getSubjectColor(slot.subject);
-              const teacherName = getTeacherName(slot.teacher);
-              const batchName = getBatchDisplayName(slot);
-              
-              return (
-                <div
-                  key={`${dk}-${time.start}`}
-                  style={{
-                    ...styles.compactSlot,
-                    backgroundColor: sc.bg,
-                    borderColor: sc.border,
-                  }}
-                >
-                  <div style={styles.compactSlotTime}>{time.start}</div>
-                  <div style={{ ...styles.compactSlotSubject, color: sc.text }}>
-                    {slot.subject?.substring(0, 6) || "Free"}
-                  </div>
-                  <div style={styles.compactSlotInfo}>
-                    {showBatch ? (
-                      batchName && (
-                        <span style={styles.compactSlotText}>📚</span>
-                      )
-                    ) : (
-                      teacherName && (
-                        <span style={styles.compactSlotText}>👨‍🏫</span>
-                      )
-                    )}
-                    {slot.room_number && (
-                      <span style={styles.compactSlotText}>🏠{slot.room_number}</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
     </div>
   );
 };
@@ -954,6 +945,14 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "50%",
     animation: "spin 1s linear infinite",
     marginBottom: 16,
+  },
+  smallSpinner: {
+    width: 16,
+    height: 16,
+    border: "2px solid #e2e8f0",
+    borderTopColor: "#3b82f6",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
   },
   errorBox: {
     display: "flex",
@@ -1048,46 +1047,50 @@ const styles: Record<string, React.CSSProperties> = {
   tabIcon: {
     fontSize: 16,
   },
-  displayModeToggle: {
-    display: "flex",
+  headerStatsInline: {
+    display: 'flex',
     gap: 8,
-    marginBottom: 20,
-    background: "#fff",
-    padding: 6,
-    borderRadius: 12,
-    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-    width: "fit-content",
+    alignItems: 'center',
+    marginRight: 8,
   },
-  displayModeBtn: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "10px 20px",
-    background: "transparent",
-    border: "none",
+  headerStatBtn: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '8px 12px',
+    background: '#fff',
+    border: '1px solid #e2e8f0',
     borderRadius: 8,
-    cursor: "pointer",
-    fontWeight: 500,
-    fontSize: 13,
-    color: "#64748b",
-    transition: "all 0.2s",
+    minWidth: 96,
+    cursor: 'pointer',
   },
-  displayModeActive: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "10px 20px",
-    background: "linear-gradient(135deg, #8b5cf6, #7c3aed)",
-    border: "none",
-    borderRadius: 8,
-    cursor: "pointer",
+  headerStatNum: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: '#0f172a',
+    lineHeight: 1,
+  },
+  headerStatLabel: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
     fontWeight: 600,
-    fontSize: 13,
-    color: "#fff",
-    boxShadow: "0 4px 12px rgba(139, 92, 246, 0.3)",
   },
-  displayModeIcon: {
+  infoBanner: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "12px 16px",
+    background: "linear-gradient(135deg, #dbeafe, #93c5fd)",
+    borderRadius: 8,
+    marginBottom: 20,
     fontSize: 14,
+    color: "#1e40af",
+    fontWeight: 500,
+  },
+  infoIcon: {
+    fontSize: 16,
   },
   statsRow: {
     display: "flex",
@@ -1119,7 +1122,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 20,
     flexWrap: "wrap",
   },
   filterLabel: {
@@ -1173,10 +1176,10 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 16,
     border: "2px dashed #e2e8f0",
   },
-  allTablesContainer: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))",
-    gap: 20,
+  tablesContainer: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 32,
   },
   tableCard: {
     background: "#fff",
@@ -1185,19 +1188,8 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
     border: "1px solid #e2e8f0",
   },
-  compactTableCard: {
-    background: "#fff",
-    borderRadius: 12,
-    overflow: "hidden",
-    boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
-    border: "1px solid #e2e8f0",
-  },
   timetableContainer: {
     padding: 20,
-  },
-  compactTimetable: {
-    padding: 16,
-    paddingTop: 0,
   },
   tableHeader: {
     display: "flex",
@@ -1208,22 +1200,10 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: "wrap",
     gap: 16,
   },
-  compactHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "16px",
-    borderLeft: "4px solid",
-  },
   entityInfo: {
     display: "flex",
     alignItems: "center",
     gap: 16,
-  },
-  compactEntityInfo: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
   },
   entityAvatar: {
     width: 48,
@@ -1236,40 +1216,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     fontSize: 20,
   },
-  compactAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    color: "#fff",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: 700,
-    fontSize: 16,
-  },
   entityName: {
     fontSize: 18,
     fontWeight: 700,
-    margin: 0,
-  },
-  compactName: {
-    fontSize: 16,
-    fontWeight: 600,
     margin: 0,
   },
   entityMeta: {
     fontSize: 13,
     color: "#64748b",
     margin: "4px 0 0",
-  },
-  compactMeta: {
-    fontSize: 12,
-    color: "#64748b",
-    margin: "2px 0 0",
-  },
-  compactEntityDetails: {
-    display: "flex",
-    flexDirection: "column",
   },
   entityBadges: {
     display: "flex",
@@ -1280,14 +1235,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: "rgba(255,255,255,0.7)",
     borderRadius: 20,
     fontSize: 13,
-    fontWeight: 600,
-    color: "#475569",
-  },
-  compactBadge: {
-    padding: "4px 10px",
-    background: "#f1f5f9",
-    borderRadius: 16,
-    fontSize: 12,
     fontWeight: 600,
     color: "#475569",
   },
@@ -1391,6 +1338,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     justifyContent: "space-between",
+    transition: "all 0.2s ease",
   },
   slotHeader: {
     display: "flex",
@@ -1440,72 +1388,121 @@ const styles: Record<string, React.CSSProperties> = {
   slotIcon: {
     fontSize: 10,
   },
-  compactGrid: {
-    display: "flex",
-    gap: 8,
-    overflowX: "auto",
-    paddingBottom: 8,
-  },
-  compactDayColumn: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-    minWidth: 70,
-  },
-  compactDayHeader: {
+  availableTeachersIndicator: {
     display: "flex",
     alignItems: "center",
-    gap: 6,
-    padding: "8px",
+    gap: 4,
+    marginTop: 6,
+    paddingTop: 6,
+    borderTop: "1px dashed rgba(0,0,0,0.1)",
+    fontSize: 10,
+    color: "#64748b",
+  },
+  loadingIndicator: {
+    fontSize: 10,
+  },
+  indicatorOpen: {
+    fontSize: 8,
+    fontWeight: 'bold',
+  },
+  indicatorClosed: {
+    fontSize: 8,
+    fontWeight: 'bold',
+  },
+  indicatorText: {
+    fontSize: 9,
+    fontWeight: 600,
+  },
+  availableTeachersPanel: {
+    marginTop: 8,
     background: "#f8fafc",
     borderRadius: 6,
-    justifyContent: "center",
+    border: "1px solid #e2e8f0",
+    overflow: "hidden",
+    animation: "slideDown 0.3s ease-out",
   },
-  compactDayDot: {
-    width: 8,
-    height: 8,
-    borderRadius: "50%",
+  availableTeachersHeader: {
+    padding: "10px 12px",
+    background: "#e2e8f0",
+    borderBottom: "1px solid #cbd5e1",
   },
-  compactDayName: {
+  availableTeachersTitle: {
     fontSize: 12,
-    fontWeight: 600,
-    color: "#0f172a",
-  },
-  compactDaySlots: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-  },
-  compactSlot: {
-    padding: "8px",
-    borderRadius: 6,
-    border: "1px solid",
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
-    alignItems: "center",
-    textAlign: "center",
-  },
-  compactSlotTime: {
-    fontSize: 10,
     fontWeight: 600,
     color: "#475569",
   },
-  compactSlotSubject: {
-    fontSize: 11,
-    fontWeight: 700,
-  },
-  compactSlotInfo: {
+  loadingTeachers: {
     display: "flex",
-    gap: 4,
+    alignItems: "center",
+    gap: 8,
+    padding: "16px",
+    color: "#64748b",
+    fontSize: 12,
+  },
+  teachersList: {
+    maxHeight: 200,
+    overflowY: "auto",
+  },
+  teacherItem: {
+    padding: "10px 12px",
+    borderBottom: "1px solid #e2e8f0",
+    transition: "background-color 0.2s",
+  },
+  teacherInfo: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  teacherName: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#1e293b",
+  },
+  teacherCode: {
+    fontSize: 11,
+    color: "#64748b",
+  },
+  teacherStatus: {
+    marginBottom: 4,
+  },
+  statusAvailable: {
+    fontSize: 10,
+    color: "#166534",
+    fontWeight: 600,
+    padding: "2px 6px",
+    background: "#dcfce7",
+    borderRadius: 4,
+    display: "inline-block",
+  },
+  statusUnavailable: {
+    fontSize: 10,
+    color: "#991b1b",
+    fontWeight: 600,
+    padding: "2px 6px",
+    background: "#fee2e2",
+    borderRadius: 4,
+    display: "inline-block",
+  },
+  teacherSubjects: {
+    fontSize: 10,
+    color: "#475569",
+    marginTop: 2,
+  },
+  subjectsLabel: {
+    fontWeight: 600,
+  },
+  currentAssignment: {
     fontSize: 9,
     color: "#64748b",
-    alignItems: "center",
+    fontStyle: "italic",
+    marginTop: 2,
   },
-  compactSlotText: {
-    display: "flex",
-    alignItems: "center",
-    gap: 1,
+  noTeachersMessage: {
+    padding: "16px",
+    textAlign: "center",
+    color: "#64748b",
+    fontSize: 12,
   },
   noSlotsMessage: {
     display: "flex",
@@ -1527,12 +1524,27 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
-// Add CSS animation
+// Add CSS animations
 const styleSheet = document.styleSheets[0];
 styleSheet.insertRule(`
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+`, styleSheet.cssRules.length);
+
+styleSheet.insertRule(`
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+      max-height: 0;
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      max-height: 300px;
+    }
   }
 `, styleSheet.cssRules.length);
 

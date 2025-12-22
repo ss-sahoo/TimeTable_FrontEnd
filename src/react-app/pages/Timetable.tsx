@@ -98,9 +98,8 @@ const Timetable: React.FC = () => {
     { key: "batches", label: "Batches" },
     { key: "teachers", label: "Teachers" },
     { key: "fixedSlots", label: "Fixed Slots" },
-    { key: "feasibility", label: "Feasibility" },
-    { key: "generate", label: "Generate" },
-    { key: "UpdateSlots", label: "Update Slots" },
+    { key: "feasibility", label: "Generate" },
+    { key: "generate", label: "Timetable" },
   ];
 
   // Get selected timetable info
