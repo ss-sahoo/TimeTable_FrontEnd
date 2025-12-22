@@ -283,7 +283,7 @@ const BatchSchedule: React.FC = () => {
         id: teacher.id,
         name: `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || teacher.name || 'Unknown',
         code: teacher.teacher_code || `TCH-${teacher.id.slice(0, 8)}`,
-        subject: teacher.subject || teacher.subject_name || teacher.specialization || "General",
+        subject: teacher.teacher_subjects || teacher.subject || teacher.subject_name || teacher.specialization || "General",
         department: teacher.department || teacher.department_name || "General",
         minLecturesPerDay: 1,
         maxLecturesPerDay: 2,
@@ -628,8 +628,8 @@ const BatchSchedule: React.FC = () => {
             id: t.teacher_id || t.teacher_code,
             name: t.teacher_name || "Unknown",
             code: t.teacher_code,
-            subject: t.subject || "General",
-            department: "General",
+            subject: t.teacher_subjects || t.subject || t.subject_name || "General",
+            department: t.department || "General",
             minLecturesPerDay: t.min_lectures_per_day || 1,
             maxLecturesPerDay: t.max_lectures_per_day || 2,
             minLecturesPerWeek: t.total_lectures || 4,
@@ -1026,6 +1026,31 @@ const BatchSchedule: React.FC = () => {
 
     loadSavedData();
   }, []);
+
+  /* Update teacher subjects when teachers list is loaded */
+  useEffect(() => {
+    if (teachers.length > 0 && teacherAssignments.length > 0) {
+      // Update subjects from fresh teacher data
+      const updatedAssignments = teacherAssignments.map(assignment => ({
+        ...assignment,
+        teachers: assignment.teachers.map(t => {
+          const freshTeacher = teachers.find(ft => ft.code === t.code);
+          if (freshTeacher && (t.subject === "General" || !t.subject)) {
+            return { ...t, subject: freshTeacher.subject };
+          }
+          return t;
+        })
+      }));
+      
+      // Only update if there are changes
+      const hasChanges = JSON.stringify(updatedAssignments) !== JSON.stringify(teacherAssignments);
+      if (hasChanges) {
+        setTeacherAssignments(updatedAssignments);
+        localStorage.setItem("batchTeacherAssignments", JSON.stringify(updatedAssignments));
+        console.log("Updated teacher subjects from fresh data");
+      }
+    }
+  }, [teachers]);
 
   /* Fetch data on component mount */
   useEffect(() => {
