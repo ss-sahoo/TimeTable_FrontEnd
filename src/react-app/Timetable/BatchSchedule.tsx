@@ -269,14 +269,15 @@ const BatchSchedule: React.FC = () => {
       
       const data = await response.json();
       console.log("Teachers API response:", data);
+      console.log("First teacher raw data:", data.results?.[0]);
       
       // Transform API data to match our UI format
       const formattedTeachers: Teacher[] = data.results.map((teacher: any) => ({
         id: teacher.id,
-        name: `${teacher.first_name} ${teacher.last_name}`,
+        name: `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || teacher.name || 'Unknown',
         code: teacher.teacher_code || `TCH-${teacher.id.slice(0, 8)}`,
-        subject: teacher.subject || "General",
-        department: teacher.department || "General",
+        subject: teacher.subject || teacher.subject_name || teacher.specialization || "General",
+        department: teacher.department || teacher.department_name || "General",
         minLecturesPerDay: 1,
         maxLecturesPerDay: 2,
         minLecturesPerWeek: 4,
@@ -284,6 +285,8 @@ const BatchSchedule: React.FC = () => {
         email: teacher.email,
         phone: teacher.phone
       }));
+      
+      console.log("Formatted teachers with subjects:", formattedTeachers);
       
       setTeachers(formattedTeachers);
       

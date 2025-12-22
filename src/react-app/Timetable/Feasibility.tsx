@@ -55,6 +55,7 @@ const Feasibility: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FeasibilityResult | null>(null);
   const [hasRun, setHasRun] = useState(false);
@@ -63,6 +64,8 @@ const Feasibility: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState<OptimizationSettings>(DEFAULT_SETTINGS);
   const [settingsChanged, setSettingsChanged] = useState(false);
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+  const [stopSlot, setStopSlot] = useState<string>("");
 
   /* Get timetable ID from localStorage */
   useEffect(() => {
@@ -195,6 +198,56 @@ const Feasibility: React.FC = () => {
       setSaving(false);
     }
   }, [timetableId, generatedTimetable]);
+
+  /* Regenerate timetable from a specific slot */
+  const handleRegenerateFromSlot = useCallback(async () => {
+    if (!timetableId) {
+      setError("No timetable ID found.");
+      return;
+    }
+
+    if (!stopSlot.trim()) {
+      setError("Please enter a stop slot (e.g., w3, d1_s1)");
+      return;
+    }
+
+    setRegenerating(true);
+    setError(null);
+
+    try {
+      console.log("Regenerating timetable from slot:", stopSlot, "with settings:", settings);
+      
+      const regeneratePayload = {
+        stop_slot: stopSlot.trim(),
+        max_retries: settings.max_retries,
+        max_try_for_slot_assign: settings.max_try_for_slot_assign,
+        weight_power_fector: settings.weight_power_fector,
+        max_one_subject_repetation_per_day: settings.max_one_subject_repetation_per_day,
+        max_one_subject_repetation_per_day_penalty_fector: settings.max_one_subject_repetation_per_day_penalty_fector,
+        weight_penalty_consu_sub_repetation: settings.weight_penalty_consu_sub_repetation
+      };
+
+      const regenerateResponse = await Fetch(`/api/timetable/timetables/${timetableId}/regenerate-from-slot/`, {
+        method: "POST",
+        body: JSON.stringify(regeneratePayload),
+      });
+
+      if (!regenerateResponse.ok) {
+        throw new Error(`Regeneration failed: ${regenerateResponse.status}`);
+      }
+
+      const regenerateData = await regenerateResponse.json();
+      console.log("Regeneration result:", regenerateData);
+      setGeneratedTimetable(regenerateData);
+      setShowRegenerateModal(false);
+      alert("Timetable regenerated successfully from slot: " + stopSlot);
+    } catch (err: any) {
+      console.error("Regeneration error:", err);
+      setError(err.message || "Failed to regenerate timetable");
+    } finally {
+      setRegenerating(false);
+    }
+  }, [timetableId, stopSlot, settings]);
 
   /* Settings handlers */
   const handleSettingsChange = (key: keyof OptimizationSettings, value: any) => {
@@ -374,6 +427,84 @@ const Feasibility: React.FC = () => {
                   Apply Settings
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Regenerate from Slot Modal */}
+      {showRegenerateModal && (
+        <div style={styles.modalOverlay}>
+          <div style={{...styles.modalContent, maxWidth: "500px"}}>
+            <div style={styles.modalHeader}>
+              <h3 style={styles.modalTitle}>🔄 Update Old Timetable</h3>
+              <button 
+                style={styles.modalCloseBtn}
+                onClick={() => setShowRegenerateModal(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{padding: "24px"}}>
+              <p style={{color: "#64748b", fontSize: "14px", marginBottom: "20px"}}>
+                Regenerate the timetable starting from a specific slot. All slots after the specified slot will be regenerated.
+              </p>
+              
+              <div style={styles.settingField}>
+                <label style={styles.settingLabel}>
+                  Stop Slot Code
+                  <span style={styles.settingDescription}>Enter the slot code to start regeneration from (e.g., w3, d1_s1, d2_s3)</span>
+                </label>
+                <input
+                  type="text"
+                  value={stopSlot}
+                  onChange={(e) => setStopSlot(e.target.value)}
+                  style={styles.numberInput}
+                  placeholder="e.g., w3"
+                />
+              </div>
+
+              <div style={{marginTop: "16px", padding: "12px", background: "#f0f9ff", borderRadius: "8px", border: "1px solid #bae6fd"}}>
+                <p style={{fontSize: "12px", color: "#0369a1", margin: "0 0 8px 0", fontWeight: "600"}}>
+                  Current Settings (from Settings panel):
+                </p>
+                <div style={{fontSize: "11px", color: "#64748b", fontFamily: "monospace"}}>
+                  <div>max_retries: {settings.max_retries}</div>
+                  <div>max_try_for_slot_assign: {settings.max_try_for_slot_assign}</div>
+                  <div>weight_power_fector: {settings.weight_power_fector}</div>
+                  <div>max_one_subject_repetation_per_day: {settings.max_one_subject_repetation_per_day}</div>
+                </div>
+              </div>
+            </div>
+
+            <div style={styles.modalFooter}>
+              <button 
+                style={styles.cancelBtn}
+                onClick={() => setShowRegenerateModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                style={{
+                  ...styles.regenerateBtn,
+                  opacity: regenerating || !stopSlot.trim() ? 0.7 : 1,
+                  cursor: regenerating ? "wait" : "pointer",
+                }}
+                onClick={handleRegenerateFromSlot}
+                disabled={regenerating || !stopSlot.trim()}
+              >
+                {regenerating ? (
+                  <>
+                    <div style={styles.buttonSpinnerWhite}></div>
+                    Regenerating...
+                  </>
+                ) : (
+                  <>
+                    🔄 Regenerate Timetable
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -574,6 +705,13 @@ const Feasibility: React.FC = () => {
                   <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 Settings
+              </button>
+
+              <button 
+                style={styles.updateOldBtn}
+                onClick={() => setShowRegenerateModal(true)}
+              >
+                🔄 Update Old Timetable
               </button>
               
               {result.feasible && !generatedTimetable && (
@@ -1138,6 +1276,34 @@ const styles: Record<string, React.CSSProperties> = {
   saveBtn: {
     padding: "10px 20px",
     background: "#3b82f6",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: "500",
+    fontSize: "14px",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    transition: "all 0.2s",
+  },
+  updateOldBtn: {
+    padding: "10px 20px",
+    background: "#f59e0b",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: "500",
+    fontSize: "14px",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    transition: "all 0.2s",
+  },
+  regenerateBtn: {
+    padding: "10px 20px",
+    background: "#f59e0b",
     color: "#ffffff",
     border: "none",
     borderRadius: "8px",
