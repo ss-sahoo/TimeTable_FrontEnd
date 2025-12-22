@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { removeBatchFromTimetable, removeTeacherFromBatch } from "../AllApi";
 
 /* ================= TYPES ================= */
 interface Teacher {
@@ -94,6 +95,12 @@ const BatchSchedule: React.FC = () => {
   
   // State for free classes count
   const [freeClassesCount, setFreeClassesCount] = useState<number>(0);
+
+  // Confirmation modal states
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmModalType, setConfirmModalType] = useState<"batch" | "teacher">("batch");
+  const [confirmModalData, setConfirmModalData] = useState<{ batchId?: string; batchName?: string; teacherId?: string; teacherName?: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // ===================== API FUNCTIONS =====================
   
@@ -334,6 +341,30 @@ const BatchSchedule: React.FC = () => {
     }
   };
   
+  // Function to remove batch from timetable via API (uses AllApi)
+  const removeBatchFromTimetableAPI = async (ttId: string, batchCode: string) => {
+    try {
+      const data = await removeBatchFromTimetable(ttId, batchCode);
+      console.log("Batch removed successfully:", data);
+      return data;
+    } catch (error: any) {
+      console.error("Error removing batch:", error);
+      throw error;
+    }
+  };
+
+  // Function to remove teacher from batch via API (uses AllApi)
+  const removeTeacherFromBatchAPI = async (ttId: string, batchCode: string, teacherCode: string) => {
+    try {
+      const data = await removeTeacherFromBatch(ttId, batchCode, teacherCode);
+      console.log("Teacher removed successfully:", data);
+      return data;
+    } catch (error: any) {
+      console.error("Error removing teacher:", error);
+      throw error;
+    }
+  };
+
   // Function to assign teacher via API
   const assignTeacherAPI = async (batchCode: string, teacherCode: string, minLecturesPerWeek: number, minLecturesPerDay: number, maxLecturesPerDay: number, maxLecturesPerWeek: number) => {
     try {
@@ -690,25 +721,58 @@ const BatchSchedule: React.FC = () => {
 
   // Function to remove a batch from view
   const removeBatchFromView = (batchId: string) => {
-    if (batches.length <= 1) {
-      alert("You must have at least one batch in view");
+    const batchToRemove = batches.find(b => b.id === batchId);
+    if (!batchToRemove) {
       return;
     }
     
-    if (window.confirm("Are you sure you want to remove this batch from your view?")) {
+    if (!timetableId) {
+      return;
+    }
+    
+    // Open confirmation modal
+    setConfirmModalType("batch");
+    setConfirmModalData({ batchId, batchName: batchToRemove.name });
+    setShowConfirmModal(true);
+  };
+
+  // Confirm batch removal
+  const confirmRemoveBatch = async () => {
+    if (!confirmModalData?.batchId || !timetableId) return;
+    
+    const batchToRemove = batches.find(b => b.id === confirmModalData.batchId);
+    if (!batchToRemove) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      // Call the remove-batch API
+      await removeBatchFromTimetableAPI(timetableId, batchToRemove.code);
+      
       // Remove batch from view
-      setBatches(prev => prev.filter(batch => batch.id !== batchId));
+      setBatches(prev => prev.filter(batch => batch.id !== confirmModalData.batchId));
       
       // Remove teacher assignments for this batch
-      setTeacherAssignments(prev => prev.filter(assignment => assignment.batchId !== batchId));
+      setTeacherAssignments(prev => prev.filter(assignment => assignment.batchId !== confirmModalData.batchId));
       
       // If active batch is being removed, set another batch as active
-      if (activeBatch === batchId) {
-        const remainingBatches = batches.filter(batch => batch.id !== batchId);
+      if (activeBatch === confirmModalData.batchId) {
+        const remainingBatches = batches.filter(batch => batch.id !== confirmModalData.batchId);
         if (remainingBatches.length > 0) {
           setActiveBatch(remainingBatches[0].id);
+        } else {
+          setActiveBatch("");
         }
       }
+      
+      // Close modal
+      setShowConfirmModal(false);
+      setConfirmModalData(null);
+      
+    } catch (error: any) {
+      console.error("Failed to remove batch:", error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -816,8 +880,52 @@ const BatchSchedule: React.FC = () => {
 
   const removeTeacher = (teacherId: string) => {
     const currentTeachers = getBatchAssignments(activeBatch);
-    const updatedTeachers = currentTeachers.filter(t => t.id !== teacherId);
-    updateBatchAssignments(activeBatch, updatedTeachers);
+    const teacherToRemove = currentTeachers.find(t => t.id === teacherId);
+    const activeBatchObj = getActiveBatch();
+    
+    if (!teacherToRemove || !activeBatchObj) {
+      return;
+    }
+    
+    if (!timetableId) {
+      return;
+    }
+    
+    // Open confirmation modal
+    setConfirmModalType("teacher");
+    setConfirmModalData({ teacherId, teacherName: teacherToRemove.name });
+    setShowConfirmModal(true);
+  };
+
+  // Confirm teacher removal
+  const confirmRemoveTeacher = async () => {
+    if (!confirmModalData?.teacherId || !timetableId) return;
+    
+    const currentTeachers = getBatchAssignments(activeBatch);
+    const teacherToRemove = currentTeachers.find(t => t.id === confirmModalData.teacherId);
+    const activeBatchObj = getActiveBatch();
+    
+    if (!teacherToRemove || !activeBatchObj) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      // Call the remove-teacher API
+      await removeTeacherFromBatchAPI(timetableId, activeBatchObj.code, teacherToRemove.code);
+      
+      // Update local state
+      const updatedTeachers = currentTeachers.filter(t => t.id !== confirmModalData.teacherId);
+      updateBatchAssignments(activeBatch, updatedTeachers);
+      
+      // Close modal
+      setShowConfirmModal(false);
+      setConfirmModalData(null);
+      
+    } catch (error: any) {
+      console.error("Failed to remove teacher:", error);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const updateTeacherLimits = (teacherId: string, field: keyof Teacher, value: number) => {
@@ -1738,6 +1846,64 @@ const BatchSchedule: React.FC = () => {
           </span>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.confirmModalContent}>
+            <div style={styles.confirmModalHeader}>
+              <div style={styles.confirmModalIcon}>
+                {confirmModalType === "batch" ? "📋" : "👨‍🏫"}
+              </div>
+              <h3 style={styles.confirmModalTitle}>
+                {confirmModalType === "batch" ? "Remove Batch" : "Remove Teacher"}
+              </h3>
+            </div>
+            
+            <div style={styles.confirmModalBody}>
+              <p style={styles.confirmModalText}>
+                {confirmModalType === "batch" 
+                  ? `Are you sure you want to remove batch "${confirmModalData?.batchName}" from this timetable?`
+                  : `Are you sure you want to remove "${confirmModalData?.teacherName}" from this batch?`
+                }
+              </p>
+              <p style={styles.confirmModalWarning}>
+                {confirmModalType === "batch" 
+                  ? "This will also remove all teacher assignments for this batch."
+                  : "This action cannot be undone."
+                }
+              </p>
+            </div>
+            
+            <div style={styles.confirmModalFooter}>
+              <button
+                style={styles.confirmModalCancel}
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  setConfirmModalData(null);
+                }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                style={styles.confirmModalDelete}
+                onClick={confirmModalType === "batch" ? confirmRemoveBatch : confirmRemoveTeacher}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <span style={styles.buttonSpinner}></span>
+                    Removing...
+                  </>
+                ) : (
+                  "Remove"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -2730,6 +2896,90 @@ const styles: Record<string, React.CSSProperties> = {
   },
   infoNoteText: {
     flex: "1",
+  },
+  // Confirmation Modal Styles
+  confirmModalContent: {
+    backgroundColor: "#ffffff",
+    borderRadius: "12px",
+    boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+    maxWidth: "420px",
+    width: "100%",
+    overflow: "hidden",
+  },
+  confirmModalHeader: {
+    padding: "24px 24px 16px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "12px",
+  },
+  confirmModalIcon: {
+    fontSize: "48px",
+  },
+  confirmModalTitle: {
+    fontSize: "18px",
+    fontWeight: "600",
+    color: "#1e293b",
+    margin: "0",
+  },
+  confirmModalBody: {
+    padding: "0 24px 24px",
+    textAlign: "center",
+  },
+  confirmModalText: {
+    fontSize: "14px",
+    color: "#475569",
+    margin: "0 0 12px 0",
+    lineHeight: "1.5",
+  },
+  confirmModalWarning: {
+    fontSize: "13px",
+    color: "#dc2626",
+    margin: "0",
+    padding: "8px 12px",
+    background: "#fef2f2",
+    borderRadius: "6px",
+  },
+  confirmModalFooter: {
+    padding: "16px 24px",
+    borderTop: "1px solid #e2e8f0",
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "12px",
+    background: "#f8fafc",
+  },
+  confirmModalCancel: {
+    padding: "10px 20px",
+    background: "#ffffff",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontWeight: "500",
+    fontSize: "14px",
+    transition: "all 0.2s",
+  },
+  confirmModalDelete: {
+    padding: "10px 20px",
+    background: "#dc2626",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontWeight: "500",
+    fontSize: "14px",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    transition: "all 0.2s",
+  },
+  buttonSpinner: {
+    width: "14px",
+    height: "14px",
+    border: "2px solid rgba(255,255,255,0.3)",
+    borderTop: "2px solid #ffffff",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
   },
 };
 
