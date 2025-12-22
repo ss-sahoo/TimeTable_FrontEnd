@@ -257,6 +257,41 @@ export const updateFreeClassesCount = async (timetableId, freeClassesCount) => {
   return response.json()
 }
 
+// ==================== BATCH/TEACHER REMOVAL APIs ====================
+
+/**
+ * Remove a batch from a timetable
+ * POST /api/timetable/admin/timetables/remove-batch/
+ */
+export const removeBatchFromTimetable = async (timetableId, batchCode) => {
+  const cleanId = cleanTimetableId(timetableId)
+  const response = await Fetch("/api/timetable/admin/timetables/remove-batch/", {
+    method: "POST",
+    body: JSON.stringify({
+      timetable_id: cleanId,
+      batch_code: batchCode,
+    }),
+  })
+  return response.json()
+}
+
+/**
+ * Remove a teacher from a batch in a timetable
+ * POST /api/timetable/admin/timetables/remove-teacher/
+ */
+export const removeTeacherFromBatch = async (timetableId, batchCode, teacherCode) => {
+  const cleanId = cleanTimetableId(timetableId)
+  const response = await Fetch("/api/timetable/admin/timetables/remove-teacher/", {
+    method: "POST",
+    body: JSON.stringify({
+      timetable_id: cleanId,
+      batch_code: batchCode,
+      teacher_code: teacherCode,
+    }),
+  })
+  return response.json()
+}
+
 // ==================== EXPORT ====================
 
 export default {
@@ -278,4 +313,6 @@ export default {
   fetchAllTimetables,
   updateTimetable,
   updateFreeClassesCount,
+  removeBatchFromTimetable,
+  removeTeacherFromBatch,
 }
