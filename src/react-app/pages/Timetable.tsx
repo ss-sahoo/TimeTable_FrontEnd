@@ -109,14 +109,13 @@ const Timetable: React.FC = () => {
   const formatTimetableName = (tt: any) => {
     const dateRange = `${tt.from_date} → ${tt.to_date}`;
     const slots = tt.slots_count || tt.total_slots || 0;
-    return `${tt.center || 'Timetable'} (${dateRange}) - ${slots} slots`;
+    return `${tt.name  || 'Timetable'} (${dateRange}) - ${slots} slots`;
   };
 
   return (
     <div style={styles.page}>
       <h2 style={styles.title}>Institute Timetable</h2>
       
-      {/* Timetable Dropdown Selector
       <div style={styles.timetableSelector}>
         <div style={styles.selectorRow}>
           <label style={styles.dropdownLabel}>📅 Select Timetable:</label>
@@ -126,6 +125,7 @@ const Timetable: React.FC = () => {
             <select
               style={styles.timetableDropdown}
               value={selectedTimetableId || ""}
+
               onChange={(e) => handleSelectTimetable(e.target.value)}
             >
               <option value="">-- Select a timetable --</option>
@@ -145,7 +145,7 @@ const Timetable: React.FC = () => {
             </span>
           )}
         </div>
-      </div> */}
+      </div>
 
       {/* Clickable Tabs */}
       <div style={styles.tabContainer}>

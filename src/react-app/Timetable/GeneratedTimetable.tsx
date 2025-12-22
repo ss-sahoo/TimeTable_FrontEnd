@@ -120,6 +120,134 @@ const TEACHER_COLORS = [
   { bg: "#f5f3ff", border: "#8b5cf6", text: "#6d28d9" },
 ];
 
+/* ================= DROPDOWN SELECTOR ================= */
+interface DropdownSelectorProps {
+  title: string;
+  items: { id: string; label: string; color?: string }[];
+  selectedIds: string[];
+  onSelectItem: (id: string) => void;
+  onClearAll: () => void;
+  placeholder?: string;
+}
+
+const DropdownSelector: React.FC<DropdownSelectorProps> = ({
+  title,
+  items,
+  selectedIds,
+  onSelectItem,
+  onClearAll,
+  placeholder = "Select items..."
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleItemClick = (id: string) => {
+    onSelectItem(id);
+  };
+
+  const selectedItems = items.filter(item => selectedIds.includes(item.id));
+
+  return (
+    <div style={{ position: "relative", display: "inline-block" }} ref={dropdownRef}>
+      {/* Dropdown Trigger Button */}
+      <button
+        style={{
+          ...styles.dropdownTrigger,
+          backgroundColor: "#f8fafc",
+          borderColor: "#e2e8f0",
+          color: "#475569",
+        }}
+        onClick={() => setIsOpen(!isOpen)}
+        title={`Select ${title.toLowerCase()}`}
+      >
+        <span style={styles.dropdownTriggerText}>
+          <span style={{ marginRight: "4px" }}>▼</span>
+          {placeholder}
+        </span>
+      </button>
+
+      {/* Dropdown Menu */}
+      {isOpen && (
+        <div style={styles.selectorDropdown}>
+          {/* Header */}
+          <div style={styles.selectorHeader}>
+            <span style={styles.selectorTitle}>Select {title}</span>
+            <button
+              style={styles.selectorClearBtn}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClearAll();
+              }}
+            >
+              Clear All
+            </button>
+          </div>
+
+          {/* Search/Info */}
+          <div style={styles.selectorInfo}>
+            <span style={styles.selectorCount}>
+              {selectedIds.length} of {items.length} selected
+            </span>
+          </div>
+
+          {/* Items List */}
+          <div style={styles.selectorItems}>
+            {items.map(item => (
+              <div
+                key={item.id}
+                style={{
+                  ...styles.selectorItem,
+                  backgroundColor: selectedIds.includes(item.id) ? "#f1f5f9" : "transparent",
+                }}
+                onClick={() => handleItemClick(item.id)}
+              >
+                <div style={styles.selectorCheckbox}>
+                  {selectedIds.includes(item.id) ? (
+                    <div style={styles.selectorCheckboxChecked}>✓</div>
+                  ) : (
+                    <div style={styles.selectorCheckboxUnchecked} />
+                  )}
+                </div>
+                <span style={styles.selectorItemLabel}>{item.label}</span>
+                {item.color && (
+                  <div
+                    style={{
+                      ...styles.selectorItemColor,
+                      backgroundColor: item.color
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div style={styles.selectorFooter}>
+            <button
+              style={styles.selectorDoneBtn}
+              onClick={() => setIsOpen(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ================= MAIN COMPONENT ================= */
 const GeneratedTimetable: React.FC = () => {
   const [timetableId, setTimetableId] = useState<string | null>(null);
@@ -134,11 +262,13 @@ const GeneratedTimetable: React.FC = () => {
   
   // Batch view state
   const [batches, setBatches] = useState<BatchData[]>([]);
-  const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
+  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
+  const [activeBatchTab, setActiveBatchTab] = useState<string | null>(null); // NEW
   
   // Teacher view state
   const [teachers, setTeachers] = useState<TeacherData[]>([]);
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string>("all");
+  const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([]);
+  const [activeTeacherTab, setActiveTeacherTab] = useState<string | null>(null); // NEW
 
   // Available teachers state
   const [loadingAvailableTeachers, setLoadingAvailableTeachers] = useState<{[key: string]: boolean}>({});
@@ -345,15 +475,43 @@ const GeneratedTimetable: React.FC = () => {
   const getBatchColor = (idx: number) => BATCH_COLORS[idx % BATCH_COLORS.length];
   const getTeacherColor = (idx: number) => TEACHER_COLORS[idx % TEACHER_COLORS.length];
 
+  // Toggle batch selection
+  const toggleBatchSelection = (batchId: string) => {
+    setSelectedBatchIds(prev =>
+      prev.includes(batchId)
+        ? prev.filter(id => id !== batchId)
+        : [...prev, batchId]
+    );
+  };
+
+  // Toggle teacher selection
+  const toggleTeacherSelection = (teacherId: string) => {
+    setSelectedTeacherIds(prev =>
+      prev.includes(teacherId)
+        ? prev.filter(id => id !== teacherId)
+        : [...prev, teacherId]
+    );
+  };
+
+  // Clear all batch filters
+  const clearBatchFilters = () => {
+    setSelectedBatchIds([]);
+  };
+
+  // Clear all teacher filters
+  const clearTeacherFilters = () => {
+    setSelectedTeacherIds([]);
+  };
+
   const filteredBatches =
-    selectedBatchId === "all"
+    selectedBatchIds.length === 0
       ? batches
-      : batches.filter((b) => b.batch_id === selectedBatchId);
+      : batches.filter((b) => selectedBatchIds.includes(b.batch_id));
 
   const filteredTeachers =
-    selectedTeacherId === "all"
+    selectedTeacherIds.length === 0
       ? teachers
-      : teachers.filter((t) => t.teacher_id === selectedTeacherId);
+      : teachers.filter((t) => selectedTeacherIds.includes(t.teacher_id));
 
   if (loading) {
     return (
@@ -412,20 +570,18 @@ const GeneratedTimetable: React.FC = () => {
         </div>
       </div>
 
-      
-
       {/* View Mode Tabs */}
       <div style={styles.viewTabs}>
         <button
           style={viewMode === "batch" ? styles.viewTabActive : styles.viewTab}
-          onClick={() => { setViewMode("batch"); setSelectedBatchId("all"); }}
+          onClick={() => { setViewMode("batch"); clearBatchFilters(); }}
         >
           <span style={styles.tabIcon}>📚</span>
           Batch-wise View
         </button>
         <button
           style={viewMode === "teacher" ? styles.viewTabActive : styles.viewTab}
-          onClick={() => { setViewMode("teacher"); setSelectedTeacherId("all"); }}
+          onClick={() => { setViewMode("teacher"); clearTeacherFilters(); }}
         >
           <span style={styles.tabIcon}>👨‍🏫</span>
           Teacher-wise View
@@ -452,54 +608,121 @@ const GeneratedTimetable: React.FC = () => {
         )}
       </div>
 
-      {/* Filter Row */}
-      <div style={styles.filterRow}>
-        <span style={styles.filterLabel}>Filter by {viewMode === "batch" ? "Batch" : "Teacher"}:</span>
+{/* Filter Row */}
+<div style={styles.filterRow}>
+  <span style={styles.filterLabel}>View {viewMode === "batch" ? "Batches" : "Teachers"}:</span>
+  
+  {/* Always show "All" button */}
+  <button
+    style={ 
+      (viewMode === "batch" && !activeBatchTab) || 
+      (viewMode === "teacher" && !activeTeacherTab)
+        ? styles.filterActive 
+        : styles.filterBtn
+    }
+    onClick={() => {
+      if (viewMode === "batch") {
+        setActiveBatchTab(null);
+      } else {
+        setActiveTeacherTab(null);
+      }
+    }}
+  >
+    All {viewMode === "batch" ? "Batches" : "Teachers"}
+  </button>
+  
+  {/* Selected items as separate tabs */}
+  {viewMode === "batch" ? (
+    <>
+      {selectedBatchIds.map((batchId, idx) => {
+        const batch = batches.find(b => b.batch_id === batchId);
+        if (!batch) return null;
         
-        {viewMode === "batch" ? (
-          <>
-            <button
-              style={selectedBatchId === "all" ? styles.filterActive : styles.filterBtn}
-              onClick={() => setSelectedBatchId("all")}
-            >
-              All Batches
-            </button>
-            {batches.map((b, i) => (
-              <button
-                key={b.batch_id}
-                style={{
-                  ...(selectedBatchId === b.batch_id ? styles.filterActive : styles.filterBtn),
-                  borderLeft: `3px solid ${getBatchColor(i).border}`,
-                }}
-                onClick={() => setSelectedBatchId(b.batch_id)}
-              >
-                {b.batch_name}
-              </button>
-            ))}
-          </>
-        ) : (
-          <>
-            <button
-              style={selectedTeacherId === "all" ? styles.filterActive : styles.filterBtn}
-              onClick={() => setSelectedTeacherId("all")}
-            >
-              All Teachers
-            </button>
-            {teachers.map((t, i) => (
-              <button
-                key={t.teacher_id}
-                style={{
-                  ...(selectedTeacherId === t.teacher_id ? styles.filterActive : styles.filterBtn),
-                  borderLeft: `3px solid ${getTeacherColor(i).border}`,
-                }}
-                onClick={() => setSelectedTeacherId(t.teacher_id)}
-              >
-                {t.teacher_name}
-              </button>
-            ))}
-          </>
-        )}
-      </div>
+        return (
+          <button
+            key={batch.batch_id}
+            style={{
+              ...(activeBatchTab === batch.batch_id 
+                ? styles.filterActive 
+                : styles.filterBtn
+              ),
+              borderLeft: `3px solid ${getBatchColor(batches.indexOf(batch)).border}`,
+            }}
+            onClick={() => setActiveBatchTab(batch.batch_id)}
+          >
+            {batch.batch_name}
+          </button>
+        );
+      })}
+    </>
+  ) : (
+    <>
+      {selectedTeacherIds.map((teacherId, idx) => {
+        const teacher = teachers.find(t => t.teacher_id === teacherId);
+        if (!teacher) return null;
+        
+        return (
+          <button
+            key={teacher.teacher_id}
+            style={{
+              ...(activeTeacherTab === teacher.teacher_id 
+                ? styles.filterActive 
+                : styles.filterBtn
+              ),
+              borderLeft: `3px solid ${getTeacherColor(teachers.indexOf(teacher)).border}`,
+            }}
+            onClick={() => setActiveTeacherTab(teacher.teacher_id)}
+          >
+            {teacher.teacher_name}
+          </button>
+        );
+      })}
+    </>
+  )}
+  
+  {/* Dropdown for selecting more items */}
+  <div style={{ display: 'inline-block' }}>
+    {viewMode === "batch" ? (
+      <DropdownSelector
+        title="Batches"
+        items={batches.map(b => ({
+          id: b.batch_id,
+          label: b.batch_name,
+          color: getBatchColor(batches.indexOf(b)).border
+        }))}
+        selectedIds={selectedBatchIds}
+        onSelectItem={(id) => {
+          toggleBatchSelection(id);
+          setActiveBatchTab(id); // Auto-select the newly added tab
+        }}
+        onClearAll={() => {
+          clearBatchFilters();
+          setActiveBatchTab(null);
+        }}
+        placeholder="Add batch..."
+      />
+    ) : (
+      <DropdownSelector
+        title="Teachers"
+        items={teachers.map(t => ({
+          id: t.teacher_id,
+          label: t.teacher_name,
+          color: getTeacherColor(teachers.indexOf(t)).border
+        }))}
+        selectedIds={selectedTeacherIds}
+        onSelectItem={(id) => {
+          toggleTeacherSelection(id);
+          setActiveTeacherTab(id); // Auto-select the newly added tab
+        }}
+        onClearAll={() => {
+          clearTeacherFilters();
+          setActiveTeacherTab(null);
+        }}
+        placeholder="Add teacher..."
+      />
+    )}
+  </div>
+</div>
 
       {/* Info Banner */}
       <div style={styles.infoBanner}>
@@ -510,41 +733,95 @@ const GeneratedTimetable: React.FC = () => {
       </div>
 
       {/* Content */}
-      {viewMode === "batch" ? (
-        batches.length === 0 ? (
-          <EmptyState message="No batch timetable data available" />
-        ) : (
-          <div style={styles.tablesContainer}>
-            {filteredBatches.map((batch, idx) => (
+{viewMode === "batch" ? (
+  batches.length === 0 ? (
+    <EmptyState message="No batch timetable data available" />
+  ) : (
+    <div>
+      {/* Show All Batches view */}
+      {!activeBatchTab ? (
+        <div style={styles.tablesContainer}>
+          {filteredBatches.map((batch, idx) => {
+            const batchColorIdx = batches.findIndex(b => b.batch_id === batch.batch_id);
+            return (
               <BatchTable
                 key={batch.batch_id}
                 batch={batch}
-                color={getBatchColor(idx)}
+                color={getBatchColor(batchColorIdx)}
                 getSubjectColor={getSubjectColor}
                 toggleAvailableTeachers={toggleAvailableTeachers}
                 loadingAvailableTeachers={loadingAvailableTeachers}
               />
-            ))}
-          </div>
-        )
+            );
+          })}
+        </div>
       ) : (
-        teachers.length === 0 ? (
-          <EmptyState message="No teacher timetable data available" />
-        ) : (
-          <div style={styles.tablesContainer}>
-            {filteredTeachers.map((teacher, idx) => (
+        /* Show Single Batch view */
+        <div style={styles.tablesContainer}>
+          {(() => {
+            const batch = batches.find(b => b.batch_id === activeBatchTab);
+            if (!batch) return <EmptyState message="Batch not found" />;
+            const batchColorIdx = batches.findIndex(b => b.batch_id === batch.batch_id);
+            return (
+              <BatchTable
+                key={batch.batch_id}
+                batch={batch}
+                color={getBatchColor(batchColorIdx)}
+                getSubjectColor={getSubjectColor}
+                toggleAvailableTeachers={toggleAvailableTeachers}
+                loadingAvailableTeachers={loadingAvailableTeachers}
+              />
+            );
+          })()}
+        </div>
+      )}
+    </div>
+  )
+) : (
+  teachers.length === 0 ? (
+    <EmptyState message="No teacher timetable data available" />
+  ) : (
+    <div>
+      {/* Show All Teachers view */}
+      {!activeTeacherTab ? (
+        <div style={styles.tablesContainer}>
+          {filteredTeachers.map((teacher, idx) => {
+            const teacherColorIdx = teachers.findIndex(t => t.teacher_id === teacher.teacher_id);
+            return (
               <TeacherTable
                 key={teacher.teacher_id}
                 teacher={teacher}
-                color={getTeacherColor(idx)}
+                color={getTeacherColor(teacherColorIdx)}
                 getSubjectColor={getSubjectColor}
                 toggleAvailableTeachers={toggleAvailableTeachers}
                 loadingAvailableTeachers={loadingAvailableTeachers}
               />
-            ))}
-          </div>
-        )
+            );
+          })}
+        </div>
+      ) : (
+        /* Show Single Teacher view */
+        <div style={styles.tablesContainer}>
+          {(() => {
+            const teacher = teachers.find(t => t.teacher_id === activeTeacherTab);
+            if (!teacher) return <EmptyState message="Teacher not found" />;
+            const teacherColorIdx = teachers.findIndex(t => t.teacher_id === teacher.teacher_id);
+            return (
+              <TeacherTable
+                key={teacher.teacher_id}
+                teacher={teacher}
+                color={getTeacherColor(teacherColorIdx)}
+                getSubjectColor={getSubjectColor}
+                toggleAvailableTeachers={toggleAvailableTeachers}
+                loadingAvailableTeachers={loadingAvailableTeachers}
+              />
+            );
+          })()}
+        </div>
       )}
+    </div>
+  )
+)}
     </div>
   );
 };
@@ -649,7 +926,7 @@ const TeacherTable: React.FC<TeacherTableProps> = ({
           <div>
             <h3 style={{ ...styles.entityName, color: color.text }}>{teacher.teacher_name}</h3>
             <p style={styles.entityMeta}>
-              {teacher.teacher_code} {teacher.department ? `• ${teacher.department}` : ""}
+              {teacher.teacher_code} {teacher.department ? ` • ${teacher.department}` : ""}
             </p>
           </div>
         </div>
@@ -755,7 +1032,7 @@ const StandardTimetableGrid: React.FC<StandardTimetableGridProps> = ({
         </thead>
         <tbody>
           {timeSlots.map((time, timeIdx) => (
-            <tr key={`time-${timeIdx}`}>
+            <tr key={`${time}-${timeIdx}`}>
               <td style={styles.timeCell}>
                 <div style={styles.timeSlotDisplay}>
                   <span style={styles.timeStart}>{time.start}</span>
@@ -1131,19 +1408,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#475569",
     minWidth: "fit-content",
   },
-  filterSelect: {
-    padding: "10px 16px",
-    background: "#fff",
-    border: "2px solid #e2e8f0",
-    borderRadius: 8,
-    fontSize: 14,
-    color: "#475569",
-    fontWeight: 500,
-    minWidth: 250,
-    cursor: "pointer",
-    outline: "none",
-    transition: "border-color 0.2s",
-  },
   filterBtn: {
     padding: "8px 16px",
     background: "#fff",
@@ -1164,6 +1428,151 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontWeight: 600,
     fontSize: 13,
+  },
+  // Dropdown Selector Styles
+  dropdownTrigger: {
+    padding: "8px 16px",
+    border: "1px solid #e2e8f0",
+    borderRadius: 8,
+    cursor: "pointer",
+    fontWeight: 500,
+    fontSize: 13,
+    backgroundColor: "#f8fafc",
+    color: "#475569",
+    transition: "all 0.2s",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 120,
+  },
+  dropdownTriggerText: {
+    display: "flex",
+    alignItems: "center",
+    fontSize: 13,
+  },
+  selectorDropdown: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    backgroundColor: "#fff",
+    border: "1px solid #e2e8f0",
+    borderRadius: 8,
+    boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+    minWidth: 280,
+    maxWidth: 320,
+    maxHeight: 400,
+    overflow: "hidden",
+    zIndex: 1000,
+    marginTop: 4,
+  },
+  selectorHeader: {
+    padding: "12px 16px",
+    borderBottom: "1px solid #e2e8f0",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+  },
+  selectorTitle: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "#1e293b",
+  },
+  selectorClearBtn: {
+    backgroundColor: "transparent",
+    border: "none",
+    color: "#ef4444",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 600,
+    padding: "4px 8px",
+    borderRadius: 4,
+  },
+  selectorInfo: {
+    padding: "8px 16px",
+    backgroundColor: "#f8fafc",
+    borderBottom: "1px solid #e2e8f0",
+  },
+  selectorCount: {
+    fontSize: 12,
+    color: "#64748b",
+    fontWeight: 500,
+  },
+  selectorItems: {
+    maxHeight: 280,
+    overflowY: "auto",
+  },
+  selectorItem: {
+    display: "flex",
+    alignItems: "center",
+    padding: "10px 16px",
+    cursor: "pointer",
+    transition: "background-color 0.2s",
+    borderBottom: "1px solid #f1f5f9",
+  },
+  selectorCheckbox: {
+    width: 20,
+    height: 20,
+    marginRight: 12,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectorCheckboxChecked: {
+    width: 16,
+    height: 16,
+    backgroundColor: "#3b82f6",
+    borderRadius: 4,
+    color: "#fff",
+    fontSize: 12,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectorCheckboxUnchecked: {
+    width: 16,
+    height: 16,
+    border: "2px solid #cbd5e1",
+    borderRadius: 4,
+  },
+  selectorItemLabel: {
+    fontSize: 13,
+    color: "#334155",
+    flex: 1,
+  },
+  selectorItemColor: {
+    width: 12,
+    height: 12,
+    borderRadius: "50%",
+    marginLeft: 8,
+  },
+  selectorFooter: {
+    padding: "12px 16px",
+    borderTop: "1px solid #e2e8f0",
+    display: "flex",
+    justifyContent: "flex-end",
+    backgroundColor: "#f8fafc",
+  },
+  selectorDoneBtn: {
+    backgroundColor: "#3b82f6",
+    color: "#fff",
+    border: "none",
+    padding: "6px 16px",
+    borderRadius: 4,
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 600,
+  },
+  clearFiltersBtn: {
+    padding: "8px 16px",
+    background: "#ef4444",
+    color: "#fff",
+    border: "1px solid #ef4444",
+    borderRadius: 8,
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: 13,
+    transition: "all 0.2s",
   },
   emptyBox: {
     display: "flex",
@@ -1189,7 +1598,8 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid #e2e8f0",
   },
   timetableContainer: {
-    padding: 20,
+  padding: '16px',
+  overflowX: 'auto',
   },
   tableHeader: {
     display: "flex",
@@ -1522,19 +1932,52 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     marginTop: 4,
   },
+  // Add these styles to your existing styles object
+selectedFilterTab: {
+  padding: "8px 12px",
+  background: "#3b82f6",
+  color: "#fff",
+  border: "none",
+  borderRadius: 8,
+  cursor: "pointer",
+  fontWeight: 600,
+  fontSize: 13,
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+  transition: "all 0.2s",
+  margin: "0 4px",
+},
+selectedTabCheck: {
+  fontSize: '10px',
+  fontWeight: 'bold',
+},
+selectedTabLabel: {
+  fontSize: '12px',
+  fontWeight: 600,
+},
+selectedTabRemove: {
+  fontSize: '12px',
+  fontWeight: 'bold',
+  marginLeft: '4px',
+  opacity: 0.8,
+  transition: 'opacity 0.2s',
+},
+
 };
 
 // Add CSS animations
 const styleSheet = document.styleSheets[0];
-styleSheet.insertRule(`
-  @keyframes spin {
+styleSheet.insertRule(
+  `@keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
-  }
-`, styleSheet.cssRules.length);
+  }`,
+  styleSheet.cssRules.length
+);
 
-styleSheet.insertRule(`
-  @keyframes slideDown {
+styleSheet.insertRule(
+  `@keyframes slideDown {
     from {
       opacity: 0;
       transform: translateY(-10px);
@@ -1545,7 +1988,8 @@ styleSheet.insertRule(`
       transform: translateY(0);
       max-height: 300px;
     }
-  }
-`, styleSheet.cssRules.length);
+  }`,
+  styleSheet.cssRules.length
+);
 
 export default GeneratedTimetable;
