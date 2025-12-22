@@ -165,6 +165,8 @@ const SlotsGrid: React.FC = () => {
   const [lastSavedTime, setLastSavedTime] = useState<string>("");
   // const [showDayDropdown, setShowDayDropdown] = useState<number | null>(null);
   const [showAddDayModal, setShowAddDayModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [timetableName, setTimetableName] = useState<string>("");
   const [selectionMode, setSelectionMode] = useState<DaySelectionMode>("dropdown");
   const [selectedDays, setSelectedDays] = useState<string[]>(["Monday"]);
   const [calendarRange, setCalendarRange] = useState({
@@ -645,7 +647,11 @@ const SlotsGrid: React.FC = () => {
 
   // ===================== API CALLS =====================
   const createTimetable = async () => {
-    const payload = buildTimetablePayload();
+    const base = buildTimetablePayload();
+    const payload = {
+      ...base,
+      name: timetableName || "Untitled Timetable",
+    };
     
     const accessToken = localStorage.getItem("access_token");
     
@@ -677,8 +683,10 @@ const SlotsGrid: React.FC = () => {
   };
 
   const updateTimetable = async (timetableId: string) => {
+    const base = buildTimetablePayload();
     const payload = {
-      ...buildTimetablePayload(),
+      ...base,
+      name: timetableName || base.from_date || "Untitled Timetable",
       is_active: true,
       description: "",
     };
@@ -749,7 +757,10 @@ const SlotsGrid: React.FC = () => {
         console.log("Updating existing timetable:", existingTimetableId);
         apiResponse = await updateTimetable(existingTimetableId);
         console.log("Update API Response:", apiResponse);
-        setSaveMessage(`Timetable updated successfully!`);
+        if (apiResponse && apiResponse.name) {
+          setTimetableName(apiResponse.name);
+        }
+        setSaveMessage(`Timetable updated successfully${apiResponse?.name ? `: ${apiResponse.name}` : ''}!`);
       } else {
         // CREATE new timetable
         console.log("Creating new timetable...");
@@ -757,7 +768,10 @@ const SlotsGrid: React.FC = () => {
         console.log("Create API Response:", apiResponse);
         localStorage.setItem("timetable_id", JSON.stringify(apiResponse.timetable_id));
         setIsEditMode(true); // Now we're in edit mode
-        setSaveMessage(`Timetable created successfully!`);
+        if (apiResponse && apiResponse.name) {
+          setTimetableName(apiResponse.name);
+        }
+        setSaveMessage(`Timetable created successfully${apiResponse?.name ? `: ${apiResponse.name}` : ''}!`);
       }
       
       setSaveStatus("saved");
@@ -866,25 +880,30 @@ const SlotsGrid: React.FC = () => {
 
   // Create new timetable - clears localStorage and resets state
   const createNewTimetable = () => {
-    if (window.confirm("Create a new timetable? This will clear the current selection.")) {
-      // Clear timetable_id from localStorage
-      localStorage.removeItem("timetable_id");
-      
-      // Reset all state
-      setDays([{ 
-        day: "Monday",
-        date: new Date().toISOString().split('T')[0],
-        dayIndex: 1,
-        slots: [{ id: "M1", time: "8:00 AM - 9:00 AM" }], 
-        color: DAY_COLORS[0] 
-      }]);
-      setSelectedDays(["Monday"]);
-      setCalendarRange({ startDate: "", endDate: "" });
-      setSaveStatus("idle");
-      setSaveMessage("");
-      setIsEditMode(false); // Switch to create mode
-      setFetchedSlots(null);
-    }
+    // Open modal to ask for timetable name before clearing
+    setShowCreateModal(true);
+  };
+
+  const confirmCreateNewTimetable = (name: string) => {
+    // Clear timetable_id from localStorage
+    localStorage.removeItem("timetable_id");
+
+    // Reset all state
+    setDays([{ 
+      day: "Monday",
+      date: new Date().toISOString().split('T')[0],
+      dayIndex: 1,
+      slots: [{ id: "M1", time: "8:00 AM - 9:00 AM" }], 
+      color: DAY_COLORS[0] 
+    }]);
+    setSelectedDays(["Monday"]);
+    setCalendarRange({ startDate: "", endDate: "" });
+    setSaveStatus("idle");
+    setSaveMessage("");
+    setIsEditMode(false); // Switch to create mode
+    setFetchedSlots(null);
+    setShowCreateModal(false);
+    setTimetableName(name || "");
   };
 
   // Toggle day selection
@@ -938,6 +957,11 @@ const SlotsGrid: React.FC = () => {
         <div>
           <h3 style={styles.title}>Fixed Slots Management</h3>
           <p style={styles.subtitle}>Define time slots for each day of the week</p>
+          {timetableName && (
+            <div style={{marginTop: 6, color: "#334155", fontSize: 13}}>
+              <strong>Timetable:</strong> {timetableName}
+            </div>
+          )}
         </div>
         
         <div style={styles.headerActions}>
@@ -1244,6 +1268,50 @@ const SlotsGrid: React.FC = () => {
           </div>
         </div>
       )}
+
+              {/* Create New Timetable Name Modal */}
+              {showCreateModal && (
+                <div style={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
+                  <div style={{...styles.modalContent, width: 420}} onClick={(e) => e.stopPropagation()}>
+                    <div style={styles.modalHeader}>
+                      <h3 style={styles.modalTitle}>Create New Timetable</h3>
+                      <button
+                        style={styles.closeModalBtn}
+                        onClick={() => setShowCreateModal(false)}
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <div style={{padding: 16}}>
+                      <label style={{display: 'block', marginBottom: 8, color: '#475569'}}>Timetable name</label>
+                      <input
+                        type="text"
+                        value={timetableName}
+                        onChange={(e) => setTimetableName(e.target.value)}
+                        placeholder="e.g. JEE Main 2025 Schedule"
+                        style={{width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #e2e8f0'}}
+                      />
+                    </div>
+
+                    <div style={styles.modalFooter}>
+                      <button style={styles.cancelModalBtn} onClick={() => setShowCreateModal(false)}>Cancel</button>
+                      <button
+                        style={styles.confirmModalBtn}
+                        onClick={() => {
+                          if (!timetableName || timetableName.trim() === "") {
+                            alert('Please enter a timetable name');
+                            return;
+                          }
+                          confirmCreateNewTimetable(timetableName.trim());
+                        }}
+                      >
+                        Create
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
       {/* Grid Container */}
       <div style={styles.gridContainer}>

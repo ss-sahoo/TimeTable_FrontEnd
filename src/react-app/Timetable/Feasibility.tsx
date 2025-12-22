@@ -24,7 +24,7 @@ interface FeasibilityResult {
     RULE_1: string;
     RULE_2: string;
     RULE_3: string;
-    RULE_4: string;
+    RULE_4: string; 
     RULE_5: string;
     RULE_6: string;
   };
@@ -55,7 +55,6 @@ const Feasibility: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FeasibilityResult | null>(null);
   const [hasRun, setHasRun] = useState(false);
@@ -64,8 +63,7 @@ const Feasibility: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState<OptimizationSettings>(DEFAULT_SETTINGS);
   const [settingsChanged, setSettingsChanged] = useState(false);
-  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
-  const [stopSlot, setStopSlot] = useState<string>("");
+  const [brokenRules, setBrokenRules] = useState<string[]>([]);
 
   /* Get timetable ID from localStorage */
   useEffect(() => {
@@ -76,6 +74,71 @@ const Feasibility: React.FC = () => {
       setTimetableId(cleanId);
     }
   }, []);
+
+  /* Parse error response to extract broken rules */
+  const parseErrorResponse = (errorData: any): string => {
+    if (!errorData) {
+      return "An unknown error occurred";
+    }
+
+    // If errorData is a string, return it
+    if (typeof errorData === 'string') {
+      return errorData;
+    }
+
+    // If errorData has a 'detail' field
+    if (errorData.detail) {
+      if (typeof errorData.detail === 'string') {
+        return errorData.detail;
+      }
+      return JSON.stringify(errorData.detail);
+    }
+
+    // If errorData has violations object
+    if (errorData.violations) {
+      const brokenRulesList: string[] = [];
+      const rules: Record<string, string> = {
+        RULE_1: "Each slot must have enough available teachers for all batches",
+        RULE_2: "Fixed slot teachers must be available in that slot",
+        RULE_3: "Batch must have enough slots to meet minimum class requirements",
+        RULE_4: "Batch must not exceed maximum class limit",
+        RULE_5: "Batch max classes must be >= min classes remaining",
+        RULE_6: "Teacher must have enough available slots to meet their minimum load"
+      };
+
+      Object.entries(errorData.violations).forEach(([rule, violations]) => {
+        if (Array.isArray(violations) && violations.length > 0) {
+          brokenRulesList.push(rule);
+        }
+      });
+
+      setBrokenRules(brokenRulesList);
+
+      if (brokenRulesList.length > 0) {
+        let errorMessage = "Feasibility check failed due to the following rule violations:\n\n";
+        brokenRulesList.forEach(rule => {
+          errorMessage += `• ${rule}: ${rules[rule as keyof typeof rules]}\n`;
+          // Add specific violations if available
+          const violations = errorData.violations[rule];
+          if (Array.isArray(violations) && violations.length > 0) {
+            violations.forEach((violation: string, index: number) => {
+              if (index < 3) { // Show only first 3 violations per rule to avoid overwhelming
+                errorMessage += `  - ${violation}\n`;
+              }
+            });
+            if (violations.length > 3) {
+              errorMessage += `  ... and ${violations.length - 3} more violations\n`;
+            }
+          }
+          errorMessage += "\n";
+        });
+        return errorMessage;
+      }
+    }
+
+    // Default fallback
+    return JSON.stringify(errorData);
+  };
 
   /* Run feasibility check */
   const runFeasibilityCheck = useCallback(async () => {
@@ -88,6 +151,7 @@ const Feasibility: React.FC = () => {
     setError(null);
     setResult(null);
     setGeneratedTimetable(null);
+    setBrokenRules([]);
 
     try {
       // Step 1: Get payload from the timetable
@@ -97,7 +161,8 @@ const Feasibility: React.FC = () => {
       });
       
       if (!payloadResponse.ok) {
-        throw new Error(`Failed to fetch payload: ${payloadResponse.status}`);
+        const errorData = await payloadResponse.json().catch(() => null);
+        throw new Error(`Failed to fetch payload: ${payloadResponse.status} - ${parseErrorResponse(errorData)}`);
       }
       
       const payloadData = await payloadResponse.json();
@@ -112,7 +177,8 @@ const Feasibility: React.FC = () => {
       });
 
       if (!feasibilityResponse.ok) {
-        throw new Error(`Feasibility check failed: ${feasibilityResponse.status}`);
+        const errorData = await feasibilityResponse.json().catch(() => null);
+        throw new Error(parseErrorResponse(errorData));
       }
 
       const feasibilityData: FeasibilityResult = await feasibilityResponse.json();
@@ -153,7 +219,8 @@ const Feasibility: React.FC = () => {
       });
 
       if (!optimizeResponse.ok) {
-        throw new Error(`Optimization failed: ${optimizeResponse.status}`);
+        const errorData = await optimizeResponse.json().catch(() => null);
+        throw new Error(`Optimization failed: ${optimizeResponse.status} - ${parseErrorResponse(errorData)}`);
       }
 
       const optimizeData = await optimizeResponse.json();
@@ -185,7 +252,8 @@ const Feasibility: React.FC = () => {
       });
 
       if (!saveResponse.ok) {
-        throw new Error(`Save failed: ${saveResponse.status}`);
+        const errorData = await saveResponse.json().catch(() => null);
+        throw new Error(`Save failed: ${saveResponse.status} - ${parseErrorResponse(errorData)}`);
       }
 
       const saveData = await saveResponse.json();
@@ -198,56 +266,6 @@ const Feasibility: React.FC = () => {
       setSaving(false);
     }
   }, [timetableId, generatedTimetable]);
-
-  /* Regenerate timetable from a specific slot */
-  const handleRegenerateFromSlot = useCallback(async () => {
-    if (!timetableId) {
-      setError("No timetable ID found.");
-      return;
-    }
-
-    if (!stopSlot.trim()) {
-      setError("Please enter a stop slot (e.g., w3, d1_s1)");
-      return;
-    }
-
-    setRegenerating(true);
-    setError(null);
-
-    try {
-      console.log("Regenerating timetable from slot:", stopSlot, "with settings:", settings);
-      
-      const regeneratePayload = {
-        stop_slot: stopSlot.trim(),
-        max_retries: settings.max_retries,
-        max_try_for_slot_assign: settings.max_try_for_slot_assign,
-        weight_power_fector: settings.weight_power_fector,
-        max_one_subject_repetation_per_day: settings.max_one_subject_repetation_per_day,
-        max_one_subject_repetation_per_day_penalty_fector: settings.max_one_subject_repetation_per_day_penalty_fector,
-        weight_penalty_consu_sub_repetation: settings.weight_penalty_consu_sub_repetation
-      };
-
-      const regenerateResponse = await Fetch(`/api/timetable/timetables/${timetableId}/regenerate-from-slot/`, {
-        method: "POST",
-        body: JSON.stringify(regeneratePayload),
-      });
-
-      if (!regenerateResponse.ok) {
-        throw new Error(`Regeneration failed: ${regenerateResponse.status}`);
-      }
-
-      const regenerateData = await regenerateResponse.json();
-      console.log("Regeneration result:", regenerateData);
-      setGeneratedTimetable(regenerateData);
-      setShowRegenerateModal(false);
-      alert("Timetable regenerated successfully from slot: " + stopSlot);
-    } catch (err: any) {
-      console.error("Regeneration error:", err);
-      setError(err.message || "Failed to regenerate timetable");
-    } finally {
-      setRegenerating(false);
-    }
-  }, [timetableId, stopSlot, settings]);
 
   /* Settings handlers */
   const handleSettingsChange = (key: keyof OptimizationSettings, value: any) => {
@@ -379,8 +397,6 @@ const Feasibility: React.FC = () => {
                 />
               </div>
 
-              
-
               {/* Weight Penalty Array */}
               <div style={styles.settingFieldFull}>
                 <label style={styles.settingLabel}>
@@ -432,84 +448,6 @@ const Feasibility: React.FC = () => {
         </div>
       )}
 
-      {/* Regenerate from Slot Modal */}
-      {showRegenerateModal && (
-        <div style={styles.modalOverlay}>
-          <div style={{...styles.modalContent, maxWidth: "500px"}}>
-            <div style={styles.modalHeader}>
-              <h3 style={styles.modalTitle}>🔄 Update Old Timetable</h3>
-              <button 
-                style={styles.modalCloseBtn}
-                onClick={() => setShowRegenerateModal(false)}
-              >
-                ×
-              </button>
-            </div>
-
-            <div style={{padding: "24px"}}>
-              <p style={{color: "#64748b", fontSize: "14px", marginBottom: "20px"}}>
-                Regenerate the timetable starting from a specific slot. All slots after the specified slot will be regenerated.
-              </p>
-              
-              <div style={styles.settingField}>
-                <label style={styles.settingLabel}>
-                  Stop Slot Code
-                  <span style={styles.settingDescription}>Enter the slot code to start regeneration from (e.g., w3, d1_s1, d2_s3)</span>
-                </label>
-                <input
-                  type="text"
-                  value={stopSlot}
-                  onChange={(e) => setStopSlot(e.target.value)}
-                  style={styles.numberInput}
-                  placeholder="e.g., w3"
-                />
-              </div>
-
-              <div style={{marginTop: "16px", padding: "12px", background: "#f0f9ff", borderRadius: "8px", border: "1px solid #bae6fd"}}>
-                <p style={{fontSize: "12px", color: "#0369a1", margin: "0 0 8px 0", fontWeight: "600"}}>
-                  Current Settings (from Settings panel):
-                </p>
-                <div style={{fontSize: "11px", color: "#64748b", fontFamily: "monospace"}}>
-                  <div>max_retries: {settings.max_retries}</div>
-                  <div>max_try_for_slot_assign: {settings.max_try_for_slot_assign}</div>
-                  <div>weight_power_fector: {settings.weight_power_fector}</div>
-                  <div>max_one_subject_repetation_per_day: {settings.max_one_subject_repetation_per_day}</div>
-                </div>
-              </div>
-            </div>
-
-            <div style={styles.modalFooter}>
-              <button 
-                style={styles.cancelBtn}
-                onClick={() => setShowRegenerateModal(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                style={{
-                  ...styles.regenerateBtn,
-                  opacity: regenerating || !stopSlot.trim() ? 0.7 : 1,
-                  cursor: regenerating ? "wait" : "pointer",
-                }}
-                onClick={handleRegenerateFromSlot}
-                disabled={regenerating || !stopSlot.trim()}
-              >
-                {regenerating ? (
-                  <>
-                    <div style={styles.buttonSpinnerWhite}></div>
-                    Regenerating...
-                  </>
-                ) : (
-                  <>
-                    🔄 Regenerate Timetable
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div style={styles.header}>
         <div>
@@ -546,10 +484,37 @@ const Feasibility: React.FC = () => {
         </button>
       </div>
 
-      {/* Error Display */}
+      {/* Error Display - Enhanced with broken rules */}
       {error && (
         <div style={styles.errorAlert}>
-          <span>❌ {error}</span>
+          <div style={styles.errorContent}>
+            <div style={styles.errorIcon}>❌</div>
+            <div style={styles.errorMessage}>
+              <div style={styles.errorTitle}>Feasibility Check Failed</div>
+              <div style={styles.errorText}>{error}</div>
+              {brokenRules.length > 0 && (
+                <div style={styles.brokenRulesSection}>
+                  <div style={styles.brokenRulesTitle}>Broken Rules:</div>
+                  {brokenRules.map((rule, index) => {
+                    const ruleExplanations: Record<string, string> = {
+                      RULE_1: "Each slot must have enough available teachers for all batches",
+                      RULE_2: "Fixed slot teachers must be available in that slot",
+                      RULE_3: "Batch must have enough slots to meet minimum class requirements",
+                      RULE_4: "Batch must not exceed maximum class limit",
+                      RULE_5: "Batch max classes must be >= min classes remaining",
+                      RULE_6: "Teacher must have enough available slots to meet their minimum load"
+                    };
+                    return (
+                      <div key={index} style={styles.brokenRuleItem}>
+                        <span style={styles.brokenRuleName}>{rule}:</span>
+                        <span style={styles.brokenRuleDescription}>{ruleExplanations[rule] || "Unknown rule"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
           <button style={styles.errorCloseBtn} onClick={() => setError(null)}>×</button>
         </div>
       )}
@@ -706,13 +671,6 @@ const Feasibility: React.FC = () => {
                 </svg>
                 Settings
               </button>
-
-              <button 
-                style={styles.updateOldBtn}
-                onClick={() => setShowRegenerateModal(true)}
-              >
-                🔄 Update Old Timetable
-              </button>
               
               {result.feasible && !generatedTimetable && (
                 <button 
@@ -797,242 +755,73 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: "calc(100vh - 48px)",
     position: "relative",
   },
-  // ... (keep all existing styles as they were) ...
   
-  // Modal Styles
-  modalOverlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1000,
-    padding: "20px",
-  },
-  modalContent: {
-    background: "#ffffff",
-    borderRadius: "12px",
-    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-    maxWidth: "800px",
-    width: "100%",
-    maxHeight: "90vh",
-    overflow: "auto",
-  },
-  modalHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "24px 24px 16px",
-    borderBottom: "1px solid #e2e8f0",
-  },
-  modalTitle: {
-    fontSize: "18px",
-    fontWeight: "600",
-    color: "#1e293b",
-    margin: 0,
-  },
-  modalCloseBtn: {
-    background: "none",
-    border: "none",
-    fontSize: "24px",
-    color: "#64748b",
-    cursor: "pointer",
-    width: "32px",
-    height: "32px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "4px",
-  },
-  settingsGrid: {
-    padding: "24px",
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-    gap: "20px",
-  },
-  settingField: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  },
-  settingFieldFull: {
-    gridColumn: "1 / -1",
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-  },
-  settingLabel: {
-    fontSize: "14px",
-    fontWeight: "500",
-    color: "#1e293b",
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-  },
-  settingDescription: {
-    fontSize: "12px",
-    color: "#64748b",
-    fontWeight: "400",
-  },
-  numberInput: {
-    padding: "8px 12px",
-    border: "1px solid #e2e8f0",
-    borderRadius: "6px",
-    fontSize: "14px",
-    color: "#1e293b",
-    background: "#ffffff",
-  },
-  checkboxContainer: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-  },
-  checkbox: {
-    marginRight: "8px",
-  },
-  checkboxLabel: {
-    fontSize: "14px",
-    color: "#1e293b",
-    fontWeight: "500",
-  },
-  checkboxDescription: {
-    fontSize: "12px",
-    color: "#64748b",
-    marginLeft: "24px",
-  },
-  arrayInputs: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-    gap: "12px",
-    marginTop: "8px",
-  },
-  arrayInputWrapper: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-  },
-  arrayLabel: {
-    fontSize: "12px",
-    color: "#64748b",
-  },
-  arrayInput: {
-    padding: "8px 12px",
-    border: "1px solid #e2e8f0",
-    borderRadius: "6px",
-    fontSize: "14px",
-    color: "#1e293b",
-    background: "#ffffff",
-  },
-  modalFooter: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "16px 24px",
-    borderTop: "1px solid #e2e8f0",
-    background: "#f8fafc",
-  },
-  defaultBtn: {
-    padding: "8px 16px",
-    background: "#f1f5f9",
-    color: "#475569",
-    border: "1px solid #e2e8f0",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "14px",
-    fontWeight: "500",
-    opacity: 0.7,
-    transition: "all 0.2s",
-  },
-  modalActions: {
-    display: "flex",
-    gap: "12px",
-  },
-  cancelBtn: {
-    padding: "8px 16px",
-    background: "#ffffff",
-    color: "#475569",
-    border: "1px solid #e2e8f0",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "14px",
-    fontWeight: "500",
-  },
-  applyBtn: {
-    padding: "8px 20px",
-    background: "#8b5cf6",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "14px",
-    fontWeight: "500",
-  },
-  // ... (keep all other existing styles) ...
-
-  // The rest of your existing styles remain exactly the same...
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: "24px",
-    flexWrap: "wrap",
-    gap: "16px",
-  },
-  title: {
-    fontSize: "20px",
-    fontWeight: "600",
-    color: "#1e293b",
-    margin: "0 0 4px 0",
-  },
-  subtitle: {
-    fontSize: "14px",
-    color: "#64748b",
-    margin: "0",
-  },
-  startFeasibilityBtn: {
-    padding: "10px 20px",
-    background: "#8b5cf6",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "500",
-    fontSize: "14px",
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    transition: "all 0.2s",
-  },
-  buttonSpinner: {
-    width: "16px",
-    height: "16px",
-    border: "2px solid #ffffff40",
-    borderTop: "2px solid #ffffff",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-  },
-  buttonSpinnerWhite: {
-    width: "16px",
-    height: "16px",
-    border: "2px solid #ffffff40",
-    borderTop: "2px solid #ffffff",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-  },
+  // Enhanced Error Styles
   errorAlert: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
-    padding: "12px 16px",
+    alignItems: "flex-start",
+    padding: "16px",
     background: "#fef2f2",
     border: "1px solid #fecaca",
     borderRadius: "8px",
     marginBottom: "20px",
     color: "#dc2626",
+  },
+  errorContent: {
+    display: "flex",
+    gap: "12px",
+    flex: 1,
+  },
+  errorIcon: {
+    fontSize: "20px",
+    flexShrink: 0,
+    marginTop: "2px",
+  },
+  errorMessage: {
+    flex: 1,
+  },
+  errorTitle: {
+    fontWeight: "600",
+    fontSize: "14px",
+    marginBottom: "4px",
+  },
+  errorText: {
+    fontSize: "13px",
+    lineHeight: "1.4",
+    whiteSpace: "pre-line",
+    marginBottom: "12px",
+  },
+  brokenRulesSection: {
+    marginTop: "12px",
+    padding: "12px",
+    background: "rgba(220, 38, 38, 0.05)",
+    border: "1px solid rgba(220, 38, 38, 0.2)",
+    borderRadius: "6px",
+  },
+  brokenRulesTitle: {
+    fontWeight: "600",
+    fontSize: "13px",
+    marginBottom: "8px",
+    color: "#991b1b",
+  },
+  brokenRuleItem: {
+    display: "flex",
+    gap: "8px",
+    marginBottom: "6px",
+    alignItems: "flex-start",
+  },
+  brokenRuleName: {
+    fontWeight: "600",
+    fontSize: "12px",
+    color: "#dc2626",
+    flexShrink: 0,
+    minWidth: "70px",
+  },
+  brokenRuleDescription: {
+    fontSize: "12px",
+    color: "#991b1b",
+    lineHeight: "1.4",
   },
   errorCloseBtn: {
     background: "none",
@@ -1040,7 +829,18 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "20px",
     cursor: "pointer",
     color: "#dc2626",
+    marginLeft: "8px",
+    padding: "0",
+    width: "24px",
+    height: "24px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "4px",
   },
+  
+  // ... (all other styles remain exactly the same) ...
+  
   warningAlert: {
     padding: "12px 16px",
     background: "#fffbeb",
@@ -1287,34 +1087,6 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "8px",
     transition: "all 0.2s",
   },
-  updateOldBtn: {
-    padding: "10px 20px",
-    background: "#f59e0b",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "500",
-    fontSize: "14px",
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    transition: "all 0.2s",
-  },
-  regenerateBtn: {
-    padding: "10px 20px",
-    background: "#f59e0b",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "500",
-    fontSize: "14px",
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    transition: "all 0.2s",
-  },
   initialState: {
     display: "flex",
     flexDirection: "column",
@@ -1338,6 +1110,212 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#64748b",
     margin: "0",
     maxWidth: "400px",
+  },
+  
+  // Header
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: "24px",
+    flexWrap: "wrap",
+    gap: "16px",
+  },
+  title: {
+    fontSize: "20px",
+    fontWeight: "600",
+    color: "#1e293b",
+    margin: "0 0 4px 0",
+  },
+  subtitle: {
+    fontSize: "14px",
+    color: "#64748b",
+    margin: "0",
+  },
+  startFeasibilityBtn: {
+    padding: "10px 20px",
+    background: "#8b5cf6",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: "500",
+    fontSize: "14px",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    transition: "all 0.2s",
+  },
+  buttonSpinner: {
+    width: "16px",
+    height: "16px",
+    border: "2px solid #ffffff40",
+    borderTop: "2px solid #ffffff",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+  },
+  buttonSpinnerWhite: {
+    width: "16px",
+    height: "16px",
+    border: "2px solid #ffffff40",
+    borderTop: "2px solid #ffffff",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+  },
+  
+  // Modal Styles
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+    padding: "20px",
+  },
+  modalContent: {
+    background: "#ffffff",
+    borderRadius: "12px",
+    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+    maxWidth: "800px",
+    width: "100%",
+    maxHeight: "90vh",
+    overflow: "auto",
+  },
+  modalHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "24px 24px 16px",
+    borderBottom: "1px solid #e2e8f0",
+  },
+  modalTitle: {
+    fontSize: "18px",
+    fontWeight: "600",
+    color: "#1e293b",
+    margin: 0,
+  },
+  modalCloseBtn: {
+    background: "none",
+    border: "none",
+    fontSize: "24px",
+    color: "#64748b",
+    cursor: "pointer",
+    width: "32px",
+    height: "32px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "4px",
+  },
+  settingsGrid: {
+    padding: "24px",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+    gap: "20px",
+  },
+  settingField: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+  settingFieldFull: {
+    gridColumn: "1 / -1",
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+  },
+  settingLabel: {
+    fontSize: "14px",
+    fontWeight: "500",
+    color: "#1e293b",
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  },
+  settingDescription: {
+    fontSize: "12px",
+    color: "#64748b",
+    fontWeight: "400",
+  },
+  numberInput: {
+    padding: "8px 12px",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    fontSize: "14px",
+    color: "#1e293b",
+    background: "#ffffff",
+  },
+  arrayInputs: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+    gap: "12px",
+    marginTop: "8px",
+  },
+  arrayInputWrapper: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  },
+  arrayLabel: {
+    fontSize: "12px",
+    color: "#64748b",
+  },
+  arrayInput: {
+    padding: "8px 12px",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    fontSize: "14px",
+    color: "#1e293b",
+    background: "#ffffff",
+  },
+  modalFooter: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "16px 24px",
+    borderTop: "1px solid #e2e8f0",
+    background: "#f8fafc",
+  },
+  defaultBtn: {
+    padding: "8px 16px",
+    background: "#f1f5f9",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+    opacity: 0.7,
+    transition: "all 0.2s",
+  },
+  modalActions: {
+    display: "flex",
+    gap: "12px",
+  },
+  cancelBtn: {
+    padding: "8px 16px",
+    background: "#ffffff",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+  },
+  applyBtn: {
+    padding: "8px 20px",
+    background: "#8b5cf6",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
   },
 };
 
