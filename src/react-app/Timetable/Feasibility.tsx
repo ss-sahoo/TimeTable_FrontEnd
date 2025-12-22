@@ -55,6 +55,7 @@ const Feasibility: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [updatingSlots, setUpdatingSlots] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FeasibilityResult | null>(null);
   const [hasRun, setHasRun] = useState(false);
@@ -64,6 +65,8 @@ const Feasibility: React.FC = () => {
   const [settings, setSettings] = useState<OptimizationSettings>(DEFAULT_SETTINGS);
   const [settingsChanged, setSettingsChanged] = useState(false);
   const [brokenRules, setBrokenRules] = useState<string[]>([]);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [stopSlot, setStopSlot] = useState<string>("");
 
   /* Get timetable ID from localStorage */
   useEffect(() => {
@@ -267,6 +270,54 @@ const Feasibility: React.FC = () => {
     }
   }, [timetableId, generatedTimetable]);
 
+  /* Open update modal */
+  const handleOpenUpdateModal = () => {
+    setShowUpdateModal(true);
+    setStopSlot("");
+  };
+
+  /* Update old slots with regenerate-from-slot API */
+  const handleUpdateOldSlots = useCallback(async () => {
+    if (!timetableId) {
+      setError("No timetable ID found. Please create a timetable first.");
+      return;
+    }
+    if (!stopSlot.trim()) {
+      setError("Please enter a stop slot (e.g., d2_s3)");
+      return;
+    }
+    setUpdatingSlots(true);
+    setError(null);
+    try {
+      console.log("Regenerating timetable from slot:", stopSlot);
+      const payload = {
+        stop_slot: stopSlot.trim(),
+        max_retries: settings.max_retries,
+        max_try_for_slot_assign: settings.max_try_for_slot_assign,
+        weight_power_fector: settings.weight_power_fector,
+        max_one_subject_repetation_per_day: settings.max_one_subject_repetation_per_day
+      };
+      const updateResponse = await Fetch(`/api/timetable/timetables/${timetableId}/regenerate-from-slot/`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json().catch(() => null);
+        throw new Error(`Regenerate from slot failed: ${updateResponse.status} - ${parseErrorResponse(errorData)}`);
+      }
+      const updateData = await updateResponse.json();
+      console.log("Regenerate from slot result:", updateData);
+      setShowUpdateModal(false);
+      setStopSlot("");
+      alert("Timetable regenerated successfully from slot " + stopSlot + "!");
+    } catch (err: any) {
+      console.error("Regenerate from slot error:", err);
+      setError(err.message || "Failed to regenerate from slot");
+    } finally {
+      setUpdatingSlots(false);
+    }
+  }, [timetableId, stopSlot, settings]);
+
   /* Settings handlers */
   const handleSettingsChange = (key: keyof OptimizationSettings, value: any) => {
     setSettings(prev => ({
@@ -443,6 +494,81 @@ const Feasibility: React.FC = () => {
                   Apply Settings
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Update Old Slots Modal */}
+      {showUpdateModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <div style={styles.modalHeader}>
+              <h3 style={styles.modalTitle}>Update Old Slots</h3>
+              <button 
+                style={styles.modalCloseBtn}
+                onClick={() => {
+                  setShowUpdateModal(false);
+                  setStopSlot("");
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div style={styles.updateModalBody}>
+              <p style={styles.updateModalDescription}>
+                Enter the slot code from which you want to regenerate the timetable. 
+                All slots from this point onwards will be regenerated.
+              </p>
+              <div style={styles.settingField}>
+                <label style={styles.settingLabel}>
+                  Stop Slot Code
+                  <span style={styles.settingDescription}>e.g., d2_s3, d1_s1, d3_s4</span>
+                </label>
+                <input
+                  type="text"
+                  value={stopSlot}
+                  onChange={(e) => setStopSlot(e.target.value)}
+                  placeholder="Enter slot code (e.g., d2_s3)"
+                  style={styles.numberInput}
+                />
+              </div>
+              <div style={styles.updateModalNote}>
+                <span style={styles.noteIcon}>ℹ️</span>
+                <span style={styles.noteText}>
+                  This will regenerate the timetable from the specified slot onwards. 
+                  Make sure the slot code exists in your timetable configuration.
+                </span>
+              </div>
+            </div>
+            <div style={styles.modalFooter}>
+              <button 
+                style={styles.cancelBtn}
+                onClick={() => {
+                  setShowUpdateModal(false);
+                  setStopSlot("");
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                style={{
+                  ...styles.primaryBtn,
+                  opacity: updatingSlots || !stopSlot.trim() ? 0.7 : 1,
+                  cursor: updatingSlots || !stopSlot.trim() ? "not-allowed" : "pointer",
+                }}
+                onClick={handleUpdateOldSlots}
+                disabled={updatingSlots || !stopSlot.trim()}
+              >
+                {updatingSlots ? (
+                  <>
+                    <div style={styles.buttonSpinnerWhite}></div>
+                    Updating...
+                  </>
+                ) : (
+                  "Update Timetable"
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -659,6 +785,16 @@ const Feasibility: React.FC = () => {
                   <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 Run Again
+              </button>
+
+              <button 
+                style={styles.updateSlotsBtn}
+                onClick={handleOpenUpdateModal}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Update Old Slots
               </button>
 
               <button 
@@ -1073,6 +1209,20 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "8px",
     transition: "all 0.2s",
   },
+  updateSlotsBtn: {
+    padding: "10px 20px",
+    background: "#f59e0b",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: "500",
+    fontSize: "14px",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    transition: "all 0.2s",
+  },
   saveBtn: {
     padding: "10px 20px",
     background: "#3b82f6",
@@ -1316,6 +1466,35 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontSize: "14px",
     fontWeight: "500",
+  },
+  // Update Modal Styles
+  updateModalBody: {
+    padding: "24px",
+  },
+  updateModalDescription: {
+    fontSize: "14px",
+    color: "#475569",
+    marginBottom: "20px",
+    lineHeight: "1.5",
+  },
+  updateModalNote: {
+    display: "flex",
+    gap: "12px",
+    padding: "16px",
+    background: "#f0f9ff",
+    border: "1px solid #bae6fd",
+    borderRadius: "8px",
+    alignItems: "flex-start",
+    marginTop: "16px",
+  },
+  noteIcon: {
+    fontSize: "16px",
+    flexShrink: 0,
+  },
+  noteText: {
+    fontSize: "13px",
+    color: "#0369a1",
+    lineHeight: "1.4",
   },
 };
 
