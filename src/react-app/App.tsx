@@ -58,6 +58,7 @@ import BulkImportPage from "@/react-app/pages/BulkImportPage";
 import SuperAdminDashboard from "@/react-app/pages/SuperAdminDashboard";
 import CenterAdminDashboard from "@/react-app/pages/CenterAdminDashboard";
 import Timetable from "@/react-app/pages/Timetable";
+import Batches from "@/react-app/pages/Batches";
 import {
   AdminRoleDashboard,
   TeacherRoleDashboard,
@@ -158,16 +159,6 @@ function RoleProtectedRoute({
 // Helper function to get dashboard route based on role
 function getDashboardRoute(role: string | undefined): string {
   switch (role) {
-    case 'super_admin':
-    case 'SUPER_ADMIN':
-      return '/superadmin/dashboard';
-    case 'admin':
-    case 'ADMIN':
-    case 'institute_admin':
-      return '/center-admin/dashboard';
-    case 'teacher':
-    case 'TEACHER':
-      return '/teacher';
     case 'student':
     case 'STUDENT':
       return '/student-dashboard';
@@ -253,28 +244,37 @@ function AppRoutes() {
         </FullscreenProtectedRoute>
       } />
       <Route path="/center-admin" element={<Navigate to="/center-admin/dashboard" replace />} />
-      <Route path="/timetable" element={<Timetable />} />
+      <Route path="/timetable" element={
+        <ProtectedRoute>
+          <Timetable />
+        </ProtectedRoute>
+      } />
+      <Route path="/batches" element={
+        <ProtectedRoute>
+          <Batches />
+        </ProtectedRoute>
+      } />
 
       <Route path="/admin" element={<AdminRoleDashboard />} />
       <Route path="/teacher" element={<TeacherRoleDashboard />} />
       <Route path="/staff" element={<StaffDashboard />} /> 
           <Route path="/exams" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
               <ExamManagement />
             </RoleProtectedRoute>
           } />
           <Route path="/exams/create" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
               <ExamCreation />
             </RoleProtectedRoute>
           } />
           <Route path="/exams/:examId" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
               <ExamView />
             </RoleProtectedRoute>
           } />
           <Route path="/exams/:examId/analytics" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
               <ExamAnalytics />
             </RoleProtectedRoute>
           } />
@@ -299,27 +299,27 @@ function AppRoutes() {
             <Route path="graphs" element={<GraphsPage />} />
           </Route>
           <Route path="/exams/:examId/evaluation" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
               <TeacherEvaluationDashboard />
             </RoleProtectedRoute>
           } />
           <Route path="/exams/:examId/edit" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
               <ExamCreation />
             </RoleProtectedRoute>
           } />
           <Route path="/exams/:examId/setup" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
               <ExamSetupDetails />
             </RoleProtectedRoute>
           } />
           <Route path="/exams/:examId/question/:questionNumber" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
               <EnhancedQuestionEditor />
             </RoleProtectedRoute>
           } />
           <Route path="/exam-view/:examId" element={
-            <RoleProtectedRoute allowedRoles={['student', 'super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <RoleProtectedRoute allowedRoles={['student', 'STUDENT', 'super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
               <StudentExamView />
             </RoleProtectedRoute>
           } />
@@ -406,17 +406,17 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
           <Route path="/patterns" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
               <PatternManagement />
             </RoleProtectedRoute>
           } />
           <Route path="/patterns/create" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
               <PatternCreation />
             </RoleProtectedRoute>
           } />
           <Route path="/patterns/:id/edit" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
               <PatternCreation />
             </RoleProtectedRoute>
           } />
@@ -436,7 +436,7 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
           <Route path="/exam/:examId/pattern/:patternId/bulk-import" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
               <BulkImportPage />
             </RoleProtectedRoute>
           } />
@@ -471,7 +471,7 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
           <Route path="/analytics" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'institute_admin', 'teacher', 'exam_admin']}>
+            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
               <TeacherAnalytics />
             </RoleProtectedRoute>
           } />

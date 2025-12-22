@@ -23,7 +23,10 @@ import {
   Moon,
   Sun,
   HelpCircle,
-  Shield
+  Shield,
+  Home,
+  GraduationCap,
+  CalendarDays,
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useOnboardingTour } from '../contexts/OnboardingTourContext';
@@ -80,7 +83,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const getNavigation = (): NavigationItem[] => {
     const baseNavigation: NavigationItem[] = [
-      { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+      { name: 'Home', href: '/dashboard', icon: Home },
     ];
 
     if (user?.role === 'student') {
@@ -93,6 +96,8 @@ export default function Layout({ children }: LayoutProps) {
       baseNavigation.push(
         { name: 'Patterns', href: '/patterns', icon: Zap, badge: 'New' },
         { name: 'Exams', href: '/exams', icon: BookOpen },
+        { name: 'Batches', href: '/batches', icon: GraduationCap },
+        { name: 'Timetable', href: '/timetable', icon: CalendarDays },
         { name: 'Results', href: '/results', icon: FileText }
       );
 
