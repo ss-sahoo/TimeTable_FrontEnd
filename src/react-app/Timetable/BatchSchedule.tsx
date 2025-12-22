@@ -911,11 +911,26 @@ const BatchSchedule: React.FC = () => {
     
     try {
       // Call the remove-teacher API
-      await removeTeacherFromBatchAPI(timetableId, activeBatchObj.code, teacherToRemove.code);
+      console.log("Removing teacher:", {
+        timetableId,
+        batchCode: activeBatchObj.code,
+        teacherCode: teacherToRemove.code
+      });
+      
+      const result = await removeTeacherFromBatchAPI(timetableId, activeBatchObj.code, teacherToRemove.code);
+      console.log("Remove teacher API result:", result);
       
       // Update local state
       const updatedTeachers = currentTeachers.filter(t => t.id !== confirmModalData.teacherId);
       updateBatchAssignments(activeBatch, updatedTeachers);
+      
+      // Also update localStorage
+      const updatedAssignments = teacherAssignments.map(a => 
+        a.batchId === activeBatch 
+          ? { ...a, teachers: updatedTeachers }
+          : a
+      );
+      localStorage.setItem("batchTeacherAssignments", JSON.stringify(updatedAssignments));
       
       // Close modal
       setShowConfirmModal(false);
@@ -923,6 +938,10 @@ const BatchSchedule: React.FC = () => {
       
     } catch (error: any) {
       console.error("Failed to remove teacher:", error);
+      setError(`Failed to remove teacher: ${error.message}`);
+      // Close modal even on error so user can see the error message
+      setShowConfirmModal(false);
+      setConfirmModalData(null);
     } finally {
       setIsDeleting(false);
     }
@@ -1373,6 +1392,14 @@ const BatchSchedule: React.FC = () => {
           <code style={styles.codeText}>{timetableId}</code>
         </div>
       </div> */}
+
+      {/* Error Alert */}
+      {error && (
+        <div style={styles.errorAlert}>
+          <span>{error}</span>
+          <button style={styles.errorCloseBtn} onClick={() => setError(null)}>×</button>
+        </div>
+      )}
 
       {/* Help Section */}
       {showHelp && (
@@ -3005,6 +3032,27 @@ const styles: Record<string, React.CSSProperties> = {
     borderTop: "2px solid #ffffff",
     borderRadius: "50%",
     animation: "spin 1s linear infinite",
+  },
+  errorAlert: {
+    padding: "12px 16px",
+    background: "#fef2f2",
+    border: "1px solid #fecaca",
+    borderRadius: "8px",
+    marginBottom: "16px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    color: "#dc2626",
+    fontSize: "14px",
+  },
+  errorCloseBtn: {
+    background: "none",
+    border: "none",
+    color: "#dc2626",
+    cursor: "pointer",
+    fontSize: "18px",
+    padding: "0",
+    marginLeft: "12px",
   },
 };
 
