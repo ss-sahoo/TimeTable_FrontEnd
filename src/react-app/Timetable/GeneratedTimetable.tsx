@@ -503,15 +503,10 @@ const GeneratedTimetable: React.FC = () => {
     setSelectedTeacherIds([]);
   };
 
-  const filteredBatches =
-    selectedBatchIds.length === 0
-      ? batches
-      : batches.filter((b) => selectedBatchIds.includes(b.batch_id));
-
-  const filteredTeachers =
-    selectedTeacherIds.length === 0
-      ? teachers
-      : teachers.filter((t) => selectedTeacherIds.includes(t.teacher_id));
+  // Always display all batches and teachers, regardless of selection
+  // The selection is only for creating filter tabs, not for filtering display
+  const filteredBatches = batches;
+  const filteredTeachers = teachers;
 
   if (loading) {
     return (
