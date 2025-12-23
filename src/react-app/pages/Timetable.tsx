@@ -41,6 +41,7 @@ const Timetable: React.FC = () => {
   const [loadingTimetables, setLoadingTimetables] = useState(false);
   const [selectedTimetableId, setSelectedTimetableId] = useState<string | null>(null);
   const [centerName, setCenterName] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0); // Key to trigger timetable list refresh
 
   // Get center name from user profile API
   useEffect(() => {
@@ -60,7 +61,7 @@ const Timetable: React.FC = () => {
     getCenterName();
   }, [user]);
 
-  // Load timetables when center name is available
+  // Load timetables when center name is available or refreshKey changes
   useEffect(() => {
     const loadTimetables = async () => {
       setLoadingTimetables(true);
@@ -83,7 +84,13 @@ const Timetable: React.FC = () => {
     };
     
     loadTimetables();
-  }, [centerName]);
+  }, [centerName, refreshKey]);
+
+  // Callback to refresh timetable list after creation
+  const handleTimetableCreated = (newTimetableId: string) => {
+    setSelectedTimetableId(newTimetableId);
+    setRefreshKey(prev => prev + 1); // Trigger refresh of timetable list
+  };
 
   // Handle timetable selection - no page reload
   const handleSelectTimetable = (timetableId: string) => {
@@ -165,7 +172,7 @@ const Timetable: React.FC = () => {
 
       {/* Tab Content */}
       <div style={styles.contentArea}>
-        {activeTab === "instructions" && <Instructions />}
+        {activeTab === "instructions" && <Instructions onTimetableCreated={handleTimetableCreated} />}
         {activeTab === "slots" && <Slots key={selectedTimetableId || 'new'} />}
         {activeTab === "batches" && <Batches />}
         {activeTab === "teachers" && <TeachersWrapper />}
@@ -183,7 +190,7 @@ const Timetable: React.FC = () => {
 ================================ */
 
 // Instructions Tab
-const Instructions = () => {
+const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string) => void }) => {
   const [freeClassesCount, setFreeClassesCount] = useState<number>(0);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -285,7 +292,7 @@ const Instructions = () => {
         throw new Error("No access token found. Please login again.");
       }
 
-      // Step 1: Create timetable with name and date range
+      // Only call create API - no update needed
       const createPayload = {
         name: timetableName.trim(),
         from_date: calendarRange.startDate,
@@ -315,36 +322,7 @@ const Instructions = () => {
       const createData = await createResponse.json();
       const timetableId = createData.timetable_id;
 
-      // Step 2: Immediately save/update the timetable with proper payload (save slots API)
-      const updatePayload = {
-        name: timetableName.trim(),
-        from_date: calendarRange.startDate,
-        to_date: calendarRange.endDate,
-        free_classes_count: 0,
-        weekly_slots: {}, // Empty slots, will be added in Slots tab
-        holidays: [],
-        is_active: true,
-        description: "",
-      };
-
-      const updateResponse = await fetch(
-        `https://exams.dashoapp.com/api/timetable/admin/timetables/${timetableId}/update/`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify(updatePayload),
-        }
-      );
-
-      if (!updateResponse.ok) {
-        const errorText = await updateResponse.text();
-        throw new Error(`Update API Error: ${updateResponse.status} - ${errorText}`);
-      }
-
-      // Store the timetable ID and calendar range
+      // Store the timetable ID and calendar range in localStorage
       localStorage.setItem("timetable_id", JSON.stringify(timetableId));
       localStorage.setItem("timetable_dateRange", JSON.stringify({
         startDate: calendarRange.startDate,
@@ -360,10 +338,11 @@ const Instructions = () => {
       setTimetableName("");
       setCalendarRange({ startDate: "", endDate: "" });
       
-      // Close modal after 2 seconds
+      // Close modal after 2 seconds and notify parent to refresh list
       setTimeout(() => {
         setShowCreateModal(false);
         setCreateMessage(null);
+        onTimetableCreated(timetableId); // Notify parent to refresh timetable list
       }, 2000);
 
     } catch (error: any) {
