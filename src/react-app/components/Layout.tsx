@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  LayoutDashboard, 
   BookOpen, 
   Users, 
   Settings, 
@@ -14,7 +13,6 @@ import {
   User,
   ChevronDown,
   Zap,
-  FileText,
   BarChart3,
   ChevronLeft,
   ChevronRight,
@@ -90,26 +88,13 @@ export default function Layout({ children }: LayoutProps) {
       baseNavigation.push(
         { name: 'My Exams', href: '/student-exams', icon: BookOpen },
         { name: 'Analytics', href: '/student-analytics', icon: BarChart3 },
-        { name: 'Settings', href: '/settings', icon: Settings }
       );
     } else {
       baseNavigation.push(
-        { name: 'Patterns', href: '/patterns', icon: Zap, badge: 'New' },
-        { name: 'Exams', href: '/exams', icon: BookOpen },
+        { name: 'Exam', href: '/exam', icon: BookOpen },
         { name: 'Batches', href: '/batches', icon: GraduationCap },
         { name: 'Timetable', href: '/timetable', icon: CalendarDays },
-        { name: 'Results', href: '/results', icon: FileText }
       );
-
-      if (user?.role === 'super_admin' || user?.role === 'institute_admin') {
-        baseNavigation.push({ name: 'Users', href: '/users', icon: Users });
-      }
-
-      if (user?.role === 'super_admin' || user?.role === 'institute_admin' || user?.role === 'exam_admin') {
-        baseNavigation.push({ name: 'Analytics', href: '/analytics', icon: BarChart3 });
-      }
-
-      baseNavigation.push({ name: 'Settings', href: '/settings', icon: Settings });
     }
 
     return baseNavigation;

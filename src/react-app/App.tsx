@@ -59,6 +59,7 @@ import SuperAdminDashboard from "@/react-app/pages/SuperAdminDashboard";
 import CenterAdminDashboard from "@/react-app/pages/CenterAdminDashboard";
 import Timetable from "@/react-app/pages/Timetable";
 import Batches from "@/react-app/pages/Batches";
+import ExamHub from "@/react-app/pages/ExamHub";
 import {
   AdminRoleDashboard,
   TeacherRoleDashboard,
@@ -253,6 +254,13 @@ function AppRoutes() {
         <ProtectedRoute>
           <Batches />
         </ProtectedRoute>
+      } />
+
+      {/* Exam Hub - Main exam management page with tabs */}
+      <Route path="/exam" element={
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <ExamHub />
+        </RoleProtectedRoute>
       } />
 
       <Route path="/admin" element={<AdminRoleDashboard />} />
