@@ -337,6 +337,15 @@ const MatrixTimetable: React.FC<MatrixTimetableProps> = ({
       .sort((a, b) => a.start.localeCompare(b.start));
   }, [rows]);
 
+  // Calculate dynamic width for day cells based on number of time slots
+  const dayCellWidth = React.useMemo(() => {
+    // Each slot needs ~90px (80px width + 4px gap * 2)
+    const slotWidth = 90;
+    const minDayWidth = 150; // Minimum width for day cell
+    const calculatedWidth = Math.max(minDayWidth, allTimeSlots.length * slotWidth);
+    return calculatedWidth;
+  }, [allTimeSlots.length]);
+
   // Get color for row based on index
   const getRowColor = (index: number) => {
     if (rowType === "batch") {
@@ -372,24 +381,25 @@ const MatrixTimetable: React.FC<MatrixTimetableProps> = ({
 
   // Function to get time display for slot
   const getTimeDisplay = (slot: SlotData) => {
-    const start = slot.start_time.substring(0, 5); // Get HH:MM format
+    const start = slot.start_time.substring(0, 5);
     const end = slot.end_time.substring(0, 5);
     return `${start}-${end}`;
   };
-const getDateForDay = (dayKey: string): string | null => {
-  for (const row of rows) {
-    const slots = row.slots[dayKey];
-    if (slots && slots.length > 0) {
-      return slots[0].actual_date;
+
+  const getDateForDay = (dayKey: string): string | null => {
+    for (const row of rows) {
+      const slots = row.slots[dayKey];
+      if (slots && slots.length > 0) {
+        return slots[0].actual_date;
+      }
     }
-  }
-  return null;
-};
+    return null;
+  };
 
   return (
     <div style={styles.matrixWrapper}>
       <div style={styles.matrixContainer}>
-        {/* Header Row - Days */}
+        {/* Header Row */}
         <div style={styles.matrixHeader}>
           <div style={styles.matrixCornerCell}>
             {rowType === "batch" ? "Batch" : "Teacher"}
@@ -399,24 +409,24 @@ const getDateForDay = (dayKey: string): string | null => {
               key={dayKey} 
               style={{
                 ...styles.matrixDayHeader,
-                backgroundColor: getWeekdayColor(parseInt(dayKey.replace('d', '')))
+                backgroundColor: getWeekdayColor(parseInt(dayKey.replace('d', ''))),
+                minWidth: dayCellWidth,
               }}
             >
               <div style={styles.dayHeaderContent}>
-  <div style={styles.dayName}>
-    {DAY_SHORT_NAMES[dayKey] || getWeekdayShortName(parseInt(dayKey.replace('d', '')))}
-  </div>
+                <div style={styles.dayName}>
+                  {DAY_SHORT_NAMES[dayKey] || getWeekdayShortName(parseInt(dayKey.replace('d', '')))}
+                </div>
 
-  {getDateForDay(dayKey) && (
-    <div style={styles.dayDate}>
-      {new Date(getDateForDay(dayKey)!).toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-      })}
-    </div>
-  )}
-</div>
-
+                {getDateForDay(dayKey) && (
+                  <div style={styles.dayDate}>
+                    {new Date(getDateForDay(dayKey)!).toLocaleDateString('en-GB', {
+                      day: '2-digit',
+                      month: 'short',
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -450,77 +460,78 @@ const getDateForDay = (dayKey: string): string | null => {
                 </div>
               </div>
 
-              {/* Day Cells with Slots */}
+              {/* Day Cells with Horizontal Time Slots */}
               {allDays.map(dayKey => (
                 <div 
                   key={`${row[rowType === "batch" ? "batch_id" : "teacher_id"]}-${dayKey}`} 
                   style={{
                     ...styles.matrixDayCell,
-                    display: 'grid',
-gridTemplateRows: `repeat(${allTimeSlots.length}, 1fr)`,
-                    gap: '6px',
+                    minWidth: dayCellWidth,
                   }}
                 >
-                  {allTimeSlots.map((timeSlot, timeIdx) => {
-                    const slot = findSlot(row, dayKey, timeSlot);
-                    
-                    if (!slot) {
-                      return (
-                        <div 
-                          key={`${dayKey}-${timeIdx}`} 
-                          style={styles.emptySlot}
-                          title="No class"
-                        />
-                      );
-                    }
+                  {/* Time slots in horizontal row */}
+                  <div style={styles.timeSlotsRow}>
+                    {allTimeSlots.map((timeSlot, timeIdx) => {
+                      const slot = findSlot(row, dayKey, timeSlot);
+                      
+                      if (!slot) {
+                        return (
+                          <div 
+                            key={`${dayKey}-${timeIdx}`} 
+                            style={styles.emptyTimeSlotHorizontal}
+                            title="No class"
+                          />
+                        );
+                      }
 
-                    const subjectColor = getSubjectColor(slot.subject);
-                    const isLoading = loadingAvailableTeachers[slot.slot_id];
-                    
-                    return (
-                      <div
-                        key={`${dayKey}-${timeIdx}`}
-                        style={{
-                          ...styles.slotBox,
-                          backgroundColor: subjectColor.bg,
-                          borderColor: subjectColor.border,
-                          cursor: 'pointer'
-                        }}
-                        onClick={() => handleSlotClick(slot, 
-                          row[rowType === "batch" ? "batch_id" : "teacher_id"], 
-                          dayKey
-                        )}
-                        title={`${slot.subject || 'Free'} \n${getTimeDisplay(slot)} \n${slot.room_number ? `Room: ${slot.room_number}` : ''}`}
-                      >
-                        <div style={styles.slotContent}>
-                          <div style={{...styles.slotSubject, color: subjectColor.text}}>
-                            {slot.subject || 'Free'}
-                          </div>
-                          <div style={styles.slotTime}>
-                            {getTimeDisplay(slot)}
-                          </div>
-                          {rowType === "teacher" && slot.batch_name && (
-                            <div style={styles.slotBatchMini}>
-                              {slot.batch_name}
-                            </div>
+                      const subjectColor = getSubjectColor(slot.subject);
+                      const isLoading = loadingAvailableTeachers[slot.slot_id];
+                      
+                      return (
+                        <div
+                          key={`${dayKey}-${timeIdx}`}
+                          style={{
+                            ...styles.slotBoxHorizontal,
+                            backgroundColor: subjectColor.bg,
+                            borderColor: subjectColor.border,
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => handleSlotClick(slot, 
+                            row[rowType === "batch" ? "batch_id" : "teacher_id"], 
+                            dayKey
                           )}
-                          {rowType === "batch" && slot.teacher && (
-                            <div style={styles.slotTeacherMini}>
-                              {typeof slot.teacher === 'string' 
-                                ? slot.teacher 
-                                : slot.teacher.teacher_name || slot.teacher.teacher_code || 'TCH'}
+                          title={`${slot.subject || 'Free'} \n${getTimeDisplay(slot)} \n${slot.room_number ? `Room: ${slot.room_number}` : ''}`}
+                        >
+                          <div style={styles.slotContentHorizontal}>
+                            <div style={{...styles.slotSubjectHorizontal, color: subjectColor.text}}>
+                              {slot.subject || 'Free'}
+                            </div>
+                            <div style={styles.slotTimeHorizontal}>
+                              {getTimeDisplay(slot)}
+                            </div>
+                            {rowType === "teacher" && slot.batch_name && (
+                              <div style={styles.slotBatchMiniHorizontal}>
+                                {slot.batch_name}
+                              </div>
+                            )}
+                            {rowType === "batch" && slot.teacher && (
+                              <div style={styles.slotTeacherMiniHorizontal}>
+                                {typeof slot.teacher === 'string' 
+                                  ? slot.teacher 
+                                  : slot.teacher.teacher_name || slot.teacher.teacher_code || 'TCH'}
+                              </div>
+                            )}
+                          </div>
+                          
+                          {isLoading && (
+                            <div style={styles.slotLoading}>
+                              <div style={styles.miniSpinner}></div>
                             </div>
                           )}
                         </div>
-                        
-                        {isLoading && (
-                          <div style={styles.slotLoading}>
-                            <div style={styles.miniSpinner}></div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               ))}
             </div>
@@ -530,7 +541,6 @@ gridTemplateRows: `repeat(${allTimeSlots.length}, 1fr)`,
     </div>
   );
 };
-
 /* ================= MAIN COMPONENT ================= */
 const GeneratedTimetable: React.FC = () => {
   const [timetableId, setTimetableId] = useState<string | null>(null);
@@ -1564,6 +1574,107 @@ const dayName = getWeekdayShortName(slot.day_index);
 
 /* ================= STYLES ================= */
 const styles: Record<string, React.CSSProperties> = {
+
+    /* ================= HORIZONTAL TIME SLOTS STYLES ================= */
+  matrixDayCell: {
+    flex: 1,
+    minWidth: 110,
+    padding: "8px",
+    borderRight: "1px solid #e2e8f0",
+    backgroundColor: "#fff",
+    overflowX: "auto",
+  },
+  timeSlotsRow: {
+    display: "flex",
+    gap: "4px",
+    height: "100%",
+    alignItems: "stretch",
+  },
+  slotBoxHorizontal: {
+    minWidth: "80px",
+    width: "80px",
+    borderRadius: 6,
+    border: "2px solid",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    transition: "all 0.2s",
+    padding: "6px 4px",
+    boxSizing: "border-box",
+    overflow: "hidden",
+    flexShrink: 0,
+  },
+  slotContentHorizontal: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    width: "100%",
+    textAlign: "center",
+    overflow: "hidden",
+  },
+  slotSubjectHorizontal: {
+    fontSize: 11,
+    fontWeight: 700,
+    lineHeight: 1.1,
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "normal",
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+    maxHeight: "2.2em",
+  },
+  slotTimeHorizontal: {
+    fontSize: 9,
+    color: "#64748b",
+    fontWeight: 600,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    padding: "1px 3px",
+    borderRadius: 3,
+    lineHeight: 1,
+    marginTop: 1,
+  },
+  slotBatchMiniHorizontal: {
+    fontSize: 9,
+    color: "#475569",
+    fontWeight: 600,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    padding: "1px 3px",
+    borderRadius: 3,
+    lineHeight: 1,
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    marginTop: 1,
+  },
+  slotTeacherMiniHorizontal: {
+    fontSize: 9,
+    color: "#475569",
+    fontWeight: 600,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    padding: "1px 3px",
+    borderRadius: 3,
+    lineHeight: 1,
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    marginTop: 1,
+  },
+  emptyTimeSlotHorizontal: {
+    minWidth: "80px",
+    width: "80px",
+    borderRadius: 6,
+    backgroundColor: "#f8fafc",
+    border: "2px dashed #e2e8f0",
+    flexShrink: 0,
+  },
   wrapper: {
     background: "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)",
     padding: 24,
@@ -1654,51 +1765,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontWeight: 600,
     fontSize: 14,
-  },
-  activationToggleContainer: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "8px 16px",
-    background: "#fff",
-    borderRadius: 8,
-    border: "1px solid #e2e8f0",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.04)",
-  },
-  activationLabel: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: "#475569",
-    minWidth: 60,
-  },
-  toggleSwitch: {
-    position: "relative" as const,
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-    border: "none",
-    cursor: "pointer",
-    transition: "background-color 0.3s ease",
-    padding: 2,
-  },
-  toggleKnob: {
-    width: 20,
-    height: 20,
-    backgroundColor: "#fff",
-    borderRadius: "50%",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-    transition: "transform 0.3s ease",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  toggleSpinner: {
-    width: 12,
-    height: 12,
-    border: "2px solid #e2e8f0",
-    borderTopColor: "#3b82f6",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
   },
   viewTabs: {
     display: "flex",
@@ -2073,7 +2139,7 @@ matrixDayCell: {
 
 slotBox: {
   width: "100%",
-  aspectRatio: "1 / 1",
+  aspectRatio: "1 / 1",   // ⭐ MAKES IT SQUARE
   borderRadius: 8,
   border: "2px solid",
   display: "flex",
@@ -2087,6 +2153,67 @@ slotBox: {
   overflow: "hidden",
 },
 
+slotContent: {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",  // ADD THIS
+  gap: 4,
+  width: "100%",
+  textAlign: "center",
+  overflow: "hidden",  // ADD THIS
+},
+slotSubject: {
+  fontSize: 12,  // CHANGED from 14 to 12
+  fontWeight: 700,
+  lineHeight: 1.2,
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "normal",  // CHANGED from "nowrap" to "normal"
+  display: "-webkit-box",
+  WebkitLineClamp: 2,  // ADD THIS - allows 2 lines
+  WebkitBoxOrient: "vertical",  // ADD THIS
+  maxHeight: "2.4em",  // ADD THIS - 2 lines * 1.2 line-height
+},
+slotTime: {
+  fontSize: 10,  // CHANGED from 11 to 10
+  color: "#64748b",
+  fontWeight: 600,
+  backgroundColor: "rgba(255,255,255,0.7)",
+  padding: "2px 4px",
+  borderRadius: 4,
+  lineHeight: 1,
+  marginTop: 2,  // ADD THIS
+},
+slotBatchMini: {
+  fontSize: 10,  // CHANGED from 11 to 10
+  color: "#475569",
+  fontWeight: 600,
+  backgroundColor: "rgba(255,255,255,0.7)",
+  padding: "2px 4px",
+  borderRadius: 4,
+  lineHeight: 1,
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  marginTop: 2,  // ADD THIS
+},
+slotTeacherMini: {
+  fontSize: 10,  // CHANGED from 11 to 10
+  color: "#475569",
+  fontWeight: 600,
+  backgroundColor: "rgba(255,255,255,0.7)",
+  padding: "2px 4px",
+  borderRadius: 4,
+  lineHeight: 1,
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  marginTop: 2,  // ADD THIS
+},
   slotLoading: {
     position: "absolute",
     top: 4,
@@ -2348,6 +2475,51 @@ slotBox: {
     textAlign: "center",
     color: "#64748b",
     fontSize: 12,
+  },
+  activationToggleContainer: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 16px",
+    background: "#fff",
+    borderRadius: 8,
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.04)",
+  },
+  activationLabel: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#475569",
+    minWidth: 60,
+  },
+  toggleSwitch: {
+    position: "relative" as const,
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    border: "none",
+    cursor: "pointer",
+    transition: "background-color 0.3s ease",
+    padding: 2,
+  },
+  toggleKnob: {
+    width: 20,
+    height: 20,
+    backgroundColor: "#fff",
+    borderRadius: "50%",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+    transition: "transform 0.3s ease",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  toggleSpinner: {
+    width: 12,
+    height: 12,
+    border: "2px solid #e2e8f0",
+    borderTopColor: "#3b82f6",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
   },
 };
 
