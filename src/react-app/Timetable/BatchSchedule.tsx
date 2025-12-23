@@ -837,7 +837,7 @@ const BatchSchedule: React.FC = () => {
     });
   };
 
-  const assignTeacher = (teacher: Teacher) => {
+  const assignTeacher = async (teacher: Teacher) => {
     const currentTeachers = getBatchAssignments(activeBatch);
     // Check if teacher already exists in this batch
     if (currentTeachers.some(t => t.id === teacher.id)) {
@@ -845,37 +845,74 @@ const BatchSchedule: React.FC = () => {
       return;
     }
     
-    const updatedTeachers = [...currentTeachers, { ...teacher }];
-    updateBatchAssignments(activeBatch, updatedTeachers);
-    
-    // DEBUG: Log what's being saved
-    console.log("Assigning teacher to batch:", activeBatch);
-    console.log("Teacher:", teacher);
-    console.log("Current assignments before save:", teacherAssignments);
-    
-    // Force immediate save to localStorage
-    const updatedAssignments = [...teacherAssignments];
-    const assignmentIndex = updatedAssignments.findIndex(a => a.batchId === activeBatch);
-    
-    if (assignmentIndex >= 0) {
-      updatedAssignments[assignmentIndex] = { 
-        ...updatedAssignments[assignmentIndex], 
-        teachers: updatedTeachers,
-        timetableId 
-      };
-    } else {
-      updatedAssignments.push({ 
-        batchId: activeBatch, 
-        teachers: updatedTeachers,
-        timetableId 
-      });
+    const activeBatchObj = getActiveBatch();
+    if (!activeBatchObj) {
+      alert("No active batch selected");
+      return;
     }
     
-    setTeacherAssignments(updatedAssignments);
-    localStorage.setItem("batchTeacherAssignments", JSON.stringify(updatedAssignments));
-    console.log("Saved to localStorage:", updatedAssignments);
+    if (!timetableId) {
+      alert("Please select a timetable first");
+      return;
+    }
     
+    // Close dropdown immediately for better UX
     setOpenDropdown(null);
+    
+    try {
+      // Call the assign-teacher API immediately
+      console.log("Assigning teacher via API:", {
+        batchCode: activeBatchObj.code,
+        teacherCode: teacher.code,
+        minLecturesPerWeek: teacher.minLecturesPerWeek,
+        minLecturesPerDay: teacher.minLecturesPerDay,
+        maxLecturesPerDay: teacher.maxLecturesPerDay,
+        maxLecturesPerWeek: teacher.maxLecturesPerWeek
+      });
+      
+      await assignTeacherAPI(
+        activeBatchObj.code,
+        teacher.code,
+        teacher.minLecturesPerWeek,
+        teacher.minLecturesPerDay,
+        teacher.maxLecturesPerDay,
+        teacher.maxLecturesPerWeek
+      );
+      
+      // If API call succeeds, update local state
+      const updatedTeachers = [...currentTeachers, { ...teacher }];
+      updateBatchAssignments(activeBatch, updatedTeachers);
+      
+      // DEBUG: Log what's being saved
+      console.log("Teacher assigned successfully to batch:", activeBatch);
+      console.log("Teacher:", teacher);
+      
+      // Update localStorage
+      const updatedAssignments = [...teacherAssignments];
+      const assignmentIndex = updatedAssignments.findIndex(a => a.batchId === activeBatch);
+      
+      if (assignmentIndex >= 0) {
+        updatedAssignments[assignmentIndex] = { 
+          ...updatedAssignments[assignmentIndex], 
+          teachers: updatedTeachers,
+          timetableId 
+        };
+      } else {
+        updatedAssignments.push({ 
+          batchId: activeBatch, 
+          teachers: updatedTeachers,
+          timetableId 
+        });
+      }
+      
+      setTeacherAssignments(updatedAssignments);
+      localStorage.setItem("batchTeacherAssignments", JSON.stringify(updatedAssignments));
+      console.log("Saved to localStorage:", updatedAssignments);
+      
+    } catch (error: any) {
+      console.error("Failed to assign teacher:", error);
+      alert(`Failed to assign teacher: ${error.message}`);
+    }
   };
 
   const removeTeacher = (teacherId: string) => {
