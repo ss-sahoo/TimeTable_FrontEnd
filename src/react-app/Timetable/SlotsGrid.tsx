@@ -165,8 +165,6 @@ const SlotsGrid: React.FC = () => {
   const [lastSavedTime, setLastSavedTime] = useState<string>("");
   // const [showDayDropdown, setShowDayDropdown] = useState<number | null>(null);
   const [showAddDayModal, setShowAddDayModal] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [timetableName, setTimetableName] = useState<string>("");
   const [selectionMode, setSelectionMode] = useState<DaySelectionMode>("dropdown");
   const [selectedDays, setSelectedDays] = useState<string[]>(["Monday"]);
   const [calendarRange, setCalendarRange] = useState({
@@ -197,6 +195,16 @@ const SlotsGrid: React.FC = () => {
             endDate: parsedData.settings.endDate || ""
           });
         }
+      }
+
+      // Load calendar range from instruction page creation
+      const savedDateRange = localStorage.getItem("timetable_dateRange");
+      if (savedDateRange) {
+        const dateRange = JSON.parse(savedDateRange);
+        setCalendarRange({
+          startDate: dateRange.startDate || "",
+          endDate: dateRange.endDate || ""
+        });
       }
     } catch (error) {
       console.error("Failed to load saved time:", error);
@@ -878,34 +886,6 @@ const SlotsGrid: React.FC = () => {
     }
   };
 
-  // Create new timetable - clears localStorage and resets state
-  const createNewTimetable = () => {
-    // Open modal to ask for timetable name before clearing
-    setShowCreateModal(true);
-  };
-
-  const confirmCreateNewTimetable = (name: string) => {
-    // Clear timetable_id from localStorage
-    localStorage.removeItem("timetable_id");
-
-    // Reset all state
-    setDays([{ 
-      day: "Monday",
-      date: new Date().toISOString().split('T')[0],
-      dayIndex: 1,
-      slots: [{ id: "M1", time: "8:00 AM - 9:00 AM" }], 
-      color: DAY_COLORS[0] 
-    }]);
-    setSelectedDays(["Monday"]);
-    setCalendarRange({ startDate: "", endDate: "" });
-    setSaveStatus("idle");
-    setSaveMessage("");
-    setIsEditMode(false); // Switch to create mode
-    setFetchedSlots(null);
-    setShowCreateModal(false);
-    setTimetableName(name || "");
-  };
-
   // Toggle day selection
   const toggleDaySelection = (dayName: string) => {
     if (selectedDays.includes(dayName)) {
@@ -957,9 +937,9 @@ const SlotsGrid: React.FC = () => {
         <div>
           <h3 style={styles.title}>Fixed Slots Management</h3>
           <p style={styles.subtitle}>Define time slots for each day of the week</p>
-          {timetableName && (
-            <div style={{marginTop: 6, color: "#334155", fontSize: 13}}>
-              <strong>Timetable:</strong> {timetableName}
+          {calendarRange.startDate && calendarRange.endDate && (
+            <div style={{marginTop: 8, color: "#0369a1", fontSize: 13, fontWeight: 500}}>
+              📅 {new Date(calendarRange.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(calendarRange.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </div>
           )}
         </div>
@@ -1003,14 +983,6 @@ const SlotsGrid: React.FC = () => {
             >
               {isSaving ? "Saving..." : isEditMode ? "💾 Update Slots" : "💾 Save Slots"}
             </button>
-            
-            {/* Add Days Button */}
-            <button
-              style={styles.addDaysButton}
-              onClick={() => setShowAddDayModal(true)}
-            >
-              + Add Days
-            </button>
 
             {/* Reset Button */}
             <button
@@ -1019,13 +991,6 @@ const SlotsGrid: React.FC = () => {
               title="Reset to default"
             >
               Reset
-            </button>
-            <button
-              style={styles.createNewButton}
-              onClick={createNewTimetable}
-              title="Create a new timetable"
-            >
-              + Create New Timetable
             </button>
           </div>
         </div>
@@ -1268,50 +1233,6 @@ const SlotsGrid: React.FC = () => {
           </div>
         </div>
       )}
-
-              {/* Create New Timetable Name Modal */}
-              {showCreateModal && (
-                <div style={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
-                  <div style={{...styles.modalContent, width: 420}} onClick={(e) => e.stopPropagation()}>
-                    <div style={styles.modalHeader}>
-                      <h3 style={styles.modalTitle}>Create New Timetable</h3>
-                      <button
-                        style={styles.closeModalBtn}
-                        onClick={() => setShowCreateModal(false)}
-                      >
-                        ×
-                      </button>
-                    </div>
-
-                    <div style={{padding: 16}}>
-                      <label style={{display: 'block', marginBottom: 8, color: '#475569'}}>Timetable name</label>
-                      <input
-                        type="text"
-                        value={timetableName}
-                        onChange={(e) => setTimetableName(e.target.value)}
-                        placeholder="e.g. JEE Main 2025 Schedule"
-                        style={{width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #e2e8f0'}}
-                      />
-                    </div>
-
-                    <div style={styles.modalFooter}>
-                      <button style={styles.cancelModalBtn} onClick={() => setShowCreateModal(false)}>Cancel</button>
-                      <button
-                        style={styles.confirmModalBtn}
-                        onClick={() => {
-                          if (!timetableName || timetableName.trim() === "") {
-                            alert('Please enter a timetable name');
-                            return;
-                          }
-                          confirmCreateNewTimetable(timetableName.trim());
-                        }}
-                      >
-                        Create
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
       {/* Grid Container */}
       <div style={styles.gridContainer}>
@@ -1627,16 +1548,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontSize: "14px",
     fontWeight: "500",
-  },
-  createNewButton: {
-    padding: "10px 20px",
-    background: "#8b5cf6",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "500",
-    fontSize: "14px",
   },
   helpSection: {
     marginBottom: "24px",

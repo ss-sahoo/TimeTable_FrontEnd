@@ -188,6 +188,192 @@ const Instructions = () => {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Create new timetable states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [timetableName, setTimetableName] = useState<string>("");
+  const [calendarRange, setCalendarRange] = useState({ startDate: "", endDate: "" });
+  const [creatingTimetable, setCreatingTimetable] = useState(false);
+  const [createMessage, setCreateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Get current date in YYYY-MM-DD format
+  const getCurrentDate = () => {
+    return new Date().toISOString().split('T')[0];
+  };
+
+  // Get date 7 days from now
+  const getNextWeekDate = () => {
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    return nextWeek.toISOString().split('T')[0];
+  };
+
+  // Get date 30 days from now
+  const getNextMonthDate = () => {
+    const nextMonth = new Date();
+    nextMonth.setDate(nextMonth.getDate() + 30);
+    return nextMonth.toISOString().split('T')[0];
+  };
+
+  // Get days from date range (for display)
+  const getDaysFromDateRange = (startDate: string, endDate: string): string[] => {
+    if (!startDate || !endDate) return [];
+    
+    const ALL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    const DAY_ABBREVIATIONS: Record<string, string> = {
+      "Monday": "M",
+      "Tuesday": "TU",
+      "Wednesday": "WE",
+      "Thursday": "TH",
+      "Friday": "FR",
+      "Saturday": "SA",
+      "Sunday": "SU"
+    };
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const daysInRange: string[] = [];
+    
+    const dayIndexMap: Record<number, string> = {
+      1: "Monday",
+      2: "Tuesday",
+      3: "Wednesday",
+      4: "Thursday",
+      5: "Friday",
+      6: "Saturday",
+      0: "Sunday"
+    };
+    
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      const dayIndex = currentDate.getDay();
+      const dayName = dayIndexMap[dayIndex];
+      
+      if (dayName && !daysInRange.includes(dayName)) {
+        daysInRange.push(dayName);
+      }
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    return daysInRange.sort((a, b) => ALL_DAYS.indexOf(a) - ALL_DAYS.indexOf(b));
+  };
+
+  // Get days count from calendar range
+  const getDaysCountFromRange = () => {
+    if (!calendarRange.startDate || !calendarRange.endDate) return 0;
+    return getDaysFromDateRange(calendarRange.startDate, calendarRange.endDate).length;
+  };
+
+  // Create new timetable with initial days
+  const createNewTimetableHandler = async () => {
+    if (!timetableName.trim()) {
+      setCreateMessage({ type: 'error', text: 'Please enter a timetable name' });
+      return;
+    }
+
+    if (!calendarRange.startDate || !calendarRange.endDate) {
+      setCreateMessage({ type: 'error', text: 'Please select start and end dates' });
+      return;
+    }
+
+    setCreatingTimetable(true);
+    setCreateMessage(null);
+
+    try {
+      const accessToken = localStorage.getItem("access_token");
+      if (!accessToken) {
+        throw new Error("No access token found. Please login again.");
+      }
+
+      // Step 1: Create timetable with name and date range
+      const createPayload = {
+        name: timetableName.trim(),
+        from_date: calendarRange.startDate,
+        to_date: calendarRange.endDate,
+        free_classes_count: 0,
+        weekly_slots: {},
+        holidays: [],
+      };
+
+      const createResponse = await fetch(
+        "https://exams.dashoapp.com/api/timetable/admin/timetables/create/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(createPayload),
+        }
+      );
+
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text();
+        throw new Error(`API Error: ${createResponse.status} - ${errorText}`);
+      }
+
+      const createData = await createResponse.json();
+      const timetableId = createData.timetable_id;
+
+      // Step 2: Immediately save/update the timetable with proper payload (save slots API)
+      const updatePayload = {
+        name: timetableName.trim(),
+        from_date: calendarRange.startDate,
+        to_date: calendarRange.endDate,
+        free_classes_count: 0,
+        weekly_slots: {}, // Empty slots, will be added in Slots tab
+        holidays: [],
+        is_active: true,
+        description: "",
+      };
+
+      const updateResponse = await fetch(
+        `https://exams.dashoapp.com/api/timetable/admin/timetables/${timetableId}/update/`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(updatePayload),
+        }
+      );
+
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        throw new Error(`Update API Error: ${updateResponse.status} - ${errorText}`);
+      }
+
+      // Store the timetable ID and calendar range
+      localStorage.setItem("timetable_id", JSON.stringify(timetableId));
+      localStorage.setItem("timetable_dateRange", JSON.stringify({
+        startDate: calendarRange.startDate,
+        endDate: calendarRange.endDate
+      }));
+      
+      setCreateMessage({ 
+        type: 'success', 
+        text: `Timetable "${timetableName}" created successfully! You can now add slots in the Slots tab.` 
+      });
+
+      // Reset form
+      setTimetableName("");
+      setCalendarRange({ startDate: "", endDate: "" });
+      
+      // Close modal after 2 seconds
+      setTimeout(() => {
+        setShowCreateModal(false);
+        setCreateMessage(null);
+      }, 2000);
+
+    } catch (error: any) {
+      console.error("Failed to create timetable:", error);
+      setCreateMessage({ type: 'error', text: error.message || 'Failed to create timetable. Please try again.' });
+    } finally {
+      setCreatingTimetable(false);
+    }
+  };
+
   const handleSaveFreeClasses = async () => {
     const timetableId = localStorage.getItem("timetable_id");
     if (!timetableId) {
@@ -215,11 +401,162 @@ const Instructions = () => {
     }
   };
 
+  const DAY_ABBREVIATIONS: Record<string, string> = {
+    "Monday": "M",
+    "Tuesday": "TU",
+    "Wednesday": "WE",
+    "Thursday": "TH",
+    "Friday": "FR",
+    "Saturday": "SA",
+    "Sunday": "SU"
+  };
+
   return (
     <div style={styles.tabContent}>
       <div style={styles.headerRow}>
         <h3 style={styles.tabTitle}>Timetable Configuration</h3>
       </div>
+      
+      {/* Create New Timetable Card */}
+      <div style={styles.configCard}>
+        <div style={styles.configHeader}>
+          <span style={styles.configIcon}>✨</span>
+          <h4 style={styles.configTitle}>Create New Timetable</h4>
+        </div>
+        <p style={styles.configDescription}>
+          Start by creating a new timetable with a name and date range. You'll add specific slots and batches after creation.
+        </p>
+        <button 
+          style={styles.saveConfigBtn}
+          onClick={() => setShowCreateModal(true)}
+        >
+          + Create New Timetable
+        </button>
+      </div>
+
+      {/* Create Timetable Modal */}
+      {showCreateModal && (
+        <div style={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
+          <div style={{...styles.modalContent, width: 500}} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h3 style={styles.modalTitle}>Create New Timetable</h3>
+              <button
+                style={styles.closeModalBtn}
+                onClick={() => setShowCreateModal(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{padding: 16}}>
+              <label style={{display: 'block', marginBottom: 8, color: '#475569'}}>Timetable name</label>
+              <input
+                type="text"
+                value={timetableName}
+                onChange={(e) => setTimetableName(e.target.value)}
+                placeholder="e.g. JEE Main 2025 Schedule"
+                style={{width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #e2e8f0'}}
+              />
+            </div>
+
+            {/* Calendar Range Selection */}
+            <div style={{padding: 12, borderTop: '1px solid #eef2f7'}}>
+              <div style={styles.timeNote}>
+                <p style={styles.noteText}>
+                  💡 <strong>Note:</strong> Select the date range for your timetable. You can add specific time slots after creation.
+                </p>
+              </div>
+
+              <div style={styles.calendarSelection}>
+                <div style={styles.calendarHeader}>
+                  <span style={styles.selectionTitle}>Select Date Range</span>
+                </div>
+          
+                <div style={styles.calendarInputs}>
+                  <div style={styles.dateInputGroup}>
+                    <label style={styles.dateLabel}>Start Date</label>
+                    <input
+                      type="date"
+                      value={calendarRange.startDate}
+                      onChange={(e) => setCalendarRange({...calendarRange, startDate: e.target.value})}
+                      style={styles.dateInput}
+                      min={getCurrentDate()}
+                    />
+                    <button
+                      style={styles.quickDateBtn}
+                      onClick={() => setCalendarRange({...calendarRange, startDate: getCurrentDate()})}
+                    >
+                      Today
+                    </button>
+                  </div>
+            
+                  <div style={styles.dateInputGroup}>
+                    <label style={styles.dateLabel}>End Date</label>
+                    <input
+                      type="date"
+                      value={calendarRange.endDate}
+                      onChange={(e) => setCalendarRange({...calendarRange, endDate: e.target.value})}
+                      style={styles.dateInput}
+                      min={calendarRange.startDate || getCurrentDate()}
+                    />
+                    <div style={styles.quickDateButtons}>
+                      <button
+                        style={styles.quickDateBtn}
+                        onClick={() => setCalendarRange({...calendarRange, endDate: getNextWeekDate()})}
+                      >
+                        Next Week
+                      </button>
+                      <button
+                        style={styles.quickDateBtn}
+                        onClick={() => setCalendarRange({...calendarRange, endDate: getNextMonthDate()})}
+                      >
+                        Next Month
+                      </button>
+                    </div>
+                  </div>
+                </div>
+          
+                {calendarRange.startDate && calendarRange.endDate && (
+                  <div style={styles.calendarInfo}>
+                    <p>📅 Date range: <strong>{getDaysCountFromRange()}</strong> days</p>
+                    <div style={styles.daysList}>
+                      {getDaysFromDateRange(calendarRange.startDate, calendarRange.endDate).map(day => (
+                        <span key={day} style={styles.dayBadge}>
+                          {DAY_ABBREVIATIONS[day]}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Create Message */}
+            {createMessage && (
+              <div style={{
+                ...styles.messageBox,
+                backgroundColor: createMessage.type === 'success' ? '#dcfce7' : '#fee2e2',
+                color: createMessage.type === 'success' ? '#166534' : '#dc2626',
+                borderColor: createMessage.type === 'success' ? '#bbf7d0' : '#fecaca',
+                margin: '12px 16px 0 16px'
+              }}>
+                {createMessage.type === 'success' ? '✓' : '✗'} {createMessage.text}
+              </div>
+            )}
+
+            <div style={styles.modalFooter}>
+              <button style={styles.cancelModalBtn} onClick={() => setShowCreateModal(false)}>Cancel</button>
+              <button
+                style={styles.confirmModalBtn}
+                onClick={createNewTimetableHandler}
+                disabled={creatingTimetable}
+              >
+                {creatingTimetable ? "Creating..." : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Free Classes Configuration */}
       <div style={styles.configCard}>
@@ -867,6 +1204,169 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#0c4a6e",
     margin: "0",
     lineHeight: "1.5",
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    position: "fixed",
+    top: "0",
+    left: "0",
+    right: "0",
+    bottom: "0",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+  },
+  modalContent: {
+    background: "#ffffff",
+    borderRadius: "12px",
+    width: "500px",
+    maxWidth: "90vw",
+    maxHeight: "85vh",
+    overflow: "hidden",
+    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+  },
+  modalHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "20px 24px",
+    background: "#f8fafc",
+    borderBottom: "1px solid #e2e8f0",
+  },
+  modalTitle: {
+    fontSize: "18px",
+    fontWeight: "600",
+    color: "#1e293b",
+    margin: "0",
+  },
+  closeModalBtn: {
+    width: "32px",
+    height: "32px",
+    borderRadius: "6px",
+    border: "1px solid #d1d5db",
+    background: "#ffffff",
+    cursor: "pointer",
+    fontSize: "18px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalFooter: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "12px",
+    padding: "20px 24px",
+    background: "#f8fafc",
+    borderTop: "1px solid #e2e8f0",
+  },
+  cancelModalBtn: {
+    padding: "10px 20px",
+    background: "#ffffff",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+  },
+  confirmModalBtn: {
+    padding: "10px 20px",
+    background: "#10b981",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+  },
+
+  // Calendar Styles
+  timeNote: {
+    marginBottom: "20px",
+    padding: "12px 16px",
+    background: "#f0f9ff",
+    borderRadius: "8px",
+    border: "1px solid #bae6fd",
+  },
+  noteText: {
+    margin: "0",
+    fontSize: "13px",
+    color: "#0369a1",
+    lineHeight: "1.5",
+  },
+  calendarSelection: {
+    marginBottom: "24px",
+  },
+  calendarHeader: {
+    marginBottom: "20px",
+  },
+  selectionTitle: {
+    fontSize: "16px",
+    fontWeight: "600",
+    color: "#1e293b",
+  },
+  calendarInputs: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "20px",
+    marginBottom: "20px",
+  },
+  dateInputGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+  dateLabel: {
+    fontSize: "14px",
+    fontWeight: "500",
+    color: "#475569",
+  },
+  dateInput: {
+    padding: "10px 12px",
+    borderRadius: "6px",
+    border: "1px solid #d1d5db",
+    fontSize: "14px",
+    width: "100%",
+  },
+  quickDateButtons: {
+    display: "flex",
+    gap: "8px",
+  },
+  quickDateBtn: {
+    padding: "6px 12px",
+    background: "#f1f5f9",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "12px",
+    flex: "1",
+  },
+  calendarInfo: {
+    padding: "12px",
+    background: "#f0f9ff",
+    borderRadius: "6px",
+    border: "1px solid #bae6fd",
+    color: "#0369a1",
+    fontSize: "13px",
+    marginTop: "12px",
+  },
+  daysList: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "6px",
+    marginTop: "8px",
+  },
+  dayBadge: {
+    padding: "4px 10px",
+    background: "#dbeafe",
+    color: "#1d4ed8",
+    borderRadius: "12px",
+    fontSize: "12px",
+    fontWeight: "500",
   },
 };
 
