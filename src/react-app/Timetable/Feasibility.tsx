@@ -1012,7 +1012,10 @@ const Feasibility: React.FC = () => {
                   <div>
                     <h2 style={styles.resultTitle}>Timetable Can Be Generated</h2>
                     <p style={styles.resultText}>
-                      All constraints are satisfied. You may proceed to generate the timetable.
+                      {result.summary.total_violations > 0 
+                        ? `${result.summary.total_violations} warning(s) found but you can still proceed to generate.`
+                        : "All constraints are satisfied. You may proceed to generate the timetable."
+                      }
                     </p>
                   </div>
                 </>
@@ -1030,47 +1033,48 @@ const Feasibility: React.FC = () => {
             </div>
           </div>
 
-          {/* Violations Section - Only show if not feasible */}
-          {!result.feasible && result.violations && (
+          {/* Violations Section - Show if there are any violations */}
+          {result.summary.total_violations > 0 && result.violations && (
             <div style={styles.violationsSection}>
-              <h4 style={styles.sectionTitle}>Rule Violations</h4>
+              <h4 style={styles.sectionTitle}>
+                {result.feasible ? "Warnings" : "Rule Violations"}
+              </h4>
               
               {Object.entries(result.rules_explanation).map(([ruleKey, explanation]) => {
                 const violations = result.violations[ruleKey as keyof typeof result.violations] || [];
                 const hasViolations = violations.length > 0;
                 
+                // Only show rules that have violations
+                if (!hasViolations) return null;
+                
                 return (
                   <div key={ruleKey} style={{
                     ...styles.ruleCard,
-                    borderLeftColor: hasViolations ? "#ef4444" : "#10b981",
+                    borderLeftColor: result.feasible ? "#f59e0b" : "#ef4444",
                   }}>
                     <div style={styles.ruleHeader}>
                       <div style={styles.ruleHeaderLeft}>
                         <span style={{
                           ...styles.ruleStatus,
-                          background: hasViolations ? "#fee2e2" : "#dcfce7",
-                          color: hasViolations ? "#dc2626" : "#16a34a",
+                          background: result.feasible ? "#fef3c7" : "#fee2e2",
+                          color: result.feasible ? "#d97706" : "#dc2626",
                         }}>
-                          {hasViolations ? "✗" : "✓"}
+                          {result.feasible ? "⚠" : "✗"}
                         </span>
                         <span style={styles.ruleKey}>{ruleKey}</span>
-                        {hasViolations && (
-                          <span style={styles.violationCount}>{violations.length} violation(s)</span>
-                        )}
+                        <span style={styles.violationCount}>{violations.length} violation(s)</span>
                       </div>
                     </div>
                     <p style={styles.ruleExplanation}>{explanation}</p>
                     
-                    {hasViolations && (
-                      <div style={styles.violationsList}>
-                        {violations.map((violation, idx) => (
-                          <div key={idx} style={styles.violationItem}>
-                            <span style={styles.violationBullet}>•</span>
-                            <span style={styles.violationText}>{violation}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <div style={styles.violationsList}>
+                      {violations.map((violation, idx) => (
+                        <div key={idx} style={styles.violationItem}>
+                          <span style={styles.violationBullet}>•</span>
+                          <span style={styles.violationText}>{violation}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 );
               })}
