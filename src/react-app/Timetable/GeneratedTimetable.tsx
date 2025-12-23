@@ -564,6 +564,10 @@ const GeneratedTimetable: React.FC = () => {
   }>({});
   const [loadingAllTeachers, setLoadingAllTeachers] = useState(false);
 
+  // Timetable activation state
+  const [isActive, setIsActive] = useState<boolean>(false);
+  const [togglingActive, setTogglingActive] = useState(false);
+
   useEffect(() => {
     const rawId = localStorage.getItem("timetable_id");
     if (rawId) {
@@ -573,6 +577,59 @@ const GeneratedTimetable: React.FC = () => {
       setLoading(false);
     }
   }, []);
+
+  // Check timetable activation status
+  const checkActivationStatus = useCallback(async () => {
+    if (!timetableId) return;
+    try {
+      const response = await Fetch(`/api/timetable/timetables/${timetableId}/`, {
+        method: "GET",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setIsActive(data.is_active || false);
+      }
+    } catch (err) {
+      console.error("Error checking activation status:", err);
+    }
+  }, [timetableId]);
+
+  // Toggle timetable activation
+  const toggleActivation = useCallback(async () => {
+    if (!timetableId || togglingActive) return;
+    
+    setTogglingActive(true);
+    try {
+      const endpoint = isActive 
+        ? `/api/timetable/admin/timetables/${timetableId}/deactivate/`
+        : `/api/timetable/admin/timetables/${timetableId}/activate/`;
+      
+      const response = await Fetch(endpoint, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      
+      if (response.ok) {
+        setIsActive(!isActive);
+       
+      } else {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.detail || `Failed to ${isActive ? 'deactivate' : 'activate'} timetable`);
+      }
+    } catch (err: any) {
+      console.error("Toggle activation error:", err);
+      alert(err.message || `Failed to ${isActive ? 'deactivate' : 'activate'} timetable`);
+    } finally {
+      setTogglingActive(false);
+    }
+  }, [timetableId, isActive, togglingActive]);
+
+  // Check activation status when timetableId changes
+  useEffect(() => {
+    if (timetableId) {
+      checkActivationStatus();
+    }
+  }, [timetableId, checkActivationStatus]);
 
   // Load batches data
   const loadBatchesData = useCallback(async () => {
@@ -934,6 +991,33 @@ const GeneratedTimetable: React.FC = () => {
         </div>
         
         <div style={styles.headerActions}>
+          {/* Activation Toggle */}
+          <div style={styles.activationToggleContainer}>
+            <span style={styles.activationLabel}>
+              {isActive ? "Active" : "Inactive"}
+            </span>
+            <button
+              style={{
+                ...styles.toggleSwitch,
+                backgroundColor: isActive ? "#10b981" : "#cbd5e1",
+                opacity: togglingActive ? 0.7 : 1,
+                cursor: togglingActive ? "wait" : "pointer",
+              }}
+              onClick={toggleActivation}
+              disabled={togglingActive}
+              title={isActive ? "Click to deactivate timetable" : "Click to activate timetable"}
+            >
+              <div
+                style={{
+                  ...styles.toggleKnob,
+                  transform: isActive ? "translateX(20px)" : "translateX(0)",
+                }}
+              >
+                {togglingActive && <div style={styles.toggleSpinner}></div>}
+              </div>
+            </button>
+          </div>
+          
           {viewMode === "batch" && (
             <div style={styles.headerStatsInline}>
               <button style={styles.headerStatBtn} onClick={() => setViewMode("batch")}>
@@ -1571,6 +1655,51 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     fontSize: 14,
   },
+  activationToggleContainer: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 16px",
+    background: "#fff",
+    borderRadius: 8,
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.04)",
+  },
+  activationLabel: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#475569",
+    minWidth: 60,
+  },
+  toggleSwitch: {
+    position: "relative" as const,
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    border: "none",
+    cursor: "pointer",
+    transition: "background-color 0.3s ease",
+    padding: 2,
+  },
+  toggleKnob: {
+    width: 20,
+    height: 20,
+    backgroundColor: "#fff",
+    borderRadius: "50%",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+    transition: "transform 0.3s ease",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  toggleSpinner: {
+    width: 12,
+    height: 12,
+    border: "2px solid #e2e8f0",
+    borderTopColor: "#3b82f6",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+  },
   viewTabs: {
     display: "flex",
     gap: 8,
@@ -1944,7 +2073,7 @@ matrixDayCell: {
 
 slotBox: {
   width: "100%",
-  aspectRatio: "1 / 1",   // ⭐ MAKES IT SQUARE
+  aspectRatio: "1 / 1",
   borderRadius: 8,
   border: "2px solid",
   display: "flex",
@@ -1958,67 +2087,6 @@ slotBox: {
   overflow: "hidden",
 },
 
-slotContent: {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",  // ADD THIS
-  gap: 4,
-  width: "100%",
-  textAlign: "center",
-  overflow: "hidden",  // ADD THIS
-},
-slotSubject: {
-  fontSize: 12,  // CHANGED from 14 to 12
-  fontWeight: 700,
-  lineHeight: 1.2,
-  maxWidth: "100%",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "normal",  // CHANGED from "nowrap" to "normal"
-  display: "-webkit-box",
-  WebkitLineClamp: 2,  // ADD THIS - allows 2 lines
-  WebkitBoxOrient: "vertical",  // ADD THIS
-  maxHeight: "2.4em",  // ADD THIS - 2 lines * 1.2 line-height
-},
-slotTime: {
-  fontSize: 10,  // CHANGED from 11 to 10
-  color: "#64748b",
-  fontWeight: 600,
-  backgroundColor: "rgba(255,255,255,0.7)",
-  padding: "2px 4px",
-  borderRadius: 4,
-  lineHeight: 1,
-  marginTop: 2,  // ADD THIS
-},
-slotBatchMini: {
-  fontSize: 10,  // CHANGED from 11 to 10
-  color: "#475569",
-  fontWeight: 600,
-  backgroundColor: "rgba(255,255,255,0.7)",
-  padding: "2px 4px",
-  borderRadius: 4,
-  lineHeight: 1,
-  maxWidth: "100%",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-  marginTop: 2,  // ADD THIS
-},
-slotTeacherMini: {
-  fontSize: 10,  // CHANGED from 11 to 10
-  color: "#475569",
-  fontWeight: 600,
-  backgroundColor: "rgba(255,255,255,0.7)",
-  padding: "2px 4px",
-  borderRadius: 4,
-  lineHeight: 1,
-  maxWidth: "100%",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-  marginTop: 2,  // ADD THIS
-},
   slotLoading: {
     position: "absolute",
     top: 4,
