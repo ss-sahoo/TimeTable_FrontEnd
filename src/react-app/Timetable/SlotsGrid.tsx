@@ -178,6 +178,7 @@ const SlotsGrid: React.FC = () => {
   // Add the missing state variables
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string>("");
+  const [timetableName, setTimetableName] = useState<string>("");
   
   // const dropdownRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -572,17 +573,42 @@ const SlotsGrid: React.FC = () => {
       const data = await response.json();
       setFetchedSlots(data);
       
+      // Update calendar range from API response
+      if (data.from_date && data.to_date) {
+        setCalendarRange({
+          startDate: data.from_date,
+          endDate: data.to_date
+        });
+      }
+      
       // Convert and set the days state
       const convertedDays = convertApiSlotsToComponentFormat(data);
       if (convertedDays.length > 0) {
         setDays(convertedDays);
-        setIsEditMode(true); // We're editing an existing timetable
-        // Update calendar range from API response
+        setIsEditMode(true); // We're editing an existing timetable with slots
+      } else {
+        // No slots yet - auto-populate days from date range
         if (data.from_date && data.to_date) {
-          setCalendarRange({
-            startDate: data.from_date,
-            endDate: data.to_date
-          });
+          const daysWithIndices = getDaysFromDateRangeWithIndices(data.from_date, data.to_date);
+          if (daysWithIndices.length > 0) {
+            const newDays = daysWithIndices.map((dayInfo, idx) => {
+              const dayColorIndex = ALL_DAYS.indexOf(dayInfo.dayName);
+              return {
+                day: dayInfo.dayName,
+                date: dayInfo.date,
+                dayIndex: idx + 1,
+                slots: [{
+                  id: generateSlotId(dayInfo.dayName, 1),
+                  time: "8:00 AM - 9:00 AM"
+                }],
+                color: DAY_COLORS[dayColorIndex >= 0 ? dayColorIndex : 0],
+                startDate: data.from_date,
+                endDate: data.to_date
+              };
+            });
+            setDays(newDays);
+            setIsEditMode(true); // Timetable exists but no slots yet
+          }
         }
       }
       
@@ -608,6 +634,44 @@ const SlotsGrid: React.FC = () => {
         }
       } catch (error) {
         console.error("Failed to load slots from API:", error);
+        
+        // If API fails, check if we have a date range from creation and populate days
+        const savedDateRange = localStorage.getItem("timetable_dateRange");
+        if (savedDateRange) {
+          try {
+            const dateRange = JSON.parse(savedDateRange);
+            if (dateRange.startDate && dateRange.endDate) {
+              setCalendarRange({
+                startDate: dateRange.startDate,
+                endDate: dateRange.endDate
+              });
+              
+              // Auto-populate days from the date range
+              const daysWithIndices = getDaysFromDateRangeWithIndices(dateRange.startDate, dateRange.endDate);
+              if (daysWithIndices.length > 0) {
+                const newDays = daysWithIndices.map((dayInfo, idx) => {
+                  const dayColorIndex = ALL_DAYS.indexOf(dayInfo.dayName);
+                  return {
+                    day: dayInfo.dayName,
+                    date: dayInfo.date,
+                    dayIndex: idx + 1,
+                    slots: [{
+                      id: generateSlotId(dayInfo.dayName, 1),
+                      time: "8:00 AM - 9:00 AM"
+                    }],
+                    color: DAY_COLORS[dayColorIndex >= 0 ? dayColorIndex : 0],
+                    startDate: dateRange.startDate,
+                    endDate: dateRange.endDate
+                  };
+                });
+                setDays(newDays);
+                setIsEditMode(false); // New timetable, not edit mode
+              }
+            }
+          } catch (e) {
+            console.error("Failed to parse date range:", e);
+          }
+        }
       }
     };
     
@@ -960,8 +1024,13 @@ const SlotsGrid: React.FC = () => {
           
           {/* Save Button */}
           <div style={styles.saveSection}>
-            {/* Mode indicator */}
-            
+            {/* Add Days Button */}
+            <button
+              style={styles.addDaysButton}
+              onClick={() => setShowAddDayModal(true)}
+            >
+              + Add Days
+            </button>
             
             {saveMessage && (
               <span style={{
