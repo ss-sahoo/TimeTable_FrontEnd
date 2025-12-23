@@ -142,8 +142,13 @@ interface ExamFormData {
   is_published: boolean;
   allow_negative_marking: boolean;
   negative_marking_percentage: number;
+  // Shuffle settings
   shuffle_questions: boolean;
+  shuffle_within_sections: boolean;
+  shuffle_sections: boolean;
+  shuffle_subjects: boolean;
   shuffle_options: boolean;
+  shuffle_seed_per_student: boolean;
   show_results_immediately: boolean;
   instructions: string;
   
@@ -183,8 +188,13 @@ const getDefaultFormData = (): ExamFormData => ({
   is_published: false,
   allow_negative_marking: false,
   negative_marking_percentage: 25,
-  shuffle_questions: true,
-  shuffle_options: true,
+  // Shuffle settings
+  shuffle_questions: false,
+  shuffle_within_sections: true,
+  shuffle_sections: false,
+  shuffle_subjects: false,
+  shuffle_options: false,
+  shuffle_seed_per_student: true,
   show_results_immediately: true,
   instructions: '',
 
@@ -296,8 +306,12 @@ export default function ExamCreation() {
         is_published: exam.is_published || false,
         allow_negative_marking: exam.allow_negative_marking || false,
         negative_marking_percentage: exam.negative_marking_percentage || 25,
-        shuffle_questions: exam.shuffle_questions ?? true,
-        shuffle_options: exam.shuffle_options ?? true,
+        shuffle_questions: exam.shuffle_questions ?? false,
+        shuffle_within_sections: exam.shuffle_within_sections ?? true,
+        shuffle_sections: exam.shuffle_sections ?? false,
+        shuffle_subjects: exam.shuffle_subjects ?? false,
+        shuffle_options: exam.shuffle_options ?? false,
+        shuffle_seed_per_student: exam.shuffle_seed_per_student ?? true,
         show_results_immediately: exam.show_results_immediately ?? true,
         instructions: exam.instructions || '',
         status: exam.status || 'draft',
@@ -1287,10 +1301,12 @@ export default function ExamCreation() {
                   </div>
 
                   <div className="pt-3 border-t border-slate-100 space-y-3">
+                    <h4 className="text-xs font-semibold text-slate-700 mb-2">Question Shuffling</h4>
+                    
                     <div className="flex items-center justify-between">
                       <div>
-                        <label className="text-xs font-medium text-slate-700">Shuffle Questions</label>
-                        <p className="text-xs text-slate-500">Randomize question order</p>
+                        <label className="text-xs font-medium text-slate-700">Enable Shuffling</label>
+                        <p className="text-xs text-slate-500">Master toggle for question shuffling</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
@@ -1303,21 +1319,89 @@ export default function ExamCreation() {
                       </label>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-xs font-medium text-slate-700">Shuffle Options</label>
-                        <p className="text-xs text-slate-500">Randomize answer options</p>
+                    {formData.shuffle_questions && (
+                      <div className="ml-4 pl-4 border-l-2 border-blue-200 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <label className="text-xs font-medium text-slate-700">Shuffle Within Sections</label>
+                            <p className="text-xs text-slate-500">Randomize questions within each section</p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={formData.shuffle_within_sections}
+                              onChange={(e) => handleInputChange('shuffle_within_sections', e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                          </label>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <label className="text-xs font-medium text-slate-700">Shuffle Sections</label>
+                            <p className="text-xs text-slate-500">Randomize the order of sections</p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={formData.shuffle_sections}
+                              onChange={(e) => handleInputChange('shuffle_sections', e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                          </label>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <label className="text-xs font-medium text-slate-700">Shuffle Subjects</label>
+                            <p className="text-xs text-slate-500">Randomize the order of subjects</p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={formData.shuffle_subjects}
+                              onChange={(e) => handleInputChange('shuffle_subjects', e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                          </label>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <label className="text-xs font-medium text-slate-700">Shuffle Options</label>
+                            <p className="text-xs text-slate-500">Randomize MCQ answer options</p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={formData.shuffle_options}
+                              onChange={(e) => handleInputChange('shuffle_options', e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                          </label>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <label className="text-xs font-medium text-slate-700">Unique Order Per Student</label>
+                            <p className="text-xs text-slate-500">Each student gets a different shuffle order</p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={formData.shuffle_seed_per_student}
+                              onChange={(e) => handleInputChange('shuffle_seed_per_student', e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                          </label>
+                        </div>
                       </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.shuffle_options}
-                          onChange={(e) => handleInputChange('shuffle_options', e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
+                    )}
 
                     <div className="flex items-center justify-between">
                       <div>

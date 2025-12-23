@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Users, Building2, Shield, Zap, User, X, Calendar, Upload,
+  Users, Building2, Shield, Zap, User, X, Calendar, Upload, UserPlus,
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
 import BulkTeacherUpload from '../components/BulkTeacherUpload';
+import AddTeacherModal from '../components/AddTeacherModal';
 
 // Interfaces
 interface Center {
@@ -213,6 +214,7 @@ function PeoplesTab({ centerId }: { centerId: string | null }) {
   const [roleCounts, setRoleCounts] = useState<Record<string, number>>({});
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, totalCount: 0, hasNext: false, hasPrevious: false });
   const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [showAddTeacher, setShowAddTeacher] = useState(false);
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'SUPER_ADMIN' || 
                   user?.role === 'institute_admin' || user?.role === 'ADMIN';
@@ -299,13 +301,22 @@ function PeoplesTab({ centerId }: { centerId: string | null }) {
             ))}
           </select>
           {isAdmin && (
-            <button
-              onClick={() => setShowBulkUpload(true)}
-              className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 flex items-center gap-2"
-            >
-              <Upload className="w-4 h-4" />
-              Bulk Upload
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowAddTeacher(true)}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              >
+                <UserPlus className="w-4 h-4" />
+                Add Teacher
+              </button>
+              <button
+                onClick={() => setShowBulkUpload(true)}
+                className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Bulk Upload
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -433,6 +444,14 @@ function PeoplesTab({ centerId }: { centerId: string | null }) {
       <BulkTeacherUpload
         isOpen={showBulkUpload}
         onClose={() => setShowBulkUpload(false)}
+        onSuccess={() => fetchPeople(1)}
+        centerId={centerId || undefined}
+      />
+
+      {/* Add Teacher Modal */}
+      <AddTeacherModal
+        isOpen={showAddTeacher}
+        onClose={() => setShowAddTeacher(false)}
         onSuccess={() => fetchPeople(1)}
         centerId={centerId || undefined}
       />
