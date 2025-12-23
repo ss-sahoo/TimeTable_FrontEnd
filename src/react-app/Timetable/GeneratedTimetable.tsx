@@ -1655,51 +1655,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     fontSize: 14,
   },
-  activationToggleContainer: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "8px 16px",
-    background: "#fff",
-    borderRadius: 8,
-    border: "1px solid #e2e8f0",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.04)",
-  },
-  activationLabel: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: "#475569",
-    minWidth: 60,
-  },
-  toggleSwitch: {
-    position: "relative" as const,
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-    border: "none",
-    cursor: "pointer",
-    transition: "background-color 0.3s ease",
-    padding: 2,
-  },
-  toggleKnob: {
-    width: 20,
-    height: 20,
-    backgroundColor: "#fff",
-    borderRadius: "50%",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-    transition: "transform 0.3s ease",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  toggleSpinner: {
-    width: 12,
-    height: 12,
-    border: "2px solid #e2e8f0",
-    borderTopColor: "#3b82f6",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-  },
   viewTabs: {
     display: "flex",
     gap: 8,
@@ -2073,7 +2028,7 @@ matrixDayCell: {
 
 slotBox: {
   width: "100%",
-  aspectRatio: "1 / 1",
+  aspectRatio: "1 / 1",   // ⭐ MAKES IT SQUARE
   borderRadius: 8,
   border: "2px solid",
   display: "flex",
@@ -2087,6 +2042,67 @@ slotBox: {
   overflow: "hidden",
 },
 
+slotContent: {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",  // ADD THIS
+  gap: 4,
+  width: "100%",
+  textAlign: "center",
+  overflow: "hidden",  // ADD THIS
+},
+slotSubject: {
+  fontSize: 12,  // CHANGED from 14 to 12
+  fontWeight: 700,
+  lineHeight: 1.2,
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "normal",  // CHANGED from "nowrap" to "normal"
+  display: "-webkit-box",
+  WebkitLineClamp: 2,  // ADD THIS - allows 2 lines
+  WebkitBoxOrient: "vertical",  // ADD THIS
+  maxHeight: "2.4em",  // ADD THIS - 2 lines * 1.2 line-height
+},
+slotTime: {
+  fontSize: 10,  // CHANGED from 11 to 10
+  color: "#64748b",
+  fontWeight: 600,
+  backgroundColor: "rgba(255,255,255,0.7)",
+  padding: "2px 4px",
+  borderRadius: 4,
+  lineHeight: 1,
+  marginTop: 2,  // ADD THIS
+},
+slotBatchMini: {
+  fontSize: 10,  // CHANGED from 11 to 10
+  color: "#475569",
+  fontWeight: 600,
+  backgroundColor: "rgba(255,255,255,0.7)",
+  padding: "2px 4px",
+  borderRadius: 4,
+  lineHeight: 1,
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  marginTop: 2,  // ADD THIS
+},
+slotTeacherMini: {
+  fontSize: 10,  // CHANGED from 11 to 10
+  color: "#475569",
+  fontWeight: 600,
+  backgroundColor: "rgba(255,255,255,0.7)",
+  padding: "2px 4px",
+  borderRadius: 4,
+  lineHeight: 1,
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  marginTop: 2,  // ADD THIS
+},
   slotLoading: {
     position: "absolute",
     top: 4,
@@ -2348,6 +2364,51 @@ slotBox: {
     textAlign: "center",
     color: "#64748b",
     fontSize: 12,
+  },
+  activationToggleContainer: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 16px",
+    background: "#fff",
+    borderRadius: 8,
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.04)",
+  },
+  activationLabel: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#475569",
+    minWidth: 60,
+  },
+  toggleSwitch: {
+    position: "relative" as const,
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    border: "none",
+    cursor: "pointer",
+    transition: "background-color 0.3s ease",
+    padding: 2,
+  },
+  toggleKnob: {
+    width: 20,
+    height: 20,
+    backgroundColor: "#fff",
+    borderRadius: "50%",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+    transition: "transform 0.3s ease",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  toggleSpinner: {
+    width: 12,
+    height: 12,
+    border: "2px solid #e2e8f0",
+    borderTopColor: "#3b82f6",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
   },
 };
 
