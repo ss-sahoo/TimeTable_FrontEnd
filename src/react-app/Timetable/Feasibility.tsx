@@ -894,12 +894,17 @@ const Feasibility: React.FC = () => {
             </div>
           </div>
 
-          {/* Violations Section - Only show if not feasible */}
-          {!result.feasible && result.violations && (
+          {/* Violations Section - Show whenever violations exist */}
+          {result.violations && Object.values(result.violations).some((v: any) => Array.isArray(v) && v.length > 0) && (
             <div style={styles.violationsSection}>
               <h4 style={styles.sectionTitle}>Rule Violations</h4>
               
-              {Object.entries(result.rules_explanation).map(([ruleKey, explanation]) => {
+              {Object.entries(result.rules_explanation)
+                .filter(([ruleKey]) => {
+                  const violations = result.violations[ruleKey as keyof typeof result.violations] || [];
+                  return violations.length > 0;
+                })
+                .map(([ruleKey, explanation]) => {
                 const violations = result.violations[ruleKey as keyof typeof result.violations] || [];
                 const hasViolations = violations.length > 0;
                 
