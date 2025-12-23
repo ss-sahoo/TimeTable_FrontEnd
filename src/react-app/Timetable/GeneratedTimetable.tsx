@@ -72,7 +72,7 @@ interface TimetableResponse {
   total_teachers?: number;
 }
 
-type ViewMode = "batch" | "teacher";
+type ViewMode = "batch" | "teacher" | "available_teachers";
 
 /* ================= CONSTANTS ================= */
 const SUBJECT_COLORS: { [key: string]: { bg: string; text: string; border: string } } = {
@@ -119,6 +119,34 @@ const TEACHER_COLORS = [
   { bg: "#fefce8", border: "#eab308", text: "#a16207" },
   { bg: "#f5f3ff", border: "#8b5cf6", text: "#6d28d9" },
 ];
+
+/* ================= HELPER FUNCTIONS ================= */
+// Function to get weekday name for any day index
+const getWeekdayName = (dayIndex: number): string => {
+  const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  
+  // Day 1 = Monday (index 0), Day 2 = Tuesday (index 1), etc.
+  // Using modulo 7 to wrap around the week
+  const adjustedIndex = (dayIndex - 1) % 7;
+  return weekdays[adjustedIndex];
+};
+
+// Function to get weekday color for any day index
+const getWeekdayColor = (dayIndex: number): string => {
+  const defaultColors = [
+    "#3b82f6",  // Monday - Blue
+    "#10b981",  // Tuesday - Green
+    "#8b5cf6",  // Wednesday - Purple
+    "#f59e0b",  // Thursday - Orange
+    "#ef4444",  // Friday - Red
+    "#ec4899",  // Saturday - Pink
+    "#06b6d4"   // Sunday - Cyan
+  ];
+  
+  // Day 1 = Monday (index 0), Day 2 = Tuesday (index 1), etc.
+  const colorIndex = (dayIndex - 1) % 7;
+  return defaultColors[colorIndex];
+};
 
 /* ================= DROPDOWN SELECTOR ================= */
 interface DropdownSelectorProps {
@@ -272,6 +300,15 @@ const GeneratedTimetable: React.FC = () => {
 
   // Available teachers state
   const [loadingAvailableTeachers, setLoadingAvailableTeachers] = useState<{[key: string]: boolean}>({});
+  const [allAvailableTeachers, setAllAvailableTeachers] = useState<AvailableTeacher[]>([]);
+const [slotsWithTeachers, setSlotsWithTeachers] = useState<{
+  [slotId: string]: {
+    slot: SlotData;
+    teachers: AvailableTeacher[];
+    hasLoaded: boolean;
+  }
+}>({});
+  const [loadingAllTeachers, setLoadingAllTeachers] = useState(false);
 
   useEffect(() => {
     const rawId = localStorage.getItem("timetable_id");
@@ -364,65 +401,111 @@ const GeneratedTimetable: React.FC = () => {
     }
   }, [timetableId]);
 
+  // Load all available teachers for the available teachers view
+const loadAllAvailableTeachers = useCallback(async () => {
+  if (!timetableId) return;
+  
+  setLoadingAllTeachers(true);
+  
+  try {
+    // First load batches to get all slots
+    const batchResponse = await Fetch(
+      `/api/timetable/timetables/${timetableId}/batches/`,
+      { method: "GET" }
+    );
+    
+    if (!batchResponse.ok) {
+      console.warn(`Failed to load batches: ${batchResponse.status}`);
+      return;
+    }
+    
+    const batchData: TimetableResponse = await batchResponse.json();
+    const allBatches = batchData.batches || [];
+    
+    // Collect all unique slots (DON'T fetch available teachers here!)
+    const slotsMap: { [slotId: string]: { slot: SlotData; teachers: AvailableTeacher[] } } = {};
+    
+    for (const batch of allBatches) {
+      for (const dayKey in batch.slots) {
+        for (const slot of batch.slots[dayKey]) {
+          if (!slotsMap[slot.slot_id]) {
+            // DON'T fetch available teachers here - only store slot data
+            slotsMap[slot.slot_id] = {
+  slot,
+  teachers: [],
+  hasLoaded: false,
+};
+
+          }
+        }
+      }
+    }
+    
+    setSlotsWithTeachers(slotsMap);
+  } catch (err: any) {
+    console.warn(`Error loading slots:`, err.message);
+  } finally {
+    setLoadingAllTeachers(false);
+  }
+}, [timetableId]);
+
   // Load data based on view mode
   useEffect(() => {
     if (timetableId) {
       if (viewMode === "batch") {
         loadBatchesData();
-      } else {
+      } else if (viewMode === "teacher") {
         loadTeachersData();
+      } else if (viewMode === "available_teachers") {
+        loadAllAvailableTeachers();
       }
     }
-  }, [timetableId, viewMode, loadBatchesData, loadTeachersData]);
+  }, [timetableId, viewMode, loadBatchesData, loadTeachersData, loadAllAvailableTeachers]);
 
   // Toggle available teachers for a slot
-  const toggleAvailableTeachers = useCallback(async (slotId: string, dayKey: string, timeSlot: string, entityId: string, entityType: 'batch' | 'teacher') => {
-    // Update the state based on entity type
-    if (entityType === 'batch') {
-      setBatches(prev => prev.map(batch => {
-        if (batch.batch_id === entityId) {
-          const updatedSlots = { ...batch.slots };
-          if (updatedSlots[dayKey]) {
-            updatedSlots[dayKey] = updatedSlots[dayKey].map(slot => {
-              if (slot.slot_id === slotId) {
-                const shouldShow = !slot.show_available_teachers;
-                
-                // If we need to show and haven't loaded yet, load the data
-                if (shouldShow && !slot.available_teachers) {
-                  loadAvailableTeachers(slotId).then(teachers => {
-                    if (teachers) {
-                      setBatches(prevBatches => prevBatches.map(b => {
-                        if (b.batch_id === entityId) {
-                          const updated = { ...b };
-                          if (updated.slots[dayKey]) {
-                            updated.slots[dayKey] = updated.slots[dayKey].map(s => {
-                              if (s.slot_id === slotId) {
-                                return { ...s, available_teachers: teachers, show_available_teachers: true };
-                              }
-                              return s;
-                            });
-                          }
-                          return updated;
-                        }
-                        return b;
-                      }));
-                    }
-                  });
-                }
-                
-                return {
-                  ...slot,
-                  show_available_teachers: shouldShow
-                };
-              }
-              return slot;
-            });
-          }
-          return { ...batch, slots: updatedSlots };
-        }
-        return batch;
-      }));
-    } else {
+const toggleAvailableTeachers = useCallback(async (slotId: string, dayKey: string, timeSlot: string, entityId: string, entityType: 'batch' | 'teacher') => {
+  // Special handling for available teachers view
+  if (entityId === 'available_teachers_view') {
+  // Prevent double-click spam
+  if (loadingAvailableTeachers[slotId]) return;
+
+  setSlotsWithTeachers(prev => {
+    const current = prev[slotId];
+    if (!current) return prev;
+
+    return {
+      ...prev,
+      [slotId]: {
+        ...current,
+        slot: {
+          ...current.slot,
+          show_available_teachers: !current.slot.show_available_teachers,
+        },
+      },
+    };
+  });
+
+  // ⛔ STOP if already loaded (CACHE HIT)
+  if (slotsWithTeachers[slotId]?.hasLoaded) return;
+
+  // 🔥 FETCH ONLY ONCE
+  const teachers = await loadAvailableTeachers(slotId);
+
+  if (teachers) {
+    setSlotsWithTeachers(prev => ({
+      ...prev,
+      [slotId]: {
+        ...prev[slotId],
+        teachers,
+        hasLoaded: true,
+      },
+    }));
+  }
+
+  return;
+}
+
+    else {
       setTeachers(prev => prev.map(teacher => {
         if (teacher.teacher_id === entityId) {
           const updatedSlots = { ...teacher.slots };
@@ -561,6 +644,32 @@ const GeneratedTimetable: React.FC = () => {
               </button>
             </div>
           )}
+          {viewMode === "teacher" && (
+            <div style={styles.headerStatsInline}>
+              <button style={styles.headerStatBtn} onClick={() => setViewMode("teacher")}>
+                <div style={styles.headerStatNum}>{teachers.length}</div>
+                <div style={styles.headerStatLabel}>Total Teachers</div>
+              </button>
+              <button style={styles.headerStatBtn} onClick={() => setViewMode("teacher")}>
+                <div style={styles.headerStatNum}>{teachers.reduce((sum, t) => sum + t.total_classes, 0)}</div>
+                <div style={styles.headerStatLabel}>Total Classes</div>
+              </button>
+            </div>
+          )}
+          {viewMode === "available_teachers" && (
+  <div style={styles.headerStatsInline}>
+    <button style={styles.headerStatBtn} onClick={() => setViewMode("available_teachers")}>
+      <div style={styles.headerStatNum}>{Object.keys(slotsWithTeachers).length}</div>
+      <div style={styles.headerStatLabel}>Total Slots</div>
+    </button>
+    <button style={styles.headerStatBtn} onClick={() => setViewMode("available_teachers")}>
+      <div style={styles.headerStatNum}>
+        Click to load
+      </div>
+      <div style={styles.headerStatLabel}>Available Teachers</div>
+    </button>
+  </div>
+)}
           <button style={styles.exportBtn}>📥 Export PDF</button>
         </div>
       </div>
@@ -581,29 +690,20 @@ const GeneratedTimetable: React.FC = () => {
           <span style={styles.tabIcon}>👨‍🏫</span>
           Teacher-wise View
         </button>
+        <button
+          style={viewMode === "available_teachers" ? styles.viewTabActive : styles.viewTab}
+          onClick={() => { setViewMode("available_teachers"); }}
+        >
+          <span style={styles.tabIcon}>✅</span>
+          Available Teachers
+        </button>
       </div>
 
       {/* Stats Row */}
       <div style={styles.statsRow}>
-        {viewMode === "batch" ? (
-          <></>
-        ) : (
-          <>
-            <div style={styles.statCard}>
-              <span style={styles.statNum}>{teachers.length}</span>
-              <span style={styles.statLabel}>Total Teachers</span>
-            </div>
-            <div style={styles.statCard}>
-              <span style={styles.statNum}>
-                {teachers.reduce((sum, t) => sum + t.total_classes, 0)}
-              </span>
-              <span style={styles.statLabel}>Total Classes</span>
-            </div>
-          </>
-        )}
       </div>
 
-{/* Filter Row */}
+{viewMode !== "available_teachers" && (
 <div style={styles.filterRow}>
   <span style={styles.filterLabel}>View {viewMode === "batch" ? "Batches" : "Teachers"}:</span>
   
@@ -718,14 +818,17 @@ const GeneratedTimetable: React.FC = () => {
     )}
   </div>
 </div>
+)}
 
       {/* Info Banner */}
+      {viewMode === "available_teachers" && (
       <div style={styles.infoBanner}>
         <span style={styles.infoIcon}>ℹ️</span>
         <span>
-          Click on any class slot to view available teachers for that time period
+          View all available teachers and their availability status across time slots
         </span>
       </div>
+      )}
 
       {/* Content */}
 {viewMode === "batch" ? (
@@ -772,7 +875,7 @@ const GeneratedTimetable: React.FC = () => {
       )}
     </div>
   )
-) : (
+) : viewMode === "teacher" ? (
   teachers.length === 0 ? (
     <EmptyState message="No teacher timetable data available" />
   ) : (
@@ -816,10 +919,313 @@ const GeneratedTimetable: React.FC = () => {
       )}
     </div>
   )
-)}
+) :
+ viewMode === "available_teachers" ? (
+  loadingAllTeachers ? (
+    <div style={styles.wrapper}>
+      <div style={styles.loadingBox}>
+        <div style={styles.spinner}></div>
+        <p>Loading Available Teachers...</p>
+      </div>
+    </div>
+  ) : Object.keys(slotsWithTeachers).length === 0 ? (
+    <EmptyState message="No slots with available teachers data found" />
+  ) : (
+    <AvailableTeachersView 
+      slotsWithTeachers={slotsWithTeachers} 
+      getSubjectColor={getSubjectColor}
+      toggleAvailableTeachers={toggleAvailableTeachers}
+      loadingAvailableTeachers={loadingAvailableTeachers}
+    />
+  )
+) : null}
     </div>
   );
 };
+
+/* ================= AVAILABLE TEACHERS VIEW ================= */
+// First, update the AvailableTeachersView component interface and props
+interface AvailableTeachersViewProps {
+  slotsWithTeachers: { [slotId: string]: { slot: SlotData; teachers: AvailableTeacher[] } };
+  getSubjectColor: (s: string | null) => { bg: string; text: string; border: string };
+  toggleAvailableTeachers: (slotId: string, dayKey: string, timeSlot: string, entityId: string, entityType: 'batch' | 'teacher') => void;
+  loadingAvailableTeachers: {[key: string]: boolean};
+}
+
+const AvailableTeachersView: React.FC<AvailableTeachersViewProps> = ({ 
+  slotsWithTeachers, 
+  getSubjectColor,
+  toggleAvailableTeachers,
+  loadingAvailableTeachers 
+}) => {
+  // Group slots by day and time
+// Group slots by day and time
+const groupedSlots = React.useMemo(() => {
+  const groups: { [dayKey: string]: { 
+    dayKey: string; 
+    dayName: string; 
+    date?: string;
+    slots: { 
+      slot: SlotData; 
+      teachers: AvailableTeacher[];
+      availableTeachers: AvailableTeacher[];
+    }[] 
+  } } = {};
+  
+  Object.values(slotsWithTeachers).forEach(({ slot, teachers }) => {
+    const dayKey = `d${slot.day_index}`;
+    const dayName = getWeekdayName(slot.day_index); // Use helper function
+    
+    if (!groups[dayKey]) {
+      groups[dayKey] = {
+        dayKey,
+        dayName,
+        date: slot.actual_date,
+        slots: []
+      };
+    }
+    
+    groups[dayKey].slots.push({
+      slot,
+      teachers,
+      availableTeachers: teachers.filter(t => t.is_available)
+    });
+  });
+  
+  // Sort slots within each day by time
+  Object.keys(groups).forEach(dayKey => {
+    groups[dayKey].slots.sort((a, b) => 
+      a.slot.start_time.localeCompare(b.slot.start_time)
+    );
+  });
+  
+  // Sort days by day_index
+  return Object.keys(groups)
+    .sort((a, b) => {
+      const dayA = parseInt(a.replace('d', ''));
+      const dayB = parseInt(b.replace('d', ''));
+      return dayA - dayB;
+    })
+    .map(key => groups[key]);
+}, [slotsWithTeachers]);
+
+  // Get unique time slots across all days
+  const timeSlots = React.useMemo(() => {
+    const slots: { start: string; end: string }[] = [];
+    Object.values(slotsWithTeachers).forEach(({ slot }) => {
+      if (!slots.find(t => t.start === slot.start_time && t.end === slot.end_time)) {
+        slots.push({ start: slot.start_time, end: slot.end_time });
+      }
+    });
+    return slots.sort((a, b) => a.start.localeCompare(b.start));
+  }, [slotsWithTeachers]);
+
+  const handleSlotClick = (slot: SlotData) => {
+  toggleAvailableTeachers(
+    slot.slot_id,
+    `d${slot.day_index}`,
+    `${slot.start_time}-${slot.end_time}`,
+    'available_teachers_view',
+    'batch'
+  );
+};
+
+
+  if (groupedSlots.length === 0) {
+    return (
+      <EmptyState message="No slots with available teachers data found" />
+    );
+  }
+
+  return (
+    <div style={styles.availableTeachersView}>
+      {/* Grid View */}
+      <div style={styles.timetableContainer}>
+        <div style={styles.tableScroll}>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.thTime}>Time</th>
+                {groupedSlots.map(dayGroup => (
+  <th key={dayGroup.dayKey} style={styles.thDay}>
+    <div style={styles.dayHeader}>
+      <div style={{ 
+        ...styles.dayDot, 
+        backgroundColor: getWeekdayColor(parseInt(dayGroup.dayKey.replace('d', ''))) 
+      }}></div>
+      <div style={styles.dayHeaderContent}>
+        <span style={styles.dayName}>{dayGroup.dayName}</span>
+        {dayGroup.date && (
+          <span style={styles.dayDate}>{dayGroup.date}</span>
+        )}
+      </div>
+    </div>
+  </th>
+))}
+              </tr>
+            </thead>
+            <tbody>
+              {timeSlots.map((time, timeIdx) => (
+                <tr key={`${time.start}-${time.end}`}>
+                  <td style={styles.timeCell}>
+                    <div style={styles.timeSlotDisplay}>
+                      <span style={styles.timeStart}>{time.start}</span>
+                      <span style={styles.timeSeparator}>-</span>
+                      <span style={styles.timeEnd}>{time.end}</span>
+                    </div>
+                  </td>
+                  
+                  {groupedSlots.map(dayGroup => {
+                    const slotData = dayGroup.slots.find(s => 
+                      s.slot.start_time === time.start && s.slot.end_time === time.end
+                    );
+                    
+                    if (!slotData) {
+                      return <td key={`${dayGroup.dayKey}-${timeIdx}`} style={styles.emptyCell}></td>;
+                    }
+                    
+                    const { slot, teachers, availableTeachers } = slotData;
+                    const isLoading = loadingAvailableTeachers[slot.slot_id];
+                    const hasTeachersData = teachers.length > 0;
+                    
+                    return (
+  <td key={`${dayGroup.dayKey}-${timeIdx}`} style={styles.slotCell}>
+    <div
+      style={{
+        ...styles.slotCard,
+        backgroundColor: '#f8fafc', // Use neutral background
+        borderColor: '#e2e8f0',
+        cursor: 'pointer',
+        position: 'relative'
+      }}
+      onClick={() => handleSlotClick(slot, teachers)}
+      title="Click to view available teachers"
+    >
+      <div style={styles.slotHeader}>
+        <span style={{ ...styles.slotSubject, color: '#475569' }}>
+          {slot.slot_code} {/* Show only slot code */}
+        </span>
+        {/* REMOVED: <span style={styles.slotCode}>Slot #{slot.slot_number}</span> */}
+      </div>
+      
+      <div style={styles.slotContent}>
+        {/* Batch Info - Keep if you want to show batch */}
+        {slot.batch_name && (
+          <div style={styles.slotBatch}>
+            <span style={styles.slotIcon}>📚</span>
+            {slot.batch_name}
+          </div>
+        )}
+        
+        {/* Room Info - Keep if you want to show room */}
+        {slot.room_number && (
+          <div style={styles.slotRoom}>
+            <span style={styles.slotIcon}>🏠</span>
+            {slot.room_number}
+          </div>
+        )}
+        
+        {/* Available Teachers Indicator */}
+        <div style={styles.availableTeachersIndicator}>
+          {isLoading ? (
+            <div style={styles.loadingIndicator}>
+              <div style={styles.smallSpinner}></div>
+              <span style={styles.indicatorText}>Loading...</span>
+            </div>
+          ) : hasTeachersData ? (
+            <>
+              <span style={{
+                ...styles.indicatorText,
+                color: availableTeachers.length > 0 ? '#059669' : '#dc2626'
+              }}>
+                {availableTeachers.length > 0 ? '✅' : '❌'} {availableTeachers.length} available
+              </span>
+              <span style={slot.show_available_teachers ? styles.indicatorOpen : styles.indicatorClosed}>
+                {slot.show_available_teachers ? '▲' : '▼'}
+              </span>
+            </>
+          ) : (
+            <>
+              <span style={styles.indicatorText}>
+                Click to load
+              </span>
+              <span style={styles.indicatorClosed}>
+                ▼
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+      
+      {/* Available Teachers Panel */}
+      {slot.show_available_teachers && hasTeachersData && (
+        <div style={styles.availableTeachersPanel}>
+          <div style={styles.availableTeachersHeader}>
+            <span style={styles.availableTeachersTitle}>
+              Available Teachers for {slot.slot_code}
+            </span>
+          </div>
+          
+          {isLoading ? (
+            <div style={styles.loadingTeachers}>
+              <div style={styles.smallSpinner}></div>
+              <span>Loading teachers...</span>
+            </div>
+          ) : (
+            <div style={styles.teachersList}>
+              {teachers.length > 0 ? (
+                teachers.map(teacher => (
+                  <div key={teacher.teacher_id} style={styles.teacherItem}>
+                    <div style={styles.teacherInfo}>
+                      <span style={styles.teacherName}>{teacher.teacher_name}</span>
+                      <span style={styles.teacherCode}>({teacher.teacher_code})</span>
+                    </div>
+                    
+                    <div style={styles.teacherStatus}>
+                      <span style={
+                        teacher.is_available ? styles.statusAvailable : styles.statusUnavailable
+                      }>
+                        {teacher.is_available ? 'Available' : 'Unavailable'}
+                      </span>
+                    </div>
+                    
+                    {teacher.subject_specializations && teacher.subject_specializations.length > 0 && (
+                      <div style={styles.teacherSubjects}>
+                        <span style={styles.subjectsLabel}>Subjects: </span>
+                        {teacher.subject_specializations.join(', ')}
+                      </div>
+                    )}
+                    
+                    {teacher.current_assignment && (
+                      <div style={styles.currentAssignment}>
+                        Currently: {teacher.current_assignment}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div style={styles.noTeachersMessage}>
+                  No teachers data available for this slot
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  </td>
+);
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 /* ================= EMPTY STATE ================= */
 const EmptyState: React.FC<{ message: string }> = ({ message }) => (
@@ -986,11 +1392,12 @@ const StandardTimetableGrid: React.FC<StandardTimetableGridProps> = ({
   toggleAvailableTeachers,
   loadingAvailableTeachers
 }) => {
-  const getTeacherName = (teacher: string | TeacherInfo | null): string | null => {
-    if (!teacher) return null;
-    if (typeof teacher === "string") return teacher;
-    return teacher.teacher_name || teacher.teacher_code || null;
-  };
+const getTeacherName = (teacher: string | TeacherInfo | null): string | null => {
+  if (!teacher) return null;
+  if (typeof teacher === "string") return teacher;
+  return teacher.teacher_code || teacher.teacher_name || null;
+};
+
 
   const getBatchDisplayName = (slot: SlotData): string | null => {
     if (slot.batch_name) return slot.batch_name;
@@ -1011,18 +1418,23 @@ const StandardTimetableGrid: React.FC<StandardTimetableGridProps> = ({
           <tr>
             <th style={styles.thTime}>Time</th>
             {dayKeys.map((dk) => (
-              <th key={dk} style={styles.thDay}>
-                <div style={styles.dayHeader}>
-                  <div style={{ ...styles.dayDot, backgroundColor: DAY_COLORS[dk] || "#64748b" }}></div>
-                  <div style={styles.dayHeaderContent}>
-                    <span style={styles.dayName}>{DAY_NAMES[dk] || `Day ${dk.replace("d", "")}`}</span>
-                    {slots[dk]?.[0]?.actual_date && (
-                      <span style={styles.dayDate}>{slots[dk][0].actual_date}</span>
-                    )}
-                  </div>
-                </div>
-              </th>
-            ))}
+  <th key={dk} style={styles.thDay}>
+    <div style={styles.dayHeader}>
+      <div style={{ 
+        ...styles.dayDot, 
+        backgroundColor: getWeekdayColor(parseInt(dk.replace("d", ""))) 
+      }}></div>
+      <div style={styles.dayHeaderContent}>
+        <span style={styles.dayName}>
+          {getWeekdayName(parseInt(dk.replace("d", "")))}
+        </span>
+        {slots[dk]?.[0]?.actual_date && (
+          <span style={styles.dayDate}>{slots[dk][0].actual_date}</span>
+        )}
+      </div>
+    </div>
+  </th>
+))}
           </tr>
         </thead>
         <tbody>
@@ -1056,11 +1468,8 @@ const StandardTimetableGrid: React.FC<StandardTimetableGridProps> = ({
                         ...styles.slotCard,
                         backgroundColor: sc.bg,
                         borderColor: sc.border,
-                        cursor: 'pointer',
-                        position: 'relative'
                       }}
-                      onClick={() => handleSlotClick(slot, dk)}
-                      title="Click to view available teachers"
+                      title="View in Available Teachers page"
                     >
                       <div style={styles.slotHeader}>
                         <span style={{ ...styles.slotSubject, color: sc.text }}>
@@ -1093,79 +1502,7 @@ const StandardTimetableGrid: React.FC<StandardTimetableGridProps> = ({
                           </div>
                         )}
                       </div>
-
-                      {/* Available teachers toggle indicator */}
-                      <div style={styles.availableTeachersIndicator}>
-                        {isLoading ? (
-                          <span style={styles.loadingIndicator}>⏳</span>
-                        ) : slot.show_available_teachers ? (
-                          <span style={styles.indicatorOpen}>▼</span>
-                        ) : (
-                          <span style={styles.indicatorClosed}>▶</span>
-                        )}
-                        <span style={styles.indicatorText}>
-                          {slot.available_teachers?.length || 0} available
-                        </span>
-                      </div>
                     </div>
-
-                    {/* Available teachers panel */}
-                    {slot.show_available_teachers && (
-                      <div style={styles.availableTeachersPanel}>
-                        <div style={styles.availableTeachersHeader}>
-                          <span style={styles.availableTeachersTitle}>
-                            👨‍🏫 Available Teachers ({time.start} - {time.end})
-                          </span>
-                        </div>
-                        
-                        {isLoading ? (
-                          <div style={styles.loadingTeachers}>
-                            <div style={styles.smallSpinner}></div>
-                            <span>Loading available teachers...</span>
-                          </div>
-                        ) : slot.available_teachers && slot.available_teachers.length > 0 ? (
-                          <div style={styles.teachersList}>
-                            {slot.available_teachers.map((teacher, idx) => (
-                              <div
-                                key={teacher.teacher_id}
-                                style={{
-                                  ...styles.teacherItem,
-                                  backgroundColor: teacher.is_available ? '#f0fdf4' : '#fef2f2',
-                                  borderLeft: `4px solid ${teacher.is_available ? '#22c55e' : '#ef4444'}`
-                                }}
-                              >
-                                <div style={styles.teacherInfo}>
-                                  <span style={styles.teacherName}>{teacher.teacher_name}</span>
-                                  <span style={styles.teacherCode}>({teacher.teacher_code})</span>
-                                </div>
-                                <div style={styles.teacherStatus}>
-                                  {teacher.is_available ? (
-                                    <span style={styles.statusAvailable}>✅ Available</span>
-                                  ) : (
-                                    <span style={styles.statusUnavailable}>❌ Unavailable</span>
-                                  )}
-                                </div>
-                                {teacher.subject_specializations && teacher.subject_specializations.length > 0 && (
-                                  <div style={styles.teacherSubjects}>
-                                    <span style={styles.subjectsLabel}>Subjects: </span>
-                                    {teacher.subject_specializations.join(", ")}
-                                  </div>
-                                )}
-                                {teacher.current_assignment && (
-                                  <div style={styles.currentAssignment}>
-                                    Currently: {teacher.current_assignment}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div style={styles.noTeachersMessage}>
-                            <span>No available teachers found for this time slot</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </td>
                 );
               })}
@@ -1735,27 +2072,28 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid #e2e8f0",
     verticalAlign: "top",
   },
-  slotCard: {
-    padding: "12px",
-    borderRadius: 8,
-    border: "2px solid",
-    minHeight: 80,
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    transition: "all 0.2s ease",
-  },
+slotCard: {
+  padding: "12px",
+  borderRadius: 8,
+  border: "2px solid",
+  minHeight: 60, // Reduced from 80px
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "space-between",
+  transition: "all 0.2s ease",
+},
   slotHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: 8,
   },
-  slotSubject: {
-    fontSize: 14,
-    fontWeight: 700,
-    flex: 1,
-  },
+slotSubject: {
+  fontSize: 14,
+  fontWeight: 700,
+  flex: 1,
+  textAlign: 'center', // Center align the slot code
+},
   slotCode: {
     fontSize: 10,
     fontWeight: 600,
@@ -1793,122 +2131,126 @@ const styles: Record<string, React.CSSProperties> = {
   slotIcon: {
     fontSize: 10,
   },
-  availableTeachersIndicator: {
-    display: "flex",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 6,
-    paddingTop: 6,
-    borderTop: "1px dashed rgba(0,0,0,0.1)",
-    fontSize: 10,
-    color: "#64748b",
-  },
-  loadingIndicator: {
-    fontSize: 10,
-  },
-  indicatorOpen: {
-    fontSize: 8,
-    fontWeight: 'bold',
-  },
-  indicatorClosed: {
-    fontSize: 8,
-    fontWeight: 'bold',
-  },
-  indicatorText: {
-    fontSize: 9,
-    fontWeight: 600,
-  },
-  availableTeachersPanel: {
-    marginTop: 8,
-    background: "#f8fafc",
-    borderRadius: 6,
-    border: "1px solid #e2e8f0",
-    overflow: "hidden",
-    animation: "slideDown 0.3s ease-out",
-  },
-  availableTeachersHeader: {
-    padding: "10px 12px",
-    background: "#e2e8f0",
-    borderBottom: "1px solid #cbd5e1",
-  },
-  availableTeachersTitle: {
-    fontSize: 12,
-    fontWeight: 600,
-    color: "#475569",
-  },
-  loadingTeachers: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "16px",
-    color: "#64748b",
-    fontSize: 12,
-  },
-  teachersList: {
-    maxHeight: 200,
-    overflowY: "auto",
-  },
-  teacherItem: {
-    padding: "10px 12px",
-    borderBottom: "1px solid #e2e8f0",
-    transition: "background-color 0.2s",
-  },
-  teacherInfo: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 4,
-  },
-  teacherName: {
-    fontSize: 12,
-    fontWeight: 600,
-    color: "#1e293b",
-  },
-  teacherCode: {
-    fontSize: 11,
-    color: "#64748b",
-  },
-  teacherStatus: {
-    marginBottom: 4,
-  },
-  statusAvailable: {
-    fontSize: 10,
-    color: "#166534",
-    fontWeight: 600,
-    padding: "2px 6px",
-    background: "#dcfce7",
-    borderRadius: 4,
-    display: "inline-block",
-  },
-  statusUnavailable: {
-    fontSize: 10,
-    color: "#991b1b",
-    fontWeight: 600,
-    padding: "2px 6px",
-    background: "#fee2e2",
-    borderRadius: 4,
-    display: "inline-block",
-  },
-  teacherSubjects: {
-    fontSize: 10,
-    color: "#475569",
-    marginTop: 2,
-  },
-  subjectsLabel: {
-    fontWeight: 600,
-  },
-  currentAssignment: {
-    fontSize: 9,
-    color: "#64748b",
-    fontStyle: "italic",
-    marginTop: 2,
-  },
-  noTeachersMessage: {
-    padding: "16px",
-    textAlign: "center",
-    color: "#64748b",
-    fontSize: 12,
-  },
+// Add these styles to your existing styles object:
+availableTeachersIndicator: {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginTop: 6,
+  paddingTop: 6,
+  borderTop: "1px dashed rgba(0,0,0,0.1)",
+  fontSize: 10,
+  color: "#64748b",
+},
+loadingIndicator: {
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+},
+indicatorText: {
+  fontSize: 9,
+  fontWeight: 600,
+},
+
+indicatorOpen: {
+  fontSize: 8,
+  fontWeight: 'bold',
+},
+indicatorClosed: {
+  fontSize: 8,
+  fontWeight: 'bold',
+},
+availableTeachersPanel: {
+  marginTop: 8,
+  background: "#f8fafc",
+  borderRadius: 6,
+  border: "1px solid #e2e8f0",
+  overflow: "hidden",
+  animation: "slideDown 0.3s ease-out",
+},
+availableTeachersHeader: {
+  padding: "10px 12px",
+  background: "#e2e8f0",
+  borderBottom: "1px solid #cbd5e1",
+},
+availableTeachersTitle: {
+  fontSize: 12,
+  fontWeight: 600,
+  color: "#475569",
+},
+loadingTeachers: {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "16px",
+  color: "#64748b",
+  fontSize: 12,
+},
+teachersList: {
+  maxHeight: 300,
+  overflowY: "auto",
+},
+teacherItem: {
+  padding: "12px",
+  borderBottom: "1px solid #e2e8f0",
+  transition: "background-color 0.2s",
+},
+teacherInfo: {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  marginBottom: 4,
+},
+teacherName: {
+  fontSize: 12,
+  fontWeight: 600,
+  color: "#1e293b",
+},
+teacherCode: {
+  fontSize: 11,
+  color: "#64748b",
+},
+teacherStatus: {
+  marginBottom: 4,
+},
+statusAvailable: {
+  fontSize: 10,
+  color: "#166534",
+  fontWeight: 600,
+  padding: "2px 6px",
+  background: "#dcfce7",
+  borderRadius: 4,
+  display: "inline-block",
+},
+statusUnavailable: {
+  fontSize: 10,
+  color: "#991b1b",
+  fontWeight: 600,
+  padding: "2px 6px",
+  background: "#fee2e2",
+  borderRadius: 4,
+  display: "inline-block",
+},
+teacherSubjects: {
+  fontSize: 10,
+  color: "#475569",
+  marginTop: 2,
+},
+subjectsLabel: {
+  fontWeight: 600,
+},
+currentAssignment: {
+  fontSize: 9,
+  color: "#64748b",
+  fontStyle: "italic",
+  marginTop: 2,
+},
+noTeachersMessage: {
+  padding: "16px",
+  textAlign: "center",
+  color: "#64748b",
+  fontSize: 12,
+},
   noSlotsMessage: {
     display: "flex",
     flexDirection: "column",
@@ -1926,6 +2268,90 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#3b82f6",
     fontWeight: 500,
     marginTop: 4,
+  },
+  // Available Teachers View Styles
+  availableTeachersView: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 24,
+  },
+  availabilityFilterRow: {
+    display: "flex",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  teachersGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))",
+    gap: 20,
+  },
+  teacherCard: {
+    padding: "20px",
+    background: "#fff",
+    borderRadius: 12,
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+    transition: "all 0.2s",
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+  },
+  teacherCardHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  teacherCardName: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: "#0f172a",
+    margin: 0,
+  },
+  teacherCardCode: {
+    fontSize: 12,
+    color: "#64748b",
+    margin: "4px 0 0",
+  },
+  availabilityBadge: {
+    padding: "8px 12px",
+    borderRadius: 8,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    whiteSpace: "nowrap" as const,
+  },
+  teacherCardSection: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  teacherCardSectionTitle: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#475569",
+    margin: 0,
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.5px",
+  },
+  subjectsTagsContainer: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  subjectTag: {
+    padding: "4px 10px",
+    borderRadius: 20,
+    fontSize: 11,
+    fontWeight: 600,
+    border: "1px solid",
+    display: "inline-block",
+  },
+  currentAssignmentText: {
+    fontSize: 12,
+    color: "#475569",
+    margin: 0,
+    fontStyle: "italic",
   },
   // Add these styles to your existing styles object
 selectedFilterTab: {
@@ -1958,6 +2384,123 @@ selectedTabRemove: {
   opacity: 0.8,
   transition: 'opacity 0.2s',
 },
+// Slot Teachers View Styles
+slotTeachersContainer: {
+  display: "flex",
+  flexDirection: "column",
+  gap: 24,
+},
+slotTeachersCard: {
+  background: "#fff",
+  borderRadius: 12,
+  overflow: "hidden",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+  border: "1px solid #e2e8f0",
+},
+slotTeachersHeader: {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  padding: "20px",
+  borderLeft: "5px solid",
+  gap: 16,
+},
+slotTeachersInfo: {
+  flex: 1,
+},
+slotTeachersTitle: {
+  fontSize: 18,
+  fontWeight: 700,
+  margin: 0,
+},
+slotTeachersTime: {
+  fontSize: 14,
+  fontWeight: 600,
+  color: "#64748b",
+  margin: "4px 0 2px",
+},
+slotTeachersCode: {
+  fontSize: 12,
+  color: "#94a3b8",
+  margin: 0,
+},
+slotTeachersBadges: {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
+},
+slotTeachersBadge: {
+  padding: "6px 12px",
+  background: "rgba(255,255,255,0.7)",
+  borderRadius: 6,
+  fontSize: 12,
+  fontWeight: 600,
+  color: "#475569",
+  whiteSpace: "nowrap" as const,
+},
+slotTeachersList: {
+  display: "flex",
+  flexDirection: "column",
+  gap: 0,
+  borderTop: "1px solid #e2e8f0",
+},
+slotTeacherItem: {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  padding: "16px 20px",
+  borderLeft: "4px solid",
+  borderBottom: "1px solid #f1f5f9",
+  gap: 12,
+  transition: "background-color 0.2s",
+},
+teacherDetailsLeft: {
+  flex: 1,
+},
+teacherDetailsRight: {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+},
+slotTeacherName: {
+  fontSize: 14,
+  fontWeight: 700,
+  color: "#1e293b",
+  margin: 0,
+},
+slotTeacherCode: {
+  fontSize: 12,
+  color: "#64748b",
+  margin: "4px 0 0",
+},
+slotTeacherSubjects: {
+  display: "flex",
+  gap: 6,
+  marginTop: 8,
+  flexWrap: "wrap",
+},
+smallSubjectTag: {
+  padding: "3px 8px",
+  borderRadius: 4,
+  fontSize: 10,
+  fontWeight: 600,
+  border: "1px solid",
+  display: "inline-block",
+},
+slotTeacherStatus: {
+  padding: "6px 10px",
+  borderRadius: 6,
+  fontSize: 11,
+  fontWeight: 600,
+  whiteSpace: "nowrap" as const,
+},
+noTeachersForSlot: {
+  padding: "24px",
+  textAlign: "center",
+  color: "#94a3b8",
+  fontSize: 14,
+},
 
 };
 
@@ -1970,6 +2513,7 @@ styleSheet.insertRule(
   }`,
   styleSheet.cssRules.length
 );
+
 
 styleSheet.insertRule(
   `@keyframes slideDown {
@@ -1984,6 +2528,7 @@ styleSheet.insertRule(
       max-height: 300px;
     }
   }`,
+  
   styleSheet.cssRules.length
 );
 
