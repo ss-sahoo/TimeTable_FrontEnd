@@ -106,6 +106,16 @@ const DAY_NAMES: { [key: string]: string } = {
   "d7": "Sunday",
 };
 
+const DAY_SHORT_NAMES: { [key: string]: string } = {
+  "d1": "Mon",
+  "d2": "Tue",
+  "d3": "Wed",
+  "d4": "Thu",
+  "d5": "Fri",
+  "d6": "Sat",
+  "d7": "Sun",
+};
+
 const BATCH_COLORS = [
   { bg: "#eff6ff", border: "#3b82f6", text: "#1e40af" },
   { bg: "#f0fdf4", border: "#22c55e", text: "#166534" },
@@ -124,9 +134,13 @@ const TEACHER_COLORS = [
 // Function to get weekday name for any day index
 const getWeekdayName = (dayIndex: number): string => {
   const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-  
-  // Day 1 = Monday (index 0), Day 2 = Tuesday (index 1), etc.
-  // Using modulo 7 to wrap around the week
+  const adjustedIndex = (dayIndex - 1) % 7;
+  return weekdays[adjustedIndex];
+};
+
+// Function to get weekday short name
+const getWeekdayShortName = (dayIndex: number): string => {
+  const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const adjustedIndex = (dayIndex - 1) % 7;
   return weekdays[adjustedIndex];
 };
@@ -142,8 +156,6 @@ const getWeekdayColor = (dayIndex: number): string => {
     "#ec4899",  // Saturday - Pink
     "#06b6d4"   // Sunday - Cyan
   ];
-  
-  // Day 1 = Monday (index 0), Day 2 = Tuesday (index 1), etc.
   const colorIndex = (dayIndex - 1) % 7;
   return defaultColors[colorIndex];
 };
@@ -169,7 +181,6 @@ const DropdownSelector: React.FC<DropdownSelectorProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -185,11 +196,8 @@ const DropdownSelector: React.FC<DropdownSelectorProps> = ({
     onSelectItem(id);
   };
 
-  const selectedItems = items.filter(item => selectedIds.includes(item.id));
-
   return (
     <div style={{ position: "relative", display: "inline-block" }} ref={dropdownRef}>
-      {/* Dropdown Trigger Button */}
       <button
         style={{
           ...styles.dropdownTrigger,
@@ -206,10 +214,8 @@ const DropdownSelector: React.FC<DropdownSelectorProps> = ({
         </span>
       </button>
 
-      {/* Dropdown Menu */}
       {isOpen && (
         <div style={styles.selectorDropdown}>
-          {/* Header */}
           <div style={styles.selectorHeader}>
             <span style={styles.selectorTitle}>Select {title}</span>
             <button
@@ -223,14 +229,12 @@ const DropdownSelector: React.FC<DropdownSelectorProps> = ({
             </button>
           </div>
 
-          {/* Search/Info */}
           <div style={styles.selectorInfo}>
             <span style={styles.selectorCount}>
               {selectedIds.length} of {items.length} selected
             </span>
           </div>
 
-          {/* Items List */}
           <div style={styles.selectorItems}>
             {items.map(item => (
               <div
@@ -261,7 +265,6 @@ const DropdownSelector: React.FC<DropdownSelectorProps> = ({
             ))}
           </div>
 
-          {/* Footer */}
           <div style={styles.selectorFooter}>
             <button
               style={styles.selectorDoneBtn}
@@ -272,6 +275,258 @@ const DropdownSelector: React.FC<DropdownSelectorProps> = ({
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+/* ================= MATRIX TIMETABLE COMPONENT ================= */  
+
+
+interface MatrixTimetableProps {
+  rows: BatchData[] | TeacherData[];
+  rowType: "batch" | "teacher";
+  getSubjectColor: (s: string | null) => { bg: string; text: string; border: string };
+  toggleAvailableTeachers: (slotId: string, dayKey: string, timeSlot: string, entityId: string, entityType: 'batch' | 'teacher') => void;
+  loadingAvailableTeachers: {[key: string]: boolean};
+}
+
+const MatrixTimetable: React.FC<MatrixTimetableProps> = ({
+  rows,
+  rowType,
+  getSubjectColor,
+  toggleAvailableTeachers,
+  loadingAvailableTeachers
+}) => {
+  // Get all days present in the data
+  const allDays = React.useMemo(() => {
+    const daysSet = new Set<string>();
+    rows.forEach(row => {
+      Object.keys(row.slots || {}).forEach(dayKey => {
+        daysSet.add(dayKey);
+      });
+    });
+    
+    // Sort days by day index
+    return Array.from(daysSet).sort((a, b) => {
+      const dayA = parseInt(a.replace('d', ''));
+      const dayB = parseInt(b.replace('d', ''));
+      return dayA - dayB;
+    });
+  }, [rows]);
+
+  // Get ALL unique time slots across ALL days and rows
+  const allTimeSlots = React.useMemo(() => {
+    const timeSet = new Set<string>();
+    
+    rows.forEach(row => {
+      Object.keys(row.slots || {}).forEach(dayKey => {
+        const daySlots = row.slots[dayKey] || [];
+        daySlots.forEach(slot => {
+          const timeKey = `${slot.start_time}-${slot.end_time}`;
+          timeSet.add(timeKey);
+        });
+      });
+    });
+    
+    // Convert to array and sort by time
+    return Array.from(timeSet)
+      .map(time => {
+        const [start, end] = time.split('-');
+        return { start, end, key: time };
+      })
+      .sort((a, b) => a.start.localeCompare(b.start));
+  }, [rows]);
+
+  // Get color for row based on index
+  const getRowColor = (index: number) => {
+    if (rowType === "batch") {
+      return BATCH_COLORS[index % BATCH_COLORS.length];
+    } else {
+      return TEACHER_COLORS[index % TEACHER_COLORS.length];
+    }
+  };
+
+  // Function to find slot for specific row, day, and time
+  const findSlot = (row: BatchData | TeacherData, dayKey: string, timeSlot: {start: string, end: string}) => {
+    const daySlots = row.slots[dayKey] || [];
+    return daySlots.find(s => 
+      s.start_time === timeSlot.start && s.end_time === timeSlot.end
+    );
+  };
+
+  const handleSlotClick = (
+    slot: SlotData, 
+    rowId: string, 
+    dayKey: string
+  ) => {
+    if (slot && slot.slot_id) {
+      toggleAvailableTeachers(
+        slot.slot_id,
+        dayKey,
+        `${slot.start_time}-${slot.end_time}`,
+        rowId,
+        rowType
+      );
+    }
+  };
+
+  // Function to get time display for slot
+  const getTimeDisplay = (slot: SlotData) => {
+    const start = slot.start_time.substring(0, 5); // Get HH:MM format
+    const end = slot.end_time.substring(0, 5);
+    return `${start}-${end}`;
+  };
+const getDateForDay = (dayKey: string): string | null => {
+  for (const row of rows) {
+    const slots = row.slots[dayKey];
+    if (slots && slots.length > 0) {
+      return slots[0].actual_date;
+    }
+  }
+  return null;
+};
+
+  return (
+    <div style={styles.matrixWrapper}>
+      <div style={styles.matrixContainer}>
+        {/* Header Row - Days */}
+        <div style={styles.matrixHeader}>
+          <div style={styles.matrixCornerCell}>
+            {rowType === "batch" ? "Batch" : "Teacher"}
+          </div>
+          {allDays.map(dayKey => (
+            <div 
+              key={dayKey} 
+              style={{
+                ...styles.matrixDayHeader,
+                backgroundColor: getWeekdayColor(parseInt(dayKey.replace('d', '')))
+              }}
+            >
+              <div style={styles.dayHeaderContent}>
+  <div style={styles.dayName}>
+    {DAY_SHORT_NAMES[dayKey] || getWeekdayShortName(parseInt(dayKey.replace('d', '')))}
+  </div>
+
+  {getDateForDay(dayKey) && (
+    <div style={styles.dayDate}>
+      {new Date(getDateForDay(dayKey)!).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+      })}
+    </div>
+  )}
+</div>
+
+            </div>
+          ))}
+        </div>
+
+        {/* Rows (Batches or Teachers) */}
+        {rows.map((row, rowIndex) => {
+          const rowColor = getRowColor(rowIndex);
+          
+          return (
+            <div key={row[rowType === "batch" ? "batch_id" : "teacher_id"]} style={styles.matrixRow}>
+              {/* Left Column - Row Name */}
+              <div 
+                style={{
+                  ...styles.matrixRowLabel,
+                  backgroundColor: rowColor.bg,
+                  borderLeftColor: rowColor.border,
+                  color: rowColor.text
+                }}
+              >
+                <div style={styles.rowLabelContent}>
+                  <div style={styles.rowName}>
+                    {rowType === "batch" 
+                      ? (row as BatchData).batch_name 
+                      : (row as TeacherData).teacher_name}
+                  </div>
+                  <div style={styles.rowCode}>
+                    {rowType === "batch" 
+                      ? (row as BatchData).batch_code 
+                      : (row as TeacherData).teacher_code}
+                  </div>
+                </div>
+              </div>
+
+              {/* Day Cells with Slots */}
+              {allDays.map(dayKey => (
+                <div 
+                  key={`${row[rowType === "batch" ? "batch_id" : "teacher_id"]}-${dayKey}`} 
+                  style={{
+                    ...styles.matrixDayCell,
+                    display: 'grid',
+gridTemplateRows: `repeat(${allTimeSlots.length}, 1fr)`,
+                    gap: '6px',
+                  }}
+                >
+                  {allTimeSlots.map((timeSlot, timeIdx) => {
+                    const slot = findSlot(row, dayKey, timeSlot);
+                    
+                    if (!slot) {
+                      return (
+                        <div 
+                          key={`${dayKey}-${timeIdx}`} 
+                          style={styles.emptySlot}
+                          title="No class"
+                        />
+                      );
+                    }
+
+                    const subjectColor = getSubjectColor(slot.subject);
+                    const isLoading = loadingAvailableTeachers[slot.slot_id];
+                    
+                    return (
+                      <div
+                        key={`${dayKey}-${timeIdx}`}
+                        style={{
+                          ...styles.slotBox,
+                          backgroundColor: subjectColor.bg,
+                          borderColor: subjectColor.border,
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => handleSlotClick(slot, 
+                          row[rowType === "batch" ? "batch_id" : "teacher_id"], 
+                          dayKey
+                        )}
+                        title={`${slot.subject || 'Free'} \n${getTimeDisplay(slot)} \n${slot.room_number ? `Room: ${slot.room_number}` : ''}`}
+                      >
+                        <div style={styles.slotContent}>
+                          <div style={{...styles.slotSubject, color: subjectColor.text}}>
+                            {slot.subject || 'Free'}
+                          </div>
+                          <div style={styles.slotTime}>
+                            {getTimeDisplay(slot)}
+                          </div>
+                          {rowType === "teacher" && slot.batch_name && (
+                            <div style={styles.slotBatchMini}>
+                              {slot.batch_name}
+                            </div>
+                          )}
+                          {rowType === "batch" && slot.teacher && (
+                            <div style={styles.slotTeacherMini}>
+                              {typeof slot.teacher === 'string' 
+                                ? slot.teacher 
+                                : slot.teacher.teacher_name || slot.teacher.teacher_code || 'TCH'}
+                            </div>
+                          )}
+                        </div>
+                        
+                        {isLoading && (
+                          <div style={styles.slotLoading}>
+                            <div style={styles.miniSpinner}></div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -291,23 +546,22 @@ const GeneratedTimetable: React.FC = () => {
   // Batch view state
   const [batches, setBatches] = useState<BatchData[]>([]);
   const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
-  const [activeBatchTab, setActiveBatchTab] = useState<string | null>(null); // NEW
+  const [activeBatchTab, setActiveBatchTab] = useState<string | null>(null);
   
   // Teacher view state
   const [teachers, setTeachers] = useState<TeacherData[]>([]);
   const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([]);
-  const [activeTeacherTab, setActiveTeacherTab] = useState<string | null>(null); // NEW
+  const [activeTeacherTab, setActiveTeacherTab] = useState<string | null>(null);
 
   // Available teachers state
   const [loadingAvailableTeachers, setLoadingAvailableTeachers] = useState<{[key: string]: boolean}>({});
-  const [allAvailableTeachers, setAllAvailableTeachers] = useState<AvailableTeacher[]>([]);
-const [slotsWithTeachers, setSlotsWithTeachers] = useState<{
-  [slotId: string]: {
-    slot: SlotData;
-    teachers: AvailableTeacher[];
-    hasLoaded: boolean;
-  }
-}>({});
+  const [slotsWithTeachers, setSlotsWithTeachers] = useState<{
+    [slotId: string]: {
+      slot: SlotData;
+      teachers: AvailableTeacher[];
+      hasLoaded: boolean;
+    }
+  }>({});
   const [loadingAllTeachers, setLoadingAllTeachers] = useState(false);
 
   useEffect(() => {
@@ -402,52 +656,48 @@ const [slotsWithTeachers, setSlotsWithTeachers] = useState<{
   }, [timetableId]);
 
   // Load all available teachers for the available teachers view
-const loadAllAvailableTeachers = useCallback(async () => {
-  if (!timetableId) return;
-  
-  setLoadingAllTeachers(true);
-  
-  try {
-    // First load batches to get all slots
-    const batchResponse = await Fetch(
-      `/api/timetable/timetables/${timetableId}/batches/`,
-      { method: "GET" }
-    );
+  const loadAllAvailableTeachers = useCallback(async () => {
+    if (!timetableId) return;
     
-    if (!batchResponse.ok) {
-      console.warn(`Failed to load batches: ${batchResponse.status}`);
-      return;
-    }
+    setLoadingAllTeachers(true);
     
-    const batchData: TimetableResponse = await batchResponse.json();
-    const allBatches = batchData.batches || [];
-    
-    // Collect all unique slots (DON'T fetch available teachers here!)
-    const slotsMap: { [slotId: string]: { slot: SlotData; teachers: AvailableTeacher[] } } = {};
-    
-    for (const batch of allBatches) {
-      for (const dayKey in batch.slots) {
-        for (const slot of batch.slots[dayKey]) {
-          if (!slotsMap[slot.slot_id]) {
-            // DON'T fetch available teachers here - only store slot data
-            slotsMap[slot.slot_id] = {
-  slot,
-  teachers: [],
-  hasLoaded: false,
-};
-
+    try {
+      const batchResponse = await Fetch(
+        `/api/timetable/timetables/${timetableId}/batches/`,
+        { method: "GET" }
+      );
+      
+      if (!batchResponse.ok) {
+        console.warn(`Failed to load batches: ${batchResponse.status}`);
+        return;
+      }
+      
+      const batchData: TimetableResponse = await batchResponse.json();
+      const allBatches = batchData.batches || [];
+      
+      const slotsMap: { [slotId: string]: { slot: SlotData; teachers: AvailableTeacher[]; hasLoaded: boolean; } } = {};
+      
+      for (const batch of allBatches) {
+        for (const dayKey in batch.slots) {
+          for (const slot of batch.slots[dayKey]) {
+            if (!slotsMap[slot.slot_id]) {
+              slotsMap[slot.slot_id] = {
+                slot,
+                teachers: [],
+                hasLoaded: false,
+              };
+            }
           }
         }
       }
+      
+      setSlotsWithTeachers(slotsMap);
+    } catch (err: any) {
+      console.warn(`Error loading slots:`, err.message);
+    } finally {
+      setLoadingAllTeachers(false);
     }
-    
-    setSlotsWithTeachers(slotsMap);
-  } catch (err: any) {
-    console.warn(`Error loading slots:`, err.message);
-  } finally {
-    setLoadingAllTeachers(false);
-  }
-}, [timetableId]);
+  }, [timetableId]);
 
   // Load data based on view mode
   useEffect(() => {
@@ -463,100 +713,135 @@ const loadAllAvailableTeachers = useCallback(async () => {
   }, [timetableId, viewMode, loadBatchesData, loadTeachersData, loadAllAvailableTeachers]);
 
   // Toggle available teachers for a slot
-const toggleAvailableTeachers = useCallback(async (slotId: string, dayKey: string, timeSlot: string, entityId: string, entityType: 'batch' | 'teacher') => {
-  // Special handling for available teachers view
-  if (entityId === 'available_teachers_view') {
-  // Prevent double-click spam
-  if (loadingAvailableTeachers[slotId]) return;
+  const toggleAvailableTeachers = useCallback(async (slotId: string, dayKey: string, timeSlot: string, entityId: string, entityType: 'batch' | 'teacher') => {
+    if (entityId === 'available_teachers_view') {
+      if (loadingAvailableTeachers[slotId]) return;
 
-  setSlotsWithTeachers(prev => {
-    const current = prev[slotId];
-    if (!current) return prev;
+      setSlotsWithTeachers(prev => {
+        const current = prev[slotId];
+        if (!current) return prev;
 
-    return {
-      ...prev,
-      [slotId]: {
-        ...current,
-        slot: {
-          ...current.slot,
-          show_available_teachers: !current.slot.show_available_teachers,
-        },
-      },
-    };
-  });
+        return {
+          ...prev,
+          [slotId]: {
+            ...current,
+            slot: {
+              ...current.slot,
+              show_available_teachers: !current.slot.show_available_teachers,
+            },
+          },
+        };
+      });
 
-  // ⛔ STOP if already loaded (CACHE HIT)
-  if (slotsWithTeachers[slotId]?.hasLoaded) return;
+      if (slotsWithTeachers[slotId]?.hasLoaded) return;
 
-  // 🔥 FETCH ONLY ONCE
-  const teachers = await loadAvailableTeachers(slotId);
+      const teachers = await loadAvailableTeachers(slotId);
 
-  if (teachers) {
-    setSlotsWithTeachers(prev => ({
-      ...prev,
-      [slotId]: {
-        ...prev[slotId],
-        teachers,
-        hasLoaded: true,
-      },
-    }));
-  }
+      if (teachers) {
+        setSlotsWithTeachers(prev => ({
+          ...prev,
+          [slotId]: {
+            ...prev[slotId],
+            teachers,
+            hasLoaded: true,
+          },
+        }));
+      }
 
-  return;
-}
-
-    else {
-      setTeachers(prev => prev.map(teacher => {
-        if (teacher.teacher_id === entityId) {
-          const updatedSlots = { ...teacher.slots };
-          if (updatedSlots[dayKey]) {
-            updatedSlots[dayKey] = updatedSlots[dayKey].map(slot => {
-              if (slot.slot_id === slotId) {
-                const shouldShow = !slot.show_available_teachers;
-                
-                // If we need to show and haven't loaded yet, load the data
-                if (shouldShow && !slot.available_teachers) {
-                  loadAvailableTeachers(slotId).then(teachers => {
-                    if (teachers) {
-                      setTeachers(prevTeachers => prevTeachers.map(t => {
-                        if (t.teacher_id === entityId) {
-                          const updated = { ...t };
-                          if (updated.slots[dayKey]) {
-                            updated.slots[dayKey] = updated.slots[dayKey].map(s => {
-                              if (s.slot_id === slotId) {
-                                return { ...s, available_teachers: teachers, show_available_teachers: true };
-                              }
-                              return s;
-                            });
+      return;
+    } else {
+      if (entityType === 'teacher') {
+        setTeachers(prev => prev.map(teacher => {
+          if (teacher.teacher_id === entityId) {
+            const updatedSlots = { ...teacher.slots };
+            if (updatedSlots[dayKey]) {
+              updatedSlots[dayKey] = updatedSlots[dayKey].map(slot => {
+                if (slot.slot_id === slotId) {
+                  const shouldShow = !slot.show_available_teachers;
+                  
+                  if (shouldShow && !slot.available_teachers) {
+                    loadAvailableTeachers(slotId).then(teachers => {
+                      if (teachers) {
+                        setTeachers(prevTeachers => prevTeachers.map(t => {
+                          if (t.teacher_id === entityId) {
+                            const updated = { ...t };
+                            if (updated.slots[dayKey]) {
+                              updated.slots[dayKey] = updated.slots[dayKey].map(s => {
+                                if (s.slot_id === slotId) {
+                                  return { ...s, available_teachers: teachers, show_available_teachers: true };
+                                }
+                                return s;
+                              });
+                            }
+                            return updated;
                           }
-                          return updated;
-                        }
-                        return t;
-                      }));
-                    }
-                  });
+                          return t;
+                        }));
+                      }
+                    });
+                  }
+                  
+                  return {
+                    ...slot,
+                    show_available_teachers: shouldShow
+                  };
                 }
-                
-                return {
-                  ...slot,
-                  show_available_teachers: shouldShow
-                };
-              }
-              return slot;
-            });
+                return slot;
+              });
+            }
+            return { ...teacher, slots: updatedSlots };
           }
-          return { ...teacher, slots: updatedSlots };
-        }
-        return teacher;
-      }));
+          return teacher;
+        }));
+      } else if (entityType === 'batch') {
+        setBatches(prev => prev.map(batch => {
+          if (batch.batch_id === entityId) {
+            const updatedSlots = { ...batch.slots };
+            if (updatedSlots[dayKey]) {
+              updatedSlots[dayKey] = updatedSlots[dayKey].map(slot => {
+                if (slot.slot_id === slotId) {
+                  const shouldShow = !slot.show_available_teachers;
+                  
+                  if (shouldShow && !slot.available_teachers) {
+                    loadAvailableTeachers(slotId).then(teachers => {
+                      if (teachers) {
+                        setBatches(prevBatches => prevBatches.map(b => {
+                          if (b.batch_id === entityId) {
+                            const updated = { ...b };
+                            if (updated.slots[dayKey]) {
+                              updated.slots[dayKey] = updated.slots[dayKey].map(s => {
+                                if (s.slot_id === slotId) {
+                                  return { ...s, available_teachers: teachers, show_available_teachers: true };
+                                }
+                                return s;
+                              });
+                            }
+                            return updated;
+                          }
+                          return b;
+                        }));
+                      }
+                    });
+                  }
+                  
+                  return {
+                    ...slot,
+                    show_available_teachers: shouldShow
+                  };
+                }
+                return slot;
+              });
+            }
+            return { ...batch, slots: updatedSlots };
+          }
+          return batch;
+        }));
+      }
     }
-  }, [loadAvailableTeachers]);
+  }, [loadAvailableTeachers, loadingAvailableTeachers, slotsWithTeachers]);
 
   const getSubjectColor = (subject: string | null) =>
     subject ? SUBJECT_COLORS[subject] || SUBJECT_COLORS.default : SUBJECT_COLORS.default;
-
-  const getBatchColor = (idx: number) => BATCH_COLORS[idx % BATCH_COLORS.length];
-  const getTeacherColor = (idx: number) => TEACHER_COLORS[idx % TEACHER_COLORS.length];
 
   // Toggle batch selection
   const toggleBatchSelection = (batchId: string) => {
@@ -586,10 +871,26 @@ const toggleAvailableTeachers = useCallback(async (slotId: string, dayKey: strin
     setSelectedTeacherIds([]);
   };
 
-  // Always display all batches and teachers, regardless of selection
-  // The selection is only for creating filter tabs, not for filtering display
-  const filteredBatches = batches;
-  const filteredTeachers = teachers;
+  // Filter rows based on selection
+  const getFilteredRows = () => {
+    if (viewMode === "batch") {
+      if (activeBatchTab) {
+        return batches.filter(b => b.batch_id === activeBatchTab);
+      }
+      if (selectedBatchIds.length > 0) {
+        return batches.filter(b => selectedBatchIds.includes(b.batch_id));
+      }
+      return batches;
+    } else {
+      if (activeTeacherTab) {
+        return teachers.filter(t => t.teacher_id === activeTeacherTab);
+      }
+      if (selectedTeacherIds.length > 0) {
+        return teachers.filter(t => selectedTeacherIds.includes(t.teacher_id));
+      }
+      return teachers;
+    }
+  };
 
   if (loading) {
     return (
@@ -617,10 +918,11 @@ const toggleAvailableTeachers = useCallback(async (slotId: string, dayKey: strin
     );
   }
 
+  const filteredRows = getFilteredRows();
+
   return (
     <div style={styles.wrapper}>
       {/* Header */}
-      
       <div style={styles.header}>
         <div>
           <h2 style={styles.title}>📅 Generated Timetable</h2>
@@ -657,19 +959,19 @@ const toggleAvailableTeachers = useCallback(async (slotId: string, dayKey: strin
             </div>
           )}
           {viewMode === "available_teachers" && (
-  <div style={styles.headerStatsInline}>
-    <button style={styles.headerStatBtn} onClick={() => setViewMode("available_teachers")}>
-      <div style={styles.headerStatNum}>{Object.keys(slotsWithTeachers).length}</div>
-      <div style={styles.headerStatLabel}>Total Slots</div>
-    </button>
-    <button style={styles.headerStatBtn} onClick={() => setViewMode("available_teachers")}>
-      <div style={styles.headerStatNum}>
-        Click to load
-      </div>
-      <div style={styles.headerStatLabel}>Available Teachers</div>
-    </button>
-  </div>
-)}
+            <div style={styles.headerStatsInline}>
+              <button style={styles.headerStatBtn} onClick={() => setViewMode("available_teachers")}>
+                <div style={styles.headerStatNum}>{Object.keys(slotsWithTeachers).length}</div>
+                <div style={styles.headerStatLabel}>Total Slots</div>
+              </button>
+              <button style={styles.headerStatBtn} onClick={() => setViewMode("available_teachers")}>
+                <div style={styles.headerStatNum}>
+                  Click to load
+                </div>
+                <div style={styles.headerStatLabel}>Available Teachers</div>
+              </button>
+            </div>
+          )}
           <button style={styles.exportBtn}>📥 Export PDF</button>
         </div>
       </div>
@@ -678,14 +980,14 @@ const toggleAvailableTeachers = useCallback(async (slotId: string, dayKey: strin
       <div style={styles.viewTabs}>
         <button
           style={viewMode === "batch" ? styles.viewTabActive : styles.viewTab}
-          onClick={() => { setViewMode("batch"); clearBatchFilters(); }}
+          onClick={() => { setViewMode("batch"); clearBatchFilters(); setActiveBatchTab(null); }}
         >
           <span style={styles.tabIcon}>📚</span>
           Batch-wise View
         </button>
         <button
           style={viewMode === "teacher" ? styles.viewTabActive : styles.viewTab}
-          onClick={() => { setViewMode("teacher"); clearTeacherFilters(); }}
+          onClick={() => { setViewMode("teacher"); clearTeacherFilters(); setActiveTeacherTab(null); }}
         >
           <span style={styles.tabIcon}>👨‍🏫</span>
           Teacher-wise View
@@ -701,250 +1003,195 @@ const toggleAvailableTeachers = useCallback(async (slotId: string, dayKey: strin
 
       {/* Stats Row */}
       <div style={styles.statsRow}>
+        {/* Stats can be added here if needed */}
       </div>
 
-{viewMode !== "available_teachers" && (
-<div style={styles.filterRow}>
-  <span style={styles.filterLabel}>View {viewMode === "batch" ? "Batches" : "Teachers"}:</span>
-  
-  {/* Always show "All" button */}
-  <button
-    style={ 
-      (viewMode === "batch" && !activeBatchTab) || 
-      (viewMode === "teacher" && !activeTeacherTab)
-        ? styles.filterActive 
-        : styles.filterBtn
-    }
-    onClick={() => {
-      if (viewMode === "batch") {
-        setActiveBatchTab(null);
-      } else {
-        setActiveTeacherTab(null);
-      }
-    }}
-  >
-    All {viewMode === "batch" ? "Batches" : "Teachers"}
-  </button>
-  
-  {/* Selected items as separate tabs */}
-  {viewMode === "batch" ? (
-    <>
-      {selectedBatchIds.map((batchId, idx) => {
-        const batch = batches.find(b => b.batch_id === batchId);
-        if (!batch) return null;
-        
-        return (
+      {viewMode !== "available_teachers" && (
+        <div style={styles.filterRow}>
+          <span style={styles.filterLabel}>View {viewMode === "batch" ? "Batches" : "Teachers"}:</span>
+          
+          {/* Always show "All" button */}
           <button
-            key={batch.batch_id}
-            style={{
-              ...(activeBatchTab === batch.batch_id 
+            style={ 
+              ((viewMode === "batch" && !activeBatchTab && selectedBatchIds.length === 0) || 
+              (viewMode === "teacher" && !activeTeacherTab && selectedTeacherIds.length === 0))
                 ? styles.filterActive 
                 : styles.filterBtn
-              ),
-              borderLeft: `3px solid ${getBatchColor(batches.indexOf(batch)).border}`,
+            }
+            onClick={() => {
+              if (viewMode === "batch") {
+                setActiveBatchTab(null);
+                setSelectedBatchIds([]);
+              } else {
+                setActiveTeacherTab(null);
+                setSelectedTeacherIds([]);
+              }
             }}
-            onClick={() => setActiveBatchTab(batch.batch_id)}
           >
-            {batch.batch_name}
+            All {viewMode === "batch" ? "Batches" : "Teachers"}
           </button>
-        );
-      })}
-    </>
-  ) : (
-    <>
-      {selectedTeacherIds.map((teacherId, idx) => {
-        const teacher = teachers.find(t => t.teacher_id === teacherId);
-        if (!teacher) return null;
-        
-        return (
-          <button
-            key={teacher.teacher_id}
-            style={{
-              ...(activeTeacherTab === teacher.teacher_id 
-                ? styles.filterActive 
-                : styles.filterBtn
-              ),
-              borderLeft: `3px solid ${getTeacherColor(teachers.indexOf(teacher)).border}`,
-            }}
-            onClick={() => setActiveTeacherTab(teacher.teacher_id)}
-          >
-            {teacher.teacher_name}
-          </button>
-        );
-      })}
-    </>
-  )}
-  
-  {/* Dropdown for selecting more items */}
-  <div style={{ display: 'inline-block' }}>
-    {viewMode === "batch" ? (
-      <DropdownSelector
-        title="Batches"
-        items={batches.map(b => ({
-          id: b.batch_id,
-          label: b.batch_name,
-          color: getBatchColor(batches.indexOf(b)).border
-        }))}
-        selectedIds={selectedBatchIds}
-        onSelectItem={(id) => {
-          toggleBatchSelection(id);
-          setActiveBatchTab(id); // Auto-select the newly added tab
-        }}
-        onClearAll={() => {
-          clearBatchFilters();
-          setActiveBatchTab(null);
-        }}
-        placeholder="Add batch..."
-      />
-    ) : (
-      <DropdownSelector
-        title="Teachers"
-        items={teachers.map(t => ({
-          id: t.teacher_id,
-          label: t.teacher_name,
-          color: getTeacherColor(teachers.indexOf(t)).border
-        }))}
-        selectedIds={selectedTeacherIds}
-        onSelectItem={(id) => {
-          toggleTeacherSelection(id);
-          setActiveTeacherTab(id); // Auto-select the newly added tab
-        }}
-        onClearAll={() => {
-          clearTeacherFilters();
-          setActiveTeacherTab(null);
-        }}
-        placeholder="Add teacher..."
-      />
-    )}
-  </div>
-</div>
-)}
+          
+          {/* Selected items as separate tabs */}
+          {viewMode === "batch" ? (
+            <>
+              {selectedBatchIds.map((batchId, idx) => {
+                const batch = batches.find(b => b.batch_id === batchId);
+                if (!batch) return null;
+                
+                return (
+                  <button
+                    key={batch.batch_id}
+                    style={{
+                      ...(activeBatchTab === batch.batch_id 
+                        ? styles.filterActive 
+                        : styles.filterBtn
+                      ),
+                      borderLeft: `3px solid ${BATCH_COLORS[idx % BATCH_COLORS.length].border}`,
+                    }}
+                    onClick={() => setActiveBatchTab(batch.batch_id)}
+                  >
+                    {batch.batch_name}
+                  </button>
+                );
+              })}
+            </>
+          ) : (
+            <>
+              {selectedTeacherIds.map((teacherId, idx) => {
+                const teacher = teachers.find(t => t.teacher_id === teacherId);
+                if (!teacher) return null;
+                
+                return (
+                  <button
+                    key={teacher.teacher_id}
+                    style={{
+                      ...(activeTeacherTab === teacher.teacher_id 
+                        ? styles.filterActive 
+                        : styles.filterBtn
+                      ),
+                      borderLeft: `3px solid ${TEACHER_COLORS[idx % TEACHER_COLORS.length].border}`,
+                    }}
+                    onClick={() => setActiveTeacherTab(teacher.teacher_id)}
+                  >
+                    {teacher.teacher_name}
+                  </button>
+                );
+              })}
+            </>
+          )}
+          
+          {/* Dropdown for selecting more items */}
+          <div style={{ display: 'inline-block' }}>
+            {viewMode === "batch" ? (
+              <DropdownSelector
+                title="Batches"
+                items={batches.map(b => ({
+                  id: b.batch_id,
+                  label: b.batch_name,
+                  color: BATCH_COLORS[batches.indexOf(b) % BATCH_COLORS.length].border
+                }))}
+                selectedIds={selectedBatchIds}
+                onSelectItem={(id) => {
+                  toggleBatchSelection(id);
+                  setActiveBatchTab(id);
+                }}
+                onClearAll={() => {
+                  clearBatchFilters();
+                  setActiveBatchTab(null);
+                }}
+                placeholder="Add batch..."
+              />
+            ) : (
+              <DropdownSelector
+                title="Teachers"
+                items={teachers.map(t => ({
+                  id: t.teacher_id,
+                  label: t.teacher_name,
+                  color: TEACHER_COLORS[teachers.indexOf(t) % TEACHER_COLORS.length].border
+                }))}
+                selectedIds={selectedTeacherIds}
+                onSelectItem={(id) => {
+                  toggleTeacherSelection(id);
+                  setActiveTeacherTab(id);
+                }}
+                onClearAll={() => {
+                  clearTeacherFilters();
+                  setActiveTeacherTab(null);
+                }}
+                placeholder="Add teacher..."
+              />
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Info Banner */}
       {viewMode === "available_teachers" && (
-      <div style={styles.infoBanner}>
-        <span style={styles.infoIcon}>ℹ️</span>
-        <span>
-          View all available teachers and their availability status across time slots
-        </span>
-      </div>
+        <div style={styles.infoBanner}>
+          <span style={styles.infoIcon}>ℹ️</span>
+          <span>
+            View all available teachers and their availability status across time slots
+          </span>
+        </div>
       )}
 
       {/* Content */}
-{viewMode === "batch" ? (
-  batches.length === 0 ? (
-    <EmptyState message="No batch timetable data available" />
-  ) : (
-    <div>
-      {/* Show All Batches view */}
-      {!activeBatchTab ? (
-        <div style={styles.tablesContainer}>
-          {filteredBatches.map((batch, idx) => {
-            const batchColorIdx = batches.findIndex(b => b.batch_id === batch.batch_id);
-            return (
-              <BatchTable
-                key={batch.batch_id}
-                batch={batch}
-                color={getBatchColor(batchColorIdx)}
-                getSubjectColor={getSubjectColor}
-                toggleAvailableTeachers={toggleAvailableTeachers}
-                loadingAvailableTeachers={loadingAvailableTeachers}
-              />
-            );
-          })}
-        </div>
-      ) : (
-        /* Show Single Batch view */
-        <div style={styles.tablesContainer}>
-          {(() => {
-            const batch = batches.find(b => b.batch_id === activeBatchTab);
-            if (!batch) return <EmptyState message="Batch not found" />;
-            const batchColorIdx = batches.findIndex(b => b.batch_id === batch.batch_id);
-            return (
-              <BatchTable
-                key={batch.batch_id}
-                batch={batch}
-                color={getBatchColor(batchColorIdx)}
-                getSubjectColor={getSubjectColor}
-                toggleAvailableTeachers={toggleAvailableTeachers}
-                loadingAvailableTeachers={loadingAvailableTeachers}
-              />
-            );
-          })()}
-        </div>
-      )}
-    </div>
-  )
-) : viewMode === "teacher" ? (
-  teachers.length === 0 ? (
-    <EmptyState message="No teacher timetable data available" />
-  ) : (
-    <div>
-      {/* Show All Teachers view */}
-      {!activeTeacherTab ? (
-        <div style={styles.tablesContainer}>
-          {filteredTeachers.map((teacher, idx) => {
-            const teacherColorIdx = teachers.findIndex(t => t.teacher_id === teacher.teacher_id);
-            return (
-              <TeacherTable
-                key={teacher.teacher_id}
-                teacher={teacher}
-                color={getTeacherColor(teacherColorIdx)}
-                getSubjectColor={getSubjectColor}
-                toggleAvailableTeachers={toggleAvailableTeachers}
-                loadingAvailableTeachers={loadingAvailableTeachers}
-              />
-            );
-          })}
-        </div>
-      ) : (
-        /* Show Single Teacher view */
-        <div style={styles.tablesContainer}>
-          {(() => {
-            const teacher = teachers.find(t => t.teacher_id === activeTeacherTab);
-            if (!teacher) return <EmptyState message="Teacher not found" />;
-            const teacherColorIdx = teachers.findIndex(t => t.teacher_id === teacher.teacher_id);
-            return (
-              <TeacherTable
-                key={teacher.teacher_id}
-                teacher={teacher}
-                color={getTeacherColor(teacherColorIdx)}
-                getSubjectColor={getSubjectColor}
-                toggleAvailableTeachers={toggleAvailableTeachers}
-                loadingAvailableTeachers={loadingAvailableTeachers}
-              />
-            );
-          })()}
-        </div>
-      )}
-    </div>
-  )
-) :
- viewMode === "available_teachers" ? (
-  loadingAllTeachers ? (
-    <div style={styles.wrapper}>
-      <div style={styles.loadingBox}>
-        <div style={styles.spinner}></div>
-        <p>Loading Available Teachers...</p>
-      </div>
-    </div>
-  ) : Object.keys(slotsWithTeachers).length === 0 ? (
-    <EmptyState message="No slots with available teachers data found" />
-  ) : (
-    <AvailableTeachersView 
-      slotsWithTeachers={slotsWithTeachers} 
-      getSubjectColor={getSubjectColor}
-      toggleAvailableTeachers={toggleAvailableTeachers}
-      loadingAvailableTeachers={loadingAvailableTeachers}
-    />
-  )
-) : null}
+      {viewMode === "batch" ? (
+        batches.length === 0 ? (
+          <EmptyState message="No batch timetable data available" />
+        ) : (
+          <MatrixTimetable
+            rows={filteredRows as BatchData[]}
+            rowType="batch"
+            getSubjectColor={getSubjectColor}
+            toggleAvailableTeachers={toggleAvailableTeachers}
+            loadingAvailableTeachers={loadingAvailableTeachers}
+          />
+        )
+      ) : viewMode === "teacher" ? (
+        teachers.length === 0 ? (
+          <EmptyState message="No teacher timetable data available" />
+        ) : (
+          <MatrixTimetable
+            rows={filteredRows as TeacherData[]}
+            rowType="teacher"
+            getSubjectColor={getSubjectColor}
+            toggleAvailableTeachers={toggleAvailableTeachers}
+            loadingAvailableTeachers={loadingAvailableTeachers}
+          />
+        )
+      ) : viewMode === "available_teachers" ? (
+        loadingAllTeachers ? (
+          <div style={styles.wrapper}>
+            <div style={styles.loadingBox}>
+              <div style={styles.spinner}></div>
+              <p>Loading Available Teachers...</p>
+            </div>
+          </div>
+        ) : Object.keys(slotsWithTeachers).length === 0 ? (
+          <EmptyState message="No slots with available teachers data found" />
+        ) : (
+          <AvailableTeachersView 
+            slotsWithTeachers={slotsWithTeachers} 
+            getSubjectColor={getSubjectColor}
+            toggleAvailableTeachers={toggleAvailableTeachers}
+            loadingAvailableTeachers={loadingAvailableTeachers}
+          />
+        )
+      ) : null}
     </div>
   );
 };
 
+/* ================= EMPTY STATE ================= */
+const EmptyState: React.FC<{ message: string }> = ({ message }) => (
+  <div style={styles.emptyBox}>
+    <span style={{ fontSize: 48 }}>📋</span>
+    <p>{message}</p>
+  </div>
+);
+
 /* ================= AVAILABLE TEACHERS VIEW ================= */
-// First, update the AvailableTeachersView component interface and props
 interface AvailableTeachersViewProps {
   slotsWithTeachers: { [slotId: string]: { slot: SlotData; teachers: AvailableTeacher[] } };
   getSubjectColor: (s: string | null) => { bg: string; text: string; border: string };
@@ -959,55 +1206,52 @@ const AvailableTeachersView: React.FC<AvailableTeachersViewProps> = ({
   loadingAvailableTeachers 
 }) => {
   // Group slots by day and time
-// Group slots by day and time
-const groupedSlots = React.useMemo(() => {
-  const groups: { [dayKey: string]: { 
-    dayKey: string; 
-    dayName: string; 
-    date?: string;
-    slots: { 
-      slot: SlotData; 
-      teachers: AvailableTeacher[];
-      availableTeachers: AvailableTeacher[];
-    }[] 
-  } } = {};
-  
-  Object.values(slotsWithTeachers).forEach(({ slot, teachers }) => {
-    const dayKey = `d${slot.day_index}`;
-    const dayName = getWeekdayName(slot.day_index); // Use helper function
+  const groupedSlots = React.useMemo(() => {
+    const groups: { [dayKey: string]: { 
+      dayKey: string; 
+      dayName: string; 
+      date?: string;
+      slots: { 
+        slot: SlotData; 
+        teachers: AvailableTeacher[];
+        availableTeachers: AvailableTeacher[];
+      }[] 
+    } } = {};
     
-    if (!groups[dayKey]) {
-      groups[dayKey] = {
-        dayKey,
-        dayName,
-        date: slot.actual_date,
-        slots: []
-      };
-    }
-    
-    groups[dayKey].slots.push({
-      slot,
-      teachers,
-      availableTeachers: teachers.filter(t => t.is_available)
+    Object.values(slotsWithTeachers).forEach(({ slot, teachers }) => {
+      const dayKey = `d${slot.day_index}`;
+const dayName = getWeekdayShortName(slot.day_index);
+      
+      if (!groups[dayKey]) {
+        groups[dayKey] = {
+          dayKey,
+          dayName,
+          date: slot.actual_date,
+          slots: []
+        };
+      }
+      
+      groups[dayKey].slots.push({
+        slot,
+        teachers,
+        availableTeachers: teachers.filter(t => t.is_available)
+      });
     });
-  });
-  
-  // Sort slots within each day by time
-  Object.keys(groups).forEach(dayKey => {
-    groups[dayKey].slots.sort((a, b) => 
-      a.slot.start_time.localeCompare(b.slot.start_time)
-    );
-  });
-  
-  // Sort days by day_index
-  return Object.keys(groups)
-    .sort((a, b) => {
-      const dayA = parseInt(a.replace('d', ''));
-      const dayB = parseInt(b.replace('d', ''));
-      return dayA - dayB;
-    })
-    .map(key => groups[key]);
-}, [slotsWithTeachers]);
+    
+    Object.keys(groups).forEach(dayKey => {
+      groups[dayKey].slots.sort((a, b) => 
+        a.slot.start_time.localeCompare(b.slot.start_time)
+      );
+    });
+    
+    return Object.keys(groups)
+      .sort((a, b) => {
+        const dayA = parseInt(a.replace('d', ''));
+        const dayB = parseInt(b.replace('d', ''));
+        return dayA - dayB;
+      })
+      .map(key => groups[key]);
+  }, [slotsWithTeachers]);
 
   // Get unique time slots across all days
   const timeSlots = React.useMemo(() => {
@@ -1021,25 +1265,32 @@ const groupedSlots = React.useMemo(() => {
   }, [slotsWithTeachers]);
 
   const handleSlotClick = (slot: SlotData) => {
-  toggleAvailableTeachers(
-    slot.slot_id,
-    `d${slot.day_index}`,
-    `${slot.start_time}-${slot.end_time}`,
-    'available_teachers_view',
-    'batch'
-  );
-};
-
+    toggleAvailableTeachers(
+      slot.slot_id,
+      `d${slot.day_index}`,
+      `${slot.start_time}-${slot.end_time}`,
+      'available_teachers_view',
+      'batch'
+    );
+  };
 
   if (groupedSlots.length === 0) {
     return (
       <EmptyState message="No slots with available teachers data found" />
     );
   }
+  const formatDayDate = (date?: string) => {
+  if (!date) return null;
+
+  return new Date(date).toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+  });
+};
+
 
   return (
     <div style={styles.availableTeachersView}>
-      {/* Grid View */}
       <div style={styles.timetableContainer}>
         <div style={styles.tableScroll}>
           <table style={styles.table}>
@@ -1047,21 +1298,27 @@ const groupedSlots = React.useMemo(() => {
               <tr>
                 <th style={styles.thTime}>Time</th>
                 {groupedSlots.map(dayGroup => (
-  <th key={dayGroup.dayKey} style={styles.thDay}>
-    <div style={styles.dayHeader}>
-      <div style={{ 
-        ...styles.dayDot, 
-        backgroundColor: getWeekdayColor(parseInt(dayGroup.dayKey.replace('d', ''))) 
-      }}></div>
-      <div style={styles.dayHeaderContent}>
-        <span style={styles.dayName}>{dayGroup.dayName}</span>
-        {dayGroup.date && (
-          <span style={styles.dayDate}>{dayGroup.date}</span>
-        )}
-      </div>
-    </div>
-  </th>
-))}
+                  <th key={dayGroup.dayKey} style={styles.thDay}>
+                    <div style={styles.dayHeader}>
+                      <div style={{ 
+                        ...styles.dayDot, 
+                        backgroundColor: getWeekdayColor(parseInt(dayGroup.dayKey.replace('d', ''))) 
+                      }}></div>
+                      <div style={styles.dayHeaderContent}>
+                        <span style={styles.dayName}>
+  {dayGroup.dayName}
+</span>
+
+{dayGroup.date && (
+  <span style={styles.dayDate}>
+    {formatDayDate(dayGroup.date)}
+  </span>
+)}
+
+                      </div>
+                    </div>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -1089,132 +1346,127 @@ const groupedSlots = React.useMemo(() => {
                     const hasTeachersData = teachers.length > 0;
                     
                     return (
-  <td key={`${dayGroup.dayKey}-${timeIdx}`} style={styles.slotCell}>
-    <div
-      style={{
-        ...styles.slotCard,
-        backgroundColor: '#f8fafc', // Use neutral background
-        borderColor: '#e2e8f0',
-        cursor: 'pointer',
-        position: 'relative'
-      }}
-      onClick={() => handleSlotClick(slot, teachers)}
-      title="Click to view available teachers"
-    >
-      <div style={styles.slotHeader}>
-        <span style={{ ...styles.slotSubject, color: '#475569' }}>
-          {slot.slot_code} {/* Show only slot code */}
-        </span>
-        {/* REMOVED: <span style={styles.slotCode}>Slot #{slot.slot_number}</span> */}
-      </div>
-      
-      <div style={styles.slotContent}>
-        {/* Batch Info - Keep if you want to show batch */}
-        {slot.batch_name && (
-          <div style={styles.slotBatch}>
-            <span style={styles.slotIcon}>📚</span>
-            {slot.batch_name}
-          </div>
-        )}
-        
-        {/* Room Info - Keep if you want to show room */}
-        {slot.room_number && (
-          <div style={styles.slotRoom}>
-            <span style={styles.slotIcon}>🏠</span>
-            {slot.room_number}
-          </div>
-        )}
-        
-        {/* Available Teachers Indicator */}
-        <div style={styles.availableTeachersIndicator}>
-          {isLoading ? (
-            <div style={styles.loadingIndicator}>
-              <div style={styles.smallSpinner}></div>
-              <span style={styles.indicatorText}>Loading...</span>
-            </div>
-          ) : hasTeachersData ? (
-            <>
-              <span style={{
-                ...styles.indicatorText,
-                color: availableTeachers.length > 0 ? '#059669' : '#dc2626'
-              }}>
-                {availableTeachers.length > 0 ? '✅' : '❌'} {availableTeachers.length} available
-              </span>
-              <span style={slot.show_available_teachers ? styles.indicatorOpen : styles.indicatorClosed}>
-                {slot.show_available_teachers ? '▲' : '▼'}
-              </span>
-            </>
-          ) : (
-            <>
-              <span style={styles.indicatorText}>
-                Click to load
-              </span>
-              <span style={styles.indicatorClosed}>
-                ▼
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-      
-      {/* Available Teachers Panel */}
-      {slot.show_available_teachers && hasTeachersData && (
-        <div style={styles.availableTeachersPanel}>
-          <div style={styles.availableTeachersHeader}>
-            <span style={styles.availableTeachersTitle}>
-              Available Teachers for {slot.slot_code}
-            </span>
-          </div>
-          
-          {isLoading ? (
-            <div style={styles.loadingTeachers}>
-              <div style={styles.smallSpinner}></div>
-              <span>Loading teachers...</span>
-            </div>
-          ) : (
-            <div style={styles.teachersList}>
-              {teachers.length > 0 ? (
-                teachers.map(teacher => (
-                  <div key={teacher.teacher_id} style={styles.teacherItem}>
-                    <div style={styles.teacherInfo}>
-                      <span style={styles.teacherName}>{teacher.teacher_name}</span>
-                      <span style={styles.teacherCode}>({teacher.teacher_code})</span>
-                    </div>
-                    
-                    <div style={styles.teacherStatus}>
-                      <span style={
-                        teacher.is_available ? styles.statusAvailable : styles.statusUnavailable
-                      }>
-                        {teacher.is_available ? 'Available' : 'Unavailable'}
-                      </span>
-                    </div>
-                    
-                    {teacher.subject_specializations && teacher.subject_specializations.length > 0 && (
-                      <div style={styles.teacherSubjects}>
-                        <span style={styles.subjectsLabel}>Subjects: </span>
-                        {teacher.subject_specializations.join(', ')}
-                      </div>
-                    )}
-                    
-                    {teacher.current_assignment && (
-                      <div style={styles.currentAssignment}>
-                        Currently: {teacher.current_assignment}
-                      </div>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div style={styles.noTeachersMessage}>
-                  No teachers data available for this slot
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  </td>
-);
+                      <td key={`${dayGroup.dayKey}-${timeIdx}`} style={styles.slotCell}>
+                        <div
+                          style={{
+                            ...styles.slotCard,
+                            backgroundColor: '#f8fafc',
+                            borderColor: '#e2e8f0',
+                            cursor: 'pointer',
+                            position: 'relative'
+                          }}
+                          onClick={() => handleSlotClick(slot)}
+                          title="Click to view available teachers"
+                        >
+                          <div style={styles.slotHeader}>
+                            <span style={{ ...styles.slotSubject, color: '#475569' }}>
+                              {slot.slot_code}
+                            </span>
+                          </div>
+                          
+                          <div style={styles.slotContent}>
+                            {slot.batch_name && (
+                              <div style={styles.slotBatch}>
+                                <span style={styles.slotIcon}>📚</span>
+                                {slot.batch_name}
+                              </div>
+                            )}
+                            
+                            {slot.room_number && (
+                              <div style={styles.slotRoom}>
+                                <span style={styles.slotIcon}>🏠</span>
+                                {slot.room_number}
+                              </div>
+                            )}
+                            
+                            <div style={styles.availableTeachersIndicator}>
+                              {isLoading ? (
+                                <div style={styles.loadingIndicator}>
+                                  <div style={styles.smallSpinner}></div>
+                                  <span style={styles.indicatorText}>Loading...</span>
+                                </div>
+                              ) : hasTeachersData ? (
+                                <>
+                                  <span style={{
+                                    ...styles.indicatorText,
+                                    color: availableTeachers.length > 0 ? '#059669' : '#dc2626'
+                                  }}>
+                                    {availableTeachers.length > 0 ? '✅' : '❌'} {availableTeachers.length} available
+                                  </span>
+                                  <span style={slot.show_available_teachers ? styles.indicatorOpen : styles.indicatorClosed}>
+                                    {slot.show_available_teachers ? '▲' : '▼'}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span style={styles.indicatorText}>
+                                    Click to load
+                                  </span>
+                                  <span style={styles.indicatorClosed}>
+                                    ▼
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {slot.show_available_teachers && hasTeachersData && (
+                            <div style={styles.availableTeachersPanel}>
+                              <div style={styles.availableTeachersHeader}>
+                                <span style={styles.availableTeachersTitle}>
+                                  Available Teachers for {slot.slot_code}
+                                </span>
+                              </div>
+                              
+                              {isLoading ? (
+                                <div style={styles.loadingTeachers}>
+                                  <div style={styles.smallSpinner}></div>
+                                  <span>Loading teachers...</span>
+                                </div>
+                              ) : (
+                                <div style={styles.teachersList}>
+                                  {teachers.length > 0 ? (
+                                    teachers.map(teacher => (
+                                      <div key={teacher.teacher_id} style={styles.teacherItem}>
+                                        <div style={styles.teacherInfo}>
+                                          <span style={styles.teacherName}>{teacher.teacher_name}</span>
+                                          <span style={styles.teacherCode}>({teacher.teacher_code})</span>
+                                        </div>
+                                        
+                                        <div style={styles.teacherStatus}>
+                                          <span style={
+                                            teacher.is_available ? styles.statusAvailable : styles.statusUnavailable
+                                          }>
+                                            {teacher.is_available ? 'Available' : 'Unavailable'}
+                                          </span>
+                                        </div>
+                                        
+                                        {teacher.subject_specializations && teacher.subject_specializations.length > 0 && (
+                                          <div style={styles.teacherSubjects}>
+                                            <span style={styles.subjectsLabel}>Subjects: </span>
+                                            {teacher.subject_specializations.join(', ')}
+                                          </div>
+                                        )}
+                                        
+                                        {teacher.current_assignment && (
+                                          <div style={styles.currentAssignment}>
+                                            Currently: {teacher.current_assignment}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div style={styles.noTeachersMessage}>
+                                      No teachers data available for this slot
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    );
                   })}
                 </tr>
               ))}
@@ -1225,310 +1477,6 @@ const groupedSlots = React.useMemo(() => {
     </div>
   );
 };
-
-
-/* ================= EMPTY STATE ================= */
-const EmptyState: React.FC<{ message: string }> = ({ message }) => (
-  <div style={styles.emptyBox}>
-    <span style={{ fontSize: 48 }}>📋</span>
-    <p>{message}</p>
-  </div>
-);
-
-/* ================= BATCH TABLE ================= */
-interface BatchTableProps {
-  batch: BatchData;
-  color: { bg: string; border: string; text: string };
-  getSubjectColor: (s: string | null) => { bg: string; text: string; border: string };
-  toggleAvailableTeachers: (slotId: string, dayKey: string, timeSlot: string, entityId: string, entityType: 'batch' | 'teacher') => void;
-  loadingAvailableTeachers: {[key: string]: boolean};
-}
-
-const BatchTable: React.FC<BatchTableProps> = ({
-  batch,
-  color,
-  getSubjectColor,
-  toggleAvailableTeachers,
-  loadingAvailableTeachers
-}) => {
-  const dayKeys = Object.keys(batch.slots || {}).sort(
-    (a, b) => parseInt(a.replace("d", "")) - parseInt(b.replace("d", ""))
-  );
-
-  const timeSlots = getUniqueTimeSlots(batch.slots, dayKeys);
-
-  return (
-    <div style={styles.tableCard}>
-      <div style={{ ...styles.tableHeader, borderLeftColor: color.border, backgroundColor: color.bg }}>
-        <div style={styles.entityInfo}>
-          <div style={{ ...styles.entityAvatar, backgroundColor: color.border }}>
-            {batch.batch_name.charAt(0)}
-          </div>
-          <div>
-            <h3 style={{ ...styles.entityName, color: color.text }}>{batch.batch_name}</h3>
-            <p style={styles.entityMeta}>
-              {batch.batch_code} • {batch.program}
-            </p>
-          </div>
-        </div>
-        <div style={styles.entityBadges}>
-          <span style={styles.badge}>📅 {dayKeys.length} Days</span>
-          <span style={styles.badge}>📖 {batch.total_classes} Classes</span>
-        </div>
-      </div>
-
-      <div style={styles.timetableContainer}>
-        <StandardTimetableGrid
-          slots={batch.slots}
-          dayKeys={dayKeys}
-          timeSlots={timeSlots}
-          getSubjectColor={getSubjectColor}
-          showBatch={false}
-          entityId={batch.batch_id}
-          entityType="batch"
-          toggleAvailableTeachers={toggleAvailableTeachers}
-          loadingAvailableTeachers={loadingAvailableTeachers}
-        />
-      </div>
-    </div>
-  );
-};
-
-/* ================= TEACHER TABLE ================= */
-interface TeacherTableProps {
-  teacher: TeacherData;
-  color: { bg: string; border: string; text: string };
-  getSubjectColor: (s: string | null) => { bg: string; text: string; border: string };
-  toggleAvailableTeachers: (slotId: string, dayKey: string, timeSlot: string, entityId: string, entityType: 'batch' | 'teacher') => void;
-  loadingAvailableTeachers: {[key: string]: boolean};
-}
-
-const TeacherTable: React.FC<TeacherTableProps> = ({
-  teacher,
-  color,
-  getSubjectColor,
-  toggleAvailableTeachers,
-  loadingAvailableTeachers
-}) => {
-  const dayKeys = Object.keys(teacher.slots || {}).sort(
-    (a, b) => parseInt(a.replace("d", "")) - parseInt(b.replace("d", ""))
-  );
-
-  const timeSlots = getUniqueTimeSlots(teacher.slots, dayKeys);
-  const hasSlots = dayKeys.length > 0 && timeSlots.length > 0;
-
-  return (
-    <div style={styles.tableCard}>
-      <div style={{ ...styles.tableHeader, borderLeftColor: color.border, backgroundColor: color.bg }}>
-        <div style={styles.entityInfo}>
-          <div style={{ ...styles.entityAvatar, backgroundColor: color.border }}>
-            👨‍🏫
-          </div>
-          <div>
-            <h3 style={{ ...styles.entityName, color: color.text }}>{teacher.teacher_name}</h3>
-            <p style={styles.entityMeta}>
-              {teacher.teacher_code} {teacher.department ? ` • ${teacher.department}` : ""}
-            </p>
-          </div>
-        </div>
-        <div style={styles.entityBadges}>
-          {teacher.batches && teacher.batches.length > 0 && (
-            <span style={styles.badge}>📚 {teacher.batches.join(", ")}</span>
-          )}
-          <span style={styles.badge}>📖 {teacher.total_classes} Classes</span>
-        </div>
-      </div>
-
-      <div style={styles.timetableContainer}>
-        {hasSlots ? (
-          <StandardTimetableGrid
-            slots={teacher.slots}
-            dayKeys={dayKeys}
-            timeSlots={timeSlots}
-            getSubjectColor={getSubjectColor}
-            showBatch={true}
-            entityId={teacher.teacher_id}
-            entityType="teacher"
-            toggleAvailableTeachers={toggleAvailableTeachers}
-            loadingAvailableTeachers={loadingAvailableTeachers}
-          />
-        ) : (
-          <div style={styles.noSlotsMessage}>
-            <span style={{ fontSize: 24 }}>📭</span>
-            <p>No scheduled classes yet</p>
-            {teacher.batches && teacher.batches.length > 0 && (
-              <p style={styles.assignedBatchesText}>
-                Assigned to: {teacher.batches.join(", ")}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-/* ================= STANDARD TIMETABLE GRID ================= */
-interface StandardTimetableGridProps {
-  slots: { [dayKey: string]: SlotData[] };
-  dayKeys: string[];
-  timeSlots: { start: string; end: string }[];
-  getSubjectColor: (s: string | null) => { bg: string; text: string; border: string };
-  showBatch: boolean;
-  entityId: string;
-  entityType: 'batch' | 'teacher';
-  toggleAvailableTeachers: (slotId: string, dayKey: string, timeSlot: string, entityId: string, entityType: 'batch' | 'teacher') => void;
-  loadingAvailableTeachers: {[key: string]: boolean};
-}
-
-const StandardTimetableGrid: React.FC<StandardTimetableGridProps> = ({
-  slots,
-  dayKeys,
-  timeSlots,
-  getSubjectColor,
-  showBatch,
-  entityId,
-  entityType,
-  toggleAvailableTeachers,
-  loadingAvailableTeachers
-}) => {
-const getTeacherName = (teacher: string | TeacherInfo | null): string | null => {
-  if (!teacher) return null;
-  if (typeof teacher === "string") return teacher;
-  return teacher.teacher_code || teacher.teacher_name || null;
-};
-
-
-  const getBatchDisplayName = (slot: SlotData): string | null => {
-    if (slot.batch_name) return slot.batch_name;
-    if (slot.batch_code) return slot.batch_code;
-    if (!slot.batch) return null;
-    if (typeof slot.batch === "string") return slot.batch;
-    return slot.batch.batch_name || slot.batch.batch_code || null;
-  };
-
-  const handleSlotClick = (slot: SlotData, dayKey: string) => {
-    toggleAvailableTeachers(slot.slot_id, dayKey, `${slot.start_time}-${slot.end_time}`, entityId, entityType);
-  };
-
-  return (
-    <div style={styles.tableScroll}>
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            <th style={styles.thTime}>Time</th>
-            {dayKeys.map((dk) => (
-  <th key={dk} style={styles.thDay}>
-    <div style={styles.dayHeader}>
-      <div style={{ 
-        ...styles.dayDot, 
-        backgroundColor: getWeekdayColor(parseInt(dk.replace("d", ""))) 
-      }}></div>
-      <div style={styles.dayHeaderContent}>
-        <span style={styles.dayName}>
-          {getWeekdayName(parseInt(dk.replace("d", "")))}
-        </span>
-        {slots[dk]?.[0]?.actual_date && (
-          <span style={styles.dayDate}>{slots[dk][0].actual_date}</span>
-        )}
-      </div>
-    </div>
-  </th>
-))}
-          </tr>
-        </thead>
-        <tbody>
-          {timeSlots.map((time, timeIdx) => (
-            <tr key={`${time}-${timeIdx}`}>
-              <td style={styles.timeCell}>
-                <div style={styles.timeSlotDisplay}>
-                  <span style={styles.timeStart}>{time.start}</span>
-                  <span style={styles.timeSeparator}>-</span>
-                  <span style={styles.timeEnd}>{time.end}</span>
-                </div>
-              </td>
-              {dayKeys.map((dk) => {
-                const slot = (slots[dk] || []).find(
-                  (s) => s.start_time === time.start && s.end_time === time.end
-                );
-                
-                if (!slot) {
-                  return <td key={`${dk}-${timeIdx}`} style={styles.emptyCell}></td>;
-                }
-
-                const sc = getSubjectColor(slot.subject);
-                const teacherName = getTeacherName(slot.teacher);
-                const batchName = getBatchDisplayName(slot);
-                const isLoading = loadingAvailableTeachers[slot.slot_id];
-                
-                return (
-                  <td key={`${dk}-${timeIdx}`} style={styles.slotCell}>
-                    <div
-                      style={{
-                        ...styles.slotCard,
-                        backgroundColor: sc.bg,
-                        borderColor: sc.border,
-                      }}
-                      title="View in Available Teachers page"
-                    >
-                      <div style={styles.slotHeader}>
-                        <span style={{ ...styles.slotSubject, color: sc.text }}>
-                          {slot.subject || "Free"}
-                        </span>
-                        <span style={styles.slotCode}>{slot.slot_code}</span>
-                      </div>
-                      
-                      <div style={styles.slotContent}>
-                        {showBatch ? (
-                          batchName && (
-                            <div style={styles.slotBatch}>
-                              <span style={styles.slotIcon}>📚</span>
-                              {batchName}
-                            </div>
-                          )
-                        ) : (
-                          teacherName && (
-                            <div style={styles.slotTeacher}>
-                              <span style={styles.slotIcon}>👨‍🏫</span>
-                              {teacherName}
-                            </div>
-                          )
-                        )}
-                        
-                        {slot.room_number && (
-                          <div style={styles.slotRoom}>
-                            <span style={styles.slotIcon}>🏠</span>
-                            {slot.room_number}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-};
-
-/* ================= HELPER FUNCTIONS ================= */
-function getUniqueTimeSlots(
-  slots: { [dayKey: string]: SlotData[] },
-  dayKeys: string[]
-): { start: string; end: string }[] {
-  const timeSlots: { start: string; end: string }[] = [];
-  dayKeys.forEach((dk) => {
-    slots[dk]?.forEach((slot) => {
-      if (!timeSlots.find((t) => t.start === slot.start_time && t.end === slot.end_time)) {
-        timeSlots.push({ start: slot.start_time, end: slot.end_time });
-      }
-    });
-  });
-  return timeSlots.sort((a, b) => a.start.localeCompare(b.start));
-}
 
 /* ================= STYLES ================= */
 const styles: Record<string, React.CSSProperties> = {
@@ -1559,6 +1507,14 @@ const styles: Record<string, React.CSSProperties> = {
     width: 16,
     height: 16,
     border: "2px solid #e2e8f0",
+    borderTopColor: "#3b82f6",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+  },
+  miniSpinner: {
+    width: 10,
+    height: 10,
+    border: "1px solid #e2e8f0",
     borderTopColor: "#3b82f6",
     borderRadius: "50%",
     animation: "spin 1s linear infinite",
@@ -1707,26 +1663,6 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 20,
     flexWrap: "wrap",
   },
-  statCard: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    padding: "16px 28px",
-    background: "#fff",
-    borderRadius: 12,
-    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-    border: "1px solid #e2e8f0",
-  },
-  statNum: {
-    fontSize: 28,
-    fontWeight: 700,
-    color: "#0f172a",
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "#64748b",
-    marginTop: 4,
-  },
   filterRow: {
     display: "flex",
     alignItems: "center",
@@ -1761,7 +1697,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     fontSize: 13,
   },
-  // Dropdown Selector Styles
   dropdownTrigger: {
     padding: "8px 16px",
     border: "1px solid #e2e8f0",
@@ -1895,17 +1830,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     fontWeight: 600,
   },
-  clearFiltersBtn: {
-    padding: "8px 16px",
-    background: "#ef4444",
-    color: "#fff",
-    border: "1px solid #ef4444",
-    borderRadius: 8,
-    cursor: "pointer",
-    fontWeight: 600,
-    fontSize: 13,
-    transition: "all 0.2s",
-  },
   emptyBox: {
     display: "flex",
     flexDirection: "column",
@@ -1917,68 +1841,205 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 16,
     border: "2px dashed #e2e8f0",
   },
-  tablesContainer: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 32,
-  },
-  tableCard: {
+  
+  /* ================= MATRIX TIMETABLE STYLES ================= */
+  matrixWrapper: {
     background: "#fff",
-    borderRadius: 16,
-    overflow: "hidden",
-    boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
-    border: "1px solid #e2e8f0",
-  },
-  timetableContainer: {
-  padding: '16px',
-  overflowX: 'auto',
-  },
-  tableHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "20px 24px",
-    borderLeft: "5px solid",
-    flexWrap: "wrap",
-    gap: 16,
-  },
-  entityInfo: {
-    display: "flex",
-    alignItems: "center",
-    gap: 16,
-  },
-  entityAvatar: {
-    width: 48,
-    height: 48,
     borderRadius: 12,
-    color: "#fff",
+    border: "1px solid #e2e8f0",
+    overflow: "hidden",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+  },
+  matrixContainer: {
+    width: "100%",
+    overflowX: "auto",
+  },
+  matrixHeader: {
+    display: "flex",
+    borderBottom: "2px solid #e2e8f0",
+    position: "sticky",
+    top: 0,
+    zIndex: 10,
+    backgroundColor: "#f8fafc",
+  },
+  matrixCornerCell: {
+    minWidth: 180,
+    width: 180,
+    padding: "16px",
+    fontWeight: 700,
+    fontSize: 14,
+    color: "#475569",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    borderRight: "1px solid #e2e8f0",
+    backgroundColor: "#f1f5f9",
+    position: "sticky",
+    left: 0,
+    zIndex: 11,
+  },
+  matrixDayHeader: {
+    flex: 1,
+    minWidth: 110,
+    padding: "12px",
+    color: "white",
     fontWeight: 700,
-    fontSize: 20,
-  },
-  entityName: {
-    fontSize: 18,
-    fontWeight: 700,
-    margin: 0,
-  },
-  entityMeta: {
-    fontSize: 13,
-    color: "#64748b",
-    margin: "4px 0 0",
-  },
-  entityBadges: {
+    fontSize: 14,
     display: "flex",
-    gap: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRight: "1px solid rgba(255,255,255,0.2)",
   },
-  badge: {
-    padding: "6px 14px",
-    background: "rgba(255,255,255,0.7)",
-    borderRadius: 20,
-    fontSize: 13,
-    fontWeight: 600,
-    color: "#475569",
+  dayHeaderContent: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 4,
+  },
+  dayName: {
+    fontSize: 16,
+    fontWeight: 700,
+  },
+  dayDate: {
+    fontSize: 11,
+    opacity: 0.9,
+  },
+  matrixRow: {
+    display: "flex",
+    borderBottom: "1px solid #e2e8f0",
+    transition: "background-color 0.2s",
+  },
+  matrixRowLabel: {
+    minWidth: 180,
+    width: 180,
+    padding: "12px 16px",
+    borderRight: "1px solid #e2e8f0",
+    borderLeft: "4px solid",
+    display: "flex",
+    alignItems: "center",
+    position: "sticky",
+    left: 0,
+    zIndex: 8,
+  },
+  rowLabelContent: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+  },
+  rowName: {
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  rowCode: {
+    fontSize: 12,
+    opacity: 0.8,
+  },
+matrixDayCell: {
+  flex: 1,
+  minWidth: 110,
+  padding: "12px",
+  borderRight: "1px solid #e2e8f0",
+  backgroundColor: "#fff",
+},
+
+slotBox: {
+  width: "100%",
+  aspectRatio: "1 / 1",   // ⭐ MAKES IT SQUARE
+  borderRadius: 8,
+  border: "2px solid",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  position: "relative",
+  transition: "all 0.2s",
+  padding: "8px",
+  boxSizing: "border-box",
+  overflow: "hidden",
+},
+
+slotContent: {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",  // ADD THIS
+  gap: 4,
+  width: "100%",
+  textAlign: "center",
+  overflow: "hidden",  // ADD THIS
+},
+slotSubject: {
+  fontSize: 12,  // CHANGED from 14 to 12
+  fontWeight: 700,
+  lineHeight: 1.2,
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "normal",  // CHANGED from "nowrap" to "normal"
+  display: "-webkit-box",
+  WebkitLineClamp: 2,  // ADD THIS - allows 2 lines
+  WebkitBoxOrient: "vertical",  // ADD THIS
+  maxHeight: "2.4em",  // ADD THIS - 2 lines * 1.2 line-height
+},
+slotTime: {
+  fontSize: 10,  // CHANGED from 11 to 10
+  color: "#64748b",
+  fontWeight: 600,
+  backgroundColor: "rgba(255,255,255,0.7)",
+  padding: "2px 4px",
+  borderRadius: 4,
+  lineHeight: 1,
+  marginTop: 2,  // ADD THIS
+},
+slotBatchMini: {
+  fontSize: 10,  // CHANGED from 11 to 10
+  color: "#475569",
+  fontWeight: 600,
+  backgroundColor: "rgba(255,255,255,0.7)",
+  padding: "2px 4px",
+  borderRadius: 4,
+  lineHeight: 1,
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  marginTop: 2,  // ADD THIS
+},
+slotTeacherMini: {
+  fontSize: 10,  // CHANGED from 11 to 10
+  color: "#475569",
+  fontWeight: 600,
+  backgroundColor: "rgba(255,255,255,0.7)",
+  padding: "2px 4px",
+  borderRadius: 4,
+  lineHeight: 1,
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  marginTop: 2,  // ADD THIS
+},
+  slotLoading: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+  },
+  emptySlot: {
+    minHeight: 80,
+    borderRadius: 8,
+    backgroundColor: "#f8fafc",
+    border: "2px dashed #e2e8f0",
+  },
+  
+  /* ================= AVAILABLE TEACHERS VIEW STYLES ================= */
+  availableTeachersView: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 24,
+  },
+  timetableContainer: {
+    padding: '16px',
+    overflowX: 'auto',
   },
   tableScroll: {
     overflowX: "auto",
@@ -2019,20 +2080,6 @@ const styles: Record<string, React.CSSProperties> = {
     height: 10,
     borderRadius: "50%",
   },
-  dayHeaderContent: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-  },
-  dayName: {
-    fontSize: 14,
-    fontWeight: 700,
-    color: "#0f172a",
-  },
-  dayDate: {
-    fontSize: 12,
-    color: "#64748b",
-  },
   timeCell: {
     padding: "12px",
     background: "#fafbfc",
@@ -2072,46 +2119,31 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid #e2e8f0",
     verticalAlign: "top",
   },
-slotCard: {
-  padding: "12px",
-  borderRadius: 8,
-  border: "2px solid",
-  minHeight: 60, // Reduced from 80px
-  display: "flex",
-  flexDirection: "column",
-  justifyContent: "space-between",
-  transition: "all 0.2s ease",
-},
+  slotCard: {
+    padding: "12px",
+    borderRadius: 8,
+    border: "2px solid",
+    minHeight: 60,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    transition: "all 0.2s ease",
+  },
   slotHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: 8,
   },
-slotSubject: {
-  fontSize: 14,
-  fontWeight: 700,
-  flex: 1,
-  textAlign: 'center', // Center align the slot code
-},
-  slotCode: {
-    fontSize: 10,
-    fontWeight: 600,
-    color: "#64748b",
-    background: "rgba(255,255,255,0.6)",
-    padding: "2px 6px",
-    borderRadius: 4,
+  slotSubject: {
+    fontSize: 14,
+    fontWeight: 700,
+    flex: 1,
+    textAlign: 'center',
   },
   slotContent: {
     display: "flex",
     flexDirection: "column",
-    gap: 4,
-  },
-  slotTeacher: {
-    fontSize: 12,
-    color: "#475569",
-    display: "flex",
-    alignItems: "center",
     gap: 4,
   },
   slotBatch: {
@@ -2131,377 +2163,124 @@ slotSubject: {
   slotIcon: {
     fontSize: 10,
   },
-// Add these styles to your existing styles object:
-availableTeachersIndicator: {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  marginTop: 6,
-  paddingTop: 6,
-  borderTop: "1px dashed rgba(0,0,0,0.1)",
-  fontSize: 10,
-  color: "#64748b",
-},
-loadingIndicator: {
-  display: "flex",
-  alignItems: "center",
-  gap: 4,
-},
-indicatorText: {
-  fontSize: 9,
-  fontWeight: 600,
-},
-
-indicatorOpen: {
-  fontSize: 8,
-  fontWeight: 'bold',
-},
-indicatorClosed: {
-  fontSize: 8,
-  fontWeight: 'bold',
-},
-availableTeachersPanel: {
-  marginTop: 8,
-  background: "#f8fafc",
-  borderRadius: 6,
-  border: "1px solid #e2e8f0",
-  overflow: "hidden",
-  animation: "slideDown 0.3s ease-out",
-},
-availableTeachersHeader: {
-  padding: "10px 12px",
-  background: "#e2e8f0",
-  borderBottom: "1px solid #cbd5e1",
-},
-availableTeachersTitle: {
-  fontSize: 12,
-  fontWeight: 600,
-  color: "#475569",
-},
-loadingTeachers: {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  padding: "16px",
-  color: "#64748b",
-  fontSize: 12,
-},
-teachersList: {
-  maxHeight: 300,
-  overflowY: "auto",
-},
-teacherItem: {
-  padding: "12px",
-  borderBottom: "1px solid #e2e8f0",
-  transition: "background-color 0.2s",
-},
-teacherInfo: {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  marginBottom: 4,
-},
-teacherName: {
-  fontSize: 12,
-  fontWeight: 600,
-  color: "#1e293b",
-},
-teacherCode: {
-  fontSize: 11,
-  color: "#64748b",
-},
-teacherStatus: {
-  marginBottom: 4,
-},
-statusAvailable: {
-  fontSize: 10,
-  color: "#166534",
-  fontWeight: 600,
-  padding: "2px 6px",
-  background: "#dcfce7",
-  borderRadius: 4,
-  display: "inline-block",
-},
-statusUnavailable: {
-  fontSize: 10,
-  color: "#991b1b",
-  fontWeight: 600,
-  padding: "2px 6px",
-  background: "#fee2e2",
-  borderRadius: 4,
-  display: "inline-block",
-},
-teacherSubjects: {
-  fontSize: 10,
-  color: "#475569",
-  marginTop: 2,
-},
-subjectsLabel: {
-  fontWeight: 600,
-},
-currentAssignment: {
-  fontSize: 9,
-  color: "#64748b",
-  fontStyle: "italic",
-  marginTop: 2,
-},
-noTeachersMessage: {
-  padding: "16px",
-  textAlign: "center",
-  color: "#64748b",
-  fontSize: 12,
-},
-  noSlotsMessage: {
+  availableTeachersIndicator: {
     display: "flex",
-    flexDirection: "column",
     alignItems: "center",
-    justifyContent: "center",
-    padding: "40px 20px",
-    color: "#64748b",
-    background: "#fafbfc",
-    borderTop: "1px solid #e2e8f0",
-    gap: 8,
-    minHeight: 120,
-  },
-  assignedBatchesText: {
-    fontSize: 13,
-    color: "#3b82f6",
-    fontWeight: 500,
-    marginTop: 4,
-  },
-  // Available Teachers View Styles
-  availableTeachersView: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 24,
-  },
-  availabilityFilterRow: {
-    display: "flex",
-    gap: 12,
-    flexWrap: "wrap",
-  },
-  teachersGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))",
-    gap: 20,
-  },
-  teacherCard: {
-    padding: "20px",
-    background: "#fff",
-    borderRadius: 12,
-    border: "1px solid #e2e8f0",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-    transition: "all 0.2s",
-    display: "flex",
-    flexDirection: "column",
-    gap: 16,
-  },
-  teacherCardHeader: {
-    display: "flex",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  teacherCardName: {
-    fontSize: 16,
-    fontWeight: 700,
-    color: "#0f172a",
-    margin: 0,
-  },
-  teacherCardCode: {
-    fontSize: 12,
+    marginTop: 6,
+    paddingTop: 6,
+    borderTop: "1px dashed rgba(0,0,0,0.1)",
+    fontSize: 10,
     color: "#64748b",
-    margin: "4px 0 0",
   },
-  availabilityBadge: {
-    padding: "8px 12px",
-    borderRadius: 8,
+  loadingIndicator: {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+  },
+  indicatorText: {
+    fontSize: 9,
+    fontWeight: 600,
+  },
+  indicatorOpen: {
+    fontSize: 8,
+    fontWeight: 'bold',
+  },
+  indicatorClosed: {
+    fontSize: 8,
+    fontWeight: 'bold',
+  },
+  availableTeachersPanel: {
+    marginTop: 8,
+    background: "#f8fafc",
+    borderRadius: 6,
+    border: "1px solid #e2e8f0",
+    overflow: "hidden",
+    animation: "slideDown 0.3s ease-out",
+  },
+  availableTeachersHeader: {
+    padding: "10px 12px",
+    background: "#e2e8f0",
+    borderBottom: "1px solid #cbd5e1",
+  },
+  availableTeachersTitle: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#475569",
+  },
+  loadingTeachers: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "16px",
+    color: "#64748b",
+    fontSize: 12,
+  },
+  teachersList: {
+    maxHeight: 300,
+    overflowY: "auto",
+  },
+  teacherItem: {
+    padding: "12px",
+    borderBottom: "1px solid #e2e8f0",
+    transition: "background-color 0.2s",
+  },
+  teacherInfo: {
     display: "flex",
     alignItems: "center",
     gap: 6,
-    whiteSpace: "nowrap" as const,
+    marginBottom: 4,
   },
-  teacherCardSection: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-  },
-  teacherCardSectionTitle: {
+  teacherName: {
     fontSize: 12,
-    fontWeight: 700,
-    color: "#475569",
-    margin: 0,
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.5px",
-  },
-  subjectsTagsContainer: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  subjectTag: {
-    padding: "4px 10px",
-    borderRadius: 20,
-    fontSize: 11,
     fontWeight: 600,
-    border: "1px solid",
+    color: "#1e293b",
+  },
+  teacherCode: {
+    fontSize: 11,
+    color: "#64748b",
+  },
+  teacherStatus: {
+    marginBottom: 4,
+  },
+  statusAvailable: {
+    fontSize: 10,
+    color: "#166534",
+    fontWeight: 600,
+    padding: "2px 6px",
+    background: "#dcfce7",
+    borderRadius: 4,
     display: "inline-block",
   },
-  currentAssignmentText: {
-    fontSize: 12,
-    color: "#475569",
-    margin: 0,
-    fontStyle: "italic",
+  statusUnavailable: {
+    fontSize: 10,
+    color: "#991b1b",
+    fontWeight: 600,
+    padding: "2px 6px",
+    background: "#fee2e2",
+    borderRadius: 4,
+    display: "inline-block",
   },
-  // Add these styles to your existing styles object
-selectedFilterTab: {
-  padding: "8px 12px",
-  background: "#3b82f6",
-  color: "#fff",
-  border: "none",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontWeight: 600,
-  fontSize: 13,
-  display: "flex",
-  alignItems: "center",
-  gap: "6px",
-  transition: "all 0.2s",
-  margin: "0 4px",
-},
-selectedTabCheck: {
-  fontSize: '10px',
-  fontWeight: 'bold',
-},
-selectedTabLabel: {
-  fontSize: '12px',
-  fontWeight: 600,
-},
-selectedTabRemove: {
-  fontSize: '12px',
-  fontWeight: 'bold',
-  marginLeft: '4px',
-  opacity: 0.8,
-  transition: 'opacity 0.2s',
-},
-// Slot Teachers View Styles
-slotTeachersContainer: {
-  display: "flex",
-  flexDirection: "column",
-  gap: 24,
-},
-slotTeachersCard: {
-  background: "#fff",
-  borderRadius: 12,
-  overflow: "hidden",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-  border: "1px solid #e2e8f0",
-},
-slotTeachersHeader: {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "flex-start",
-  padding: "20px",
-  borderLeft: "5px solid",
-  gap: 16,
-},
-slotTeachersInfo: {
-  flex: 1,
-},
-slotTeachersTitle: {
-  fontSize: 18,
-  fontWeight: 700,
-  margin: 0,
-},
-slotTeachersTime: {
-  fontSize: 14,
-  fontWeight: 600,
-  color: "#64748b",
-  margin: "4px 0 2px",
-},
-slotTeachersCode: {
-  fontSize: 12,
-  color: "#94a3b8",
-  margin: 0,
-},
-slotTeachersBadges: {
-  display: "flex",
-  gap: 8,
-  flexWrap: "wrap",
-  justifyContent: "flex-end",
-},
-slotTeachersBadge: {
-  padding: "6px 12px",
-  background: "rgba(255,255,255,0.7)",
-  borderRadius: 6,
-  fontSize: 12,
-  fontWeight: 600,
-  color: "#475569",
-  whiteSpace: "nowrap" as const,
-},
-slotTeachersList: {
-  display: "flex",
-  flexDirection: "column",
-  gap: 0,
-  borderTop: "1px solid #e2e8f0",
-},
-slotTeacherItem: {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "flex-start",
-  padding: "16px 20px",
-  borderLeft: "4px solid",
-  borderBottom: "1px solid #f1f5f9",
-  gap: 12,
-  transition: "background-color 0.2s",
-},
-teacherDetailsLeft: {
-  flex: 1,
-},
-teacherDetailsRight: {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-},
-slotTeacherName: {
-  fontSize: 14,
-  fontWeight: 700,
-  color: "#1e293b",
-  margin: 0,
-},
-slotTeacherCode: {
-  fontSize: 12,
-  color: "#64748b",
-  margin: "4px 0 0",
-},
-slotTeacherSubjects: {
-  display: "flex",
-  gap: 6,
-  marginTop: 8,
-  flexWrap: "wrap",
-},
-smallSubjectTag: {
-  padding: "3px 8px",
-  borderRadius: 4,
-  fontSize: 10,
-  fontWeight: 600,
-  border: "1px solid",
-  display: "inline-block",
-},
-slotTeacherStatus: {
-  padding: "6px 10px",
-  borderRadius: 6,
-  fontSize: 11,
-  fontWeight: 600,
-  whiteSpace: "nowrap" as const,
-},
-noTeachersForSlot: {
-  padding: "24px",
-  textAlign: "center",
-  color: "#94a3b8",
-  fontSize: 14,
-},
-
+  teacherSubjects: {
+    fontSize: 10,
+    color: "#475569",
+    marginTop: 2,
+  },
+  subjectsLabel: {
+    fontWeight: 600,
+  },
+  currentAssignment: {
+    fontSize: 9,
+    color: "#64748b",
+    fontStyle: "italic",
+    marginTop: 2,
+  },
+  noTeachersMessage: {
+    padding: "16px",
+    textAlign: "center",
+    color: "#64748b",
+    fontSize: 12,
+  },
 };
 
 // Add CSS animations
@@ -2513,7 +2292,6 @@ styleSheet.insertRule(
   }`,
   styleSheet.cssRules.length
 );
-
 
 styleSheet.insertRule(
   `@keyframes slideDown {
@@ -2528,7 +2306,6 @@ styleSheet.insertRule(
       max-height: 300px;
     }
   }`,
-  
   styleSheet.cssRules.length
 );
 
