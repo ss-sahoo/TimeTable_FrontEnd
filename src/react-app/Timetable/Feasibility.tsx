@@ -67,6 +67,12 @@ const Feasibility: React.FC = () => {
   const [brokenRules, setBrokenRules] = useState<string[]>([]);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [stopSlot, setStopSlot] = useState<string>("");
+  
+  // Progress tracking for async optimization
+  const [taskId, setTaskId] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ current: number; total: number; fitness?: number } | null>(null);
+  const [progressStatus, setProgressStatus] = useState<string>("");
+  const pollingIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
 
   /* Get timetable ID from localStorage */
   useEffect(() => {
@@ -197,23 +203,66 @@ const Feasibility: React.FC = () => {
     }
   }, [timetableId]);
 
+  /* Cleanup polling on unmount */
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
+
+  /* Check task status */
+  const checkTaskStatus = useCallback(async (taskIdToCheck: string) => {
+    try {
+      const res = await Fetch(`/api/timetable/tasks/${taskIdToCheck}/status/`, {
+        method: "GET",
+      });
+      if (!res.ok) {
+        throw new Error("Failed to check task status");
+      }
+      return await res.json();
+    } catch (err) {
+      console.error("Error checking task status:", err);
+      throw err;
+    }
+  }, []);
+
+  /* Cancel generation */
+  const handleCancelGeneration = useCallback(() => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    setGenerating(false);
+    setTaskId(null);
+    setProgress(null);
+    setProgressStatus("");
+  }, []);
+
   /* Generate timetable (optimize) */
   const handleGenerateTimetable = useCallback(async () => {
-    if (!timetableId || !payload) {
+    if (!timetableId) {
       setError("No payload available. Please run feasibility check first.");
       return;
     }
 
     setGenerating(true);
     setError(null);
+    setProgress(null);
+    setProgressStatus("Starting optimization...");
 
     try {
       console.log("Generating timetable (optimize) with settings:", settings);
       
-      // Create payload with settings
+      // Create optimization payload with settings
       const optimizationPayload = {
-        ...payload,
-        settings: settings
+        max_retries: settings.max_retries,
+        max_try_for_slot_assign: settings.max_try_for_slot_assign,
+        weight_power_fector: settings.weight_power_fector,
+        max_one_subject_repetation_per_day: settings.max_one_subject_repetation_per_day,
+        max_one_subject_repetation_per_day_penalty_fector: settings.max_one_subject_repetation_per_day_penalty_fector,
+        weight_penalty_consu_sub_repetation: settings.weight_penalty_consu_sub_repetation
       };
 
       const optimizeResponse = await Fetch(`/api/timetable/timetables/${timetableId}/optimize/`, {
@@ -226,16 +275,69 @@ const Feasibility: React.FC = () => {
         throw new Error(`Optimization failed: ${optimizeResponse.status} - ${parseErrorResponse(errorData)}`);
       }
 
-      const optimizeData = await optimizeResponse.json();
-      console.log("Optimization result:", optimizeData);
-      setGeneratedTimetable(optimizeData);
+      const { task_id } = await optimizeResponse.json();
+      console.log("Optimization task started:", task_id);
+      setTaskId(task_id);
+      setProgressStatus("Optimization in progress...");
+
+      // Start polling for task status
+      pollingIntervalRef.current = setInterval(async () => {
+        try {
+          const data = await checkTaskStatus(task_id);
+          console.log("Task status:", data);
+
+          if (data.status === 'PROGRESS') {
+            setProgress({
+              current: data.progress?.current || 0,
+              total: data.progress?.total || 100,
+              fitness: data.progress?.fitness
+            });
+            setProgressStatus(`Generation ${data.progress?.current || 0}/${data.progress?.total || 100}`);
+          } else if (data.status === 'SUCCESS') {
+            // Clear polling
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
+            
+            setGeneratedTimetable(data.result);
+            setGenerating(false);
+            setTaskId(null);
+            setProgress(null);
+            setProgressStatus("");
+            
+            // Show success message
+            const entriesCreated = data.result?.entries_created || 'Unknown';
+            alert(`Timetable generated successfully! ${entriesCreated} entries created.`);
+          } else if (data.status === 'FAILURE') {
+            // Clear polling
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
+            
+            setGenerating(false);
+            setTaskId(null);
+            setProgress(null);
+            setProgressStatus("");
+            setError(data.error || "Optimization failed");
+          } else if (data.status === 'PENDING') {
+            setProgressStatus("Waiting in queue...");
+          }
+        } catch (err: any) {
+          console.error("Polling error:", err);
+          // Don't stop polling on transient errors, but log them
+        }
+      }, 2000); // Poll every 2 seconds
+
     } catch (err: any) {
       console.error("Optimization error:", err);
       setError(err.message || "Failed to generate timetable");
-    } finally {
       setGenerating(false);
+      setProgress(null);
+      setProgressStatus("");
     }
-  }, [timetableId, payload, settings]);
+  }, [timetableId, settings, checkTaskStatus]);
 
   /* Save generated timetable */
   const handleSaveTimetable = useCallback(async () => {
@@ -568,6 +670,75 @@ const Feasibility: React.FC = () => {
                 ) : (
                   "Update Timetable"
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generation Progress Modal */}
+      {generating && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.progressModalContent}>
+            <div style={styles.progressModalHeader}>
+              <div style={styles.progressIconContainer}>
+                <div style={styles.progressSpinner}></div>
+              </div>
+              <h3 style={styles.progressTitle}>Generating Timetable</h3>
+              <p style={styles.progressSubtitle}>{progressStatus}</p>
+            </div>
+            
+            <div style={styles.progressBody}>
+              {/* Progress Bar */}
+              <div style={styles.progressBarContainer}>
+                <div style={styles.progressBarBackground}>
+                  <div 
+                    style={{
+                      ...styles.progressBarFill,
+                      width: progress ? `${Math.min((progress.current / progress.total) * 100, 100)}%` : '0%',
+                    }}
+                  ></div>
+                </div>
+                <div style={styles.progressStats}>
+                  {progress ? (
+                    <>
+                      <span style={styles.progressCount}>
+                        {progress.current} / {progress.total}
+                      </span>
+                      <span style={styles.progressPercent}>
+                        {Math.round((progress.current / progress.total) * 100)}%
+                      </span>
+                    </>
+                  ) : (
+                    <span style={styles.progressCount}>Initializing...</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Fitness Score */}
+              {progress?.fitness !== undefined && (
+                <div style={styles.fitnessContainer}>
+                  <span style={styles.fitnessLabel}>Fitness Score:</span>
+                  <span style={styles.fitnessValue}>{progress.fitness.toLocaleString()}</span>
+                </div>
+              )}
+
+              {/* Info Message */}
+              <div style={styles.progressInfo}>
+                <span style={styles.progressInfoIcon}>💡</span>
+                <span style={styles.progressInfoText}>
+                  The optimization algorithm is finding the best timetable arrangement. 
+                  This may take a few minutes depending on the complexity.
+                </span>
+              </div>
+            </div>
+
+            <div style={styles.progressFooter}>
+              <button 
+                style={styles.cancelGenerationBtn}
+                onClick={handleCancelGeneration}
+              >
+                Cancel Generation
               </button>
             </div>
           </div>
@@ -1495,6 +1666,134 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "13px",
     color: "#0369a1",
     lineHeight: "1.4",
+  },
+  // Progress Modal Styles
+  progressModalContent: {
+    background: "#ffffff",
+    borderRadius: "16px",
+    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+    maxWidth: "480px",
+    width: "100%",
+    overflow: "hidden",
+  },
+  progressModalHeader: {
+    padding: "32px 24px 24px",
+    textAlign: "center",
+    background: "linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)",
+    color: "#ffffff",
+  },
+  progressIconContainer: {
+    width: "64px",
+    height: "64px",
+    margin: "0 auto 16px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  progressSpinner: {
+    width: "48px",
+    height: "48px",
+    border: "4px solid rgba(255, 255, 255, 0.3)",
+    borderTop: "4px solid #ffffff",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+  },
+  progressTitle: {
+    fontSize: "20px",
+    fontWeight: "600",
+    margin: "0 0 8px 0",
+  },
+  progressSubtitle: {
+    fontSize: "14px",
+    opacity: 0.9,
+    margin: 0,
+  },
+  progressBody: {
+    padding: "24px",
+  },
+  progressBarContainer: {
+    marginBottom: "20px",
+  },
+  progressBarBackground: {
+    height: "12px",
+    background: "#e2e8f0",
+    borderRadius: "6px",
+    overflow: "hidden",
+    marginBottom: "8px",
+  },
+  progressBarFill: {
+    height: "100%",
+    background: "linear-gradient(90deg, #8b5cf6 0%, #6366f1 100%)",
+    borderRadius: "6px",
+    transition: "width 0.3s ease-out",
+  },
+  progressStats: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  progressCount: {
+    fontSize: "14px",
+    color: "#64748b",
+    fontWeight: "500",
+  },
+  progressPercent: {
+    fontSize: "14px",
+    color: "#8b5cf6",
+    fontWeight: "600",
+  },
+  fitnessContainer: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "8px",
+    padding: "12px 16px",
+    background: "#f8fafc",
+    borderRadius: "8px",
+    marginBottom: "20px",
+  },
+  fitnessLabel: {
+    fontSize: "13px",
+    color: "#64748b",
+  },
+  fitnessValue: {
+    fontSize: "16px",
+    fontWeight: "600",
+    color: "#1e293b",
+  },
+  progressInfo: {
+    display: "flex",
+    gap: "12px",
+    padding: "14px 16px",
+    background: "#fef3c7",
+    border: "1px solid #fcd34d",
+    borderRadius: "8px",
+    alignItems: "flex-start",
+  },
+  progressInfoIcon: {
+    fontSize: "16px",
+    flexShrink: 0,
+  },
+  progressInfoText: {
+    fontSize: "13px",
+    color: "#92400e",
+    lineHeight: "1.4",
+  },
+  progressFooter: {
+    padding: "16px 24px 24px",
+    display: "flex",
+    justifyContent: "center",
+  },
+  cancelGenerationBtn: {
+    padding: "10px 24px",
+    background: "#ffffff",
+    color: "#dc2626",
+    border: "1px solid #fecaca",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+    transition: "all 0.2s",
   },
 };
 
