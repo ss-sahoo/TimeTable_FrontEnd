@@ -70,7 +70,15 @@ const Feasibility: React.FC = () => {
   
   // Progress tracking for async optimization
   const [taskId, setTaskId] = useState<string | null>(null);
-  const [progress, setProgress] = useState<{ current: number; total: number; fitness?: number } | null>(null);
+  const [progress, setProgress] = useState<{ 
+    current: number; 
+    total: number; 
+    fitness?: number;
+    percent_complete?: number;
+    elapsed_seconds?: number;
+    estimated_remaining_seconds?: number;
+    phase?: string;
+  } | null>(null);
   const [progressStatus, setProgressStatus] = useState<string>("");
   const pollingIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -357,9 +365,13 @@ const Feasibility: React.FC = () => {
             setProgress({
               current: data.progress?.current || 0,
               total: data.progress?.total || 100,
-              fitness: data.progress?.fitness
+              fitness: data.progress?.best_fitness || data.progress?.fitness,
+              percent_complete: data.progress?.percent_complete,
+              elapsed_seconds: data.progress?.elapsed_seconds,
+              estimated_remaining_seconds: data.progress?.estimated_remaining_seconds,
+              phase: data.progress?.phase
             });
-            setProgressStatus(`Generation ${data.progress?.current || 0}/${data.progress?.total || 100}`);
+            setProgressStatus(data.progress?.status || `Generation ${data.progress?.current || 0}/${data.progress?.total || 100}`);
           } else if (data.status === 'SUCCESS') {
             // Clear polling
             if (pollingIntervalRef.current) {
@@ -498,9 +510,13 @@ const Feasibility: React.FC = () => {
             setProgress({
               current: data.progress?.current || 0,
               total: data.progress?.total || 100,
-              fitness: data.progress?.fitness
+              fitness: data.progress?.best_fitness || data.progress?.fitness,
+              percent_complete: data.progress?.percent_complete,
+              elapsed_seconds: data.progress?.elapsed_seconds,
+              estimated_remaining_seconds: data.progress?.estimated_remaining_seconds,
+              phase: data.progress?.phase
             });
-            setProgressStatus(`Regeneration ${data.progress?.current || 0}/${data.progress?.total || 100}`);
+            setProgressStatus(data.progress?.status || `Regeneration ${data.progress?.current || 0}/${data.progress?.total || 100}`);
           } else if (data.status === 'SUCCESS') {
             // Clear polling
             if (pollingIntervalRef.current) {
@@ -824,7 +840,11 @@ const Feasibility: React.FC = () => {
                   <div 
                     style={{
                       ...styles.progressBarFill,
-                      width: progress ? `${Math.min((progress.current / progress.total) * 100, 100)}%` : '0%',
+                      width: progress?.percent_complete 
+                        ? `${Math.min(progress.percent_complete, 100)}%` 
+                        : progress 
+                          ? `${Math.min((progress.current / progress.total) * 100, 100)}%` 
+                          : '0%',
                     }}
                   ></div>
                 </div>
@@ -835,7 +855,10 @@ const Feasibility: React.FC = () => {
                         {progress.current} / {progress.total}
                       </span>
                       <span style={styles.progressPercent}>
-                        {Math.round((progress.current / progress.total) * 100)}%
+                        {progress.percent_complete 
+                          ? `${progress.percent_complete.toFixed(1)}%` 
+                          : `${Math.round((progress.current / progress.total) * 100)}%`
+                        }
                       </span>
                     </>
                   ) : (
@@ -844,10 +867,46 @@ const Feasibility: React.FC = () => {
                 </div>
               </div>
 
+              {/* Time Stats */}
+              {progress && (progress.elapsed_seconds !== undefined || progress.estimated_remaining_seconds !== undefined) && (
+                <div style={styles.timeStatsContainer}>
+                  {progress.elapsed_seconds !== undefined && (
+                    <div style={styles.timeStat}>
+                      <span style={styles.timeStatLabel}>⏱️ Elapsed:</span>
+                      <span style={styles.timeStatValue}>
+                        {progress.elapsed_seconds < 60 
+                          ? `${Math.round(progress.elapsed_seconds)}s`
+                          : `${Math.floor(progress.elapsed_seconds / 60)}m ${Math.round(progress.elapsed_seconds % 60)}s`
+                        }
+                      </span>
+                    </div>
+                  )}
+                  {progress.estimated_remaining_seconds !== undefined && progress.estimated_remaining_seconds > 0 && (
+                    <div style={styles.timeStat}>
+                      <span style={styles.timeStatLabel}>⏳ Remaining:</span>
+                      <span style={styles.timeStatValue}>
+                        {progress.estimated_remaining_seconds < 60 
+                          ? `~${Math.round(progress.estimated_remaining_seconds)}s`
+                          : `~${Math.floor(progress.estimated_remaining_seconds / 60)}m ${Math.round(progress.estimated_remaining_seconds % 60)}s`
+                        }
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Phase indicator */}
+              {progress?.phase && (
+                <div style={styles.phaseContainer}>
+                  <span style={styles.phaseLabel}>Phase:</span>
+                  <span style={styles.phaseValue}>{progress.phase}</span>
+                </div>
+              )}
+
               {/* Fitness Score */}
               {progress?.fitness !== undefined && (
                 <div style={styles.fitnessContainer}>
-                  <span style={styles.fitnessLabel}>Fitness Score:</span>
+                  <span style={styles.fitnessLabel}>🎯 Best Fitness Score:</span>
                   <span style={styles.fitnessValue}>{progress.fitness.toLocaleString()}</span>
                 </div>
               )}
@@ -2021,6 +2080,50 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "16px",
     fontWeight: "600",
     color: "#1e293b",
+  },
+  timeStatsContainer: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "24px",
+    padding: "12px 16px",
+    background: "#f0f9ff",
+    borderRadius: "8px",
+    marginBottom: "16px",
+    flexWrap: "wrap",
+  },
+  timeStat: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  },
+  timeStatLabel: {
+    fontSize: "13px",
+    color: "#0369a1",
+  },
+  timeStatValue: {
+    fontSize: "14px",
+    fontWeight: "600",
+    color: "#0c4a6e",
+  },
+  phaseContainer: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "8px",
+    padding: "8px 16px",
+    background: "#faf5ff",
+    borderRadius: "8px",
+    marginBottom: "16px",
+  },
+  phaseLabel: {
+    fontSize: "13px",
+    color: "#7c3aed",
+  },
+  phaseValue: {
+    fontSize: "14px",
+    fontWeight: "600",
+    color: "#5b21b6",
+    textTransform: "capitalize",
   },
   progressInfo: {
     display: "flex",

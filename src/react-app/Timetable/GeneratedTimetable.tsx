@@ -597,10 +597,16 @@ const GeneratedTimetable: React.FC = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setIsActive(data.is_active || false);
+        // Only set active if API explicitly returns is_active === true
+        setIsActive(data.is_active === true);
+      } else {
+        // If API fails, default to inactive
+        setIsActive(false);
       }
     } catch (err) {
       console.error("Error checking activation status:", err);
+      // On error, default to inactive
+      setIsActive(false);
     }
   }, [timetableId]);
 
@@ -2129,91 +2135,82 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     opacity: 0.8,
   },
-matrixDayCell: {
-  flex: 1,
-  minWidth: 110,
-  padding: "12px",
-  borderRight: "1px solid #e2e8f0",
-  backgroundColor: "#fff",
-},
-
-slotBox: {
-  width: "100%",
-  aspectRatio: "1 / 1",   // ⭐ MAKES IT SQUARE
-  borderRadius: 8,
-  border: "2px solid",
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",
-  position: "relative",
-  transition: "all 0.2s",
-  padding: "8px",
-  boxSizing: "border-box",
-  overflow: "hidden",
-},
-
-slotContent: {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",  // ADD THIS
-  gap: 4,
-  width: "100%",
-  textAlign: "center",
-  overflow: "hidden",  // ADD THIS
-},
-slotSubject: {
-  fontSize: 12,  // CHANGED from 14 to 12
-  fontWeight: 700,
-  lineHeight: 1.2,
-  maxWidth: "100%",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "normal",  // CHANGED from "nowrap" to "normal"
-  display: "-webkit-box",
-  WebkitLineClamp: 2,  // ADD THIS - allows 2 lines
-  WebkitBoxOrient: "vertical",  // ADD THIS
-  maxHeight: "2.4em",  // ADD THIS - 2 lines * 1.2 line-height
-},
-slotTime: {
-  fontSize: 10,  // CHANGED from 11 to 10
-  color: "#64748b",
-  fontWeight: 600,
-  backgroundColor: "rgba(255,255,255,0.7)",
-  padding: "2px 4px",
-  borderRadius: 4,
-  lineHeight: 1,
-  marginTop: 2,  // ADD THIS
-},
-slotBatchMini: {
-  fontSize: 10,  // CHANGED from 11 to 10
-  color: "#475569",
-  fontWeight: 600,
-  backgroundColor: "rgba(255,255,255,0.7)",
-  padding: "2px 4px",
-  borderRadius: 4,
-  lineHeight: 1,
-  maxWidth: "100%",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-  marginTop: 2,  // ADD THIS
-},
-slotTeacherMini: {
-  fontSize: 10,  // CHANGED from 11 to 10
-  color: "#475569",
-  fontWeight: 600,
-  backgroundColor: "rgba(255,255,255,0.7)",
-  padding: "2px 4px",
-  borderRadius: 4,
-  lineHeight: 1,
-  maxWidth: "100%",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-  marginTop: 2,  // ADD THIS
-},
+  slotBox: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    borderRadius: 8,
+    border: "2px solid",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    transition: "all 0.2s",
+    padding: "8px",
+    boxSizing: "border-box",
+    overflow: "hidden",
+  },
+  slotContent: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    width: "100%",
+    textAlign: "center",
+    overflow: "hidden",
+  },
+  slotSubject: {
+    fontSize: 12,
+    fontWeight: 700,
+    lineHeight: 1.2,
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "normal",
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+    maxHeight: "2.4em",
+  },
+  slotTime: {
+    fontSize: 10,
+    color: "#64748b",
+    fontWeight: 600,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    padding: "2px 4px",
+    borderRadius: 4,
+    lineHeight: 1,
+    marginTop: 2,
+  },
+  slotBatchMini: {
+    fontSize: 10,
+    color: "#475569",
+    fontWeight: 600,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    padding: "2px 4px",
+    borderRadius: 4,
+    lineHeight: 1,
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    marginTop: 2,
+  },
+  slotTeacherMini: {
+    fontSize: 10,
+    color: "#475569",
+    fontWeight: 600,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    padding: "2px 4px",
+    borderRadius: 4,
+    lineHeight: 1,
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    marginTop: 2,
+  },
   slotLoading: {
     position: "absolute",
     top: 4,
@@ -2329,17 +2326,6 @@ slotTeacherMini: {
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: 8,
-  },
-  slotSubject: {
-    fontSize: 14,
-    fontWeight: 700,
-    flex: 1,
-    textAlign: 'center',
-  },
-  slotContent: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
   },
   slotBatch: {
     fontSize: 12,
