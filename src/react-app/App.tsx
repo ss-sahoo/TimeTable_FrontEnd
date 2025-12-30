@@ -188,6 +188,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 // Landing Route Component (show landing page if not authenticated, dashboard if authenticated)
+// Also handles domain-based landing page selection
 function LandingRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading, user } = useAuthContext();
 
@@ -202,7 +203,18 @@ function LandingRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return isAuthenticated ? <Navigate to={getDashboardRoute(user?.role)} replace /> : children;
+  if (isAuthenticated) {
+    return <Navigate to={getDashboardRoute(user?.role)} replace />;
+  }
+
+  // Domain-based landing page selection
+  const hostname = window.location.hostname;
+  if (hostname === 'timetable.dashoapp.com') {
+    return <Timetablelanding />;
+  }
+
+  // Default: exams.dashoapp.com or any other domain shows the exam landing page
+  return children;
 }
 
 function AppRoutes() {
