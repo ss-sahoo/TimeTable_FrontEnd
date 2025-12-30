@@ -1,406 +1,498 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
+import { motion, useScroll, useTransform, useInView } from 'framer-motion';
 import { 
   Zap, 
   Shield, 
   Brain, 
-  Sparkles, 
   ArrowRight, 
   CheckCircle2,
-  Users,
-  TrendingUp,
   Lock,
-  Cpu,
-  Eye,
   FileText,
   BarChart3,
   Clock,
-  Award,
-  Globe,
-  Rocket
+  Sparkles,
+  Play,
+  ChevronRight,
+  Menu,
+  X
 } from 'lucide-react';
-import ExamCardsStack from '../components/ExamCardsStack';
+
+// Animated counter hook
+function useCounter(end: number, duration: number = 2000, startOnView: boolean = true) {
+  const [count, setCount] = useState(0);
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true });
+  
+  useEffect(() => {
+    if (!startOnView || isInView) {
+      let startTime: number;
+      const animate = (currentTime: number) => {
+        if (!startTime) startTime = currentTime;
+        const progress = Math.min((currentTime - startTime) / duration, 1);
+        setCount(Math.floor(progress * end));
+        if (progress < 1) requestAnimationFrame(animate);
+      };
+      requestAnimationFrame(animate);
+    }
+  }, [end, duration, isInView, startOnView]);
+  
+  return { count, ref };
+}
+
+// Floating shapes component
+function FloatingShapes() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <motion.div
+        className="absolute top-20 left-10 w-72 h-72 bg-blue-100 rounded-full mix-blend-multiply filter blur-xl opacity-70"
+        animate={{ x: [0, 30, 0], y: [0, -20, 0] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        className="absolute top-40 right-20 w-96 h-96 bg-indigo-100 rounded-full mix-blend-multiply filter blur-xl opacity-70"
+        animate={{ x: [0, -20, 0], y: [0, 30, 0] }}
+        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        className="absolute bottom-20 left-1/3 w-80 h-80 bg-sky-100 rounded-full mix-blend-multiply filter blur-xl opacity-70"
+        animate={{ x: [0, 20, 0], y: [0, -30, 0] }}
+        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+      />
+    </div>
+  );
+}
 
 export default function LandingPage() {
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { scrollYProgress } = useScroll();
-  const scaleX = useSpring(scrollYProgress, {
-    stiffness: 100,
-    damping: 30,
-    restDelta: 0.001
-  });
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
+  const heroRef = useRef(null);
+  const isHeroInView = useInView(heroRef, { once: true });
+  
+  const backgroundY = useTransform(scrollYProgress, [0, 1], ['0%', '30%']);
 
   const features = [
     {
       icon: Brain,
-      title: 'AI-Powered Extraction',
-      description: 'Automatically extract questions from PDFs using advanced AI technology',
-      gradient: 'from-sky-500 to-blue-600'
+      title: 'AI Question Extraction',
+      description: 'Upload PDFs and let our AI automatically extract and format questions with high accuracy.',
+      color: 'bg-blue-500'
     },
     {
       icon: Shield,
-      title: 'Advanced Proctoring',
-      description: 'Real-time monitoring with AI-based cheating detection',
-      gradient: 'from-violet-500 to-purple-600'
+      title: 'Smart Proctoring',
+      description: 'Real-time monitoring with intelligent detection to maintain exam integrity.',
+      color: 'bg-indigo-500'
     },
     {
       icon: BarChart3,
-      title: 'Smart Analytics',
-      description: 'Deep insights into student performance and exam patterns',
-      gradient: 'from-pink-500 to-rose-600'
+      title: 'Deep Analytics',
+      description: 'Comprehensive insights into performance patterns and learning outcomes.',
+      color: 'bg-sky-500'
     },
     {
       icon: Zap,
-      title: 'Lightning Fast',
-      description: 'Create and deploy exams in minutes, not hours',
-      gradient: 'from-amber-500 to-orange-600'
+      title: 'Quick Setup',
+      description: 'Create and deploy professional exams in minutes with intuitive tools.',
+      color: 'bg-blue-600'
     },
     {
       icon: Lock,
-      title: 'Bank-Grade Security',
-      description: 'Enterprise-level encryption and data protection',
-      gradient: 'from-emerald-500 to-teal-600'
+      title: 'Secure Platform',
+      description: 'Enterprise-grade security with encrypted data and secure access controls.',
+      color: 'bg-indigo-600'
     },
     {
-      icon: Globe,
-      title: 'Accessible Anywhere',
-      description: 'Cloud-based platform accessible from any device',
-      gradient: 'from-indigo-500 to-blue-600'
+      icon: Clock,
+      title: 'Flexible Scheduling',
+      description: 'Schedule exams with custom time windows and automatic notifications.',
+      color: 'bg-sky-600'
     }
   ];
 
-  const stats = [
-    { value: '50K+', label: 'Active Users', icon: Users },
-    { value: '1M+', label: 'Exams Conducted', icon: FileText },
-    { value: '99.9%', label: 'Uptime', icon: TrendingUp },
-    { value: '24/7', label: 'Support', icon: Clock }
-  ];
-
-  const testimonials = [
-    {
-      name: 'Dr. Sarah Johnson',
-      role: 'University Professor',
-      content: 'DashoExams has revolutionized how we conduct assessments. The AI features save us hours of work!',
-      avatar: '👩‍🏫'
+  const steps = [
+    { 
+      number: '01', 
+      title: 'Create Your Exam', 
+      description: 'Upload questions or let AI extract them from your documents automatically.',
+      icon: FileText
     },
-    {
-      name: 'Michael Chen',
-      role: 'Education Director',
-      content: 'The proctoring features are incredibly robust. We\'ve seen a significant improvement in exam integrity.',
-      avatar: '👨‍💼'
+    { 
+      number: '02', 
+      title: 'Configure Settings', 
+      description: 'Set timing, proctoring rules, and customize the exam experience.',
+      icon: Sparkles
     },
-    {
-      name: 'Emily Rodriguez',
-      role: 'Institute Administrator',
-      content: 'Best investment we\'ve made. The analytics help us understand student performance like never before.',
-      avatar: '👩‍💻'
+    { 
+      number: '03', 
+      title: 'Analyze Results', 
+      description: 'Get detailed analytics and insights to improve learning outcomes.',
+      icon: BarChart3
     }
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden">
-      {/* Progress Bar */}
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50 text-slate-900 overflow-x-hidden">
+      {/* Progress indicator */}
       <motion.div
-        className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 via-violet-500 to-pink-500 origin-left z-50"
-        style={{ scaleX }}
+        className="fixed top-0 left-0 right-0 h-0.5 bg-blue-500 origin-left z-50"
+        style={{ scaleX: scrollYProgress }}
       />
-
-      {/* Animated Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute w-96 h-96 bg-sky-500/10 rounded-full blur-3xl"
-          animate={{
-            x: mousePosition.x - 200,
-            y: mousePosition.y - 200,
-          }}
-          transition={{ type: 'spring', damping: 30 }}
-        />
-        <div className="absolute top-20 right-20 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 left-20 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
-      </div>
 
       {/* Navigation */}
       <motion.nav
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="relative z-40 border-b border-white/10 backdrop-blur-xl bg-slate-900/50"
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="fixed top-0 w-full z-40 bg-white/80 backdrop-blur-lg border-b border-slate-200/50"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 sm:h-20">
-            <Link to="/" className="flex items-center gap-2 sm:gap-3 group">
+          <div className="flex items-center justify-between h-16 lg:h-20">
+            {/* Logo */}
+            <Link to="/" className="flex items-center gap-2.5 group">
               <motion.div
-                whileHover={{ scale: 1.1, rotate: 180 }}
-                transition={{ type: 'spring', stiffness: 300 }}
-                className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-sky-500 to-violet-500 flex items-center justify-center shadow-lg shadow-sky-500/50"
+                whileHover={{ scale: 1.05 }}
+                className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25"
               >
-                <Zap className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
+                <Zap className="w-5 h-5 text-white" />
               </motion.div>
-              <span className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-sky-400 via-violet-400 to-pink-400 bg-clip-text text-transparent">
-                DashoExams
+              <span className="text-xl font-bold text-slate-900">
+                Dasho<span className="text-blue-600">Exams</span>
               </span>
             </Link>
 
-            <div className="hidden md:flex items-center gap-6 lg:gap-8">
-              <a href="#features" className="text-sm lg:text-base text-slate-300 hover:text-white transition-colors">Features</a>
-              <a href="#how-it-works" className="text-sm lg:text-base text-slate-300 hover:text-white transition-colors">How It Works</a>
-              <a href="#pricing" className="text-sm lg:text-base text-slate-300 hover:text-white transition-colors">Pricing</a>
+            {/* Desktop Navigation */}
+            <div className="hidden lg:flex items-center gap-8">
+              {['Features', 'How It Works', 'Pricing'].map((item) => (
+                <a
+                  key={item}
+                  href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
+                  className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors relative group"
+                >
+                  {item}
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-500 group-hover:w-full transition-all duration-300" />
+                </a>
+              ))}
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            {/* CTA Buttons */}
+            <div className="hidden lg:flex items-center gap-3">
               <Link
                 to="/login"
-                className="hidden sm:inline-block px-4 lg:px-6 py-2 lg:py-2.5 text-sm lg:text-base text-white hover:text-sky-400 transition-colors"
+                className="px-5 py-2.5 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors"
               >
                 Sign In
               </Link>
-              <Link
-                to="/register"
-                className="px-4 sm:px-5 lg:px-6 py-2 lg:py-2.5 text-sm lg:text-base bg-gradient-to-r from-sky-500 to-violet-500 rounded-full font-semibold hover:shadow-lg hover:shadow-sky-500/50 transition-all hover:scale-105 whitespace-nowrap"
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Link
+                  to="/register"
+                  className="px-5 py-2.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/25"
+                >
+                  Get Started
+                </Link>
+              </motion.div>
+            </div>
+
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden p-2 text-slate-600"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile menu */}
+        <motion.div
+          initial={false}
+          animate={{ height: mobileMenuOpen ? 'auto' : 0, opacity: mobileMenuOpen ? 1 : 0 }}
+          className="lg:hidden overflow-hidden bg-white border-t border-slate-100"
+        >
+          <div className="px-4 py-4 space-y-3">
+            {['Features', 'How It Works', 'Pricing'].map((item) => (
+              <a
+                key={item}
+                href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
+                className="block py-2 text-slate-600 hover:text-blue-600"
+                onClick={() => setMobileMenuOpen(false)}
               >
+                {item}
+              </a>
+            ))}
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <Link to="/login" className="block py-2 text-slate-600">Sign In</Link>
+              <Link to="/register" className="block py-2.5 px-4 bg-blue-600 text-white rounded-lg text-center">
                 Get Started
               </Link>
             </div>
           </div>
-        </div>
+        </motion.div>
       </motion.nav>
 
       {/* Hero Section */}
-      <section className="relative pt-16 sm:pt-24 lg:pt-32 pb-12 sm:pb-16 lg:pb-20 px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 lg:gap-16 items-center">
+      <section ref={heroRef} className="relative pt-28 lg:pt-36 pb-16 lg:pb-24 px-4 sm:px-6 overflow-hidden">
+        <FloatingShapes />
+        
+        <div className="max-w-7xl mx-auto relative">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            {/* Left content */}
             <motion.div
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8 }}
+              initial={{ opacity: 0, y: 30 }}
+              animate={isHeroInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.6 }}
             >
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-sky-500/20 to-violet-500/20 rounded-full border border-sky-500/30 mb-6 sm:mb-8"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={isHeroInView ? { opacity: 1, scale: 1 } : {}}
+                transition={{ delay: 0.1 }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-full mb-6"
               >
-                <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-sky-400" />
-                <span className="text-xs sm:text-sm font-medium text-sky-300">AI-Powered Examination Platform</span>
+                <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                <span className="text-sm font-medium text-blue-700">AI-Powered Examination Platform</span>
               </motion.div>
 
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
-                <span className="bg-gradient-to-r from-white via-sky-200 to-violet-200 bg-clip-text text-transparent">
-                  Transform Your
-                </span>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6">
+                <span className="text-slate-900">Modern Exams,</span>
                 <br />
-                <span className="bg-gradient-to-r from-sky-400 via-violet-400 to-pink-400 bg-clip-text text-transparent">
-                  Examination Process
+                <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  Simplified
                 </span>
               </h1>
 
-              <p className="text-base sm:text-lg lg:text-xl text-slate-300 mb-6 sm:mb-8 lg:mb-10 leading-relaxed">
-                Create, manage, and analyze exams with cutting-edge AI technology. 
-                Save time, enhance security, and gain deeper insights.
+              <p className="text-lg text-slate-600 mb-8 leading-relaxed max-w-lg">
+                Create, manage, and analyze examinations with intelligent tools. 
+                From question extraction to detailed analytics — everything in one place.
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                <Link
-                  to="/register"
-                  className="group px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-sky-500 to-violet-500 rounded-full font-semibold text-base sm:text-lg hover:shadow-2xl hover:shadow-sky-500/50 transition-all hover:scale-105 flex items-center justify-center gap-2"
-                >
-                  Start Free Trial
-                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-                <button className="px-6 sm:px-8 py-3 sm:py-4 bg-white/10 backdrop-blur-sm rounded-full font-semibold text-base sm:text-lg hover:bg-white/20 transition-all border border-white/20">
-                  Watch Demo
-                </button>
-              </div>
-
-              <div className="flex items-center gap-6 sm:gap-8 mt-8 sm:mt-12">
-                {stats.slice(0, 2).map((stat, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 + index * 0.1 }}
+              <div className="flex flex-col sm:flex-row gap-4 mb-10">
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Link
+                    to="/register"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/25"
                   >
-                    <div className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-sky-400 to-violet-400 bg-clip-text text-transparent">
-                      {stat.value}
-                    </div>
-                    <div className="text-xs sm:text-sm text-slate-400">{stat.label}</div>
-                  </motion.div>
-                ))}
+                    Start Free Trial
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </motion.div>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white text-slate-700 font-medium rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all"
+                >
+                  <Play className="w-4 h-4" />
+                  Watch Demo
+                </motion.button>
+              </div>
+
+              {/* Trust indicators */}
+              <div className="flex items-center gap-6 text-sm text-slate-500">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  <span>No credit card required</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  <span>Free 14-day trial</span>
+                </div>
               </div>
             </motion.div>
 
+            {/* Right content - Interactive Preview */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.8 }}
-              className="hidden lg:block relative h-[550px] w-full"
+              initial={{ opacity: 0, x: 50 }}
+              animate={isHeroInView ? { opacity: 1, x: 0 } : {}}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="relative hidden lg:block"
             >
-              {/* Interactive Exam Cards Stack */}
-              <ExamCardsStack />
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="relative py-12 sm:py-16 lg:py-20 px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
-            {stats.map((stat, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="text-center group"
+              <motion.div 
+                style={{ y: backgroundY }}
+                className="relative"
               >
-                <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-sky-500/20 to-violet-500/20 rounded-2xl mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
-                  <stat.icon className="w-6 h-6 sm:w-8 sm:h-8 text-sky-400" />
-                </div>
-                <div className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-sky-400 to-violet-400 bg-clip-text text-transparent mb-1 sm:mb-2">
-                  {stat.value}
-                </div>
-                <div className="text-xs sm:text-sm text-slate-400">{stat.label}</div>
+                {/* Main card */}
+                <motion.div
+                  whileHover={{ y: -5 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                  className="bg-white rounded-2xl shadow-2xl shadow-slate-200/50 border border-slate-100 p-6 relative z-10"
+                >
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="font-semibold text-slate-900">Physics Final Exam</h3>
+                      <p className="text-sm text-slate-500">50 Questions • 2 Hours</p>
+                    </div>
+                    <span className="px-3 py-1 bg-green-50 text-green-700 text-sm font-medium rounded-full">
+                      Active
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {[
+                      { label: 'Multiple Choice', count: 30, color: 'bg-blue-500' },
+                      { label: 'Short Answer', count: 15, color: 'bg-indigo-500' },
+                      { label: 'Essay', count: 5, color: 'bg-sky-500' }
+                    ].map((item, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={isHeroInView ? { opacity: 1, x: 0 } : {}}
+                        transition={{ delay: 0.4 + i * 0.1 }}
+                        className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 ${item.color} rounded-full`} />
+                          <span className="text-sm text-slate-700">{item.label}</span>
+                        </div>
+                        <span className="text-sm font-medium text-slate-900">{item.count}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-slate-100">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-500">Completion Rate</span>
+                      <span className="font-medium text-slate-900">78%</span>
+                    </div>
+                    <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={isHeroInView ? { width: '78%' } : {}}
+                        transition={{ duration: 1, delay: 0.6 }}
+                        className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Floating notification card */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={isHeroInView ? { opacity: 1, y: 0 } : {}}
+                  transition={{ delay: 0.8 }}
+                  className="absolute -bottom-6 -left-6 bg-white rounded-xl shadow-xl shadow-slate-200/50 border border-slate-100 p-4 z-20"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">AI Extraction Complete</p>
+                      <p className="text-xs text-slate-500">50 questions extracted</p>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Floating stats card */}
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={isHeroInView ? { opacity: 1, y: 0 } : {}}
+                  transition={{ delay: 1 }}
+                  className="absolute -top-4 -right-4 bg-white rounded-xl shadow-xl shadow-slate-200/50 border border-slate-100 p-4 z-20"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                      <BarChart3 className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">Avg. Score</p>
+                      <p className="text-lg font-bold text-blue-600">82%</p>
+                    </div>
+                  </div>
+                </motion.div>
               </motion.div>
-            ))}
+            </motion.div>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="relative py-16 sm:py-24 lg:py-32 px-4 sm:px-6">
+      <section id="features" className="py-20 lg:py-28 px-4 sm:px-6 bg-white">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-12 sm:mb-16 lg:mb-20"
+            viewport={{ once: true, margin: "-100px" }}
+            className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold mb-4 sm:mb-6">
-              <span className="bg-gradient-to-r from-sky-400 via-violet-400 to-pink-400 bg-clip-text text-transparent">
-                Powerful Features
-              </span>
+            <span className="inline-block px-3 py-1 bg-blue-50 text-blue-700 text-sm font-medium rounded-full mb-4">
+              Features
+            </span>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 mb-4">
+              Everything You Need
             </h2>
-            <p className="text-base sm:text-lg lg:text-xl text-slate-300 max-w-3xl mx-auto px-4">
-              Everything you need to create, manage, and analyze exams with cutting-edge technology
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+              Powerful tools designed to streamline your examination process from start to finish.
             </p>
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             {features.map((feature, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
+                viewport={{ once: true, margin: "-50px" }}
                 transition={{ delay: index * 0.1 }}
-                whileHover={{ y: -10 }}
-                className="group relative"
+                whileHover={{ y: -5 }}
+                className="group relative bg-slate-50 hover:bg-white rounded-2xl p-6 lg:p-8 border border-slate-100 hover:border-slate-200 hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-sky-500/10 to-violet-500/10 rounded-2xl sm:rounded-3xl blur-xl group-hover:blur-2xl transition-all" />
-                <div className="relative bg-slate-800/50 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 border border-white/10 hover:border-white/20 transition-all">
-                  <div className={`inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br ${feature.gradient} rounded-xl sm:rounded-2xl mb-4 sm:mb-6 shadow-lg`}>
-                    <feature.icon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-                  </div>
-                  <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-2 sm:mb-4">{feature.title}</h3>
-                  <p className="text-sm sm:text-base text-slate-300 leading-relaxed">{feature.description}</p>
+                <div className={`w-12 h-12 ${feature.color} rounded-xl flex items-center justify-center mb-5 shadow-lg`}>
+                  <feature.icon className="w-6 h-6 text-white" />
                 </div>
+                <h3 className="text-xl font-semibold text-slate-900 mb-3">{feature.title}</h3>
+                <p className="text-slate-600 leading-relaxed">{feature.description}</p>
+                <ChevronRight className="absolute bottom-6 right-6 w-5 h-5 text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* How It Works */}
-      <section id="how-it-works" className="relative py-16 sm:py-24 lg:py-32 px-4 sm:px-6 bg-gradient-to-b from-transparent via-slate-900/50 to-transparent">
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-20 lg:py-28 px-4 sm:px-6 bg-gradient-to-b from-slate-50 to-white">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-12 sm:mb-16 lg:mb-20"
+            viewport={{ once: true, margin: "-100px" }}
+            className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold mb-4 sm:mb-6">
-              <span className="bg-gradient-to-r from-sky-400 via-violet-400 to-pink-400 bg-clip-text text-transparent">
-                How It Works
-              </span>
+            <span className="inline-block px-3 py-1 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-full mb-4">
+              How It Works
+            </span>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 mb-4">
+              Simple Three-Step Process
             </h2>
-            <p className="text-base sm:text-lg lg:text-xl text-slate-300 max-w-3xl mx-auto px-4">
-              Get started in minutes with our simple three-step process
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+              Get started in minutes with our intuitive workflow.
             </p>
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-12">
-            {[
-              { step: '01', title: 'Upload & Extract', description: 'Upload your PDF and let AI extract questions automatically', icon: FileText },
-              { step: '02', title: 'Customize & Deploy', description: 'Configure exam settings and deploy to students instantly', icon: Cpu },
-              { step: '03', title: 'Monitor & Analyze', description: 'Track progress in real-time and analyze results with AI', icon: BarChart3 }
-            ].map((item, index) => (
+          <div className="grid md:grid-cols-3 gap-8 lg:gap-12">
+            {steps.map((step, index) => (
               <motion.div
                 key={index}
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.2 }}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ delay: index * 0.15 }}
                 className="relative"
               >
-                <div className="text-6xl sm:text-7xl lg:text-8xl font-bold text-sky-500/10 absolute -top-4 sm:-top-6 lg:-top-8 -left-2 sm:-left-4">{item.step}</div>
-                <div className="relative bg-slate-800/50 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 border border-white/10">
-                  <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-sky-500 to-violet-500 rounded-xl sm:rounded-2xl mb-4 sm:mb-6 shadow-lg">
-                    <item.icon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                {/* Connector line */}
+                {index < steps.length - 1 && (
+                  <div className="hidden md:block absolute top-12 left-full w-full h-0.5 bg-gradient-to-r from-blue-200 to-transparent -translate-x-8" />
+                )}
+                
+                <div className="text-center">
+                  <div className="relative inline-block mb-6">
+                    <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-500/25 mx-auto">
+                      <step.icon className="w-10 h-10 text-white" />
+                    </div>
+                    <span className="absolute -top-2 -right-2 w-8 h-8 bg-white border-2 border-blue-500 rounded-full flex items-center justify-center text-sm font-bold text-blue-600 shadow-lg">
+                      {step.number.replace('0', '')}
+                    </span>
                   </div>
-                  <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-2 sm:mb-4">{item.title}</h3>
-                  <p className="text-sm sm:text-base text-slate-300 leading-relaxed">{item.description}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="relative py-16 sm:py-24 lg:py-32 px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-12 sm:mb-16 lg:mb-20"
-          >
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold mb-4 sm:mb-6">
-              <span className="bg-gradient-to-r from-sky-400 via-violet-400 to-pink-400 bg-clip-text text-transparent">
-                Loved by Educators
-              </span>
-            </h2>
-            <p className="text-base sm:text-lg lg:text-xl text-slate-300 max-w-3xl mx-auto px-4">
-              See what our users have to say about DashoExams
-            </p>
-          </motion.div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-            {testimonials.map((testimonial, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="bg-slate-800/50 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 border border-white/10"
-              >
-                <div className="text-4xl sm:text-5xl lg:text-6xl mb-4 sm:mb-6">{testimonial.avatar}</div>
-                <p className="text-sm sm:text-base text-slate-300 mb-4 sm:mb-6 leading-relaxed">"{testimonial.content}"</p>
-                <div>
-                  <div className="font-bold text-sm sm:text-base">{testimonial.name}</div>
-                  <div className="text-xs sm:text-sm text-slate-400">{testimonial.role}</div>
+                  <h3 className="text-xl font-semibold text-slate-900 mb-3">{step.title}</h3>
+                  <p className="text-slate-600 leading-relaxed">{step.description}</p>
                 </div>
               </motion.div>
             ))}
@@ -409,34 +501,46 @@ export default function LandingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="relative py-16 sm:py-24 lg:py-32 px-4 sm:px-6">
+      <section className="py-20 lg:py-28 px-4 sm:px-6">
         <div className="max-w-5xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="relative bg-gradient-to-br from-sky-500 to-violet-500 rounded-2xl sm:rounded-3xl lg:rounded-[3rem] p-8 sm:p-12 lg:p-16 text-center overflow-hidden"
+            viewport={{ once: true, margin: "-100px" }}
+            className="relative bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 sm:p-12 lg:p-16 text-center overflow-hidden"
           >
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00em0wLTEwYzAtMi4yMS0xLjc5LTQtNC00cy00IDEuNzktNCA0IDEuNzkgNCA0IDQgNC0xLjc5IDQtNHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-20" />
+            {/* Background pattern */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute inset-0" style={{
+                backgroundImage: `radial-gradient(circle at 2px 2px, white 1px, transparent 0)`,
+                backgroundSize: '32px 32px'
+              }} />
+            </div>
             
             <div className="relative z-10">
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold mb-4 sm:mb-6 text-white">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
                 Ready to Transform Your Exams?
               </h2>
-              <p className="text-base sm:text-lg lg:text-xl text-white/90 mb-6 sm:mb-8 lg:mb-10 max-w-2xl mx-auto px-4">
-                Join thousands of educators who are already using DashoExams to create better assessments
+              <p className="text-lg text-blue-100 mb-8 max-w-2xl mx-auto">
+                Join educators who are creating better assessments with intelligent tools.
               </p>
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-                <Link
-                  to="/register"
-                  className="px-8 sm:px-10 py-4 sm:py-5 bg-white text-sky-600 rounded-full font-bold text-base sm:text-lg hover:shadow-2xl transition-all hover:scale-105 inline-flex items-center justify-center gap-2"
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Link
+                    to="/register"
+                    className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-blue-600 font-semibold rounded-xl hover:bg-blue-50 transition-colors shadow-xl"
+                  >
+                    Start Free Trial
+                    <ArrowRight className="w-5 h-5" />
+                  </Link>
+                </motion.div>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/10 text-white font-semibold rounded-xl hover:bg-white/20 transition-colors border border-white/20"
                 >
-                  Start Free Trial
-                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
-                </Link>
-                <button className="px-8 sm:px-10 py-4 sm:py-5 bg-white/20 backdrop-blur-sm text-white rounded-full font-bold text-base sm:text-lg hover:bg-white/30 transition-all border-2 border-white/30">
                   Schedule Demo
-                </button>
+                </motion.button>
               </div>
             </div>
           </motion.div>
@@ -444,63 +548,52 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="relative border-t border-white/10 bg-slate-900/50 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 lg:gap-12 mb-8 sm:mb-12">
-            <div className="col-span-2 sm:col-span-2 lg:col-span-1">
-              <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-sky-500 to-violet-500 rounded-lg sm:rounded-xl flex items-center justify-center">
-                  <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+      <footer className="bg-slate-900 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 lg:py-16">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+            <div className="col-span-2 md:col-span-1">
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-lg sm:text-xl font-bold">DashoExams</span>
+                <span className="text-lg font-bold">DashoExams</span>
               </div>
-              <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
-                AI-powered examination platform for modern education
+              <p className="text-slate-400 text-sm leading-relaxed">
+                AI-powered examination platform for modern education.
               </p>
             </div>
 
-            <div>
-              <h4 className="font-bold mb-3 sm:mb-4 text-sm sm:text-base">Product</h4>
-              <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-slate-400">
-                <li><a href="#" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Security</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Integrations</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-bold mb-3 sm:mb-4 text-sm sm:text-base">Company</h4>
-              <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-slate-400">
-                <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-bold mb-3 sm:mb-4 text-sm sm:text-base">Support</h4>
-              <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-slate-400">
-                <li><a href="#" className="hover:text-white transition-colors">Documentation</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API Reference</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Status</a></li>
-              </ul>
-            </div>
+            {[
+              { title: 'Product', links: ['Features', 'Pricing', 'Security', 'Integrations'] },
+              { title: 'Company', links: ['About', 'Blog', 'Careers', 'Contact'] },
+              { title: 'Support', links: ['Documentation', 'Help Center', 'API', 'Status'] }
+            ].map((section, i) => (
+              <div key={i}>
+                <h4 className="font-semibold mb-4 text-sm">{section.title}</h4>
+                <ul className="space-y-2.5">
+                  {section.links.map((link, j) => (
+                    <li key={j}>
+                      <a href="#" className="text-sm text-slate-400 hover:text-white transition-colors">
+                        {link}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
 
-          <div className="border-t border-white/10 pt-6 sm:pt-8 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 text-center sm:text-left">
-            <p className="text-xs sm:text-sm text-slate-400">
+          <div className="pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-slate-400">
               © {new Date().getFullYear()} DashoExams. All rights reserved.
             </p>
-            <p className="text-xs sm:text-sm text-slate-400">
+            <p className="text-sm text-slate-400">
               Powered by{' '}
               <a 
                 href="https://diracai.com/" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="font-semibold text-sky-400 hover:text-sky-300 transition-colors"
+                className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
               >
                 DiracAI
               </a>
