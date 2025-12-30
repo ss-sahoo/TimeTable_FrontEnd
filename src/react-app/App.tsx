@@ -65,6 +65,7 @@ import {
   TeacherRoleDashboard,
   StaffDashboard, 
 } from "@/react-app/pages/RoleDashboards";
+import Timetablelanding from "./pages/TimeTablelanding";
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -224,6 +225,9 @@ function AppRoutes() {
       
       {/* Public Exam Access Route */}
       <Route path="/public-exam/:token" element={<PublicExamAccess />} />
+
+      <Route path="/Timetablelanding" element={<Timetablelanding />} />
+
 
       {/* Protected Routes */}
       <Route path="/dashboard" element={
