@@ -51,6 +51,26 @@ export default function Layout({ children }: LayoutProps) {
   const { user, logout } = useAuthContext();
   const { theme, setTheme, actualTheme } = useTheme();
   
+  // Domain-aware branding
+  const isTimetableDomain = typeof window !== 'undefined' && window.location.hostname === 'timetable.dashoapp.com';
+  const brandConfig = isTimetableDomain 
+    ? {
+        name: 'IntelliSchedule',
+        subtitle: 'Timetable Management',
+        icon: CalendarDays,
+        gradientFrom: 'from-cyan-500',
+        gradientTo: 'to-teal-600',
+        shadowColor: 'shadow-cyan-500/30'
+      }
+    : {
+        name: 'DashoExams', 
+        subtitle: 'Exam Management',
+        icon: Zap,
+        gradientFrom: 'from-blue-500',
+        gradientTo: 'to-violet-600', 
+        shadowColor: 'shadow-blue-500/30'
+      };
+  
   const toggleTheme = () => {
     setTheme(actualTheme === 'dark' ? 'light' : 'dark');
   };
@@ -80,6 +100,16 @@ export default function Layout({ children }: LayoutProps) {
   }, []);
 
   const getNavigation = (): NavigationItem[] => {
+    // For timetable domain, show timetable-specific navigation
+    if (isTimetableDomain) {
+      return [
+        { name: 'Home', href: '/timetable', icon: Home },
+        { name: 'Timetable', href: '/timetable', icon: CalendarDays },
+        { name: 'Batches', href: '/batches', icon: GraduationCap },
+      ];
+    }
+
+    // For exam domain, show exam-specific navigation
     const baseNavigation: NavigationItem[] = [
       { name: 'Home', href: '/dashboard', icon: Home },
     ];
@@ -162,14 +192,14 @@ export default function Layout({ children }: LayoutProps) {
                   <div className="flex items-center gap-3">
                     <motion.div
                       whileHover={{ scale: 1.05, rotate: 5 }}
-                      className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/30"
+                      className={`relative w-11 h-11 rounded-2xl bg-gradient-to-br ${brandConfig.gradientFrom} via-blue-600 ${brandConfig.gradientTo} flex items-center justify-center shadow-lg ${brandConfig.shadowColor}`}
                     >
-                      <Zap className="w-6 h-6 text-white" />
+                      <brandConfig.icon className="w-6 h-6 text-white" />
                       <div className="absolute inset-0 rounded-2xl bg-white/20 opacity-0 hover:opacity-100 transition-opacity" />
                     </motion.div>
                     <div>
-                      <span className="font-bold text-slate-900 dark:text-white text-lg tracking-tight">DashoExams</span>
-                      <p className="text-xs text-slate-500 dark:text-gray-400">Exam Management</p>
+                      <span className="font-bold text-slate-900 dark:text-white text-lg tracking-tight">{brandConfig.name}</span>
+                      <p className="text-xs text-slate-500 dark:text-gray-400">{brandConfig.subtitle}</p>
                     </div>
                   </div>
                   <button
@@ -271,9 +301,9 @@ export default function Layout({ children }: LayoutProps) {
               <motion.div
                 whileHover={{ scale: 1.05, rotate: 5 }}
                 whileTap={{ scale: 0.95 }}
-                className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0 cursor-pointer"
+                className={`relative w-11 h-11 rounded-2xl bg-gradient-to-br ${brandConfig.gradientFrom} via-blue-600 ${brandConfig.gradientTo} flex items-center justify-center shadow-lg ${brandConfig.shadowColor} flex-shrink-0 cursor-pointer`}
               >
-                <Zap className="w-6 h-6 text-white" />
+                <brandConfig.icon className="w-6 h-6 text-white" />
                 <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-white/0 to-white/20" />
               </motion.div>
               <AnimatePresence>
@@ -284,8 +314,8 @@ export default function Layout({ children }: LayoutProps) {
                     exit={{ opacity: 0, width: 0 }}
                     className="overflow-hidden"
                   >
-                    <span className="font-bold text-slate-900 dark:text-white text-lg whitespace-nowrap tracking-tight">DashoExams</span>
-                    <p className="text-xs text-slate-500 dark:text-gray-400 whitespace-nowrap">Exam Management</p>
+                    <span className="font-bold text-slate-900 dark:text-white text-lg whitespace-nowrap tracking-tight">{brandConfig.name}</span>
+                    <p className="text-xs text-slate-500 dark:text-gray-400 whitespace-nowrap">{brandConfig.subtitle}</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -451,7 +481,7 @@ export default function Layout({ children }: LayoutProps) {
                   </div>
                   <input
                     type="text"
-                    placeholder="Search exams, patterns..."
+                    placeholder={isTimetableDomain ? "Search timetables, batches..." : "Search exams, patterns..."}
                     onFocus={() => setSearchFocused(true)}
                     onBlur={() => setSearchFocused(false)}
                     className="block w-full pl-11 pr-16 py-3 border border-slate-200/80 dark:border-gray-700/80 rounded-2xl text-sm bg-slate-50/80 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all"
@@ -697,7 +727,7 @@ export default function Layout({ children }: LayoutProps) {
         <footer className="relative bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm border-t border-slate-200/50 dark:border-gray-800/50 py-4">
           <div className="px-4 lg:px-6 flex items-center justify-between">
             <p className="text-xs text-slate-500 dark:text-gray-400">
-              © 2024 DashoExams. All rights reserved.
+              © 2024 {brandConfig.name}. All rights reserved.
             </p>
             <p className="text-xs text-slate-500 dark:text-gray-400">
               Powered by{' '}
