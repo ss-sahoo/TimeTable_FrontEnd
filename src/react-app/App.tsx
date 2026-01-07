@@ -66,6 +66,8 @@ import {
   StaffDashboard, 
 } from "@/react-app/pages/RoleDashboards";
 import Timetablelanding from "./pages/TimeTablelanding";
+import TimetableLogin from "./pages/TimetableLogin";
+import TimetableRegister from "./pages/TimetableRegister";
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -187,6 +189,64 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <Navigate to={getDashboardRoute(user?.role)} replace /> : children;
 }
 
+// Login Route Component (show domain-specific login page)
+function LoginRoute() {
+  const { isAuthenticated, loading, user } = useAuthContext();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to={getDashboardRoute(user?.role)} replace />;
+  }
+
+  // Domain-based login page selection
+  const hostname = window.location.hostname;
+  if (hostname === 'timetable.dashoapp.com') {
+    return <TimetableLogin />;
+  }
+
+  // Default: exams.dashoapp.com or any other domain shows the exam login page
+  return <Login />;
+}
+
+// Register Route Component (show domain-specific register page)
+function RegisterRoute() {
+  const { isAuthenticated, loading, user } = useAuthContext();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to={getDashboardRoute(user?.role)} replace />;
+  }
+
+  // Domain-based register page selection
+  const hostname = window.location.hostname;
+  if (hostname === 'timetable.dashoapp.com') {
+    return <TimetableRegister />;
+  }
+
+  // Default: exams.dashoapp.com or any other domain shows the exam register page
+  return <Register />;
+}
+
 // Landing Route Component (show landing page if not authenticated, dashboard if authenticated)
 // Also handles domain-based landing page selection
 function LandingRoute({ children }: { children: React.ReactNode }) {
@@ -221,16 +281,8 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/login" element={
-        <PublicRoute>
-          <Login />
-        </PublicRoute>
-      } />
-      <Route path="/register" element={
-        <PublicRoute>
-          <Register />
-        </PublicRoute>
-      } />
+      <Route path="/login" element={<LoginRoute />} />
+      <Route path="/register" element={<RegisterRoute />} />
       
       {/* Onboarding Route - Semi-protected (logged in but no institute) */}
       <Route path="/onboarding" element={<Onboarding />} />
