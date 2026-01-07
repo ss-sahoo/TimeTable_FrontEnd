@@ -160,8 +160,13 @@ function RoleProtectedRoute({
   return <Layout>{children}</Layout>;
 }
 
-// Helper function to get dashboard route based on role
+// Helper function to get dashboard route based on role and domain
 function getDashboardRoute(role: string | undefined): string {
+  // For timetable domain, always go to timetable page regardless of role
+  if (typeof window !== 'undefined' && window.location.hostname === 'timetable.dashoapp.com') {
+    return '/timetable';
+  }
+  
   switch (role) {
     case 'student':
     case 'STUDENT':
@@ -296,7 +301,10 @@ function AppRoutes() {
       {/* Protected Routes */}
       <Route path="/dashboard" element={
         <ProtectedRoute>
-          <SmartDashboard />
+          {typeof window !== 'undefined' && window.location.hostname === 'timetable.dashoapp.com' ? 
+            <Navigate to="/timetable" replace /> : 
+            <SmartDashboard />
+          }
         </ProtectedRoute>
       } />
 

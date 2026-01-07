@@ -37,6 +37,11 @@ export default function TimetableLogin() {
 
   // Helper function to get dashboard route based on role
   const getDashboardRoute = (role: string): string => {
+    // For timetable domain, always go to timetable page regardless of role
+    if (window.location.hostname === 'timetable.dashoapp.com') {
+      return '/timetable';
+    }
+    
     switch (role) {
       case 'super_admin':
       case 'SUPER_ADMIN':
@@ -52,7 +57,7 @@ export default function TimetableLogin() {
       case 'STUDENT':
         return '/student-dashboard';
       default:
-        return '/timetable'; // Default to timetable for timetable domain
+        return '/timetable';
     }
   };
 
