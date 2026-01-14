@@ -1756,4 +1756,3 @@ function CreateBatchModal({
     </Modal>
   );
 }
-
