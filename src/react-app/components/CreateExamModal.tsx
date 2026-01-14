@@ -22,7 +22,7 @@ export default function CreateExamModal({ isOpen, onClose, onSuccess }: CreateEx
     end_date: '',
     duration_minutes: 180,
   });
-  
+
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [showSubjectForm, setShowSubjectForm] = useState(false);
   const [newSubject, setNewSubject] = useState<Subject>({
@@ -30,7 +30,7 @@ export default function CreateExamModal({ isOpen, onClose, onSuccess }: CreateEx
     start_question: 1,
     end_question: 30,
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,7 +68,7 @@ export default function CreateExamModal({ isOpen, onClose, onSuccess }: CreateEx
       await api.post('/api/exams', examData);
       onSuccess();
       onClose();
-      
+
       // Reset form
       setFormData({ title: '', start_date: '', end_date: '', duration_minutes: 180 });
       setSubjects([]);
@@ -82,100 +82,100 @@ export default function CreateExamModal({ isOpen, onClose, onSuccess }: CreateEx
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-slate-200">
-          <h2 className="text-xl font-semibold text-slate-900">Create New Exam</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-3 sm:p-4 z-50">
+      <div className="bg-white rounded-lg sm:rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-200 sticky top-0 bg-white z-10">
+          <h2 className="text-lg sm:text-xl font-semibold text-slate-900">Create New Exam</h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors"
+            className="text-slate-400 hover:text-slate-600 transition-colors p-1"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-sm">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-1.5 sm:mb-2">
               Exam Name *
             </label>
             <input
               type="text"
               value={formData.title}
               onChange={(e) => handleInputChange('title', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 sm:py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
               placeholder="e.g., Half-yearly Exam"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1.5 sm:mb-2">
                 Start Date & Time *
               </label>
               <input
                 type="datetime-local"
                 value={formData.start_date}
                 onChange={(e) => handleInputChange('start_date', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 sm:py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
               />
             </div>
-            
+
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1.5 sm:mb-2">
                 End Date & Time *
               </label>
               <input
                 type="datetime-local"
                 value={formData.end_date}
                 onChange={(e) => handleInputChange('end_date', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 sm:py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-1.5 sm:mb-2">
               Duration (minutes) *
             </label>
             <input
               type="number"
               value={formData.duration_minutes}
               onChange={(e) => handleInputChange('duration_minutes', parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 sm:py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
               min="1"
             />
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-slate-900">Subjects</h3>
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="text-base sm:text-lg font-medium text-slate-900">Subjects</h3>
               <button
                 onClick={() => setShowSubjectForm(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs sm:text-sm"
               >
-                <Plus className="w-4 h-4" />
-                Add Subject
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="whitespace-nowrap">Add Subject</span>
               </button>
             </div>
 
             {subjects.map((subject, index) => (
-              <div key={index} className="p-3 bg-slate-50 rounded-lg mb-2">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-slate-800">
+              <div key={index} className="p-2.5 sm:p-3 bg-slate-50 rounded-lg mb-2">
+                <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                  <span className="text-xs sm:text-sm font-medium text-slate-800 truncate mr-2">
                     {subject.name}
                   </span>
                   <button
                     onClick={() => removeSubject(index)}
-                    className="text-red-500 hover:text-red-700 transition-colors"
+                    className="text-red-500 hover:text-red-700 transition-colors p-1 flex-shrink-0"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
                 </div>
                 <div className="text-xs text-slate-600">
@@ -185,23 +185,23 @@ export default function CreateExamModal({ isOpen, onClose, onSuccess }: CreateEx
             ))}
 
             {showSubjectForm && (
-              <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-                <div className="mb-3">
+              <div className="border border-slate-200 rounded-lg p-3 sm:p-4 bg-slate-50">
+                <div className="mb-2 sm:mb-3">
                   <input
                     type="text"
                     placeholder="Subject name"
                     value={newSubject.name}
                     onChange={(e) => setNewSubject(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 sm:py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-2 sm:mb-3">
                   <input
                     type="number"
                     placeholder="Start Q#"
                     value={newSubject.start_question}
                     onChange={(e) => setNewSubject(prev => ({ ...prev, start_question: parseInt(e.target.value) }))}
-                    className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="px-3 py-2 sm:py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                     min="1"
                   />
                   <input
@@ -209,20 +209,20 @@ export default function CreateExamModal({ isOpen, onClose, onSuccess }: CreateEx
                     placeholder="End Q#"
                     value={newSubject.end_question}
                     onChange={(e) => setNewSubject(prev => ({ ...prev, end_question: parseInt(e.target.value) }))}
-                    className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="px-3 py-2 sm:py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                     min="1"
                   />
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={addSubject}
-                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                    className="px-3 py-1.5 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs sm:text-sm"
                   >
                     Add
                   </button>
                   <button
                     onClick={() => setShowSubjectForm(false)}
-                    className="px-3 py-1.5 bg-slate-300 text-slate-700 rounded-lg hover:bg-slate-400 transition-colors text-sm"
+                    className="px-3 py-1.5 sm:py-2 bg-slate-300 text-slate-700 rounded-lg hover:bg-slate-400 transition-colors text-xs sm:text-sm"
                   >
                     Cancel
                   </button>
@@ -232,17 +232,17 @@ export default function CreateExamModal({ isOpen, onClose, onSuccess }: CreateEx
           </div>
         </div>
 
-        <div className="flex gap-3 p-6 border-t border-slate-200">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 p-4 sm:p-6 border-t border-slate-200 sticky bottom-0 bg-white">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+            className="w-full sm:flex-1 px-4 py-2.5 sm:py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm sm:text-base order-2 sm:order-1"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="w-full sm:flex-1 px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm sm:text-base order-1 sm:order-2"
           >
             {loading ? 'Creating...' : 'Create Exam'}
           </button>

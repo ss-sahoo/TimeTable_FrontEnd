@@ -28,6 +28,7 @@ interface User {
   get_full_name?: string;
   username?: string;
   center_id?: string;
+  phone?: string;
   // Add other user-related fields as needed
 }
 
@@ -45,6 +46,7 @@ interface JWTPayload {
 
 interface AuthContextType {
   user: User | null;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
   login: (identifier: string, password: string, role?: string) => Promise<User>;
   logout: () => void;
   isAuthenticated: boolean;
@@ -62,11 +64,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const loadUserFromTokens = async () => {
       const accessToken = localStorage.getItem('access_token');
-      
+
       if (accessToken) {
         try {
           const decodedToken = jwtDecode<JWTPayload>(accessToken);
-          
+
           // Check if token is expired
           const currentTime = Date.now() / 1000;
           if (decodedToken.exp && decodedToken.exp < currentTime) {
@@ -103,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               return;
             }
           }
-          
+
           // Token is valid, try to get user data from localStorage first, then API
           try {
             const storedUserData = localStorage.getItem('user_data');
@@ -112,12 +114,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setUser(parsedUser);
               setIsAuthenticated(true);
               setLoading(false);
+
+              // Background fetch to ensure data is fresh (e.g. institute details)
+              try {
+                const userResponse = await api.get('/auth/profile/');
+                if (JSON.stringify(userResponse.data) !== storedUserData) {
+                  setUser(userResponse.data);
+                  localStorage.setItem('user_data', JSON.stringify(userResponse.data));
+                }
+              } catch (bgError) {
+                console.warn("Background profile fetch failed:", bgError);
+              }
               return;
             }
           } catch (localError) {
             console.warn("Failed to parse stored user data:", localError);
           }
-          
+
           // If not in localStorage, try to fetch from API
           try {
             const userResponse = await api.get('/auth/profile/');
@@ -159,37 +172,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       let response;
-      
+
       // Determine which login endpoint to use based on role
       if (role === 'super_admin' || role === 'SUPER_ADMIN') {
         // Super Admin login endpoint - use timetable auth endpoint
-        response = await api.post('/timetable/auth/superadmin/login/', { 
+        response = await api.post('/timetable/auth/superadmin/login/', {
           username: identifier,  // Can be email or username
-          password 
+          password
         });
       } else if (role === 'admin' || role === 'institute_admin' || role === 'ADMIN') {
         // Admin login endpoint - use timetable auth endpoint
-        response = await api.post('/timetable/auth/admin/login/', { 
+        response = await api.post('/timetable/auth/admin/login/', {
           username: identifier,  // Can be email or username
-          password 
+          password
         });
       } else if (role === 'teacher' || role === 'TEACHER') {
         // Teacher login endpoint (supports teacher_code, email, or username) - use timetable auth endpoint
-        response = await api.post('/timetable/auth/teacher/login/', { 
+        response = await api.post('/timetable/auth/teacher/login/', {
           username: identifier,  // Can be email, username, or teacher_code
-          password 
+          password
         });
       } else {
         // Generic login endpoint (for student, staff, or if role not specified)
-        response = await api.post('/auth/login/', { 
+        response = await api.post('/auth/login/', {
           email: identifier,  // Generic login requires email
-          password 
+          password
         });
       }
 
       // Handle response format differences
       let access, refresh, userData;
-      
+
       if (response.data.tokens) {
         // Role-based login returns { tokens: { access, refresh }, user: {...} }
         access = response.data.tokens.access;
@@ -205,25 +218,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Store tokens in localStorage
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
-      
+
       // Store full user data in localStorage for easy access
       localStorage.setItem('user_data', JSON.stringify(userData));
 
       setUser(userData);
       setIsAuthenticated(true);
       setLoading(false);
-      
+
       return userData;
     } catch (error: any) {
       console.error("Login failed:", error);
       logout(); // Ensure no stale tokens/user data
       setLoading(false);
-      
+
       // Extract error message from response
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.error || 
-                          error.message || 
-                          'Login failed. Please check your credentials.';
+      const errorMessage = error.response?.data?.detail ||
+        error.response?.data?.error ||
+        error.message ||
+        'Login failed. Please check your credentials.';
       throw new Error(errorMessage);
     }
   };
@@ -236,23 +249,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Even if backend logout fails, continue with frontend cleanup
       console.log('Backend logout failed, continuing with frontend cleanup', logoutError);
     }
-    
+
     // Clear all frontend storage
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_data');
     localStorage.clear(); // Clear any other stored data
-    
+
     // Clear session storage as well
     sessionStorage.clear();
-    
+
     // Clear any cookies (if any)
     document.cookie.split(";").forEach((c) => {
       const eqPos = c.indexOf("=");
       const name = eqPos > -1 ? c.substr(0, eqPos) : c;
       document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
     });
-    
+
     // Reset state
     setUser(null);
     setIsAuthenticated(false);
@@ -261,7 +274,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const userRole = user ? user.role : null;
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated, loading, userRole }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, isAuthenticated, loading, userRole }}>
       {children}
     </AuthContext.Provider>
   );

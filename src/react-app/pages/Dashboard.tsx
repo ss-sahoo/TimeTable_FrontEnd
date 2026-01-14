@@ -34,7 +34,7 @@ export default function Dashboard() {
         try {
           const res = await api.get('/auth/profile/');
           if (res.data?.center_id) setCenterId(res.data.center_id);
-        } catch {}
+        } catch { }
       }
     };
     getCenterId();
@@ -46,9 +46,9 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
+    <div className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 md:space-y-5">
       {/* Tab Navigation */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 p-1">
+      <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-slate-200 dark:border-gray-700 p-1">
         <div className="flex gap-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -57,13 +57,12 @@ export default function Dashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActive
+                className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-2.5 rounded-md sm:rounded-lg text-xs sm:text-sm font-medium transition-all ${isActive
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-700/50'
-                }`}
+                  }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>{tab.label}</span>
               </button>
             );
@@ -105,11 +104,11 @@ function ProfileTab({ centerId }: { centerId: string | null }) {
 
   if (!centerId) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 p-6 text-center">
-        <div className="w-12 h-12 bg-slate-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
-          <Building2 className="w-6 h-6 text-slate-400" />
+      <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-slate-200 dark:border-gray-700 p-4 sm:p-6 text-center">
+        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3">
+          <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-slate-400" />
         </div>
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 mb-1">No Center Assigned</h3>
+        <h3 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-gray-100 mb-1">No Center Assigned</h3>
         <p className="text-xs text-slate-500 dark:text-gray-400">Contact your administrator to get assigned to a center</p>
       </div>
     );
@@ -133,39 +132,39 @@ function ProfileTab({ centerId }: { centerId: string | null }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Profile Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-5 text-white">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
-            <Building2 className="w-7 h-7" />
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg sm:rounded-xl p-3 sm:p-5 text-white">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-10 h-10 sm:w-14 sm:h-14 bg-white/20 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0">
+            <Building2 className="w-5 h-5 sm:w-7 sm:h-7" />
           </div>
-          <div>
-            <h1 className="text-lg font-semibold">{centerData.name}</h1>
-            {centerData.institute && <p className="text-blue-100 text-sm">{centerData.institute.name}</p>}
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-semibold truncate">{centerData.name}</h1>
+            {centerData.institute && <p className="text-blue-100 text-xs sm:text-sm truncate">{centerData.institute.name}</p>}
           </div>
         </div>
       </div>
 
       {/* Profile Details */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 p-4">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 mb-3 flex items-center gap-2">
-            <div className="w-1 h-4 bg-blue-600 rounded-full" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-slate-200 dark:border-gray-700 p-3 sm:p-4">
+          <h3 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-gray-100 mb-2 sm:mb-3 flex items-center gap-2">
+            <div className="w-1 h-3 sm:h-4 bg-blue-600 rounded-full" />
             Center Information
           </h3>
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             <InfoRow icon={Building2} label="Center Name" value={centerData.name} />
             {centerData.city && <InfoRow icon={Building2} label="City" value={centerData.city} />}
             {centerData.address && <InfoRow icon={Building2} label="Address" value={centerData.address} />}
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 p-4">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 mb-3 flex items-center gap-2">
-            <div className="w-1 h-4 bg-blue-600 rounded-full" />
+        <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-slate-200 dark:border-gray-700 p-3 sm:p-4">
+          <h3 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-gray-100 mb-2 sm:mb-3 flex items-center gap-2">
+            <div className="w-1 h-3 sm:h-4 bg-blue-600 rounded-full" />
             Additional Details
           </h3>
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {centerData.institute && <InfoRow icon={Shield} label="Institute" value={centerData.institute.name} />}
             {centerData.id && <InfoRow icon={Zap} label="Center ID" value={centerData.id} mono />}
             {centerData.created_at && <InfoRow icon={Calendar} label="Created" value={new Date(centerData.created_at).toLocaleDateString()} />}
@@ -178,13 +177,13 @@ function ProfileTab({ centerId }: { centerId: string | null }) {
 
 function InfoRow({ icon: Icon, label, value, mono }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-center gap-3 p-2.5 bg-slate-50 dark:bg-gray-900/50 rounded-lg">
-      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-        <Icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 bg-slate-50 dark:bg-gray-900/50 rounded-lg">
+      <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+        <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 dark:text-blue-400" />
       </div>
-      <div>
+      <div className="min-w-0 flex-1">
         <p className="text-xs text-slate-500 dark:text-gray-400">{label}</p>
-        <p className={`text-sm text-slate-900 dark:text-gray-100 ${mono ? 'font-mono text-xs' : 'font-medium'}`}>{value}</p>
+        <p className={`text-xs sm:text-sm text-slate-900 dark:text-gray-100 truncate ${mono ? 'font-mono text-xs' : 'font-medium'}`}>{value}</p>
       </div>
     </div>
   );
@@ -216,8 +215,8 @@ function PeoplesTab({ centerId }: { centerId: string | null }) {
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [showAddTeacher, setShowAddTeacher] = useState(false);
 
-  const isAdmin = user?.role === 'super_admin' || user?.role === 'SUPER_ADMIN' || 
-                  user?.role === 'institute_admin' || user?.role === 'ADMIN';
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'SUPER_ADMIN' ||
+    user?.role === 'institute_admin' || user?.role === 'ADMIN';
 
   const fetchPeople = async (page = 1) => {
     setLoading(true);
@@ -274,47 +273,49 @@ function PeoplesTab({ centerId }: { centerId: string | null }) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Search & Filter Bar */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 p-4">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              placeholder="Search by name, email, or username..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 dark:border-gray-600 rounded-lg bg-slate-50 dark:bg-gray-900 text-slate-900 dark:text-gray-100"
-            />
-            <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-slate-200 dark:border-gray-700 p-3 sm:p-4">
+        <div className="flex flex-col gap-2 sm:gap-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                placeholder="Search by name, email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-slate-200 dark:border-gray-600 rounded-lg bg-slate-50 dark:bg-gray-900 text-slate-900 dark:text-gray-100"
+              />
+              <Users className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
+            </div>
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="px-2.5 sm:px-3 py-2 sm:py-2.5 text-xs sm:text-sm border border-slate-200 dark:border-gray-600 rounded-lg bg-slate-50 dark:bg-gray-900 text-slate-900 dark:text-gray-100"
+            >
+              <option value="">All Roles</option>
+              {roles.map((role) => (
+                <option key={role.value} value={role.value}>
+                  {role.label} ({roleCounts[role.value] || 0})
+                </option>
+              ))}
+            </select>
           </div>
-          <select
-            value={selectedRole}
-            onChange={(e) => setSelectedRole(e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 dark:border-gray-600 rounded-lg bg-slate-50 dark:bg-gray-900 text-slate-900 dark:text-gray-100"
-          >
-            <option value="">All Roles</option>
-            {roles.map((role) => (
-              <option key={role.value} value={role.value}>
-                {role.label} ({roleCounts[role.value] || 0})
-              </option>
-            ))}
-          </select>
           {isAdmin && (
-            <div className="flex gap-2">
+            <div className="flex flex-col xs:flex-row gap-2">
               <button
                 onClick={() => setShowAddTeacher(true)}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                className="flex-1 xs:flex-none px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-blue-700 flex items-center justify-center gap-1.5 sm:gap-2"
               >
-                <UserPlus className="w-4 h-4" />
-                Add Teacher
+                <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>Add Teacher</span>
               </button>
               <button
                 onClick={() => setShowBulkUpload(true)}
-                className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 flex items-center gap-2"
+                className="flex-1 xs:flex-none px-3 sm:px-4 py-2 sm:py-2.5 bg-green-600 text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-green-700 flex items-center justify-center gap-1.5 sm:gap-2"
               >
-                <Upload className="w-4 h-4" />
-                Bulk Upload
+                <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>Bulk Upload</span>
               </button>
             </div>
           )}
@@ -322,7 +323,7 @@ function PeoplesTab({ centerId }: { centerId: string | null }) {
       </div>
 
       {/* Role Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+      <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2">
         {roles.map((role) => {
           const count = roleCounts[role.value] || 0;
           const isSelected = selectedRole === role.value;
@@ -330,14 +331,13 @@ function PeoplesTab({ centerId }: { centerId: string | null }) {
             <button
               key={role.value}
               onClick={() => setSelectedRole(isSelected ? '' : role.value)}
-              className={`p-3 rounded-lg border text-center transition-all ${
-                isSelected
+              className={`p-2 sm:p-3 rounded-md sm:rounded-lg border text-center transition-all ${isSelected
                   ? 'bg-blue-600 border-blue-600 text-white'
                   : 'bg-white dark:bg-gray-800 border-slate-200 dark:border-gray-700 hover:border-blue-400'
-              }`}
+                }`}
             >
-              <p className={`text-lg font-semibold ${isSelected ? 'text-white' : 'text-slate-900 dark:text-gray-100'}`}>{count}</p>
-              <p className={`text-xs ${isSelected ? 'text-blue-100' : 'text-slate-500 dark:text-gray-400'}`}>{role.label}</p>
+              <p className={`text-sm sm:text-lg font-semibold ${isSelected ? 'text-white' : 'text-slate-900 dark:text-gray-100'}`}>{count}</p>
+              <p className={`text-[10px] sm:text-xs truncate ${isSelected ? 'text-blue-100' : 'text-slate-500 dark:text-gray-400'}`}>{role.label}</p>
             </button>
           );
         })}
@@ -345,14 +345,14 @@ function PeoplesTab({ centerId }: { centerId: string | null }) {
 
 
       {/* People List */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700">
-        <div className="p-4 border-b border-slate-200 dark:border-gray-700 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-              <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+      <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-slate-200 dark:border-gray-700">
+        <div className="p-3 sm:p-4 border-b border-slate-200 dark:border-gray-700 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 dark:text-blue-400" />
             </div>
-            <div>
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100">
+            <div className="min-w-0">
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-gray-100 truncate">
                 {selectedRole ? roles.find(r => r.value === selectedRole)?.label || 'People' : 'All People'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-gray-400">{pagination.totalCount} total</p>
@@ -360,15 +360,15 @@ function PeoplesTab({ centerId }: { centerId: string | null }) {
           </div>
         </div>
 
-        <div className="p-3">
+        <div className="p-2 sm:p-3">
           {loading ? (
-            <div className="flex justify-center py-8">
-              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <div className="flex justify-center py-6 sm:py-8">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : people.length === 0 ? (
-            <div className="text-center py-8">
-              <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-500 dark:text-gray-400">No people found</p>
+            <div className="text-center py-6 sm:py-8">
+              <Users className="w-8 h-8 sm:w-10 sm:h-10 text-slate-300 mx-auto mb-2" />
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-gray-400">No people found</p>
               {(searchQuery || selectedRole) && (
                 <button
                   onClick={() => { setSearchQuery(''); setSelectedRole(''); }}
@@ -379,7 +379,7 @@ function PeoplesTab({ centerId }: { centerId: string | null }) {
               )}
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1.5 sm:space-y-2">
               {people.map((person) => {
                 const name = person.full_name || `${person.first_name || ''} ${person.last_name || ''}`.trim() || person.username;
                 const RoleIcon = getRoleIcon(person.role);
@@ -387,24 +387,24 @@ function PeoplesTab({ centerId }: { centerId: string | null }) {
                   <motion.div
                     key={person.id}
                     whileHover={{ x: 2 }}
-                    className="flex items-center justify-between p-3 bg-slate-50 dark:bg-gray-900/50 rounded-lg"
+                    className="flex items-center justify-between p-2 sm:p-3 bg-slate-50 dark:bg-gray-900/50 rounded-lg gap-2"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400 text-sm font-semibold">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400 text-xs sm:text-sm font-semibold flex-shrink-0">
                         {name.charAt(0).toUpperCase()}
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-900 dark:text-gray-100">{name}</p>
-                        <p className="text-xs text-slate-500 dark:text-gray-400">{person.email}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-gray-100 truncate">{name}</p>
+                        <p className="text-xs text-slate-500 dark:text-gray-400 truncate">{person.email}</p>
                         {person.teacher_code && (
-                          <p className="text-xs text-slate-400 dark:text-gray-500 font-mono">{person.teacher_code}</p>
+                          <p className="text-xs text-slate-400 dark:text-gray-500 font-mono truncate">{person.teacher_code}</p>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 ${getRoleColor(person.role)}`}>
-                        <RoleIcon className="w-3 h-3" />
-                        {person.role_display || person.role}
+                    <div className="flex items-center flex-shrink-0">
+                      <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium flex items-center gap-0.5 sm:gap-1 ${getRoleColor(person.role)}`}>
+                        <RoleIcon className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                        <span className="hidden xs:inline">{person.role_display || person.role}</span>
                       </span>
                     </div>
                   </motion.div>
@@ -416,22 +416,22 @@ function PeoplesTab({ centerId }: { centerId: string | null }) {
 
         {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="p-3 border-t border-slate-200 dark:border-gray-700 flex items-center justify-between">
-            <p className="text-xs text-slate-500 dark:text-gray-400">
-              Page {pagination.page} of {pagination.totalPages}
+          <div className="p-2 sm:p-3 border-t border-slate-200 dark:border-gray-700 flex items-center justify-between">
+            <p className="text-[10px] sm:text-xs text-slate-500 dark:text-gray-400">
+              Page {pagination.page}/{pagination.totalPages}
             </p>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5 sm:gap-2">
               <button
                 onClick={() => fetchPeople(pagination.page - 1)}
                 disabled={!pagination.hasPrevious}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-gray-600 disabled:opacity-50"
+                className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md sm:rounded-lg border border-slate-200 dark:border-gray-600 disabled:opacity-50"
               >
-                Previous
+                Prev
               </button>
               <button
                 onClick={() => fetchPeople(pagination.page + 1)}
                 disabled={!pagination.hasNext}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-gray-600 disabled:opacity-50"
+                className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md sm:rounded-lg border border-slate-200 dark:border-gray-600 disabled:opacity-50"
               >
                 Next
               </button>

@@ -55,7 +55,7 @@ import LandingPage from "@/react-app/pages/LandingPage";
 import ProctoringDiagnostics from "@/react-app/pages/ProctoringDiagnostics";
 import ProctoringSnapshotsView from "@/react-app/pages/ProctoringSnapshotsView";
 import BulkImportPage from "@/react-app/pages/BulkImportPage";
-import SuperAdminDashboard from "@/react-app/pages/SuperAdminDashboard";
+import NewSuperAdminDashboard from "@/react-app/pages/NewSuperAdminDashboard";
 import CenterAdminDashboard from "@/react-app/pages/CenterAdminDashboard";
 import Timetable from "@/react-app/pages/Timetable";
 import Batches from "@/react-app/pages/Batches";
@@ -63,7 +63,7 @@ import ExamHub from "@/react-app/pages/ExamHub";
 import {
   AdminRoleDashboard,
   TeacherRoleDashboard,
-  StaffDashboard, 
+  StaffDashboard,
 } from "@/react-app/pages/RoleDashboards";
 import Timetablelanding from "./pages/TimeTablelanding";
 import TimetableLogin from "./pages/TimetableLogin";
@@ -106,10 +106,10 @@ function FullscreenProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 // Role-based Protected Route Component
-function RoleProtectedRoute({ 
-  children, 
-  allowedRoles 
-}: { 
+function RoleProtectedRoute({
+  children,
+  allowedRoles
+}: {
   children: React.ReactNode;
   allowedRoles: string[];
 }) {
@@ -135,7 +135,7 @@ function RoleProtectedRoute({
     if (user?.role === 'student') {
       return <Navigate to="/student-dashboard" replace />;
     }
-    
+
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -166,7 +166,7 @@ function getDashboardRoute(role: string | undefined): string {
   if (typeof window !== 'undefined' && window.location.hostname === 'timetable.dashoapp.com') {
     return '/timetable';
   }
-  
+
   switch (role) {
     case 'student':
     case 'STUDENT':
@@ -288,10 +288,10 @@ function AppRoutes() {
       {/* Public Routes */}
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/register" element={<RegisterRoute />} />
-      
+
       {/* Onboarding Route - Semi-protected (logged in but no institute) */}
       <Route path="/onboarding" element={<Onboarding />} />
-      
+
       {/* Public Exam Access Route */}
       <Route path="/public-exam/:token" element={<PublicExamAccess />} />
 
@@ -301,8 +301,8 @@ function AppRoutes() {
       {/* Protected Routes */}
       <Route path="/dashboard" element={
         <ProtectedRoute>
-          {typeof window !== 'undefined' && window.location.hostname === 'timetable.dashoapp.com' ? 
-            <Navigate to="/timetable" replace /> : 
+          {typeof window !== 'undefined' && window.location.hostname === 'timetable.dashoapp.com' ?
+            <Navigate to="/timetable" replace /> :
             <SmartDashboard />
           }
         </ProtectedRoute>
@@ -311,7 +311,7 @@ function AppRoutes() {
       {/* Role-specific dashboards */}
       <Route path="/superadmin/dashboard" element={
         <FullscreenProtectedRoute>
-          <SuperAdminDashboard />
+          <NewSuperAdminDashboard />
         </FullscreenProtectedRoute>
       } />
       <Route path="/superadmin" element={<Navigate to="/superadmin/dashboard" replace />} />
@@ -341,244 +341,244 @@ function AppRoutes() {
 
       <Route path="/admin" element={<AdminRoleDashboard />} />
       <Route path="/teacher" element={<TeacherRoleDashboard />} />
-      <Route path="/staff" element={<StaffDashboard />} /> 
-          <Route path="/exams" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-              <ExamManagement />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/exams/create" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-              <ExamCreation />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/exams/:examId" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-              <ExamView />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/exams/:examId/analytics" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-              <ExamAnalytics />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/exams/:examId/results-analytics" element={
-            <FullscreenProtectedRoute>
-              <Navigate to="statistics" replace />
-            </FullscreenProtectedRoute>
-          } />
-          <Route path="/exams/:examId/results-analytics/*" element={
-            <FullscreenProtectedRoute>
-              <ExamAnalyticsDashboard />
-            </FullscreenProtectedRoute>
-          }>
-            <Route path="statistics" element={<StatisticsPage />} />
-            <Route path="heatmap" element={<HeatMapPage />} />
-            <Route path="histogram" element={<HistogramPage />} />
-            <Route path="boxplot" element={<BoxPlotPage />} />
-            <Route path="questions" element={<QuestionsPage />} />
-            <Route path="students" element={<StudentsPage />} />
-            <Route path="student/:studentId" element={<StudentDetailPage />} />
-            <Route path="evaluation" element={<EvaluationPage />} />
-            <Route path="graphs" element={<GraphsPage />} />
-          </Route>
-          <Route path="/exams/:examId/evaluation" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-              <TeacherEvaluationDashboard />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/exams/:examId/edit" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-              <ExamCreation />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/exams/:examId/setup" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-              <ExamSetupDetails />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/exams/:examId/question/:questionNumber" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-              <EnhancedQuestionEditor />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/exam-view/:examId" element={
-            <RoleProtectedRoute allowedRoles={['student', 'STUDENT', 'super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-              <StudentExamView />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/student-dashboard" element={
-            <ProtectedRoute>
-              <StudentDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/my-exams" element={
-            <ProtectedRoute>
-              <StudentDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/student-exams" element={
-            <ProtectedRoute>
-              <StudentExamList />
-            </ProtectedRoute>
-          } />
-          <Route path="/student-analytics" element={
-            <ProtectedRoute>
-              <StudentAnalyticsOverview />
-            </ProtectedRoute>
-          } />
-          <Route path="/student-analytics/:examId" element={
-            <ProtectedRoute>
-              <StudentAnalytics />
-            </ProtectedRoute>
-          } />
-          <Route path="/exam-access/:examId" element={
-            <ProtectedRoute>
-              <ExamAccess />
-            </ProtectedRoute>
-          } />
-          <Route path="/exam-setup/:examId" element={
-            <FullscreenProtectedRoute>
-              <ExamSetup />
-            </FullscreenProtectedRoute>
-          } />
-          <Route path="/secure-exam/:attemptId" element={
-            <FullscreenProtectedRoute>
-              <SecureExamExperience />
-            </FullscreenProtectedRoute>
-          } />
-          <Route path="/exam-results/:attemptId" element={
-            <ProtectedRoute>
-              <ExamResults />
-            </ProtectedRoute>
-          } />
-          <Route path="/exam-results/exam/:examId" element={
-            <ProtectedRoute>
-              <ExamResultsByExamId />
-            </ProtectedRoute>
-          } />
-        <Route path="/test-results/:attemptId" element={
-          <ProtectedRoute>
-            <TestResults />
-          </ProtectedRoute>
-        } />
-        {/* Test routes removed - Advanced components are now integrated into exam-specific pages */}
-          <Route path="/exam-review/:attemptId" element={
-            <ProtectedRoute>
-              <ExamReview />
-            </ProtectedRoute>
-          } />
-          <Route path="/results" element={
-            <ProtectedRoute>
-              <Results />
-            </ProtectedRoute>
-          } />
-          {/* Legacy route redirect */}
-          <Route path="/exam-attempts" element={
-            <ProtectedRoute>
-              <Results />
-            </ProtectedRoute>
-          } />
-          <Route path="/violation-dashboard" element={
-            <ProtectedRoute>
-              <ViolationDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/proctoring-snapshots/:attemptId" element={
-            <ProtectedRoute>
-              <ProctoringSnapshotsView />
-            </ProtectedRoute>
-          } />
-          <Route path="/patterns" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-              <PatternManagement />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/patterns/create" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-              <PatternCreation />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/patterns/:id/edit" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-              <PatternCreation />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/patterns/:patternId/view" element={
-            <ProtectedRoute>
-              <PatternView />
-            </ProtectedRoute>
-          } />
-          <Route path="/patterns/:patternId/questions/create" element={
-            <ProtectedRoute>
-              <QuestionCreation />
-            </ProtectedRoute>
-          } />
-          <Route path="/patterns/:patternId/sections/:sectionId/questions/create" element={
-            <ProtectedRoute>
-              <QuestionCreation />
-            </ProtectedRoute>
-          } />
-          <Route path="/exam/:examId/pattern/:patternId/bulk-import" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-              <BulkImportPage />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/questions" element={
-            <ProtectedRoute>
-              <QuestionManagement />
-            </ProtectedRoute>
-          } />
-          <Route path="/questions/create" element={
-            <ProtectedRoute>
-              <QuestionCreationEnhanced />
-            </ProtectedRoute>
-          } />
-          <Route path="/questions/create-enhanced" element={
-            <ProtectedRoute>
-              <QuestionCreationEnhanced />
-            </ProtectedRoute>
-          } />
-          <Route path="/pattern/:patternId/question/:subjectSlug/:questionNumber" element={
-            <ProtectedRoute>
-              <QuestionCreationEnhanced />
-            </ProtectedRoute>
-          } />
-          <Route path="/pattern/:patternId/question/:questionNumber" element={
-            <ProtectedRoute>
-              <QuestionCreationEnhanced />
-            </ProtectedRoute>
-          } />
-          <Route path="/users" element={
-            <ProtectedRoute>
-              <Users />
-            </ProtectedRoute>
-          } />
-          <Route path="/analytics" element={
-            <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-              <TeacherAnalytics />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/ai-assistant" element={
-            <ProtectedRoute>
-              <AIAssistant />
-            </ProtectedRoute>
-          } />
-          <Route path="/settings" element={
-            <ProtectedRoute>
-              <Settings />
-            </ProtectedRoute>
-          } />
-          <Route path="/proctoring-test" element={
-            <ProtectedRoute>
-              <ProctoringDiagnostics />
-            </ProtectedRoute>
-          } />
-          <Route path="/institute-profile" element={
-            <ProtectedRoute>
-              <InstituteProfile />
-            </ProtectedRoute>
-          } />
+      <Route path="/staff" element={<StaffDashboard />} />
+      <Route path="/exams" element={
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <ExamManagement />
+        </RoleProtectedRoute>
+      } />
+      <Route path="/exams/create" element={
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <ExamCreation />
+        </RoleProtectedRoute>
+      } />
+      <Route path="/exams/:examId" element={
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <ExamView />
+        </RoleProtectedRoute>
+      } />
+      <Route path="/exams/:examId/analytics" element={
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <ExamAnalytics />
+        </RoleProtectedRoute>
+      } />
+      <Route path="/exams/:examId/results-analytics" element={
+        <FullscreenProtectedRoute>
+          <Navigate to="statistics" replace />
+        </FullscreenProtectedRoute>
+      } />
+      <Route path="/exams/:examId/results-analytics/*" element={
+        <FullscreenProtectedRoute>
+          <ExamAnalyticsDashboard />
+        </FullscreenProtectedRoute>
+      }>
+        <Route path="statistics" element={<StatisticsPage />} />
+        <Route path="heatmap" element={<HeatMapPage />} />
+        <Route path="histogram" element={<HistogramPage />} />
+        <Route path="boxplot" element={<BoxPlotPage />} />
+        <Route path="questions" element={<QuestionsPage />} />
+        <Route path="students" element={<StudentsPage />} />
+        <Route path="student/:studentId" element={<StudentDetailPage />} />
+        <Route path="evaluation" element={<EvaluationPage />} />
+        <Route path="graphs" element={<GraphsPage />} />
+      </Route>
+      <Route path="/exams/:examId/evaluation" element={
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <TeacherEvaluationDashboard />
+        </RoleProtectedRoute>
+      } />
+      <Route path="/exams/:examId/edit" element={
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <ExamCreation />
+        </RoleProtectedRoute>
+      } />
+      <Route path="/exams/:examId/setup" element={
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <ExamSetupDetails />
+        </RoleProtectedRoute>
+      } />
+      <Route path="/exams/:examId/question/:questionNumber" element={
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <EnhancedQuestionEditor />
+        </RoleProtectedRoute>
+      } />
+      <Route path="/exam-view/:examId" element={
+        <RoleProtectedRoute allowedRoles={['student', 'STUDENT', 'super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <StudentExamView />
+        </RoleProtectedRoute>
+      } />
+      <Route path="/student-dashboard" element={
+        <ProtectedRoute>
+          <StudentDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/my-exams" element={
+        <ProtectedRoute>
+          <StudentDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/student-exams" element={
+        <ProtectedRoute>
+          <StudentExamList />
+        </ProtectedRoute>
+      } />
+      <Route path="/student-analytics" element={
+        <ProtectedRoute>
+          <StudentAnalyticsOverview />
+        </ProtectedRoute>
+      } />
+      <Route path="/student-analytics/:examId" element={
+        <ProtectedRoute>
+          <StudentAnalytics />
+        </ProtectedRoute>
+      } />
+      <Route path="/exam-access/:examId" element={
+        <ProtectedRoute>
+          <ExamAccess />
+        </ProtectedRoute>
+      } />
+      <Route path="/exam-setup/:examId" element={
+        <FullscreenProtectedRoute>
+          <ExamSetup />
+        </FullscreenProtectedRoute>
+      } />
+      <Route path="/secure-exam/:attemptId" element={
+        <FullscreenProtectedRoute>
+          <SecureExamExperience />
+        </FullscreenProtectedRoute>
+      } />
+      <Route path="/exam-results/:attemptId" element={
+        <ProtectedRoute>
+          <ExamResults />
+        </ProtectedRoute>
+      } />
+      <Route path="/exam-results/exam/:examId" element={
+        <ProtectedRoute>
+          <ExamResultsByExamId />
+        </ProtectedRoute>
+      } />
+      <Route path="/test-results/:attemptId" element={
+        <ProtectedRoute>
+          <TestResults />
+        </ProtectedRoute>
+      } />
+      {/* Test routes removed - Advanced components are now integrated into exam-specific pages */}
+      <Route path="/exam-review/:attemptId" element={
+        <ProtectedRoute>
+          <ExamReview />
+        </ProtectedRoute>
+      } />
+      <Route path="/results" element={
+        <ProtectedRoute>
+          <Results />
+        </ProtectedRoute>
+      } />
+      {/* Legacy route redirect */}
+      <Route path="/exam-attempts" element={
+        <ProtectedRoute>
+          <Results />
+        </ProtectedRoute>
+      } />
+      <Route path="/violation-dashboard" element={
+        <ProtectedRoute>
+          <ViolationDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/proctoring-snapshots/:attemptId" element={
+        <ProtectedRoute>
+          <ProctoringSnapshotsView />
+        </ProtectedRoute>
+      } />
+      <Route path="/patterns" element={
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <PatternManagement />
+        </RoleProtectedRoute>
+      } />
+      <Route path="/patterns/create" element={
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <PatternCreation />
+        </RoleProtectedRoute>
+      } />
+      <Route path="/patterns/:id/edit" element={
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <PatternCreation />
+        </RoleProtectedRoute>
+      } />
+      <Route path="/patterns/:patternId/view" element={
+        <ProtectedRoute>
+          <PatternView />
+        </ProtectedRoute>
+      } />
+      <Route path="/patterns/:patternId/questions/create" element={
+        <ProtectedRoute>
+          <QuestionCreation />
+        </ProtectedRoute>
+      } />
+      <Route path="/patterns/:patternId/sections/:sectionId/questions/create" element={
+        <ProtectedRoute>
+          <QuestionCreation />
+        </ProtectedRoute>
+      } />
+      <Route path="/exam/:examId/pattern/:patternId/bulk-import" element={
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <BulkImportPage />
+        </RoleProtectedRoute>
+      } />
+      <Route path="/questions" element={
+        <ProtectedRoute>
+          <QuestionManagement />
+        </ProtectedRoute>
+      } />
+      <Route path="/questions/create" element={
+        <ProtectedRoute>
+          <QuestionCreationEnhanced />
+        </ProtectedRoute>
+      } />
+      <Route path="/questions/create-enhanced" element={
+        <ProtectedRoute>
+          <QuestionCreationEnhanced />
+        </ProtectedRoute>
+      } />
+      <Route path="/pattern/:patternId/question/:subjectSlug/:questionNumber" element={
+        <ProtectedRoute>
+          <QuestionCreationEnhanced />
+        </ProtectedRoute>
+      } />
+      <Route path="/pattern/:patternId/question/:questionNumber" element={
+        <ProtectedRoute>
+          <QuestionCreationEnhanced />
+        </ProtectedRoute>
+      } />
+      <Route path="/users" element={
+        <ProtectedRoute>
+          <Users />
+        </ProtectedRoute>
+      } />
+      <Route path="/analytics" element={
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <TeacherAnalytics />
+        </RoleProtectedRoute>
+      } />
+      <Route path="/ai-assistant" element={
+        <ProtectedRoute>
+          <AIAssistant />
+        </ProtectedRoute>
+      } />
+      <Route path="/settings" element={
+        <ProtectedRoute>
+          <Settings />
+        </ProtectedRoute>
+      } />
+      <Route path="/proctoring-test" element={
+        <ProtectedRoute>
+          <ProctoringDiagnostics />
+        </ProtectedRoute>
+      } />
+      <Route path="/institute-profile" element={
+        <ProtectedRoute>
+          <InstituteProfile />
+        </ProtectedRoute>
+      } />
 
       {/* Landing Page */}
       <Route path="/" element={
@@ -586,7 +586,7 @@ function AppRoutes() {
           <LandingPage />
         </LandingRoute>
       } />
-      
+
       {/* Default redirect for authenticated users */}
       <Route path="*" element={
         <ProtectedRoute>
