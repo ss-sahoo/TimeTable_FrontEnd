@@ -616,7 +616,7 @@ export default function Onboarding() {
                   <h2 className="text-3xl font-bold text-slate-900 mb-3">All Set! 🎉</h2>
                   <p className="text-slate-600 mb-2">Your institute has been created successfully!</p>
                   <p className="text-sm text-slate-500 mb-8">
-                    You are now the <span className="font-semibold text-indigo-600">Institute Admin</span>
+                    You are now the <span className="font-semibold text-indigo-600">Super Admin</span>
                   </p>
                 </motion.div>
 
