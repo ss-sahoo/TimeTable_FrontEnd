@@ -18,8 +18,10 @@ import {
   Check,
 } from 'lucide-react';
 import { api } from '../hooks/useApi';
+import { useAuthContext } from '../contexts/AuthContext';
 
 export default function Register() {
+  const { setUser } = useAuthContext();
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -79,18 +81,40 @@ export default function Register() {
       };
 
       const response = await api.post('/auth/register/', userData);
+      
+      // Store tokens
       localStorage.setItem('access_token', response.data.access);
       localStorage.setItem('refresh_token', response.data.refresh);
+      
+      // Set user in context and localStorage
+      const userInfo = response.data.user;
+      localStorage.setItem('user_data', JSON.stringify(userInfo));
+      setUser(userInfo);
 
       setSuccess('Account created successfully!');
       setTimeout(() => navigate('/onboarding'), 1500);
     } catch (err: any) {
-      setError(
-        err.response?.data?.email?.[0] ||
-          err.response?.data?.username?.[0] ||
-          err.message ||
-          'Registration failed. Please try again.'
-      );
+      // Handle various error response formats
+      const errorData = err.response?.data;
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      if (errorData) {
+        if (errorData.password?.[0]) {
+          errorMessage = `Password: ${errorData.password[0]}`;
+        } else if (errorData.email?.[0]) {
+          errorMessage = errorData.email[0];
+        } else if (errorData.username?.[0]) {
+          errorMessage = errorData.username[0];
+        } else if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

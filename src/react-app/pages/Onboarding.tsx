@@ -21,8 +21,10 @@ import {
   Award,
 } from 'lucide-react';
 import { api } from '../hooks/useApi';
+import { useAuthContext } from '../contexts/AuthContext';
 
 export default function Onboarding() {
+  const { setUser } = useAuthContext();
   const [step, setStep] = useState(1);
   const [choice, setChoice] = useState<'create' | 'join' | null>(null);
   const [loading, setLoading] = useState(false);
@@ -75,6 +77,17 @@ export default function Onboarding() {
 
     try {
       await api.post('/auth/institutes/', instituteData);
+      
+      // Refresh user data to get updated role (super_admin) and institute
+      try {
+        const userResponse = await api.get('/auth/profile/');
+        const updatedUser = userResponse.data;
+        localStorage.setItem('user_data', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+      } catch (profileErr) {
+        console.warn('Failed to refresh user profile:', profileErr);
+      }
+      
       setStep(3);
     } catch (err: any) {
       setError(err.response?.data?.name?.[0] || err.message || 'Failed to create institute');

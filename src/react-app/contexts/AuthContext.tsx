@@ -225,6 +225,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
 
+      // Fetch full user profile to get complete data including institute details
+      try {
+        const profileResponse = await api.get('/auth/profile/');
+        userData = profileResponse.data;
+      } catch (profileError) {
+        console.warn("Failed to fetch full profile, using login response data:", profileError);
+        // Continue with login response data if profile fetch fails
+      }
+
       // Store full user data in localStorage for easy access
       localStorage.setItem('user_data', JSON.stringify(userData));
 

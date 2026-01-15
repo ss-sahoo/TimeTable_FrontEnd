@@ -173,10 +173,25 @@ export default function Layout({ children }: LayoutProps) {
 
   const isActive = (path: string) => {
     const [pathPart, queryPart] = path.split('?');
+    
+    // For paths with query parameters (like ?tab=centers)
     if (queryPart) {
+      // Must match both pathname AND query parameter
       return location.pathname === pathPart && location.search.includes(queryPart);
     }
-    return location.pathname === path || (path !== '/' && location.pathname.startsWith(path + '/'));
+    
+    // For Home/Dashboard without query params - only active if exact match and NO tab query param
+    if (pathPart === '/superadmin/dashboard' || pathPart === '/dashboard' || pathPart === '/center-admin/dashboard') {
+      return location.pathname === pathPart && !location.search.includes('tab=');
+    }
+    
+    // For timetable home
+    if (pathPart === '/timetable' && location.pathname === '/timetable') {
+      return true;
+    }
+    
+    // For other paths - exact match only (don't use startsWith to avoid /dashboard matching /dashboard-something)
+    return location.pathname === path;
   };
 
   // Mock notifications
