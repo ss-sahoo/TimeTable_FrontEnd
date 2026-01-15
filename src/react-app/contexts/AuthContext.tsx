@@ -18,7 +18,7 @@ interface Institute {
 interface User {
   id: number | string;
   email: string;
-  role: 'super_admin' | 'SUPER_ADMIN' | 'institute_admin' | 'admin' | 'ADMIN' | 'exam_admin' | 'teacher' | 'TEACHER' | 'student' | 'STUDENT' | 'staff' | 'STAFF';
+  role: 'super_admin' | 'SUPER_ADMIN' | 'institute_admin' | 'admin' | 'ADMIN' | 'exam_admin' | 'teacher' | 'TEACHER' | 'student' | 'STUDENT' | 'staff' | 'STAFF' | 'manager';
   institute_id?: number | string;
   institute?: Institute; // Full institute object from API
   institute_name?: string;
@@ -177,6 +177,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (role === 'super_admin' || role === 'SUPER_ADMIN') {
         // Super Admin login endpoint - use timetable auth endpoint
         response = await api.post('/timetable/auth/superadmin/login/', {
+          username: identifier,  // Can be email or username
+          password
+        });
+      } else if (role === 'manager') {
+        // Manager login endpoint
+        response = await api.post('/auth/manager/login/', {
           username: identifier,  // Can be email or username
           password
         });

@@ -68,6 +68,7 @@ import {
 import Timetablelanding from "./pages/TimeTablelanding";
 import TimetableLogin from "./pages/TimetableLogin";
 import TimetableRegister from "./pages/TimetableRegister";
+import ManagerDashboard from "./pages/ManagerDashboard";
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -168,9 +169,22 @@ function getDashboardRoute(role: string | undefined): string {
   }
 
   switch (role) {
+    case 'manager':
+      return '/manager';
+    case 'super_admin':
+    case 'SUPER_ADMIN':
+      return '/superadmin/dashboard';
+    case 'ADMIN':
+    case 'institute_admin':
+      return '/center-admin/dashboard';
     case 'student':
     case 'STUDENT':
       return '/student-dashboard';
+    case 'teacher':
+    case 'TEACHER':
+      return '/teacher';
+    case 'STAFF':
+      return '/staff';
     default:
       return '/dashboard';
   }
@@ -321,6 +335,15 @@ function AppRoutes() {
         </FullscreenProtectedRoute>
       } />
       <Route path="/center-admin" element={<Navigate to="/center-admin/dashboard" replace />} />
+      
+      {/* Manager Dashboard - Company level management */}
+      <Route path="/manager" element={
+        <FullscreenProtectedRoute>
+          <ManagerDashboard />
+        </FullscreenProtectedRoute>
+      } />
+      <Route path="/manager/dashboard" element={<Navigate to="/manager" replace />} />
+      
       <Route path="/timetable" element={
         <ProtectedRoute>
           <Timetable />

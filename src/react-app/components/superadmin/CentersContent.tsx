@@ -63,6 +63,24 @@ const CentersContent = () => {
     const [bulkFile, setBulkFile] = useState<File | null>(null);
     const [uploadingBulk, setUploadingBulk] = useState(false);
     const [bulkUploadRole, setBulkUploadRole] = useState('teacher');
+    
+    // Bulk Upload Results States (to show credentials)
+    const [showBulkResultsModal, setShowBulkResultsModal] = useState(false);
+    const [bulkUploadResults, setBulkUploadResults] = useState<{
+        total: number;
+        success: number;
+        failed: number;
+        created_users: Array<{
+            name: string;
+            username: string;
+            password: string;
+            email: string;
+        }>;
+        errors: Array<{
+            row: number;
+            error: string;
+        }>;
+    } | null>(null);
 
 
     const fetchCenters = async () => {
@@ -193,7 +211,14 @@ const CentersContent = () => {
                 payload.role = newUser.role;
             }
 
-            await api.post(endpoint, payload);
+            const response = await api.post(endpoint, payload);
+            
+            // Show credentials in alert (the response contains username and password)
+            const { username, password } = response.data;
+            if (username && password) {
+                alert(`✅ User Created Successfully!\n\n📋 Login Credentials:\n👤 Username: ${username}\n🔑 Password: ${password}\n\n⚠️ Please save these credentials - they cannot be recovered later!`);
+            }
+            
             setShowAddUserModal(false);
             fetchCenterUsers(selectedCenter.id);
             setNewUser({
@@ -225,18 +250,32 @@ const CentersContent = () => {
         }
 
         try {
-            await api.post(endpoint, formData, {
+            const response = await api.post(endpoint, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
             });
+            
+            // Extract created users from response based on role
+            const createdKey = bulkUploadRole === 'teacher' ? 'created_teachers' : 
+                              bulkUploadRole === 'student' ? 'created_students' : 'created_staff';
+            
+            setBulkUploadResults({
+                total: response.data.total || 0,
+                success: response.data.success || 0,
+                failed: response.data.failed || 0,
+                created_users: response.data[createdKey] || [],
+                errors: response.data.errors || [],
+            });
+            
             setShowBulkUploadModal(false);
             setBulkFile(null);
+            setShowBulkResultsModal(true); // Show results modal with credentials
             fetchCenterUsers(selectedCenter.id);
-            alert("Bulk upload successful!");
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error uploading file:", error);
-            alert("Failed to upload file. Please ensure the format is correct.");
+            const errorMsg = error.response?.data?.detail || "Failed to upload file. Please ensure the format is correct.";
+            alert(errorMsg);
         } finally {
             setUploadingBulk(false);
         }
@@ -834,6 +873,153 @@ const CentersContent = () => {
                                     </button>
                                 </div>
                             </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Bulk Upload Results Modal - Shows Credentials */}
+            <AnimatePresence>
+                {showBulkResultsModal && bulkUploadResults && (
+                    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                            onClick={() => setShowBulkResultsModal(false)}
+                        />
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                            className="relative w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-h-[85vh] overflow-hidden flex flex-col"
+                        >
+                            {/* Header */}
+                            <div className="px-6 py-4 border-b border-slate-200 dark:border-gray-700 flex items-center justify-between bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-900/20 dark:to-blue-900/20">
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                        <Shield className="text-emerald-600" size={20} />
+                                        Bulk Upload Results
+                                    </h3>
+                                    <p className="text-xs text-slate-500 dark:text-gray-400 mt-1">
+                                        {bulkUploadResults.success} of {bulkUploadResults.total} users created successfully
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={() => setShowBulkResultsModal(false)} 
+                                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            {/* Stats Summary */}
+                            <div className="px-6 py-3 bg-slate-50 dark:bg-gray-900/50 border-b border-slate-200 dark:border-gray-700 flex gap-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                                    <span className="text-xs font-bold text-slate-700 dark:text-gray-300">Success: {bulkUploadResults.success}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                    <span className="text-xs font-bold text-slate-700 dark:text-gray-300">Failed: {bulkUploadResults.failed}</span>
+                                </div>
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 overflow-y-auto p-6">
+                                {bulkUploadResults.created_users.length > 0 && (
+                                    <div className="mb-6">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                                <User size={16} className="text-emerald-600" />
+                                                Created Users - Login Credentials
+                                            </h4>
+                                            <button
+                                                onClick={() => {
+                                                    const csvContent = "Name,Username,Password,Email\n" + 
+                                                        bulkUploadResults.created_users.map(u => 
+                                                            `"${u.name}","${u.username}","${u.password}","${u.email}"`
+                                                        ).join("\n");
+                                                    const blob = new Blob([csvContent], { type: 'text/csv' });
+                                                    const url = URL.createObjectURL(blob);
+                                                    const a = document.createElement('a');
+                                                    a.href = url;
+                                                    a.download = `credentials_${new Date().toISOString().split('T')[0]}.csv`;
+                                                    a.click();
+                                                    URL.revokeObjectURL(url);
+                                                }}
+                                                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+                                            >
+                                                <Download size={14} />
+                                                Download CSV
+                                            </button>
+                                        </div>
+                                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3 mb-4">
+                                            <p className="text-xs text-amber-800 dark:text-amber-300 font-medium">
+                                                ⚠️ Important: Save these credentials! Passwords cannot be recovered later.
+                                            </p>
+                                        </div>
+                                        <div className="border border-slate-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                                            <table className="w-full text-left">
+                                                <thead className="bg-slate-50 dark:bg-gray-900/50">
+                                                    <tr>
+                                                        <th className="px-4 py-2 text-[10px] font-bold text-slate-500 uppercase">Name</th>
+                                                        <th className="px-4 py-2 text-[10px] font-bold text-slate-500 uppercase">Username</th>
+                                                        <th className="px-4 py-2 text-[10px] font-bold text-slate-500 uppercase">Password</th>
+                                                        <th className="px-4 py-2 text-[10px] font-bold text-slate-500 uppercase">Email</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 dark:divide-gray-700">
+                                                    {bulkUploadResults.created_users.map((user, idx) => (
+                                                        <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-gray-900/50">
+                                                            <td className="px-4 py-2 text-xs font-medium text-slate-900 dark:text-white">{user.name}</td>
+                                                            <td className="px-4 py-2">
+                                                                <code className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded text-xs font-mono">
+                                                                    {user.username}
+                                                                </code>
+                                                            </td>
+                                                            <td className="px-4 py-2">
+                                                                <code className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded text-xs font-mono">
+                                                                    {user.password}
+                                                                </code>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-xs text-slate-500 dark:text-gray-400">{user.email}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {bulkUploadResults.errors.length > 0 && (
+                                    <div>
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-3">
+                                            <AlertCircle size={16} className="text-red-600" />
+                                            Failed Records
+                                        </h4>
+                                        <div className="space-y-2">
+                                            {bulkUploadResults.errors.map((err, idx) => (
+                                                <div key={idx} className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                                                    <p className="text-xs font-bold text-red-700 dark:text-red-400">Row {err.row}</p>
+                                                    <p className="text-xs text-red-600 dark:text-red-300 mt-0.5">{err.error}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="px-6 py-4 border-t border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-900/50">
+                                <button
+                                    onClick={() => setShowBulkResultsModal(false)}
+                                    className="w-full py-2.5 bg-slate-900 dark:bg-gray-700 text-white rounded-xl text-sm font-bold hover:bg-slate-800 dark:hover:bg-gray-600 transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
                         </motion.div>
                     </div>
                 )}
