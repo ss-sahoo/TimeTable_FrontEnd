@@ -11,15 +11,16 @@ import Integrations from '../components/landing/Integrations';
 import SecurityGrid from '../components/landing/SecurityGrid';
 import PlatformCapabilities from '../components/landing/PlatformCapabilities';
 import PlatformMetrics from '../components/landing/PlatformMetrics';
+import '../styles/landing-mobile.css';
 
 export default function LandingPageEnhanced() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-blue-100 selection:text-blue-900">
+    <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden">
       {/* NAVIGATION - Exact Vivid-Canvas Style */}
       <nav className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 transition-all">
-        <div className="max-w-[1400px] mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           
           <div className="flex items-center gap-12">
             {/* Logo */}

@@ -62,27 +62,27 @@ export default function Hero() {
 
         <motion.h1 
           variants={item}
-          className="text-5xl md:text-7xl font-semibold tracking-tighter text-gray-900 mb-6 leading-[0.95]"
+          className="text-4xl sm:text-5xl md:text-7xl font-semibold tracking-tighter text-gray-900 mb-6 leading-[0.95] px-4"
         >
-          Transform Your Exam <br /> Management with <br />
+          Transform Your Exam <br className="hidden sm:block" /> Management with <br className="hidden sm:block" />
           <span className="text-blue-600">AI-Powered Intelligence</span>
         </motion.h1>
 
         <motion.p 
           variants={item}
-          className="text-base text-gray-500 mb-10 leading-relaxed max-w-xl mx-auto font-medium"
+          className="text-sm sm:text-base text-gray-500 mb-10 leading-relaxed max-w-xl mx-auto font-medium px-4"
         >
           End-to-end digital examination platform for educational institutions, corporate training centers, and online learning platforms. Create, conduct, and analyze exams with cutting-edge technology.
         </motion.p>
 
         <motion.div 
           variants={item}
-          className="flex items-center justify-center gap-4"
+          className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4"
         >
-          <Link to="/register" className="bg-gray-900 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-black hover:scale-105 active:scale-95 transition-all flex items-center gap-2 shadow-lg shadow-gray-200 cursor-pointer">
+          <Link to="/register" className="w-full sm:w-auto bg-gray-900 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-black hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-gray-200 cursor-pointer">
             Start Building <ArrowRight className="w-4 h-4" />
           </Link>
-          <button className="bg-white text-gray-600 border border-gray-200 px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-gray-50 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 cursor-pointer">
+          <button className="w-full sm:w-auto bg-white text-gray-600 border border-gray-200 px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-gray-50 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer">
             <Play className="w-4 h-4 text-gray-400 fill-current" /> Documentation
           </button>
         </motion.div>
