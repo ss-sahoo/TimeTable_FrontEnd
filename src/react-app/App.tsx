@@ -52,6 +52,7 @@ import TeacherAnalytics from "@/react-app/pages/TeacherAnalytics";
 import TeacherEvaluationDashboard from "@/react-app/pages/TeacherEvaluationDashboard";
 import InstituteProfile from "@/react-app/pages/InstituteProfile";
 import LandingPage from "@/react-app/pages/LandingPage";
+import LandingPageEnhanced from "@/react-app/pages/LandingPageEnhanced";
 import ProctoringDiagnostics from "@/react-app/pages/ProctoringDiagnostics";
 import ProctoringSnapshotsView from "@/react-app/pages/ProctoringSnapshotsView";
 import BulkImportPage from "@/react-app/pages/BulkImportPage";
@@ -606,7 +607,7 @@ function AppRoutes() {
       {/* Landing Page */}
       <Route path="/" element={
         <LandingRoute>
-          <LandingPage />
+          <LandingPageEnhanced />
         </LandingRoute>
       } />
 
