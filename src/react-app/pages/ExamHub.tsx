@@ -16,7 +16,7 @@ type TabType = 'statistics' | 'patterns' | 'exams' | 'results' | 'settings';
 
 export default function ExamHub() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') as TabType) || 'statistics';
+  const initialTab = (searchParams.get('tab') as TabType) || 'exams'; // Changed default from 'statistics' to 'exams'
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
 
   const handleTabChange = (tab: TabType) => {
@@ -33,7 +33,7 @@ export default function ExamHub() {
   ];
 
   return (
-    <div className="space-y-0">
+    <div className="min-h-screen bg-slate-50">
       {/* Tab Navigation - Fixed at top */}
       <div className="sticky top-0 z-10 bg-slate-50 dark:bg-gray-900 p-4 md:p-6 pb-4">
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 p-1">
@@ -66,6 +66,7 @@ export default function ExamHub() {
         initial={{ opacity: 0 }} 
         animate={{ opacity: 1 }} 
         transition={{ duration: 0.15 }}
+        className="min-h-[calc(100vh-200px)]"
       >
         {activeTab === 'statistics' && <StatisticsTab />}
         {activeTab === 'patterns' && <PatternManagement />}

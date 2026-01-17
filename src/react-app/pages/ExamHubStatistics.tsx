@@ -23,12 +23,35 @@ interface AdminDashboardData {
 
 export default function StatisticsTab() {
   const { user } = useAuthContext();
-  const { data: dashboardData, loading } = useApi<AdminDashboardData>('/exams/admin-dashboard/');
+  const { data: dashboardData, loading, error } = useApi<AdminDashboardData>('/exams/admin-dashboard/');
 
   if (loading) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-[400px] flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-slate-600">Loading statistics...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center bg-slate-50">
+        <div className="text-center max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">Unable to Load Statistics</h3>
+          <p className="text-sm text-slate-600 mb-4">
+            There was an error loading the exam statistics. Please try refreshing the page.
+          </p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Refresh Page
+          </button>
+        </div>
       </div>
     );
   }
@@ -38,9 +61,9 @@ export default function StatisticsTab() {
   const institute = dashboardData?.institute;
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-6 space-y-5">
       {/* Welcome Card */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-5 text-white">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-5 text-white shadow-lg">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-blue-100 text-xs font-medium mb-1">Exam Statistics</p>

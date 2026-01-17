@@ -1,7 +1,7 @@
-import ExamHub from "../../pages/ExamHub";
+import ExamManagement from "../../pages/ExamManagementNew";
 
 const ExamsContent = () => {
-  return <ExamHub />;
+  return <ExamManagement />;
 };
 
 export default ExamsContent;

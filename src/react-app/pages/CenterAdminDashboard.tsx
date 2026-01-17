@@ -5,9 +5,9 @@ import {
   FileText,
   GraduationCap,
   X,
-  Users,
   Menu,
   ChevronLeft,
+  ChevronDown,
   Zap,
   CalendarDays,
   LogOut,
@@ -35,40 +35,39 @@ export default function CenterAdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 dark:from-gray-950 dark:via-gray-900 dark:to-slate-900">
-      {/* Ambient background effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400/10 dark:bg-blue-500/5 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 -left-40 w-80 h-80 bg-violet-400/10 dark:bg-violet-500/5 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 right-1/3 w-80 h-80 bg-cyan-400/10 dark:bg-cyan-500/5 rounded-full blur-3xl" />
-      </div>
-
-      <div className="flex h-screen overflow-hidden">
-        {/* Sidebar */}
-        <aside
-          className={`hidden lg:flex flex-col bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-r border-slate-200/50 dark:border-gray-800/50 shadow-xl shadow-slate-200/20 dark:shadow-black/20 transition-all duration-300 ${
-            sidebarCollapsed ? "w-20" : "w-64"
-          }`}
-        >
-          {/* Logo */}
-          <div className="flex items-center justify-between h-[72px] px-5 border-b border-slate-200/50 dark:border-gray-800/50">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
-                <Zap className="w-6 h-6 text-white" />
-              </div>
-              {!sidebarCollapsed && (
-                <div className="overflow-hidden">
-                  <span className="font-bold text-slate-900 dark:text-white text-lg whitespace-nowrap tracking-tight">DashoExams</span>
-                  <p className="text-xs text-slate-500 dark:text-gray-400 whitespace-nowrap">Center Admin</p>
-                </div>
-              )}
+    <div className="bg-slate-50 text-slate-600 font-sans antialiased h-screen flex overflow-hidden">
+      {/* Sidebar */}
+      <aside
+        className={`hidden lg:flex flex-col bg-white border-r border-slate-200 transition-all duration-300 z-30 ${
+          sidebarCollapsed ? "w-20" : "w-72"
+        }`}
+      >
+        {/* Logo / Context Switcher */}
+        <div className="h-16 flex items-center px-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
+          <div className="flex items-center gap-3 w-full">
+            <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-violet-700 rounded-lg flex items-center justify-center text-white shadow-sm flex-shrink-0">
+              <Zap className="w-4 h-4" />
             </div>
+            {!sidebarCollapsed && (
+              <>
+                <div className="flex-1 min-w-0">
+                  <h1 className="font-bold text-sm text-slate-900 leading-tight truncate">
+                    {user?.institute?.name || user?.institute_name || "DashoExams"}
+                  </h1>
+                  <p className="text-[10px] text-slate-500 font-medium tracking-wide whitespace-nowrap">CENTER ADMIN</p>
+                </div>
+                <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              </>
+            )}
           </div>
+        </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
+          <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
             {!sidebarCollapsed && (
-              <p className="px-3 py-2 text-xs font-semibold text-slate-400 dark:text-gray-500 uppercase tracking-wider">Menu</p>
+              <div className="flex items-center gap-2 px-3 mb-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Menu</span>
+              </div>
             )}
             <SidebarNavItem
               icon={Home}
@@ -100,86 +99,111 @@ export default function CenterAdminDashboard() {
             />
           </nav>
 
-          {/* Collapse Toggle */}
-          <div className="p-4 border-t border-slate-200/50 dark:border-gray-800/50">
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-500 dark:text-gray-400 hover:bg-slate-100/80 dark:hover:bg-gray-800/80 transition-all"
-            >
-              {sidebarCollapsed ? (
-                <ChevronLeft className="w-5 h-5 rotate-180" />
-              ) : (
-                <>
-                  <ChevronLeft className="w-5 h-5" />
-                  <span>Collapse</span>
-                </>
-              )}
-            </button>
+          {/* Sidebar Footer */}
+          <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+            {!sidebarCollapsed ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white shadow-sm">
+                    {user?.first_name?.[0] || user?.full_name?.[0] || "C"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-slate-900 truncate">
+                      {user?.full_name || user?.get_full_name || user?.email}
+                    </p>
+                    <p className="text-[10px] text-slate-500 truncate">Center Admin</p>
+                  </div>
+                  <button 
+                    onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <ChevronLeft className="w-[18px] h-[18px]" />
+                  </button>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <div className="space-y-2">
+                <button 
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className="w-full flex items-center justify-center p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5 rotate-180" />
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center justify-center p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
+      </aside>
 
-          {/* Logout Button */}
-          <div className="p-4 border-t border-slate-200/50 dark:border-gray-800/50">
-            <button
-              onClick={handleLogout}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all ${sidebarCollapsed ? 'justify-center' : ''}`}
-            >
-              <LogOut className="w-5 h-5" />
-              {!sidebarCollapsed && <span>Logout</span>}
-            </button>
-          </div>
-        </aside>
-
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-w-0 h-full relative">
           {/* Top Header */}
-          <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-gray-800/50 h-[72px] flex items-center justify-between px-6">
+          <header className="bg-white/95 backdrop-blur-sm border-b border-slate-200 h-16 sticky top-0 z-20 flex justify-between items-center px-6">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800"
+                className="lg:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors"
               >
-                <Menu className="w-5 h-5 text-slate-600 dark:text-gray-400" />
+                <Menu className="w-5 h-5 text-slate-600" />
               </button>
               <div>
-                <h1 className="text-xl font-semibold text-slate-900 dark:text-white">
-                  {sidebarTab === "home" && "Home"}
-                  {sidebarTab === "exams" && "Exams"}
-                  {sidebarTab === "batches" && "Batches"}
+                <h1 className="text-xl font-semibold text-slate-900">
+                  {sidebarTab === "home" && "Dashboard"}
+                  {sidebarTab === "exams" && "Exam Management"}
+                  {sidebarTab === "batches" && "Batch Management"}
                   {sidebarTab === "timetable" && "Timetable"}
                 </h1>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-slate-900 dark:text-white">{user?.full_name || user?.get_full_name || user?.email}</p>
-                <p className="text-xs text-slate-500 dark:text-gray-400">Center Admin</p>
+                <p className="text-sm font-medium text-slate-900">{user?.full_name || user?.get_full_name || user?.email}</p>
+                <p className="text-xs text-slate-500">Center Admin</p>
               </div>
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-blue-600 to-violet-600 rounded-xl flex items-center justify-center">
-                <Users className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold ring-2 ring-white shadow-sm">
+                {user?.first_name?.[0] || user?.full_name?.[0] || "C"}
               </div>
             </div>
           </header>
 
           {/* Content Area */}
-          <main className="flex-1 overflow-y-auto">
-            {sidebarTab === "home" && <Dashboard />}
-            {sidebarTab === "exams" && <ExamHub />}
-            {sidebarTab === "batches" && <Batches />}
-            {sidebarTab === "timetable" && <Timetable />}
-          </main>
-        </div>
-      </div>
+          <div className="flex-1 overflow-y-auto bg-slate-50 p-6 lg:p-8">
+            <div className="max-w-[1600px] mx-auto">
+              {sidebarTab === "home" && <Dashboard />}
+              {sidebarTab === "exams" && <ExamHub />}
+              {sidebarTab === "batches" && <Batches />}
+              {sidebarTab === "timetable" && <Timetable />}
+            </div>
+          </div>
+      </main>
 
       {/* Mobile Sidebar */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="fixed inset-0 bg-black/60" onClick={() => setMobileMenuOpen(false)} />
-          <div className="fixed inset-y-0 left-0 w-64 bg-white dark:bg-gray-900 shadow-xl">
+          <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl">
             <div className="flex flex-col h-full">
-              <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-gray-800">
-                <span className="font-bold text-slate-900 dark:text-white text-lg">DashoExams</span>
+              <div className="flex items-center justify-between p-5 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-violet-700 rounded-lg flex items-center justify-center text-white shadow-sm">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <span className="font-bold text-slate-900 text-sm">DashoExams</span>
+                </div>
                 <button onClick={() => setMobileMenuOpen(false)}>
-                  <X className="w-5 h-5 text-slate-600 dark:text-gray-400" />
+                  <X className="w-5 h-5 text-slate-600" />
                 </button>
               </div>
               <nav className="flex-1 p-4 space-y-1">
@@ -225,13 +249,24 @@ export default function CenterAdminDashboard() {
                 />
               </nav>
               {/* Mobile Logout Button */}
-              <div className="p-4 border-t border-slate-200 dark:border-gray-800">
+              <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white shadow-sm">
+                    {user?.first_name?.[0] || user?.full_name?.[0] || "C"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-slate-900 truncate">
+                      {user?.full_name || user?.get_full_name || user?.email}
+                    </p>
+                    <p className="text-[10px] text-slate-500 truncate">Center Admin</p>
+                  </div>
+                </div>
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors"
                 >
-                  <LogOut className="w-5 h-5" />
-                  <span>Logout</span>
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
                 </button>
               </div>
             </div>
@@ -259,24 +294,20 @@ function SidebarNavItem({
   return (
     <button
       onClick={onClick}
-      className={`group flex items-center gap-3 px-3 py-3 rounded-2xl text-sm font-medium transition-all relative overflow-hidden w-full ${
+      className={`nav-item w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all group relative ${
         collapsed ? "justify-center" : ""
       } ${
         active
-          ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25"
-          : "text-slate-600 dark:text-gray-400 hover:bg-slate-100/80 dark:hover:bg-gray-800/80 hover:text-slate-900 dark:hover:text-white"
+          ? "bg-violet-50 text-violet-700"
+          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
       }`}
       title={collapsed ? label : undefined}
     >
       {active && (
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[70%] bg-violet-600 rounded-r" />
       )}
-      <Icon className={`w-5 h-5 flex-shrink-0 relative z-10 ${!active && 'group-hover:scale-110 transition-transform'}`} />
-      {!collapsed && (
-        <span className="whitespace-nowrap overflow-hidden relative z-10">
-          {label}
-        </span>
-      )}
+      <Icon className={`w-[18px] h-[18px] ${active ? "text-violet-600" : "text-slate-400 group-hover:text-slate-600"}`} />
+      {!collapsed && label}
     </button>
   );
 }
