@@ -13,7 +13,7 @@ interface ViolationData {
 interface WebcamMonitorProps {
   attemptId: number;
   onViolationDetected?: (violation: ViolationData) => void;
-  captureInterval?: number; // in seconds
+  captureInterval?: number; // in seconds (default: 10s for MediaPipe accuracy)
   showPreview?: boolean;
   className?: string;
   autoStart?: boolean;
@@ -23,7 +23,7 @@ interface WebcamMonitorProps {
 const WebcamMonitor: React.FC<WebcamMonitorProps> = ({
   attemptId,
   onViolationDetected,
-  captureInterval = 30,
+  captureInterval = 10, // Changed from 30s to 10s for MediaPipe
   showPreview = true,
   className = '',
   autoStart = true,

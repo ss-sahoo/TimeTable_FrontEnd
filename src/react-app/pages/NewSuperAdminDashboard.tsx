@@ -43,6 +43,7 @@ import BatchesContent from "../components/superadmin/BatchesContent";
 import TimetableContent from "../components/superadmin/TimetableContent";
 import SettingsContent from "../components/superadmin/SettingsContent";
 import ProfileContent from "../components/superadmin/ProfileContent";
+import { ref } from "process"; 
 
 type TabType = "overview" | "users" | "institutes" | "exams" | "batches" | "timetable" | "billing" | "settings" | "profile";
 
@@ -67,6 +68,7 @@ export default function NewSuperAdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -206,28 +208,35 @@ export default function NewSuperAdminDashboard() {
   return (
     <div className="bg-slate-50 text-slate-600 font-sans antialiased h-screen flex overflow-hidden">
       {/* SIDEBAR */}
-      <aside className="w-72 bg-white border-r border-slate-200 flex flex-col z-30">
+      <aside className={`${sidebarCollapsed ? 'w-20' : 'w-72'} bg-white border-r border-slate-200 flex flex-col z-30 transition-all duration-300`}>
         {/* Context Switcher (Organization Selector) */}
-        <div className="h-16 flex items-center px-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
-          <div className="flex items-center gap-3 w-full">
-            <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-violet-700 rounded-lg flex items-center justify-center text-white shadow-sm">
+        <div className="h-16 flex items-center px-4 border-b border-slate-100">
+          {!sidebarCollapsed ? (
+            <div className="flex items-center gap-3 w-full hover:bg-slate-50 cursor-pointer transition-colors py-2 px-2 rounded-md -mx-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-violet-700 rounded-lg flex items-center justify-center text-white shadow-sm">
+                <Zap className="w-4 h-4" />
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <h1 className="font-bold text-sm text-slate-900 leading-tight">
+                  {user?.institute?.name || user?.institute_name || "DashoExams"}
+                </h1>
+                <p className="text-[10px] text-slate-500 font-medium tracking-wide">ENTERPRISE PLAN</p>
+              </div>
+            </div>
+          ) : (
+            <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-violet-700 rounded-lg flex items-center justify-center text-white shadow-sm mx-auto">
               <Zap className="w-4 h-4" />
             </div>
-            <div className="flex-1 overflow-hidden">
-              <h1 className="font-bold text-sm text-slate-900 leading-tight">
-                {user?.institute?.name || user?.institute_name || "DashoExams"}
-              </h1>
-              <p className="text-[10px] text-slate-500 font-medium tracking-wide">ENTERPRISE PLAN</p>
-            </div>
-            <ChevronDown className="w-4 h-4 text-slate-400" />
-          </div>
+          )}
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          <div className="flex items-center gap-2 px-3 mb-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Platform</span>
-          </div>
+          {!sidebarCollapsed && (
+            <div className="flex items-center gap-2 px-3 mb-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Platform</span>
+            </div>
+          )}
           {platformNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -235,24 +244,28 @@ export default function NewSuperAdminDashboard() {
               <button
                 key={item.id}
                 onClick={() => handleTabChange(item.id)}
-                className={`nav-item w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all group relative ${
+                className={`nav-item w-full flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 text-sm font-medium rounded-md transition-all group relative ${
                   isActive
                     ? "bg-violet-50 text-violet-700"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
+                title={sidebarCollapsed ? item.label : undefined}
               >
-                {isActive && (
+                {isActive && !sidebarCollapsed && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[70%] bg-violet-600 rounded-r" />
                 )}
                 <Icon className={`w-[18px] h-[18px] ${isActive ? "text-violet-600" : "text-slate-400 group-hover:text-slate-600"}`} />
-                {item.label}
+                {!sidebarCollapsed && item.label}
               </button>
             );
           })}
 
-          <div className="flex items-center gap-2 px-3 mb-2 mt-6">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Operations</span>
-          </div>
+          {!sidebarCollapsed && (
+            <div className="flex items-center gap-2 px-3 mb-2 mt-6">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Operations</span>
+            </div>
+          )}
+          {sidebarCollapsed && <div className="h-4" />}
           {operationsNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -260,21 +273,26 @@ export default function NewSuperAdminDashboard() {
               <button
                 key={item.id}
                 onClick={() => handleTabChange(item.id)}
-                className={`nav-item w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all group relative ${
+                className={`nav-item w-full flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 text-sm font-medium rounded-md transition-all group relative ${
                   isActive
                     ? "bg-violet-50 text-violet-700"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
+                title={sidebarCollapsed ? item.label : undefined}
               >
-                {isActive && (
+                {isActive && !sidebarCollapsed && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[70%] bg-violet-600 rounded-r" />
                 )}
                 <Icon className={`w-[18px] h-[18px] ${isActive ? "text-violet-600" : "text-slate-400 group-hover:text-slate-600"}`} />
-                {item.label}
-                {item.badge && (
-                  <span className="ml-auto bg-slate-100 text-slate-500 py-0.5 px-2 rounded-full text-[10px] font-bold border border-slate-200">
-                    14
-                  </span>
+                {!sidebarCollapsed && (
+                  <>
+                    {item.label}
+                    {item.badge && (
+                      <span className="ml-auto bg-slate-100 text-slate-500 py-0.5 px-2 rounded-full text-[10px] font-bold border border-slate-200">
+                        14
+                      </span>
+                    )}
+                  </>
                 )}
               </button>
             );
@@ -282,28 +300,69 @@ export default function NewSuperAdminDashboard() {
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white shadow-sm">
-              {user?.first_name?.[0] || "S"}
+        <div className="border-t border-slate-100 bg-slate-50/50">
+          {!sidebarCollapsed ? (
+            <div className="p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white shadow-sm">
+                  {user?.first_name?.[0] || "S"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-slate-900 truncate">
+                    {user?.first_name || "Super"} {user?.last_name || "Admin"}
+                  </p>
+                  <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
+                </div>
+                <button onClick={() => handleTabChange("settings")} className="text-slate-400 hover:text-slate-600">
+                  <Settings className="w-[18px] h-[18px]" />
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleLogout}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </button>
+                <button
+                  onClick={() => setSidebarCollapsed(true)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
+                  title="Collapse sidebar"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-slate-900 truncate">
-                {user?.first_name || "Super"} {user?.last_name || "Admin"}
-              </p>
-              <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
+          ) : (
+            <div className="p-4 flex flex-col items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white shadow-sm">
+                {user?.first_name?.[0] || "S"}
+              </div>
+              <button 
+                onClick={() => handleTabChange("settings")} 
+                className="text-slate-400 hover:text-slate-600"
+                title="Settings"
+              >
+                <Settings className="w-[18px] h-[18px]" />
+              </button>
+              <button
+                onClick={handleLogout}
+                className="text-red-600 hover:text-red-700"
+                title="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+              <div className="w-full h-px bg-slate-200 my-1"></div>
+              <button
+                onClick={() => setSidebarCollapsed(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
+                title="Expand sidebar"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
-            <button onClick={() => handleTabChange("settings")} className="text-slate-400 hover:text-slate-600">
-              <Settings className="w-[18px] h-[18px]" />
-            </button>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </button>
+          )}
         </div>
       </aside>
 

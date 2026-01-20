@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Users, Building2, Shield, Zap, User, X, Calendar, Upload, UserPlus, GraduationCap, Briefcase,
+  Users, Building2, Shield, User, X, Upload, UserPlus,
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
@@ -41,37 +41,42 @@ export default function Dashboard() {
   }, [user]);
 
   const tabs = [
-    { id: 'profile' as const, label: 'Profile', icon: User },
-    { id: 'peoples' as const, label: 'Peoples', icon: Users },
+    { id: 'profile' as const, label: 'Profile Overview', icon: User },
+    { id: 'peoples' as const, label: 'People & Roles', icon: Users },
   ];
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 md:space-y-5">
-      {/* Tab Navigation */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-slate-200 dark:border-gray-700 p-1">
-        <div className="flex gap-1">
+    <div className="space-y-6 sm:space-y-8">
+      {/* Header Section */}
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Center Dashboard</h1>
+        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">Manage center details, administrators, and users.</p>
+      </div>
+
+      {/* Modern Tabs */}
+      <div className="border-b border-gray-200 dark:border-gray-700">
+        <nav className="-mb-px flex space-x-4 sm:space-x-8" aria-label="Tabs">
           {tabs.map((tab) => {
-            const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-2.5 rounded-md sm:rounded-lg text-xs sm:text-sm font-medium transition-all ${isActive
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-700/50'
-                  }`}
+                className={`whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors duration-200 ${
+                  isActive
+                    ? 'border-blue-600 text-blue-600 dark:text-blue-500'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
               >
-                <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span>{tab.label}</span>
+                {tab.label}
               </button>
             );
           })}
-        </div>
+        </nav>
       </div>
 
       {/* Tab Content */}
-      <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+      <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
         {activeTab === 'profile' && <ProfileTab centerId={centerId} />}
         {activeTab === 'peoples' && <PeoplesTab centerId={centerId} />}
       </motion.div>
@@ -104,86 +109,137 @@ function ProfileTab({ centerId }: { centerId: string | null }) {
 
   if (!centerId) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-slate-200 dark:border-gray-700 p-4 sm:p-6 text-center">
-        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3">
-          <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-slate-400" />
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 sm:p-12 text-center">
+        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Building2 className="w-8 h-8 sm:w-10 sm:h-10 text-gray-400" />
         </div>
-        <h3 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-gray-100 mb-1">No Center Assigned</h3>
-        <p className="text-xs text-slate-500 dark:text-gray-400">Contact your administrator to get assigned to a center</p>
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No Center Assigned</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Contact your administrator to get assigned to a center</p>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center py-16 sm:py-20">
+        <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error || !centerData) {
     return (
-      <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-6 text-center">
-        <X className="w-8 h-8 text-red-400 mx-auto mb-2" />
+      <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-8 text-center">
+        <X className="w-10 h-10 text-red-400 mx-auto mb-3" />
         <p className="text-sm text-red-600 dark:text-red-400">Failed to load center details</p>
       </div>
     );
   }
 
+  const centerInitial = centerData.name.charAt(0).toUpperCase();
+
   return (
-    <div className="space-y-3 sm:space-y-4">
-      {/* Profile Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg sm:rounded-xl p-3 sm:p-5 text-white">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className="w-10 h-10 sm:w-14 sm:h-14 bg-white/20 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0">
-            <Building2 className="w-5 h-5 sm:w-7 sm:h-7" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-semibold truncate">{centerData.name}</h1>
-            {centerData.institute && <p className="text-blue-100 text-xs sm:text-sm truncate">{centerData.institute.name}</p>}
+    <div className="space-y-6">
+      {/* Center Header Card */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="h-24 sm:h-32 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
+        <div className="px-4 sm:px-6 pb-6">
+          <div className="flex items-end -mt-12 sm:-mt-12 mb-4">
+            <div className="h-20 w-20 sm:h-24 sm:w-24 bg-white dark:bg-gray-800 rounded-xl p-1 shadow-md">
+              <div className="h-full w-full bg-blue-50 dark:bg-blue-900/30 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400 text-2xl sm:text-3xl font-bold">
+                {centerInitial}
+              </div>
+            </div>
+            <div className="ml-3 sm:ml-4 mb-1">
+              <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{centerData.name}</h2>
+              {centerData.institute && (
+                <span className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">{centerData.institute.name}</span>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Profile Details */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-slate-200 dark:border-gray-700 p-3 sm:p-4">
-          <h3 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-gray-100 mb-2 sm:mb-3 flex items-center gap-2">
-            <div className="w-1 h-3 sm:h-4 bg-blue-600 rounded-full" />
-            Center Information
-          </h3>
-          <div className="space-y-2 sm:space-y-3">
-            <InfoRow icon={Building2} label="Center Name" value={centerData.name} />
-            {centerData.city && <InfoRow icon={Building2} label="City" value={centerData.city} />}
-            {centerData.address && <InfoRow icon={Building2} label="Address" value={centerData.address} />}
+      {/* Profile Details Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        {/* Center Information */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">Center Information</h3>
+            <Building2 className="w-5 h-5 text-gray-400" />
+          </div>
+          <div className="space-y-4">
+            <div className="group">
+              <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Center Name</label>
+              <div className="text-sm font-medium text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900/50 px-3 py-2 rounded-lg border border-transparent group-hover:border-gray-200 dark:group-hover:border-gray-600 transition-colors">
+                {centerData.name}
+              </div>
+            </div>
+            {(centerData.city || centerData.address) && (
+              <div className="grid grid-cols-2 gap-4">
+                {centerData.city && (
+                  <div className="group">
+                    <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">City</label>
+                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900/50 px-3 py-2 rounded-lg border border-transparent group-hover:border-gray-200 dark:group-hover:border-gray-600 transition-colors">
+                      {centerData.city}
+                    </div>
+                  </div>
+                )}
+                {centerData.address && (
+                  <div className="group">
+                    <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Address</label>
+                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900/50 px-3 py-2 rounded-lg border border-transparent group-hover:border-gray-200 dark:group-hover:border-gray-600 transition-colors truncate">
+                      {centerData.address}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-slate-200 dark:border-gray-700 p-3 sm:p-4">
-          <h3 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-gray-100 mb-2 sm:mb-3 flex items-center gap-2">
-            <div className="w-1 h-3 sm:h-4 bg-blue-600 rounded-full" />
-            Additional Details
-          </h3>
-          <div className="space-y-2 sm:space-y-3">
-            {centerData.institute && <InfoRow icon={Shield} label="Institute" value={centerData.institute.name} />}
-            {centerData.id && <InfoRow icon={Zap} label="Center ID" value={centerData.id} mono />}
-            {centerData.created_at && <InfoRow icon={Calendar} label="Created" value={new Date(centerData.created_at).toLocaleDateString()} />}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function InfoRow({ icon: Icon, label, value, mono }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 bg-slate-50 dark:bg-gray-900/50 rounded-lg">
-      <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
-        <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 dark:text-blue-400" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs text-slate-500 dark:text-gray-400">{label}</p>
-        <p className={`text-xs sm:text-sm text-slate-900 dark:text-gray-100 truncate ${mono ? 'font-mono text-xs' : 'font-medium'}`}>{value}</p>
+        {/* System Details */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">System Details</h3>
+            <Shield className="w-5 h-5 text-gray-400" />
+          </div>
+          <div className="space-y-4">
+            <div className="group">
+              <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Center ID</label>
+              <div className="flex items-center justify-between text-xs sm:text-sm font-mono text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                <span className="truncate">{centerData.id}</span>
+                <button
+                  onClick={() => navigator.clipboard.writeText(centerData.id)}
+                  className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors ml-2"
+                  title="Copy ID"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {centerData.institute && (
+                <div className="group">
+                  <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Institute</label>
+                  <div className="text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg border border-blue-100 dark:border-blue-800">
+                    {centerData.institute.name}
+                  </div>
+                </div>
+              )}
+              {centerData.created_at && (
+                <div className="group">
+                  <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Created Date</label>
+                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900/50 px-3 py-2 rounded-lg border border-transparent">
+                    {new Date(centerData.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

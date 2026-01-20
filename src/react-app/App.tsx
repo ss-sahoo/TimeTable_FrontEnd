@@ -23,6 +23,7 @@ import AIAssistant from "@/react-app/pages/AIAssistant";
 import Users from "@/react-app/pages/Users";
 import Settings from "@/react-app/pages/Settings";
 import StudentDashboard from "@/react-app/pages/StudentDashboard";
+import StudentDashboardImproved from "@/react-app/pages/StudentDashboardImproved";
 import StudentAnalytics from "@/react-app/pages/StudentAnalytics";
 import StudentAnalyticsOverview from "@/react-app/pages/StudentAnalyticsOverview";
 import StudentExamList from "@/react-app/pages/StudentExamList";
