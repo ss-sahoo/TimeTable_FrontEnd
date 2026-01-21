@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { api } from '@/react-app/hooks/useApi';
 import { jwtDecode } from 'jwt-decode';
+import { deviceManager } from '@/react-app/services/DeviceManager';
 
 interface Institute {
   id: number;
@@ -52,6 +53,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   userRole: User['role'] | null;
+  deviceConflict: any | null;
+  setDeviceConflict: React.Dispatch<React.SetStateAction<any | null>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,6 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [deviceConflict, setDeviceConflict] = useState<any | null>(null);
 
   useEffect(() => {
     const loadUserFromTokens = async () => {
@@ -168,41 +172,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadUserFromTokens();
   }, []);
 
-  const login = async (identifier: string, password: string, role?: string) => {
+  const login = async (identifier: string, password: string, role?: string, forceSwitch: boolean = false) => {
     setLoading(true);
     try {
+      // Get device information
+      const deviceInfo = deviceManager.getDeviceInfo();
+      
+      // Prepare login data with device info
+      const loginData = {
+        user_agent: deviceInfo.userAgent,
+        screen_resolution: deviceInfo.screenResolution,
+        timezone: deviceInfo.timezone,
+        device_type: deviceInfo.type,
+        browser: deviceInfo.browser,
+        os: deviceInfo.os,
+        force_switch: forceSwitch,
+      };
+      
       let response;
 
       // Determine which login endpoint to use based on role
       if (role === 'super_admin' || role === 'SUPER_ADMIN') {
         // Super Admin login endpoint - use timetable auth endpoint
         response = await api.post('/timetable/auth/superadmin/login/', {
-          username: identifier,  // Can be email or username
-          password
+          username: identifier,
+          password,
+          ...loginData,
         });
       } else if (role === 'manager') {
         // Manager login endpoint
         response = await api.post('/auth/manager/login/', {
-          username: identifier,  // Can be email or username
-          password
+          username: identifier,
+          password,
+          ...loginData,
         });
       } else if (role === 'admin' || role === 'institute_admin' || role === 'ADMIN') {
         // Admin login endpoint - use timetable auth endpoint
         response = await api.post('/timetable/auth/admin/login/', {
-          username: identifier,  // Can be email or username
-          password
+          username: identifier,
+          password,
+          ...loginData,
         });
       } else if (role === 'teacher' || role === 'TEACHER') {
         // Teacher login endpoint (supports teacher_code, email, or username) - use timetable auth endpoint
         response = await api.post('/timetable/auth/teacher/login/', {
-          username: identifier,  // Can be email, username, or teacher_code
-          password
+          username: identifier,
+          password,
+          ...loginData,
+        });
+      } else if (role === 'student' || role === 'STUDENT') {
+        // Student login endpoint
+        response = await api.post('/auth/student/login/', {
+          username: identifier,
+          password,
+          ...loginData,
         });
       } else {
-        // Generic login endpoint (for student, staff, or if role not specified)
+        // Generic login endpoint (for staff or if role not specified)
         response = await api.post('/auth/login/', {
-          email: identifier,  // Generic login requires email
-          password
+          email: identifier,
+          password,
+          ...loginData,
         });
       }
 
@@ -224,6 +254,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Store tokens in localStorage
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
+      
+      // Store device fingerprint for session validation
+      if (response.data.device_session?.device_fingerprint) {
+        localStorage.setItem('device_fingerprint', response.data.device_session.device_fingerprint);
+      }
 
       // Fetch full user profile to get complete data including institute details
       try {
@@ -244,6 +279,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return userData;
     } catch (error: any) {
       console.error("Login failed:", error);
+      console.log("Error response:", error.response);
+      console.log("Error status:", error.response?.status);
+      console.log("Error data:", error.response?.data);
+      
+      // Check if this is a device conflict error (409 status)
+      if (error.response?.status === 409 && error.response?.data?.has_conflict) {
+        console.log("Device conflict detected! Setting conflict state...");
+        setDeviceConflict({
+          conflictInfo: error.response.data.conflict_info,
+          credentials: { identifier, password, role },
+        });
+        setLoading(false);
+        throw new Error('DEVICE_CONFLICT');
+      }
+      
       logout(); // Ensure no stale tokens/user data
       setLoading(false);
 
@@ -289,7 +339,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const userRole = user ? user.role : null;
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, logout, isAuthenticated, loading, userRole }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, isAuthenticated, loading, userRole, deviceConflict, setDeviceConflict }}>
       {children}
     </AuthContext.Provider>
   );

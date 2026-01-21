@@ -123,10 +123,10 @@ export default function Layout({ children }: LayoutProps) {
 
     // For exam domain, show exam-specific navigation
     const baseNavigation: NavigationItem[] = [
-      { name: 'Home', href: user?.role === 'super_admin' || user?.role === 'SUPER_ADMIN' ? '/superadmin/dashboard' : '/dashboard', icon: Home },
+      { name: 'Home', href: user?.role?.toUpperCase() === 'SUPER_ADMIN' ? '/superadmin/dashboard' : '/dashboard', icon: Home },
     ];
 
-    if (user?.role === 'super_admin' || user?.role === 'SUPER_ADMIN') {
+    if (user?.role?.toUpperCase() === 'SUPER_ADMIN') {
       baseNavigation.push(
         { name: 'Institute', href: '/superadmin/dashboard?tab=institute', icon: Building2 },
         { name: 'Centers', href: '/superadmin/dashboard?tab=centers', icon: MapPin },
@@ -137,7 +137,7 @@ export default function Layout({ children }: LayoutProps) {
         { name: 'Settings', href: '/superadmin/dashboard?tab=settings', icon: Settings },
         { name: 'Profile', href: '/superadmin/dashboard?tab=profile', icon: User },
       );
-    } else if (user?.role === 'student') {
+    } else if (user?.role?.toLowerCase() === 'student') {
       baseNavigation.push(
         { name: 'My Exams', href: '/student-exams', icon: BookOpen },
         { name: 'Analytics', href: '/student-analytics', icon: BarChart3 },

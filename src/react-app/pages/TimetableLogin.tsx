@@ -15,6 +15,8 @@ import {
   Clock,
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
+import DeviceConflictModal from '../components/DeviceConflictModal';
+import { deviceManager } from '../services/DeviceManager';
 
 export default function TimetableLogin() {
   const [formData, setFormData] = useState({
@@ -26,7 +28,7 @@ export default function TimetableLogin() {
   const [error, setError] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  const { login } = useAuthContext();
+  const { login, deviceConflict, setDeviceConflict } = useAuthContext();
   const navigate = useNavigate();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,8 +71,8 @@ export default function TimetableLogin() {
     try {
       let loggedInUser: any = null;
       
-      // Try role-specific endpoints first (admin, super_admin, teacher)
-      const roleAttempts = ['admin', 'super_admin', 'teacher'];
+      // Try role-specific endpoints first (admin, super_admin, teacher, student)
+      const roleAttempts = ['admin', 'super_admin', 'teacher', 'student'];
       let loginSuccess = false;
       
       for (const roleType of roleAttempts) {
@@ -78,7 +80,14 @@ export default function TimetableLogin() {
           loggedInUser = await login(formData.email, formData.password, roleType);
           loginSuccess = true;
           break;
-        } catch (roleError) {
+        } catch (roleError: any) {
+          console.log('Role login error:', roleError.message);
+          // Check if this is a device conflict
+          if (roleError.message === 'DEVICE_CONFLICT') {
+            console.log('Device conflict detected in login component!');
+            setLoading(false);
+            return; // Just return, the modal will show via deviceConflict state
+          }
           // Continue to next role
           continue;
         }
@@ -89,6 +98,13 @@ export default function TimetableLogin() {
         try {
           loggedInUser = await login(formData.email, formData.password);
         } catch (genericError: any) {
+          console.log('Generic login error:', genericError.message);
+          // Check if this is a device conflict
+          if (genericError.message === 'DEVICE_CONFLICT') {
+            console.log('Device conflict detected in generic login!');
+            setLoading(false);
+            return; // Just return, the modal will show via deviceConflict state
+          }
           throw genericError;
         }
       }
@@ -110,6 +126,34 @@ export default function TimetableLogin() {
     }
   };
 
+  const handleSwitchDevice = async () => {
+    if (!deviceConflict) return;
+
+    try {
+      // Retry login with stored credentials and force switch flag
+      const { identifier, password, role } = deviceConflict.credentials;
+      const loggedInUser = await login(identifier, password, role, true); // true = forceSwitch
+      
+      // Clear device conflict state
+      setDeviceConflict(null);
+      
+      // Redirect based on user role
+      if (loggedInUser?.role) {
+        const dashboardRoute = getDashboardRoute(loggedInUser.role);
+        navigate(dashboardRoute);
+      } else {
+        navigate('/timetable');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to switch device. Please try again.');
+    }
+  };
+
+  const handleCancelDeviceSwitch = () => {
+    setDeviceConflict(null);
+    setError('Login cancelled. Please use your other device or contact support.');
+  };
+
   const features = [
     { icon: Cpu, text: 'AI-Powered Scheduling', color: 'from-cyan-500 to-teal-500' },
     { icon: Users, text: 'Teacher Management', color: 'from-emerald-500 to-green-500' },
@@ -118,6 +162,16 @@ export default function TimetableLogin() {
 
   return (
     <div className="min-h-screen flex">
+      {/* Device Conflict Modal */}
+      {deviceConflict && (
+        <DeviceConflictModal
+          isOpen={true}
+          conflictInfo={deviceConflict.conflictInfo}
+          onSwitchDevice={handleSwitchDevice}
+          onCancel={handleCancelDeviceSwitch}
+        />
+      )}
+      
       {/* Left Panel - Timetable Branding */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-slate-900 via-teal-900 to-cyan-900 overflow-hidden">
         {/* Animated background elements */}

@@ -45,7 +45,7 @@ const ProctoringSnapshotsView: React.FC = () => {
   const [data, setData] = useState<SnapshotsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showViolationsOnly, setShowViolationsOnly] = useState(true);
+  const [showViolationsOnly, setShowViolationsOnly] = useState(false);
   const [selectedSnapshot, setSelectedSnapshot] = useState<Snapshot | null>(null);
 
   useEffect(() => {

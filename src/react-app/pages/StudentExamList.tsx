@@ -72,7 +72,7 @@ export default function StudentExamList() {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    if (user?.role === 'student') {
+    if (user?.role?.toLowerCase() === 'student') {
       loadExams();
     }
   }, [user]);

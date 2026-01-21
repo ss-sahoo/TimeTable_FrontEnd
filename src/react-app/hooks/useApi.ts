@@ -33,13 +33,20 @@ export const api = axios.create({
   withCredentials: true, // Important for sending cookies (like JWT refresh tokens)
 });
 
-// Interceptor to attach JWT token to requests
+// Interceptor to attach JWT token and device fingerprint to requests
 api.interceptors.request.use(
   (config) => {
     const accessToken = localStorage.getItem('access_token');
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
+    
+    // Add device fingerprint to headers if available
+    const deviceFingerprint = localStorage.getItem('device_fingerprint');
+    if (deviceFingerprint) {
+      config.headers['X-Device-Fingerprint'] = deviceFingerprint;
+    }
+    
     return config;
   },
   (error) => {
@@ -47,11 +54,25 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor to handle token refresh
+// Interceptor to handle token refresh and device session invalidation
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    
+    // Check if this is a device session invalidation error
+    if (error.response?.status === 401 && error.response?.data?.error_code === 'DEVICE_SESSION_INVALID') {
+      // Device session was invalidated (user logged in on another device)
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user_data');
+      localStorage.removeItem('device_fingerprint');
+      
+      // Redirect to login with a message
+      window.location.href = '/login?reason=device_switched';
+      return Promise.reject(error);
+    }
+    
     // If error status is 401 (Unauthorized) and it's not a login/refresh request
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true; // Mark request as retried

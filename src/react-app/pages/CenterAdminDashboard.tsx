@@ -3,27 +3,34 @@ import { useNavigate } from "react-router";
 import {
   Home,
   FileText,
-  GraduationCap,
   X,
   Menu,
   ChevronLeft,
   ChevronDown,
   Zap,
-  CalendarDays,
   LogOut,
+  Grid3x3,
+  ClipboardCheck,
+  Users as UsersIcon,
+  BarChart3,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { useAuthContext } from "../contexts/AuthContext";
 
 // Import existing page components
-import ExamHub from "./ExamHub";
-import Batches from "./Batches";
-import Timetable from "./Timetable";
 import Dashboard from "./Dashboard";
+import PatternManagementNew from "./PatternManagementNew";
+import ExamManagementNew from "./ExamManagementNew";
+import ExamCreationNew from "./ExamCreationNew";
+import Results from "./Results";
+import Users from "./Users";
+import Analytics from "./Analytics";
+import Settings from "./Settings";
 
-type SidebarTab = "home" | "exams" | "batches" | "timetable";
+type SidebarTab = "dashboard" | "patterns" | "exams" | "exam-create" | "results" | "users" | "analytics" | "settings";
 
 export default function CenterAdminDashboard() {
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("home");
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, logout } = useAuthContext();
@@ -71,9 +78,17 @@ export default function CenterAdminDashboard() {
             )}
             <SidebarNavItem
               icon={Home}
-              label="Home"
-              active={sidebarTab === "home"}
-              onClick={() => setSidebarTab("home")}
+              label="Dashboard"
+              active={sidebarTab === "dashboard"}
+              onClick={() => setSidebarTab("dashboard")}
+              collapsed={sidebarCollapsed}
+            />
+            <SidebarNavItem
+              icon={Grid3x3}
+              label="Patterns"
+              badge="New"
+              active={sidebarTab === "patterns"}
+              onClick={() => setSidebarTab("patterns")}
               collapsed={sidebarCollapsed}
             />
             <SidebarNavItem
@@ -84,17 +99,31 @@ export default function CenterAdminDashboard() {
               collapsed={sidebarCollapsed}
             />
             <SidebarNavItem
-              icon={GraduationCap}
-              label="Batches"
-              active={sidebarTab === "batches"}
-              onClick={() => setSidebarTab("batches")}
+              icon={ClipboardCheck}
+              label="Results"
+              active={sidebarTab === "results"}
+              onClick={() => setSidebarTab("results")}
               collapsed={sidebarCollapsed}
             />
             <SidebarNavItem
-              icon={CalendarDays}
-              label="Timetable"
-              active={sidebarTab === "timetable"}
-              onClick={() => setSidebarTab("timetable")}
+              icon={UsersIcon}
+              label="Users"
+              active={sidebarTab === "users"}
+              onClick={() => setSidebarTab("users")}
+              collapsed={sidebarCollapsed}
+            />
+            <SidebarNavItem
+              icon={BarChart3}
+              label="Analytics"
+              active={sidebarTab === "analytics"}
+              onClick={() => setSidebarTab("analytics")}
+              collapsed={sidebarCollapsed}
+            />
+            <SidebarNavItem
+              icon={SettingsIcon}
+              label="Settings"
+              active={sidebarTab === "settings"}
+              onClick={() => setSidebarTab("settings")}
               collapsed={sidebarCollapsed}
             />
           </nav>
@@ -160,10 +189,13 @@ export default function CenterAdminDashboard() {
               </button>
               <div>
                 <h1 className="text-xl font-semibold text-slate-900">
-                  {sidebarTab === "home" && "Dashboard"}
-                  {sidebarTab === "exams" && "Exam Management"}
-                  {sidebarTab === "batches" && "Batch Management"}
-                  {sidebarTab === "timetable" && "Timetable"}
+                  {sidebarTab === "dashboard" && "Dashboard"}
+                  {sidebarTab === "patterns" && "Patterns"}
+                  {sidebarTab === "exams" && "Exams"}
+                  {sidebarTab === "results" && "Results"}
+                  {sidebarTab === "users" && "Users"}
+                  {sidebarTab === "analytics" && "Analytics"}
+                  {sidebarTab === "settings" && "Settings"}
                 </h1>
               </div>
             </div>
@@ -181,10 +213,14 @@ export default function CenterAdminDashboard() {
           {/* Content Area */}
           <div className="flex-1 overflow-y-auto bg-slate-50 p-6 lg:p-8">
             <div className="max-w-[1600px] mx-auto">
-              {sidebarTab === "home" && <Dashboard />}
-              {sidebarTab === "exams" && <ExamHub />}
-              {sidebarTab === "batches" && <Batches />}
-              {sidebarTab === "timetable" && <Timetable />}
+              {sidebarTab === "dashboard" && <Dashboard />}
+              {sidebarTab === "patterns" && <PatternManagementNew />}
+              {sidebarTab === "exams" && <ExamManagementWrapper onCreateExam={() => setSidebarTab("exam-create")} />}
+              {sidebarTab === "exam-create" && <ExamCreationNew />}
+              {sidebarTab === "results" && <Results />}
+              {sidebarTab === "users" && <Users />}
+              {sidebarTab === "analytics" && <Analytics />}
+              {sidebarTab === "settings" && <Settings />}
             </div>
           </div>
       </main>
@@ -209,10 +245,21 @@ export default function CenterAdminDashboard() {
               <nav className="flex-1 p-4 space-y-1">
                 <SidebarNavItem
                   icon={Home}
-                  label="Home"
-                  active={sidebarTab === "home"}
+                  label="Dashboard"
+                  active={sidebarTab === "dashboard"}
                   onClick={() => {
-                    setSidebarTab("home");
+                    setSidebarTab("dashboard");
+                    setMobileMenuOpen(false);
+                  }}
+                  collapsed={false}
+                />
+                <SidebarNavItem
+                  icon={Grid3x3}
+                  label="Patterns"
+                  badge="New"
+                  active={sidebarTab === "patterns"}
+                  onClick={() => {
+                    setSidebarTab("patterns");
                     setMobileMenuOpen(false);
                   }}
                   collapsed={false}
@@ -228,21 +275,41 @@ export default function CenterAdminDashboard() {
                   collapsed={false}
                 />
                 <SidebarNavItem
-                  icon={GraduationCap}
-                  label="Batches"
-                  active={sidebarTab === "batches"}
+                  icon={ClipboardCheck}
+                  label="Results"
+                  active={sidebarTab === "results"}
                   onClick={() => {
-                    setSidebarTab("batches");
+                    setSidebarTab("results");
                     setMobileMenuOpen(false);
                   }}
                   collapsed={false}
                 />
                 <SidebarNavItem
-                  icon={CalendarDays}
-                  label="Timetable"
-                  active={sidebarTab === "timetable"}
+                  icon={UsersIcon}
+                  label="Users"
+                  active={sidebarTab === "users"}
                   onClick={() => {
-                    setSidebarTab("timetable");
+                    setSidebarTab("users");
+                    setMobileMenuOpen(false);
+                  }}
+                  collapsed={false}
+                />
+                <SidebarNavItem
+                  icon={BarChart3}
+                  label="Analytics"
+                  active={sidebarTab === "analytics"}
+                  onClick={() => {
+                    setSidebarTab("analytics");
+                    setMobileMenuOpen(false);
+                  }}
+                  collapsed={false}
+                />
+                <SidebarNavItem
+                  icon={SettingsIcon}
+                  label="Settings"
+                  active={sidebarTab === "settings"}
+                  onClick={() => {
+                    setSidebarTab("settings");
                     setMobileMenuOpen(false);
                   }}
                   collapsed={false}
@@ -281,12 +348,14 @@ export default function CenterAdminDashboard() {
 function SidebarNavItem({
   icon: Icon,
   label,
+  badge,
   active,
   onClick,
   collapsed,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  badge?: string;
   active: boolean;
   onClick: () => void;
   collapsed: boolean;
@@ -307,7 +376,33 @@ function SidebarNavItem({
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[70%] bg-violet-600 rounded-r" />
       )}
       <Icon className={`w-[18px] h-[18px] ${active ? "text-violet-600" : "text-slate-400 group-hover:text-slate-600"}`} />
-      {!collapsed && label}
+      {!collapsed && (
+        <>
+          <span className="flex-1 text-left">{label}</span>
+          {badge && (
+            <span className="px-2 py-0.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full">
+              {badge}
+            </span>
+          )}
+        </>
+      )}
     </button>
+  );
+}
+
+// Wrapper component to intercept navigation in ExamManagement
+function ExamManagementWrapper({ onCreateExam }: { onCreateExam: () => void }) {
+  return (
+    <div onClick={(e) => {
+      const target = e.target as HTMLElement;
+      // Check if the clicked element or its parent is a link to /exams/create
+      const link = target.closest('a[href="/exams/create"]');
+      if (link) {
+        e.preventDefault();
+        onCreateExam();
+      }
+    }}>
+      <ExamManagementNew />
+    </div>
   );
 }

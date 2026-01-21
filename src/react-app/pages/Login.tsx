@@ -12,6 +12,8 @@ import {
   Star,
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
+import DeviceConflictModal from '../components/DeviceConflictModal';
+import { deviceManager } from '../services/DeviceManager';
 
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -24,7 +26,7 @@ export default function Login() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
 
-  const { login } = useAuthContext();
+  const { login, deviceConflict, setDeviceConflict } = useAuthContext();
   const navigate = useNavigate();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,8 +69,8 @@ export default function Login() {
     try {
       let loggedInUser: any = null;
       
-      // Try role-specific endpoints first (admin, super_admin, teacher)
-      const roleAttempts = ['admin', 'super_admin', 'teacher'];
+      // Try role-specific endpoints first (admin, super_admin, teacher, student)
+      const roleAttempts = ['admin', 'super_admin', 'teacher', 'student'];
       let loginSuccess = false;
       
       for (const roleType of roleAttempts) {
@@ -76,7 +78,14 @@ export default function Login() {
           loggedInUser = await login(formData.email, formData.password, roleType);
           loginSuccess = true;
           break;
-        } catch (roleError) {
+        } catch (roleError: any) {
+          console.log('Role login error:', roleError.message);
+          // Check if this is a device conflict
+          if (roleError.message === 'DEVICE_CONFLICT') {
+            console.log('Device conflict detected in login component!');
+            setLoading(false);
+            return; // Just return, the modal will show via deviceConflict state
+          }
           // Continue to next role
           continue;
         }
@@ -87,6 +96,13 @@ export default function Login() {
         try {
           loggedInUser = await login(formData.email, formData.password);
         } catch (genericError: any) {
+          console.log('Generic login error:', genericError.message);
+          // Check if this is a device conflict
+          if (genericError.message === 'DEVICE_CONFLICT') {
+            console.log('Device conflict detected in generic login!');
+            setLoading(false);
+            return; // Just return, the modal will show via deviceConflict state
+          }
           throw genericError;
         }
       }
@@ -108,8 +124,47 @@ export default function Login() {
     }
   };
 
+  const handleSwitchDevice = async () => {
+    if (!deviceConflict) return;
+
+    try {
+      // Retry login with stored credentials and force switch flag
+      const { identifier, password, role } = deviceConflict.credentials;
+      const loggedInUser = await login(identifier, password, role, true); // true = forceSwitch
+      
+      // Clear device conflict state
+      setDeviceConflict(null);
+      
+      // Redirect based on user role
+      if (loggedInUser?.role) {
+        const dashboardRoute = getDashboardRoute(loggedInUser.role);
+        navigate(dashboardRoute);
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to switch device. Please try again.');
+    }
+  };
+
+  const handleCancelDeviceSwitch = () => {
+    setDeviceConflict(null);
+    setShowDeviceConflict(false);
+    setError('Login cancelled. Please use your other device or contact support.');
+  };
+
   return (
     <div className="h-screen flex overflow-hidden">
+      {/* Device Conflict Modal */}
+      {deviceConflict && (
+        <DeviceConflictModal
+          isOpen={true}
+          conflictInfo={deviceConflict.conflictInfo}
+          onSwitchDevice={handleSwitchDevice}
+          onCancel={handleCancelDeviceSwitch}
+        />
+      )}
+      
       {/* LEFT SIDE: Brand & Testimonial */}
       <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-12 text-white"
         style={{

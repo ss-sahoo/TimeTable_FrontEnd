@@ -56,6 +56,7 @@ import LandingPage from "@/react-app/pages/LandingPage";
 import LandingPageEnhanced from "@/react-app/pages/LandingPageEnhanced";
 import ProctoringDiagnostics from "@/react-app/pages/ProctoringDiagnostics";
 import ProctoringSnapshotsView from "@/react-app/pages/ProctoringSnapshotsView";
+import ProctoringTestPage from "@/react-app/pages/ProctoringTestPage";
 import BulkImportPage from "@/react-app/pages/BulkImportPage";
 import NewSuperAdminDashboard from "@/react-app/pages/NewSuperAdminDashboard";
 import CenterAdminDashboard from "@/react-app/pages/CenterAdminDashboard";
@@ -513,6 +514,9 @@ function AppRoutes() {
         <ProtectedRoute>
           <ProctoringSnapshotsView />
         </ProtectedRoute>
+      } />
+      <Route path="/proctoring-test" element={
+        <ProctoringTestPage />
       } />
       <Route path="/patterns" element={
         <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>

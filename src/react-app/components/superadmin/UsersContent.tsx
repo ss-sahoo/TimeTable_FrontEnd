@@ -955,7 +955,7 @@ const UsersContent = () => {
             <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
               <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold leading-6 text-gray-900">Assign Center to Admin</h3>
+                  <h3 className="text-lg font-semibold leading-6 text-gray-900">Assign Center to User</h3>
                   <button onClick={() => setShowAssignCenterModal(false)} className="text-gray-400 hover:text-gray-500">
                     <X className="h-6 w-6" />
                   </button>

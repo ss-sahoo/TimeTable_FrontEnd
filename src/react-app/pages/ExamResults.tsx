@@ -340,17 +340,25 @@ const ExamResults: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {attempt.violations_count > 0 && (
-                <button
-                  onClick={() => navigate(`/proctoring-snapshots/${attemptId}`)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 transition-colors text-sm font-medium"
-                  title="View Proctoring Snapshots"
-                >
-                  <Camera className="w-4 h-4" />
-                  <span className="hidden sm:inline">View Snapshots</span>
-                  <span className="sm:hidden">Snapshots</span>
-                </button>
-              )}
+              {/* Always show View Snapshots button for proctored exams */}
+              <button
+                onClick={() => navigate(`/proctoring-snapshots/${attemptId}`)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
+                  attempt.violations_count > 0
+                    ? 'bg-red-50 hover:bg-red-100 text-red-700'
+                    : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
+                }`}
+                title="View Proctoring Snapshots"
+              >
+                <Camera className="w-4 h-4" />
+                <span className="hidden sm:inline">View Snapshots</span>
+                <span className="sm:hidden">Snapshots</span>
+                {attempt.violations_count > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-red-600 text-white text-xs rounded-full">
+                    {attempt.violations_count}
+                  </span>
+                )}
+              </button>
               <button className="p-2 rounded-lg hover:bg-slate-100 transition-colors" title="Download Results">
                 <Download className="w-4 h-4 text-slate-600" />
               </button>
@@ -398,25 +406,16 @@ const ExamResults: React.FC = () => {
                 <p className="text-xs text-slate-500">Duration</p>
               </div>
               <button
-                onClick={() => attempt.violations_count > 0 && navigate(`/proctoring-snapshots/${attemptId}`)}
-                disabled={attempt.violations_count === 0}
-                className={`p-3 border border-slate-100 rounded-xl bg-slate-50 text-left w-full transition-all ${
-                  attempt.violations_count > 0 
-                    ? 'hover:bg-red-50 hover:border-red-200 cursor-pointer' 
-                    : 'cursor-default opacity-60'
-                }`}
-                title={attempt.violations_count > 0 ? 'Click to view proctoring snapshots' : 'No violations detected'}
+                onClick={() => navigate(`/proctoring-snapshots/${attemptId}`)}
+                className="p-3 border border-slate-100 rounded-xl bg-slate-50 text-left w-full transition-all hover:bg-blue-50 hover:border-blue-200 cursor-pointer"
+                title="Click to view proctoring snapshots"
               >
                 <p className="text-xs text-slate-500 uppercase">Violations</p>
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-lg font-semibold text-slate-900">{attempt.violations_count}</p>
-                  {attempt.violations_count > 0 && (
-                    <Camera className="w-4 h-4 text-red-600" />
-                  )}
+                  <Camera className={`w-4 h-4 ${attempt.violations_count > 0 ? 'text-red-600' : 'text-blue-600'}`} />
                 </div>
-                <p className="text-xs text-slate-500">
-                  {attempt.violations_count > 0 ? 'Click to view' : 'Detected'}
-                </p>
+                <p className="text-xs text-slate-500">Click to view</p>
               </button>
               <div className="p-3 border border-slate-100 rounded-xl bg-slate-50">
                 <p className="text-xs text-slate-500 uppercase">Questions Attempted</p>

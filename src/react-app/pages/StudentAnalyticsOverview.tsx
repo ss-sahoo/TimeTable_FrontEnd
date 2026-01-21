@@ -88,7 +88,7 @@ export default function StudentAnalyticsOverview() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (user?.role === 'student') {
+    if (user?.role?.toLowerCase() === 'student') {
       loadAnalytics();
     }
   }, [user]);

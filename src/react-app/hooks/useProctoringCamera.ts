@@ -33,13 +33,13 @@ interface UseProctoringCameraArgs {
 }
 
 const DEFAULT_INCIDENT_DEBOUNCE = 5000;
-// IMPROVED: Reduced from 30s to 10s for better MediaPipe coverage
-const DEFAULT_CAPTURE_INTERVAL = 10000; // 10 seconds for 90%+ accuracy
+// IMPROVED: Set to 5 seconds for frequent monitoring
+const DEFAULT_CAPTURE_INTERVAL = 5000; // 5 seconds for maximum coverage
 
 export const useProctoringCamera = ({
   attemptId,
   webcamRef,
-  captureIntervalMs = DEFAULT_CAPTURE_INTERVAL, // Changed default to 10s
+  captureIntervalMs = DEFAULT_CAPTURE_INTERVAL, // Changed default to 5s
   autoStart = true,
   incidentDebounceMs = DEFAULT_INCIDENT_DEBOUNCE,
   enableIncidentLogging = true,

@@ -182,8 +182,11 @@ const SecureExamView: React.FC = () => {
   const loadExamData = async () => {
     try {
       // Load exam attempt details
-      const attemptResponse = await api.get(`/exams/attempts/${attemptId}/`);
+      const attemptEndpoint = `/exams/attempts/${attemptId}/`;
+      console.log('🔵 API CALL #1: GET', attemptEndpoint);
+      const attemptResponse = await api.get(attemptEndpoint);
       const attemptData = attemptResponse.data;
+      console.log('✅ API RESPONSE #1:', JSON.stringify(attemptData, null, 2));
       setExamAttempt(attemptData);
 
       console.log('==== EXAM ATTEMPT LOADED ====');
@@ -197,12 +200,17 @@ const SecureExamView: React.FC = () => {
       let mappedQuestions: Question[] = [];
 
       try {
-        const questionsResponse = await api.get(`/questions/exams/${examId}/questions/`);
+        const questionsEndpoint = `/questions/exams/${examId}/questions/`;
+        console.log('🔵 API CALL #2: GET', questionsEndpoint);
+        const questionsResponse = await api.get(questionsEndpoint);
+        console.log('✅ API RESPONSE #2 (RAW):', JSON.stringify(questionsResponse.data, null, 2));
+        
         const examQuestions = Array.isArray(questionsResponse.data)
           ? questionsResponse.data
           : (questionsResponse.data?.results ?? []);
 
-        console.log(`Exam questions endpoint returned ${examQuestions.length} records for exam ${examId}`);
+        console.log('📊 Parsed Questions Array Length:', examQuestions.length);
+        console.log('📋 First Question Sample:', examQuestions[0] ? JSON.stringify(examQuestions[0], null, 2) : 'No questions');
 
         if (examQuestions.length > 0) {
           mappedQuestions = examQuestions
@@ -230,18 +238,23 @@ const SecureExamView: React.FC = () => {
             .filter((question: Question) => Boolean(question.question_text));
         }
       } catch (err) {
-        console.error(`Failed to load exam-question mappings for exam ${examId}:`, err);
+        console.error(`❌ Failed to load exam-question mappings for exam ${examId}:`, err);
       }
 
       if (mappedQuestions.length === 0) {
+        console.log('⚠️ No questions from primary endpoint, trying fallback...');
         try {
           const params = { exam: examId, page_size: 1000 };
-          const questionsResponse = await api.get('/questions/questions/', { params });
+          const fallbackEndpoint = '/questions/questions/';
+          console.log('🔵 API CALL #3 (FALLBACK): GET', fallbackEndpoint, 'with params:', params);
+          const questionsResponse = await api.get(fallbackEndpoint, { params });
+          console.log('✅ API RESPONSE #3 (RAW):', JSON.stringify(questionsResponse.data, null, 2));
+          
           const rawQuestions = Array.isArray(questionsResponse.data)
             ? questionsResponse.data
             : (questionsResponse.data?.results ?? questionsResponse.data ?? []);
 
-          console.log(`General questions endpoint returned ${rawQuestions.length} records for exam ${examId}`);
+          console.log('📊 Fallback Questions Array Length:', rawQuestions.length);
 
           mappedQuestions = rawQuestions
             .map((item: any) => {
@@ -266,17 +279,23 @@ const SecureExamView: React.FC = () => {
             })
             .filter((question: Question) => Boolean(question.question_text));
         } catch (err) {
-          console.error(`Failed to load questions list for exam ${examId}:`, err);
+          console.error(`❌ Failed to load questions list for exam ${examId}:`, err);
         }
       }
 
       if (mappedQuestions.length === 0 && attemptData.exam.pattern?.id) {
         const patternId = attemptData.exam.pattern.id;
-        console.log('Falling back to pattern questions for pattern:', patternId);
+        console.log('⚠️ Still no questions, trying pattern fallback...');
+        console.log('Pattern ID:', patternId);
 
         try {
-          const questionsResponse = await api.get(`/patterns/patterns/${patternId}/questions/`);
+          const patternEndpoint = `/patterns/patterns/${patternId}/questions/`;
+          console.log('🔵 API CALL #4 (PATTERN FALLBACK): GET', patternEndpoint);
+          const questionsResponse = await api.get(patternEndpoint);
+          console.log('✅ API RESPONSE #4 (RAW):', JSON.stringify(questionsResponse.data, null, 2));
+          
           const sections = questionsResponse.data?.sections_with_questions ?? [];
+          console.log('📊 Pattern Sections Count:', sections.length);
 
           sections.forEach((section: any) => {
             const sectionQuestions = Array.isArray(section.questions) ? section.questions : [];
@@ -306,9 +325,12 @@ const SecureExamView: React.FC = () => {
             });
           });
         } catch (err) {
-          console.error(`Failed to load pattern questions for pattern ${patternId}:`, err);
+          console.error(`❌ Failed to load pattern questions for pattern ${patternId}:`, err);
         }
       }
+
+      console.log('🎯 FINAL MAPPED QUESTIONS COUNT:', mappedQuestions.length);
+      console.log('🎯 FINAL MAPPED QUESTIONS:', JSON.stringify(mappedQuestions, null, 2));
 
       mappedQuestions.sort((a, b) => {
         const numA = a.question_number_in_pattern ?? a.question_number ?? 0;
@@ -340,20 +362,22 @@ const SecureExamView: React.FC = () => {
     setAutoSaveStatus('saving');
     try {
       const answersObject = Object.fromEntries(answers);
+      const autoSaveEndpoint = `/exams/attempts/${attemptId}/auto-save/`;
       
-      console.log('💾 Auto-saving answers...', {
+      console.log('🔵 API CALL (AUTO-SAVE): POST', autoSaveEndpoint);
+      console.log('💾 Auto-save payload:', {
         totalAnswers: answers.size,
         answers: answersObject
       });
 
-      await api.post(`/exams/attempts/${attemptId}/auto-save/`, {
+      await api.post(autoSaveEndpoint, {
         answers: answersObject
       });
 
-      console.log('✓ Auto-save successful');
+      console.log('✅ Auto-save successful');
       setAutoSaveStatus('saved');
     } catch (error: any) {
-      console.error('✗ Auto-save failed:', error);
+      console.error('❌ Auto-save failed:', error);
       setAutoSaveStatus('error');
     }
   };
@@ -444,21 +468,22 @@ const SecureExamView: React.FC = () => {
         answers: Object.fromEntries(answers)
       };
       
-      console.log('=== SUBMITTING EXAM ===');
-      console.log('Attempt ID:', attemptId);
-      console.log('Total questions answered:', answers.size);
-      console.log('Answers being submitted:', submissionData.answers);
-      console.log('API endpoint:', '/exams/submit-exam/');
+      const submitEndpoint = '/exams/submit-exam/';
+      console.log('🔵 API CALL (SUBMIT): POST', submitEndpoint);
+      console.log('📤 Submission payload:', {
+        attemptId: attemptId,
+        totalAnswers: answers.size,
+        submissionData: submissionData
+      });
       
-      const response = await api.post('/exams/submit-exam/', submissionData);
+      const response = await api.post(submitEndpoint, submissionData);
       
-      console.log('Submission successful!');
-      console.log('Response:', response.data);
-      console.log('======================');
+      console.log('✅ Submission successful!');
+      console.log('📥 Submission response:', JSON.stringify(response.data, null, 2));
 
       navigate(`/exam-results/${attemptId}`);
     } catch (error: any) {
-      console.error('Submission failed:', error);
+      console.error('❌ Submission failed:', error);
       console.error('Error response:', error.response?.data);
       setError(error.response?.data?.error || 'Failed to submit exam');
     } finally {
