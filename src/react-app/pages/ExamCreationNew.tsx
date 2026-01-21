@@ -198,7 +198,7 @@ const getDefaultFormData = (): ExamFormData => ({
   show_results_immediately: true,
   instructions: '',
 
-  status: 'draft',
+  status: 'published',  // Changed default from 'draft' to 'published' so students can see exams immediately
   timezone: userDefaultTimezone,
   grace_period_minutes: 0,
   buffer_time_minutes: 15,
@@ -521,6 +521,7 @@ export default function ExamCreation() {
         created_by: user?.id,
         institute: institute ?? user?.institute_id ?? user?.institute?.id ?? null,
         timezone: rest.timezone,
+        status: rest.status,  // Add status field
         grace_period_minutes: rest.grace_period_minutes,
         buffer_time_minutes: rest.buffer_time_minutes,
         auto_start: rest.auto_start,
