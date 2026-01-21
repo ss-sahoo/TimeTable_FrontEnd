@@ -210,7 +210,7 @@ const UsersContent = () => {
             password_confirm: adminPassword,
             first_name: newUser.first_name,
             last_name: newUser.last_name,
-            role: 'ADMIN',
+            role: 'admin',  // Changed to lowercase
             institute_id: instituteId
           });
           
@@ -270,7 +270,7 @@ const UsersContent = () => {
             password_confirm: autoPassword,
             first_name: newUser.first_name,
             last_name: newUser.last_name,
-            role: 'STUDENT',
+            role: 'student',  // Changed to lowercase
             institute_id: instituteId
           });
           
