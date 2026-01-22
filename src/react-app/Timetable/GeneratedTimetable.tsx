@@ -597,9 +597,13 @@ const GeneratedTimetable: React.FC = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        // Only set active if API explicitly returns is_active === true
-        setIsActive(data.is_active === true);
+        console.log("Timetable activation status from API:", data.is_active);
+        // Explicitly check if is_active is true, otherwise set to false
+        const activeStatus = data.is_active === true;
+        console.log("Setting isActive to:", activeStatus);
+        setIsActive(activeStatus);
       } else {
+        console.log("API response not OK, setting to inactive");
         // If API fails, default to inactive
         setIsActive(false);
       }
