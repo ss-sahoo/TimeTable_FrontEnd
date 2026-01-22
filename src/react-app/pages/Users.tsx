@@ -58,6 +58,15 @@ export default function Users() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [addUserModalOpen, setAddUserModalOpen] = useState(false);
+  const [addUserForm, setAddUserForm] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    role: 'teacher',
+    employee_id: '',
+    subjects: '',
+  });
   const [editForm, setEditForm] = useState({
     first_name: '',
     last_name: '',
@@ -99,7 +108,15 @@ export default function Users() {
   };
 
   const openAddUserModal = () => {
-    setEditForm({ first_name: '', last_name: '', phone: '', role: 'teacher', is_active: true, is_verified: false });
+    setAddUserForm({ 
+      first_name: '', 
+      last_name: '', 
+      email: '',
+      phone: '', 
+      role: 'teacher',
+      employee_id: '',
+      subjects: '',
+    });
     setActionError(null);
     setActionMessage(null);
     setAddUserModalOpen(true);
@@ -228,6 +245,100 @@ export default function Users() {
     } catch (error: any) {
       console.error('Failed to delete user:', error);
       setActionError(error.response?.data?.detail || 'Failed to delete user.');
+      setFormSubmitting(false);
+    }
+  };
+
+  const handleAddUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!addUserForm.first_name.trim()) {
+      setActionError('First name is required');
+      return;
+    }
+
+    setFormSubmitting(true);
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      // For teachers, use the timetable teacher creation API
+      if (addUserForm.role === 'teacher') {
+        const endpoint = user?.role === 'super_admin' || user?.role === 'SUPER_ADMIN'
+          ? '/timetable/superadmin/teachers/create/'
+          : '/timetable/admin/teachers/create/';
+
+        const payload: any = {
+          name: `${addUserForm.first_name} ${addUserForm.last_name}`.trim(),
+          email: addUserForm.email || undefined,
+          phone_number: addUserForm.phone || undefined,
+          employee_id: addUserForm.employee_id || undefined,
+          subjects: addUserForm.subjects || undefined,
+        };
+
+        // Add center info for super admin
+        if (user?.role === 'super_admin' || user?.role === 'SUPER_ADMIN') {
+          // Get center info from user profile
+          try {
+            const profileResponse = await api.get('/auth/profile/');
+            const centerId = profileResponse.data?.center_id || user?.center_id;
+            const centerName = profileResponse.data?.center_name || profileResponse.data?.center?.name;
+            
+            if (centerId) {
+              payload.center_id = centerId;
+            } else if (centerName) {
+              payload.center_name = centerName;
+            }
+          } catch (error) {
+            console.error('Failed to get center info:', error);
+          }
+        }
+
+        const response = await api.post(endpoint, payload);
+        
+        setActionMessage(`Teacher created successfully! Username: ${response.data.username}, Password: ${response.data.password}`);
+        
+        // Refresh users list
+        await fetchUsers();
+        
+        // Reset form
+        setAddUserForm({
+          first_name: '',
+          last_name: '',
+          email: '',
+          phone: '',
+          role: 'teacher',
+          employee_id: '',
+          subjects: '',
+        });
+      } else {
+        // For other roles, use the generic user creation API
+        const response = await api.post('/auth/users/', {
+          first_name: addUserForm.first_name,
+          last_name: addUserForm.last_name,
+          email: addUserForm.email,
+          phone: addUserForm.phone,
+          role: addUserForm.role,
+        });
+        
+        setActionMessage('User created successfully!');
+        await fetchUsers();
+        
+        // Reset form
+        setAddUserForm({
+          first_name: '',
+          last_name: '',
+          email: '',
+          phone: '',
+          role: 'teacher',
+          employee_id: '',
+          subjects: '',
+        });
+      }
+    } catch (error: any) {
+      console.error('Failed to create user:', error);
+      setActionError(error.response?.data?.error || error.response?.data?.detail || 'Failed to create user.');
+    } finally {
       setFormSubmitting(false);
     }
   };
@@ -713,15 +824,17 @@ export default function Users() {
           </button>
 
           {addUserModalOpen && (
-            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleAddUserSubmit} className="p-6 space-y-4">
               <h2 className="text-xl font-semibold text-slate-900">Add New User</h2>
               {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+              {actionMessage && <p className="text-sm text-green-600">{actionMessage}</p>}
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                 <label className="flex flex-col gap-1">
-                  <span className="font-medium text-slate-600">First Name</span>
+                  <span className="font-medium text-slate-600">First Name *</span>
                   <input
-                    value={editForm.first_name}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, first_name: e.target.value }))}
+                    value={addUserForm.first_name}
+                    onChange={(e) => setAddUserForm(prev => ({ ...prev, first_name: e.target.value }))}
                     className="border rounded-lg px-3 py-2"
                     required
                   />
@@ -729,24 +842,35 @@ export default function Users() {
                 <label className="flex flex-col gap-1">
                   <span className="font-medium text-slate-600">Last Name</span>
                   <input
-                    value={editForm.last_name}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, last_name: e.target.value }))}
+                    value={addUserForm.last_name}
+                    onChange={(e) => setAddUserForm(prev => ({ ...prev, last_name: e.target.value }))}
                     className="border rounded-lg px-3 py-2"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 md:col-span-2">
+                  <span className="font-medium text-slate-600">Email</span>
+                  <input
+                    type="email"
+                    value={addUserForm.email}
+                    onChange={(e) => setAddUserForm(prev => ({ ...prev, email: e.target.value }))}
+                    className="border rounded-lg px-3 py-2"
+                    placeholder="teacher@example.com"
                   />
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="font-medium text-slate-600">Phone</span>
                   <input
-                    value={editForm.phone}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                    value={addUserForm.phone}
+                    onChange={(e) => setAddUserForm(prev => ({ ...prev, phone: e.target.value }))}
                     className="border rounded-lg px-3 py-2"
+                    placeholder="9876543210"
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="font-medium text-slate-600">Role</span>
+                  <span className="font-medium text-slate-600">Role *</span>
                   <select
-                    value={editForm.role}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, role: e.target.value }))}
+                    value={addUserForm.role}
+                    onChange={(e) => setAddUserForm(prev => ({ ...prev, role: e.target.value }))}
                     className="border rounded-lg px-3 py-2"
                   >
                     {roles.map(role => (
@@ -754,25 +878,39 @@ export default function Users() {
                     ))}
                   </select>
                 </label>
+                
+                {/* Show teacher-specific fields when role is teacher */}
+                {addUserForm.role === 'teacher' && (
+                  <>
+                    <label className="flex flex-col gap-1">
+                      <span className="font-medium text-slate-600">Employee ID</span>
+                      <input
+                        value={addUserForm.employee_id}
+                        onChange={(e) => setAddUserForm(prev => ({ ...prev, employee_id: e.target.value }))}
+                        className="border rounded-lg px-3 py-2"
+                        placeholder="EMP-001"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="font-medium text-slate-600">Subjects</span>
+                      <input
+                        value={addUserForm.subjects}
+                        onChange={(e) => setAddUserForm(prev => ({ ...prev, subjects: e.target.value }))}
+                        className="border rounded-lg px-3 py-2"
+                        placeholder="Physics, Chemistry"
+                      />
+                    </label>
+                  </>
+                )}
               </div>
-              <div className="flex items-center gap-4 text-sm">
-                <label className="inline-flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={editForm.is_active}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, is_active: e.target.checked }))}
-                  />
-                  <span>Active</span>
-                </label>
-                <label className="inline-flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={editForm.is_verified}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, is_verified: e.target.checked }))}
-                  />
-                  <span>Verified</span>
-                </label>
-              </div>
+              
+              {addUserForm.role === 'teacher' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                  <p className="font-medium mb-1">📝 Note:</p>
+                  <p>Username and password will be auto-generated for teachers.</p>
+                </div>
+              )}
+              
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={closeModals} className="px-4 py-2 text-sm rounded-lg border">
                   Cancel
@@ -780,9 +918,16 @@ export default function Users() {
                 <button
                   type="submit"
                   disabled={formSubmitting}
-                  className="px-4 py-2 text-sm rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60"
+                  className="px-4 py-2 text-sm rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 flex items-center gap-2"
                 >
-                  {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add User'}
+                  {formSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Add User'
+                  )}
                 </button>
               </div>
             </form>
