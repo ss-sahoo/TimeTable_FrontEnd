@@ -33,7 +33,7 @@ interface UserData {
   first_name: string;
   last_name: string;
   phone?: string;
-  role: 'super_admin' | 'institute_admin' | 'exam_admin' | 'teacher' | 'student';
+  role: 'super_admin' | 'institute_admin' | 'exam_admin' | 'teacher' | 'student' | 'staff' | 'STAFF';
   is_active: boolean;
   is_verified: boolean;
   last_login: string;
@@ -57,6 +57,7 @@ export default function Users() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [addUserModalOpen, setAddUserModalOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     first_name: '',
     last_name: '',
@@ -95,6 +96,13 @@ export default function Users() {
     setActionError(null);
     setActionMessage(null);
     setInviteModalOpen(true);
+  };
+
+  const openAddUserModal = () => {
+    setEditForm({ first_name: '', last_name: '', phone: '', role: 'teacher', is_active: true, is_verified: false });
+    setActionError(null);
+    setActionMessage(null);
+    setAddUserModalOpen(true);
   };
 
   const openViewModal = async (userId: number) => {
@@ -141,6 +149,7 @@ export default function Users() {
     setEditModalOpen(false);
     setDeleteModalOpen(false);
     setInviteModalOpen(false);
+    setAddUserModalOpen(false);
     setSelectedUser(null);
     setFormSubmitting(false);
   };
@@ -366,83 +375,143 @@ export default function Users() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-black">User Management</h1>
-            <p className="text-base" style={{ color: '#6b6b6b' }}>Manage users and their permissions</p>
+            <p className="text-base" style={{ color: '#6b6b6b' }}>Manage access, track roles, and update user details across your organization.</p>
           </div>
-          <button 
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-white rounded-lg transition-colors"
-            style={{ backgroundColor: '#216865' }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a524f'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#216865'}
-            onClick={openInviteModal}
-          >
-            <UserPlus className="w-4 h-4" />
-            Invite User
-          </button>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-          <div className="bg-white rounded-lg border p-3" style={{ borderColor: '#e5e7eb' }}>
-            <div className="flex items-center gap-2">
-              <UsersIcon className="w-4 h-4" style={{ color: '#216865' }} />
-              <span className="text-xs font-medium" style={{ color: '#6b6b6b' }}>Total</span>
-            </div>
-            <div className="text-lg font-semibold text-black mt-1">{stats.total}</div>
-          </div>
-          <div className="bg-white rounded-lg border p-3" style={{ borderColor: '#e5e7eb' }}>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4" style={{ color: '#22c55e' }} />
-              <span className="text-xs font-medium" style={{ color: '#6b6b6b' }}>Active</span>
-            </div>
-            <div className="text-lg font-semibold text-black mt-1">{stats.active}</div>
-          </div>
-          <div className="bg-white rounded-lg border p-3" style={{ borderColor: '#e5e7eb' }}>
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" style={{ color: '#6b6b6b' }} />
-              <span className="text-xs font-medium" style={{ color: '#6b6b6b' }}>Inactive</span>
-            </div>
-            <div className="text-lg font-semibold text-black mt-1">{stats.inactive}</div>
-          </div>
-          <div className="bg-white rounded-lg border p-3" style={{ borderColor: '#e5e7eb' }}>
-            <div className="flex items-center gap-2">
-              <UserCheck className="w-4 h-4" style={{ color: '#3b82f6' }} />
-              <span className="text-xs font-medium" style={{ color: '#6b6b6b' }}>Verified</span>
-            </div>
-            <div className="text-lg font-semibold text-black mt-1">{stats.verified}</div>
-          </div>
-          <div className="bg-white rounded-lg border p-3" style={{ borderColor: '#e5e7eb' }}>
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4" style={{ color: '#f97316' }} />
-              <span className="text-xs font-medium" style={{ color: '#6b6b6b' }}>Pending</span>
-            </div>
-            <div className="text-lg font-semibold text-black mt-1">{stats.unverified}</div>
+          <div className="flex items-center gap-3">
+            <button 
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-lg transition-colors"
+              style={{ borderColor: '#e5e7eb', color: '#6b6b6b', backgroundColor: '#ffffff' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+            >
+              Export
+            </button>
+            <button 
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm text-white rounded-lg transition-colors"
+              style={{ backgroundColor: '#7c3aed' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#6d28d9'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#7c3aed'}
+            >
+              Import Excel
+            </button>
+            <button 
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm text-white rounded-lg transition-colors"
+              style={{ backgroundColor: '#3b82f6' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
+              onClick={openAddUserModal}
+            >
+              <UserPlus className="w-4 h-4" />
+              Add User
+            </button>
           </div>
         </div>
 
-        {/* Role Distribution */}
-        <div className="bg-white rounded-lg border p-4 mb-6" style={{ borderColor: '#e5e7eb' }}>
-          <h3 className="text-sm font-semibold text-black mb-3">Role Distribution</h3>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div className="text-center">
-              <div className="text-lg font-semibold text-black">{roleStats.super_admin}</div>
-              <div className="text-xs" style={{ color: '#6b6b6b' }}>Super Admin</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold text-black">{roleStats.institute_admin}</div>
-              <div className="text-xs" style={{ color: '#6b6b6b' }}>Institute Admin</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold text-black">{roleStats.exam_admin}</div>
-              <div className="text-xs" style={{ color: '#6b6b6b' }}>Exam Admin</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold text-black">{roleStats.teacher}</div>
-              <div className="text-xs" style={{ color: '#6b6b6b' }}>Teachers</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold text-black">{roleStats.student}</div>
-              <div className="text-xs" style={{ color: '#6b6b6b' }}>Students</div>
-            </div>
+        {/* Role Tabs */}
+        <div className="mb-6 border-b" style={{ borderColor: '#e5e7eb' }}>
+          <div className="flex gap-6">
+            <button
+              onClick={() => setRoleFilter('all')}
+              className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+                roleFilter === 'all' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              All Users
+              <span className="ml-2 px-2 py-0.5 text-xs rounded-full" style={{ 
+                backgroundColor: roleFilter === 'all' ? '#dbeafe' : '#f3f4f6',
+                color: roleFilter === 'all' ? '#1e40af' : '#6b7280'
+              }}>
+                {stats.total}
+              </span>
+              {roleFilter === 'all' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
+              )}
+            </button>
+            <button
+              onClick={() => setRoleFilter('super_admin')}
+              className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+                roleFilter === 'super_admin' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Super Admins
+              <span className="ml-2 px-2 py-0.5 text-xs rounded-full" style={{ 
+                backgroundColor: roleFilter === 'super_admin' ? '#dbeafe' : '#f3f4f6',
+                color: roleFilter === 'super_admin' ? '#1e40af' : '#6b7280'
+              }}>
+                {roleStats.super_admin}
+              </span>
+              {roleFilter === 'super_admin' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
+              )}
+            </button>
+            <button
+              onClick={() => setRoleFilter('institute_admin')}
+              className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+                roleFilter === 'institute_admin' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Admins
+              <span className="ml-2 px-2 py-0.5 text-xs rounded-full" style={{ 
+                backgroundColor: roleFilter === 'institute_admin' ? '#dbeafe' : '#f3f4f6',
+                color: roleFilter === 'institute_admin' ? '#1e40af' : '#6b7280'
+              }}>
+                {roleStats.institute_admin}
+              </span>
+              {roleFilter === 'institute_admin' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
+              )}
+            </button>
+            <button
+              onClick={() => setRoleFilter('teacher')}
+              className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+                roleFilter === 'teacher' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Teachers
+              <span className="ml-2 px-2 py-0.5 text-xs rounded-full" style={{ 
+                backgroundColor: roleFilter === 'teacher' ? '#dbeafe' : '#f3f4f6',
+                color: roleFilter === 'teacher' ? '#1e40af' : '#6b7280'
+              }}>
+                {roleStats.teacher}
+              </span>
+              {roleFilter === 'teacher' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
+              )}
+            </button>
+            <button
+              onClick={() => setRoleFilter('student')}
+              className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+                roleFilter === 'student' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Students
+              <span className="ml-2 px-2 py-0.5 text-xs rounded-full" style={{ 
+                backgroundColor: roleFilter === 'student' ? '#dbeafe' : '#f3f4f6',
+                color: roleFilter === 'student' ? '#1e40af' : '#6b7280'
+              }}>
+                {roleStats.student}
+              </span>
+              {roleFilter === 'student' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
+              )}
+            </button>
+            <button
+              onClick={() => setRoleFilter('staff')}
+              className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+                roleFilter === 'staff' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Staff
+              <span className="ml-2 px-2 py-0.5 text-xs rounded-full" style={{ 
+                backgroundColor: roleFilter === 'staff' ? '#dbeafe' : '#f3f4f6',
+                color: roleFilter === 'staff' ? '#1e40af' : '#6b7280'
+              }}>
+                {users.filter(u => u.role === 'staff' || (u.role as any) === 'STAFF').length}
+              </span>
+              {roleFilter === 'staff' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
+              )}
+            </button>
           </div>
         </div>
 
@@ -451,53 +520,41 @@ export default function Users() {
           <div className="flex items-center gap-3">
             <div className="flex-1 relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-slate-600 dark:text-gray-400" />
+                <Search className="h-4 w-4 text-slate-400" />
               </div>
               <input
                 type="text"
-                placeholder="Search users..."
+                placeholder="Search by name, email, or ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 text-sm border border-slate-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none bg-white dark:bg-gray-700 text-black dark:text-gray-100"
+                className="block w-full pl-10 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none bg-white text-black"
+                style={{ borderColor: '#e5e7eb' }}
               />
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`inline-flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 dark:border-gray-600 rounded-lg transition-colors ${
-                showFilters 
-                  ? 'bg-teal-700 dark:bg-teal-600 text-white border-teal-700 dark:border-teal-600' 
-                  : 'bg-white dark:bg-gray-800 text-slate-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-              }`}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-lg transition-colors"
+              style={{ 
+                borderColor: '#e5e7eb',
+                backgroundColor: showFilters ? '#f3f4f6' : '#ffffff',
+                color: '#6b7280'
+              }}
             >
               <Filter className="w-4 h-4" />
-              Filter
+              Filters
             </button>
           </div>
 
           {showFilters && (
-            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-gray-700">
+            <div className="mt-4 pt-4 border-t" style={{ borderColor: '#e5e7eb' }}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <span className="text-xs font-medium text-slate-600 dark:text-gray-400">Role:</span>
-                  <select
-                    value={roleFilter}
-                    onChange={(e) => setRoleFilter(e.target.value)}
-                    className="ml-2 px-2 py-1 text-xs border border-slate-200 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none bg-white dark:bg-gray-700 text-black dark:text-gray-100"
-                  >
-                    <option value="all">All Roles</option>
-                    <option value="super_admin">Super Admin</option>
-                    <option value="institute_admin">Institute Admin</option>
-                    <option value="exam_admin">Exam Admin</option>
-                    <option value="teacher">Teacher</option>
-                    <option value="student">Student</option>
-                  </select>
-                </div>
-                <div>
-                  <span className="text-xs font-medium text-slate-600 dark:text-gray-400">Status:</span>
+                  <span className="text-xs font-medium" style={{ color: '#6b7280' }}>Status:</span>
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="ml-2 px-2 py-1 text-xs border border-slate-200 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none bg-white dark:bg-gray-700 text-black dark:text-gray-100"
+                    className="ml-2 px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:outline-none bg-white text-black"
+                    style={{ borderColor: '#e5e7eb' }}
                   >
                     <option value="all">All Status</option>
                     <option value="active">Active</option>
@@ -515,21 +572,33 @@ export default function Users() {
             <table className="w-full">
               <thead className="border-b bg-slate-50 dark:bg-gray-700 border-slate-200 dark:border-gray-600">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-gray-300">User</th>
+                  <th className="px-4 py-3 text-left">
+                    <input type="checkbox" className="rounded" />
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-gray-300">User Details</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-gray-300">Role</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-gray-300">Center</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-gray-300">Institute</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-gray-300">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-gray-300">Last Login</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-gray-300">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-gray-300"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-gray-700">
                 {filteredUsers.map((userData) => (
                   <tr key={userData.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-4 py-3">
+                      <input type="checkbox" className="rounded" />
+                    </td>
+                    <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                          <UsersIcon className="w-4 h-4 text-slate-600 dark:text-gray-400" />
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm" style={{
+                          backgroundColor: userData.role === 'super_admin' ? '#ef4444' :
+                          userData.role === 'institute_admin' ? '#3b82f6' :
+                          userData.role === 'teacher' ? '#10b981' :
+                          userData.role === 'student' ? '#f59e0b' :
+                          '#6b7280'
+                        }}>
+                          {userData.first_name?.charAt(0)?.toUpperCase() || 'U'}
                         </div>
                         <div>
                           <div className="text-sm font-medium text-black dark:text-gray-100">
@@ -540,66 +609,65 @@ export default function Users() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-white`}
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium`}
                       style={{
-                        backgroundColor: userData.role === 'super_admin' ? '#216865' :
-                        userData.role === 'institute_admin' ? '#3f5fd4' :
-                        userData.role === 'exam_admin' ? '#723e11' :
-                        userData.role === 'teacher' ? '#216865' :
-                        '#3f5fd4'
+                        backgroundColor: userData.role === 'super_admin' ? '#dbeafe' :
+                        userData.role === 'institute_admin' ? '#dbeafe' :
+                        userData.role === 'exam_admin' ? '#fef3c7' :
+                        userData.role === 'teacher' ? '#d1fae5' :
+                        userData.role === 'student' ? '#fef3c7' :
+                        '#f3f4f6',
+                        color: userData.role === 'super_admin' ? '#1e40af' :
+                        userData.role === 'institute_admin' ? '#1e40af' :
+                        userData.role === 'exam_admin' ? '#92400e' :
+                        userData.role === 'teacher' ? '#065f46' :
+                        userData.role === 'student' ? '#92400e' :
+                        '#374151'
                       }}>
-                        {getRoleIcon(userData.role)}
-                        {userData.role.replace('_', ' ')}
+                        {userData.role === 'super_admin' ? 'Super Admin' :
+                         userData.role === 'institute_admin' ? 'Institute Admin' :
+                         userData.role === 'exam_admin' ? 'Exam Admin' :
+                         userData.role === 'teacher' ? 'Teacher' :
+                         userData.role === 'student' ? 'Student' :
+                         userData.role}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400">
+                        <Building2 className="w-4 h-4" />
+                        <span>Center Test</span>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-sm text-black dark:text-gray-100">{userData.institute?.name || 'N/A'}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-white`}
-                        style={{
-                          backgroundColor: userData.is_active ? '#216865' : '#6b6b6b'
-                        }}>
-                          {userData.is_active ? <CheckCircle className="w-3 h-3" /> : <Ban className="w-3 h-3" />}
-                          {userData.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                        {!userData.is_verified && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-white"
-                          style={{ backgroundColor: '#723e11' }}>
-                            <Clock className="w-3 h-3" />
-                            Pending
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-sm text-black dark:text-gray-100">
-                        {userData.last_login ? new Date(userData.last_login).toLocaleDateString() : 'Never'}
-                      </div>
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium`}
+                      style={{
+                        backgroundColor: userData.is_active ? '#d1fae5' : '#fee2e2',
+                        color: userData.is_active ? '#065f46' : '#991b1b'
+                      }}>
+                        <div className="w-1.5 h-1.5 rounded-full" style={{
+                          backgroundColor: userData.is_active ? '#10b981' : '#ef4444'
+                        }}></div>
+                        {userData.is_active ? 'Active' : 'Inactive'}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => openViewModal(userData.id)}
-                          className="p-1 rounded transition-colors hover:bg-gray-100 dark:hover:bg-gray-600 text-blue-600 dark:text-blue-400"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
                         <button
                           onClick={() => openEditModal(userData.id)}
                           className="p-1 rounded transition-colors hover:bg-gray-100 dark:hover:bg-gray-600 text-slate-600 dark:text-gray-400"
+                          title="Edit"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => openDeleteModal(userData)}
                           className="p-1 rounded transition-colors hover:bg-gray-100 dark:hover:bg-gray-600 text-slate-600 dark:text-gray-400"
+                          title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
-                        </button>
-                        <button className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-600 text-slate-600 dark:text-gray-400">
-                          <MoreVertical className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -633,7 +701,7 @@ export default function Users() {
     </div>
 
     {/* Modals */}
-    {(viewModalOpen || editModalOpen || deleteModalOpen || inviteModalOpen) && (
+    {(viewModalOpen || editModalOpen || deleteModalOpen || inviteModalOpen || addUserModalOpen) && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
         <div className="relative w-full max-w-lg rounded-xl bg-white shadow-xl">
           <button
@@ -643,6 +711,82 @@ export default function Users() {
           >
             <X className="w-5 h-5" />
           </button>
+
+          {addUserModalOpen && (
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+              <h2 className="text-xl font-semibold text-slate-900">Add New User</h2>
+              {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <label className="flex flex-col gap-1">
+                  <span className="font-medium text-slate-600">First Name</span>
+                  <input
+                    value={editForm.first_name}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, first_name: e.target.value }))}
+                    className="border rounded-lg px-3 py-2"
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="font-medium text-slate-600">Last Name</span>
+                  <input
+                    value={editForm.last_name}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, last_name: e.target.value }))}
+                    className="border rounded-lg px-3 py-2"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="font-medium text-slate-600">Phone</span>
+                  <input
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                    className="border rounded-lg px-3 py-2"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="font-medium text-slate-600">Role</span>
+                  <select
+                    value={editForm.role}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, role: e.target.value }))}
+                    className="border rounded-lg px-3 py-2"
+                  >
+                    {roles.map(role => (
+                      <option key={role.value} value={role.value}>{role.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={editForm.is_active}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, is_active: e.target.checked }))}
+                  />
+                  <span>Active</span>
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={editForm.is_verified}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, is_verified: e.target.checked }))}
+                  />
+                  <span>Verified</span>
+                </label>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={closeModals} className="px-4 py-2 text-sm rounded-lg border">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={formSubmitting}
+                  className="px-4 py-2 text-sm rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add User'}
+                </button>
+              </div>
+            </form>
+          )}
 
           {viewModalOpen && selectedUser && (
             <div className="p-6 space-y-4">

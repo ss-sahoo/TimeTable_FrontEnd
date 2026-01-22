@@ -13,7 +13,7 @@ const getDefaultApiUrl = () => {
     
     // For development
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:8001/api';
+      return 'https://exams.dashoapp.com/api';
     }
     
     // For production exams domain or any other domain

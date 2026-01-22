@@ -6,6 +6,8 @@ import Teachers from "../Timetable/Teachers";
 import Feasibility from "../Timetable/Feasibility";
 import GeneratedTimetable from "../Timetable/GeneratedTimetable";
 import UpdateSlots from "../Timetable/UpdateSlots";
+import TeacherManagement from "../Timetable/TeacherManagement";
+import Users from "./Users";
 import { fetchAllTimetables, updateFreeClassesCount, cleanTimetableId } from "../AllApi";
 import { useAuthContext } from "../contexts/AuthContext";
 import { api } from "../hooks/useApi";
@@ -172,7 +174,17 @@ const Timetable: React.FC = () => {
 
       {/* Tab Content */}
       <div style={styles.contentArea}>
-        {activeTab === "instructions" && <Instructions onTimetableCreated={handleTimetableCreated} />}
+        {activeTab === "instructions" && (
+          <>
+            <Instructions onTimetableCreated={handleTimetableCreated} />
+            <div style={{ marginTop: "24px" }}>
+              <TeacherManagement />
+            </div>
+            <div style={{ marginTop: "24px" }}>
+              <Users />
+            </div>
+          </>
+        )}
         {activeTab === "slots" && <Slots key={selectedTimetableId || 'new'} />}
         {activeTab === "batches" && <Batches />}
         {activeTab === "teachers" && <TeachersWrapper />}

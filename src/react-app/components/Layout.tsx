@@ -116,8 +116,9 @@ export default function Layout({ children }: LayoutProps) {
     if (isTimetableDomain) {
       return [
         { name: 'Home', href: '/timetable', icon: Home },
-        { name: 'Timetable', href: '/timetable', icon: CalendarDays },
         { name: 'Batches', href: '/batches', icon: GraduationCap },
+        { name: 'Users', href: '/users', icon: Users },
+        { name: 'Settings', href: '/settings', icon: Settings },
       ];
     }
 
