@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, useLocation } from 'react-router';
 import { ArrowLeft, BookOpen, Plus, Edit3, List, FileText, Calendar, Clock } from 'lucide-react';
 import { useApi, api } from '@/react-app/hooks/useApi';
 import { Exam, ExamSubject, ExamSection, CreateSection } from '@/shared/types';
@@ -8,6 +8,9 @@ import CreateSectionModal from '@/react-app/components/CreateSectionModal';
 export default function ExamSetupDetails() {
   const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
   const [selectedSubject, setSelectedSubject] = useState<ExamSubject | null>(null);
   const [showSectionModal, setShowSectionModal] = useState(false);
   const [sectionLoading, setSectionLoading] = useState(false);
@@ -24,8 +27,7 @@ export default function ExamSetupDetails() {
   const { data: exam, loading: examLoading, refetch: refetchExam } = useApi<Exam>(`/api/exams/${examId}`);
   const { data: subjects, loading: subjectsLoading, refetch: refetchSubjects } = useApi<ExamSubject[]>(`/api/exams/${examId}/subjects`);
   const { data: sections, loading: sectionsLoading, refetch: refetchSections } = useApi<ExamSection[]>(
-    selectedSubject ? `/api/subjects/${selectedSubject.id}/sections` : '', 
-    [selectedSubject?.id]
+    selectedSubject ? `/api/subjects/${selectedSubject.id}/sections` : ''
   );
 
   const handleSubjectClick = (subject: ExamSubject) => {
@@ -46,7 +48,7 @@ export default function ExamSetupDetails() {
 
   const handleSaveExam = async () => {
     if (!exam) return;
-    
+
     setIsSavingExam(true);
     try {
       await api.put(`/api/exams/${exam.id}`, {
@@ -55,7 +57,7 @@ export default function ExamSetupDetails() {
         end_date: new Date(examFormData.end_date).toISOString(),
         duration_minutes: examFormData.duration_minutes,
       });
-      
+
       refetchExam();
       setShowEditExam(false);
     } catch (error) {
@@ -77,14 +79,14 @@ export default function ExamSetupDetails() {
 
   const handleSaveSyllabus = async () => {
     if (!selectedSubject) return;
-    
+
     setIsSavingSyllabus(true);
     try {
       await api.put(`/api/subjects/${selectedSubject.id}`, {
         ...selectedSubject,
         topics_syllabus: syllabusText,
       });
-      
+
       // Update local state
       setSelectedSubject(prev => prev ? { ...prev, topics_syllabus: syllabusText } : null);
       refetchSubjects();
@@ -97,7 +99,7 @@ export default function ExamSetupDetails() {
 
   const handleAddSection = async (sectionData: CreateSection) => {
     if (!selectedSubject) return;
-    
+
     setSectionLoading(true);
     try {
       await api.post(`/api/subjects/${selectedSubject.id}/sections`, sectionData);
@@ -111,7 +113,7 @@ export default function ExamSetupDetails() {
   };
 
   const handleQuestionClick = (questionNumber: number) => {
-    navigate(`/exam/${examId}/question/${questionNumber}`);
+    navigate(`${basePath}/exam/${examId}/question/${questionNumber}`);
   };
 
   if (examLoading || subjectsLoading) {
@@ -142,7 +144,7 @@ export default function ExamSetupDetails() {
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate(`${basePath}/exams`)}
               className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
             >
               <ArrowLeft className="w-6 h-6" />
@@ -171,11 +173,10 @@ export default function ExamSetupDetails() {
                   <button
                     key={subject.id}
                     onClick={() => handleSubjectClick(subject)}
-                    className={`w-full text-left p-3 rounded-lg transition-colors ${
-                      selectedSubject?.id === subject.id
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                        : 'hover:bg-slate-50 text-slate-700'
-                    }`}
+                    className={`w-full text-left p-3 rounded-lg transition-colors ${selectedSubject?.id === subject.id
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                      : 'hover:bg-slate-50 text-slate-700'
+                      }`}
                   >
                     <div className="font-medium">{subject.name}</div>
                     <div className="text-sm text-slate-500">
@@ -201,7 +202,7 @@ export default function ExamSetupDetails() {
                   Edit Details
                 </button>
               </div>
-              
+
               {showEditExam ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -216,7 +217,7 @@ export default function ExamSetupDetails() {
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         End Date & Time
@@ -229,7 +230,7 @@ export default function ExamSetupDetails() {
                       />
                     </div>
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
                       Duration (minutes)
@@ -242,7 +243,7 @@ export default function ExamSetupDetails() {
                       min="1"
                     />
                   </div>
-                  
+
                   <div className="flex gap-3">
                     <button
                       onClick={handleSaveExam}
@@ -270,7 +271,7 @@ export default function ExamSetupDetails() {
                       <div className="font-medium text-slate-900">{formatDateTime(exam.start_date)}</div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-red-100 rounded-lg">
                       <Calendar className="w-5 h-5 text-red-600" />
@@ -280,7 +281,7 @@ export default function ExamSetupDetails() {
                       <div className="font-medium text-slate-900">{formatDateTime(exam.end_date)}</div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-blue-100 rounded-lg">
                       <Clock className="w-5 h-5 text-blue-600" />
@@ -363,11 +364,11 @@ export default function ExamSetupDetails() {
                               </p>
                             </div>
                             <div className="text-right text-sm text-slate-600">
-                              <div>Correct: +{section.marking_if_correct}</div>
-                              <div>Incorrect: {section.marking_if_incorrect}</div>
+                              <div>Correct: +{section.marking_scheme?.max_marks || 0}</div>
+                              <div>Incorrect: -{section.marking_scheme?.negative_marks || 0}</div>
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => handleQuestionClick(section.question_start)}

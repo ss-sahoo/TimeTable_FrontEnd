@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router';
+import { useParams, useNavigate, Link, useLocation } from 'react-router';
 import {
   ArrowLeft,
   Eye,
@@ -88,6 +88,7 @@ interface Exam {
   shuffle_options: boolean;
   show_results_immediately: boolean;
   instructions: string;
+  timezone?: string;
 }
 
 interface SectionQuestionStats {
@@ -101,6 +102,9 @@ interface SectionQuestionStats {
 export default function ExamView() {
   const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
   const { user } = useAuthContext();
   const [exam, setExam] = useState<Exam | null>(null);
   const [sectionStats, setSectionStats] = useState<SectionQuestionStats[]>([]);
@@ -119,7 +123,7 @@ export default function ExamView() {
       setLoading(true);
       const response = await api.get<Exam>(`/exams/exams/${examId}/`);
       setExam(response.data);
-      
+
       // Fetch question stats for each section
       if (response.data.pattern?.sections) {
         await fetchSectionStats(response.data.pattern.sections, response.data.id);
@@ -135,10 +139,10 @@ export default function ExamView() {
   const fetchSectionStats = async (sections: PatternSection[], examId?: number) => {
     try {
       const stats: SectionQuestionStats[] = [];
-      
+
       for (const section of sections) {
         const totalNeeded = section.end_question - section.start_question + 1;
-        
+
         // Fetch questions for this section
         const queryParams = new URLSearchParams({
           pattern_section: String(section.id),
@@ -149,7 +153,7 @@ export default function ExamView() {
         const response = await api.get(`/questions/questions/?${queryParams.toString()}`);
         // Use 'count' from paginated response for total, not results.length which is just the first page
         const totalAdded = response.data?.count ?? response.data?.results?.length ?? response.data?.length ?? 0;
-        
+
         stats.push({
           section_id: section.id,
           total_needed: totalNeeded,
@@ -158,7 +162,7 @@ export default function ExamView() {
           progress_percentage: (totalAdded / totalNeeded) * 100,
         });
       }
-      
+
       setSectionStats(stats);
     } catch (err) {
       console.error('Failed to fetch section stats:', err);
@@ -249,7 +253,7 @@ export default function ExamView() {
             {error || 'The exam you are looking for does not exist.'}
           </p>
           <Link
-            to="/exams"
+            to={`${basePath}/exams`}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -318,7 +322,7 @@ export default function ExamView() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3 min-w-0">
               <button
-                onClick={() => navigate('/exams')}
+                onClick={() => navigate(`${basePath}/exams`)}
                 className="p-2 rounded-md hover:bg-slate-100 transition-colors"
                 aria-label="Back to exams"
               >
@@ -335,21 +339,21 @@ export default function ExamView() {
                 {exam.status.charAt(0).toUpperCase() + exam.status.slice(1)}
               </span>
               <Link
-                to={`/exams/${exam.id}/results-analytics`}
+                to={`${basePath}/exams/${exam.id}/results-analytics`}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-purple-600 text-white hover:bg-purple-700 transition-colors"
               >
                 <FileText className="w-3.5 h-3.5" />
                 Analytics
               </Link>
               <Link
-                to={`/exams/${exam.id}/evaluation`}
+                to={`${basePath}/exams/${exam.id}/evaluation`}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
               >
                 <BarChart3 className="w-3.5 h-3.5" />
                 Evaluation
               </Link>
               <button
-                onClick={() => navigate(`/exams/${exam.id}/edit`)}
+                onClick={() => navigate(`${basePath}/exams/${exam.id}/edit`)}
                 className="p-2 rounded-md hover:bg-slate-100 transition-colors"
                 title="Edit Exam"
               >
@@ -432,14 +436,14 @@ export default function ExamView() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => navigate(`/exam/${exam.id}/pattern/${exam.pattern.id}/bulk-import`)}
+                  onClick={() => navigate(`${basePath}/exam/${exam.id}/pattern/${exam.pattern.id}/bulk-import`)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors"
                 >
                   <Upload className="w-3 h-3" />
                   AI Bulk Import
                 </button>
                 <Link
-                  to={`/patterns/${exam.pattern.id}`}
+                  to={`${basePath}/patterns/${exam.pattern.id}/view`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                 >
                   <ExternalLink className="w-3 h-3" />
@@ -495,10 +499,9 @@ export default function ExamView() {
                       </td>
                       <td className="px-3 py-2 text-right">
                         <Link
-                          to={`/pattern/${exam.pattern.id}/question/${slug}/${section.localStart}?examId=${exam.id}`}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium text-xs transition-colors ${
-                            isComplete ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-blue-600 text-white hover:bg-blue-700'
-                          }`}
+                          to={`${basePath}/pattern/${exam.pattern.id}/question/${slug}/${section.localStart}?examId=${exam.id}`}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium text-xs transition-colors ${isComplete ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
                         >
                           {isComplete ? <Eye className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
                           {isComplete ? 'View' : `Add (${Math.max(stats.remaining, 0)})`}
@@ -579,7 +582,7 @@ export default function ExamView() {
                     0
                   );
                   return (
-                        <div key={subject} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-slate-50">
+                    <div key={subject} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-slate-50">
                       <span className="font-medium text-slate-800">{subject}</span>
                       <span className="text-[11px] text-slate-500">
                         {subjectSections.length} sections · {totalQs} Qs

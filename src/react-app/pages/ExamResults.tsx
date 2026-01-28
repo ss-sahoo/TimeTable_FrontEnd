@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, useLocation } from 'react-router';
 import { api } from '../hooks/useApi';
 import { useAuthContext } from '../contexts/AuthContext';
-import { 
-  CheckCircle, 
-  Clock, 
-  Award, 
-  BarChart3, 
+import {
+  CheckCircle,
+  Clock,
+  Award,
+  BarChart3,
   Eye,
   AlertTriangle,
   Trophy,
@@ -107,8 +107,11 @@ interface ExamResult {
 const ExamResults: React.FC = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
   const { user } = useAuthContext();
-  
+
   const [result, setResult] = useState<ExamResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -166,7 +169,7 @@ const ExamResults: React.FC = () => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes}m ${secs}s`;
     } else if (minutes > 0) {
@@ -308,8 +311,8 @@ const ExamResults: React.FC = () => {
           <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-lg font-bold text-slate-900 mb-2">Error Loading Results</h2>
           <p className="text-sm text-slate-600 mb-4">{error || 'Results not available'}</p>
-          <button 
-            onClick={() => navigate('/student-dashboard')} 
+          <button
+            onClick={() => navigate(`${basePath}/student-dashboard`)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
           >
             Back to Dashboard
@@ -329,7 +332,7 @@ const ExamResults: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => navigate('/student-dashboard')}
+                onClick={() => navigate(-1)}
                 className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <ArrowLeft className="w-5 h-5 text-slate-600" />
@@ -342,12 +345,11 @@ const ExamResults: React.FC = () => {
             <div className="flex items-center gap-2">
               {/* Always show View Snapshots button for proctored exams */}
               <button
-                onClick={() => navigate(`/proctoring-snapshots/${attemptId}`)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
-                  attempt.violations_count > 0
-                    ? 'bg-red-50 hover:bg-red-100 text-red-700'
-                    : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
-                }`}
+                onClick={() => navigate(`${basePath}/proctoring-snapshots/${attemptId}`)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${attempt.violations_count > 0
+                  ? 'bg-red-50 hover:bg-red-100 text-red-700'
+                  : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
+                  }`}
                 title="View Proctoring Snapshots"
               >
                 <Camera className="w-4 h-4" />
@@ -393,9 +395,9 @@ const ExamResults: React.FC = () => {
                 <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                   <p className="text-xs uppercase tracking-wide text-emerald-600">Accuracy</p>
                   <p className="text-2xl font-bold text-emerald-900 mt-1">{accuracy.toFixed(1)}%</p>
-                    <p className="text-xs text-emerald-700">
-                      {availableSections.length} sections graded
-                    </p>
+                  <p className="text-xs text-emerald-700">
+                    {availableSections.length} sections graded
+                  </p>
                 </div>
               </div>
             </div>
@@ -406,7 +408,7 @@ const ExamResults: React.FC = () => {
                 <p className="text-xs text-slate-500">Duration</p>
               </div>
               <button
-                onClick={() => navigate(`/proctoring-snapshots/${attemptId}`)}
+                onClick={() => navigate(`${basePath}/proctoring-snapshots/${attemptId}`)}
                 className="p-3 border border-slate-100 rounded-xl bg-slate-50 text-left w-full transition-all hover:bg-blue-50 hover:border-blue-200 cursor-pointer"
                 title="Click to view proctoring snapshots"
               >
@@ -481,11 +483,10 @@ const ExamResults: React.FC = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
-                    activeTab === tab.id
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-50'
-                  }`}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${activeTab === tab.id
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50'
+                    }`}
                 >
                   <tab.icon className="w-4 h-4" />
                   {tab.label}
@@ -516,9 +517,8 @@ const ExamResults: React.FC = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">Status:</span>
-                        <span className={`font-medium ${
-                          attempt.status === 'submitted' ? 'text-green-600' : 'text-orange-600'
-                        }`}>
+                        <span className={`font-medium ${attempt.status === 'submitted' ? 'text-green-600' : 'text-orange-600'
+                          }`}>
                           {attempt.status.replace('_', ' ').toUpperCase()}
                         </span>
                       </div>
@@ -699,11 +699,10 @@ const ExamResults: React.FC = () => {
                         <button
                           key={filter.id}
                           onClick={() => setDetailFilter(filter.id as typeof detailFilter)}
-                          className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${
-                            detailFilter === filter.id
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                          }`}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${detailFilter === filter.id
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                            }`}
                         >
                           {filter.label}
                         </button>
@@ -789,9 +788,8 @@ const ExamResults: React.FC = () => {
                                   Marks {detail.marks_obtained}/{detail.max_marks}
                                 </span>
                                 <span
-                                  className={`px-4 py-1 rounded-full text-xs font-semibold ${
-                                    detail.is_correct ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                                  }`}
+                                  className={`px-4 py-1 rounded-full text-xs font-semibold ${detail.is_correct ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                                    }`}
                                 >
                                   {detail.is_correct ? 'Correct' : 'Incorrect'}
                                 </span>
@@ -830,14 +828,14 @@ const ExamResults: React.FC = () => {
         {/* Action Buttons */}
         <div className="flex justify-center gap-3">
           <button
-            onClick={() => navigate('/student-dashboard')}
+            onClick={() => navigate(-1)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Dashboard
           </button>
           <button
-            onClick={() => navigate('/student-analytics')}
+            onClick={() => navigate(`${basePath}/student-analytics`)}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
           >
             <BarChart3 className="w-4 h-4" />

@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Eye, 
-  Edit, 
-  Copy, 
-  Trash2, 
-  Users, 
+import { Link, useNavigate, useLocation } from 'react-router';
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreVertical,
+  Eye,
+  Edit,
+  Copy,
+  Trash2,
+  Users,
   BarChart3,
   Calendar,
   Clock,
@@ -66,11 +66,21 @@ interface Exam {
 
 export default function ExamManagement() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
   const { user } = useAuthContext();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filters
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [visibilityFilter, setVisibilityFilter] = useState<string>('all');
+  const [selectedCenter, setSelectedCenter] = useState<string>('');
+  const [selectedBatch, setSelectedBatch] = useState<string>('');
+
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -79,9 +89,27 @@ export default function ExamManagement() {
   const dropdownRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
   const copyFeedbackTimeout = useRef<number | null>(null);
 
+  // Data for filters
+  const [centers, setCenters] = useState<any[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchCenters();
+    fetchBatches();
+  }, []);
+
+  // Debounce search term
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  // Fetch exams when filters change
   useEffect(() => {
     fetchExams();
-  }, []);
+  }, [debouncedSearchTerm, statusFilter, visibilityFilter, selectedCenter, selectedBatch]);
 
   useEffect(() => {
     return () => {
@@ -95,10 +123,10 @@ export default function ExamManagement() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      const isClickInsideAnyDropdown = Object.values(dropdownRefs.current).some(ref => 
+      const isClickInsideAnyDropdown = Object.values(dropdownRefs.current).some(ref =>
         ref && ref.contains(target)
       );
-      
+
       if (!isClickInsideAnyDropdown) {
         setOpenDropdown(null);
       }
@@ -110,10 +138,51 @@ export default function ExamManagement() {
     };
   }, []);
 
+  const fetchCenters = async () => {
+    try {
+      const response = await api.get('/timetable/centers/');
+      setCenters(response.data.results || response.data.centers || response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch centers:', error);
+    }
+  };
+
+  const fetchBatches = async () => {
+    try {
+      const response = await api.get('/timetable/batches/');
+      setBatches(response.data.batches || response.data.results || response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch batches:', error);
+    }
+  };
+
   const fetchExams = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/exams/exams/');
+
+      const params = new URLSearchParams();
+
+      if (debouncedSearchTerm) {
+        params.append('search', debouncedSearchTerm);
+      }
+
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter);
+      }
+
+      if (visibilityFilter !== 'all') {
+        params.append('visibility_scope', visibilityFilter);
+      }
+
+      if (selectedCenter) {
+        params.append('center_id', selectedCenter);
+      }
+
+      if (selectedBatch) {
+        params.append('batch_id', selectedBatch);
+      }
+
+      const response = await api.get(`/exams/exams/?${params.toString()}`);
       setExams(response.data.results || response.data);
     } catch (error) {
       console.error('Failed to fetch exams:', error);
@@ -137,6 +206,26 @@ export default function ExamManagement() {
       alert('Failed to delete exam. Please try again.');
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handlePublishExam = async (examId: number) => {
+    try {
+      await api.patch(`/exams/exams/${examId}/`, { status: 'published' });
+      setExams(exams.map(exam =>
+        exam.id === examId ? { ...exam, status: 'published' } : exam
+      ));
+      setCopyFeedback('Exam published successfully!');
+      if (copyFeedbackTimeout.current) {
+        window.clearTimeout(copyFeedbackTimeout.current);
+      }
+      copyFeedbackTimeout.current = window.setTimeout(() => setCopyFeedback(null), 2500);
+    } catch (error: any) {
+      console.error('Failed to publish exam:', error);
+      const errorMessage = error.response?.data?.status?.[0] ||
+        error.response?.data?.non_field_errors?.[0] ||
+        'Failed to publish exam. Please ensure all questions are added.';
+      alert(errorMessage);
     }
   };
 
@@ -226,12 +315,7 @@ export default function ExamManagement() {
     }
   };
 
-  const filteredExams = exams.filter(exam => {
-    const matchesSearch = exam.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         exam.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || exam.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  // Exams are now filtered server-side, so we use them directly
 
   const getExamStats = () => {
     return {
@@ -266,7 +350,7 @@ export default function ExamManagement() {
             <p className="text-xs text-slate-600 mt-1">Manage and organize your exams</p>
           </div>
           <Link
-            to="/exams/create"
+            to={`${basePath}/exams/create`}
             className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
           >
             <Plus className="w-4 h-4" />
@@ -324,34 +408,87 @@ export default function ExamManagement() {
         </div>
 
         {/* Search and Filters - Improved Design */}
-        <div className="flex items-center gap-3 mb-6">
-          {/* Search Input */}
-          <div className="flex-1 relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-slate-400" />
+        <div className="bg-white rounded-lg border border-slate-200 p-4 mb-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            {/* Search Input */}
+            <div className="flex-1 relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-slate-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search exams by title or description..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="block w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm hover:border-slate-300"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Search exams by title or description..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm hover:border-slate-300"
-            />
           </div>
 
-          {/* Filter Dropdown */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm hover:border-slate-300 min-w-[140px]"
-          >
-            <option value="all">All Status</option>
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-            <option value="active">Active</option>
-            <option value="completed">Completed</option>
-            <option value="archived">Archived</option>
-          </select>
+          {/* Filter Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Status Filter */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-600">Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              >
+                <option value="all">All Status</option>
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+
+            {/* Visibility Filter */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-600">Visibility</label>
+              <select
+                value={visibilityFilter}
+                onChange={(e) => setVisibilityFilter(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              >
+                <option value="all">All Scopes</option>
+                <option value="institute">Institute-Wide</option>
+                <option value="centers">Specific Centers</option>
+                <option value="batches">Specific Batches</option>
+              </select>
+            </div>
+
+            {/* Center Filter */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-600">Center</label>
+              <select
+                value={selectedCenter}
+                onChange={(e) => setSelectedCenter(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              >
+                <option value="">All Centers</option>
+                {centers.map(center => (
+                  <option key={center.id} value={center.id}>{center.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Batch Filter */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-600">Batch</label>
+              <select
+                value={selectedBatch}
+                onChange={(e) => setSelectedBatch(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              >
+                <option value="">All Batches</option>
+                {batches.map(batch => (
+                  <option key={batch.id} value={batch.id}>{batch.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         {copyFeedback && (
@@ -362,183 +499,195 @@ export default function ExamManagement() {
 
         {/* Exams Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {filteredExams.map((exam) => {
+          {exams.map((exam) => {
             const requiredQuestions = exam.questions_required || exam.total_questions || 0;
             const addedQuestions = Math.max(0, exam.questions_added || 0);
             const effectiveAdded = requiredQuestions > 0 ? Math.min(addedQuestions, requiredQuestions) : addedQuestions;
             const percent =
               requiredQuestions > 0
                 ? Math.min(
-                    100,
-                    Math.max(0, Math.round((effectiveAdded / requiredQuestions) * 100)),
-                  )
+                  100,
+                  Math.max(0, Math.round((effectiveAdded / requiredQuestions) * 100)),
+                )
                 : 0;
 
             const canShareExam = exam.is_question_complete && !!getExamLink(exam);
 
             return (
-            <div key={exam.id} className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-lg hover:border-slate-300 transition-all duration-200">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-slate-900 truncate mb-1">{exam.title}</h3>
-                  <p className="text-xs text-slate-600 line-clamp-2">{exam.description}</p>
+              <div key={exam.id} className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-lg hover:border-slate-300 transition-all duration-200">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-slate-900 truncate mb-1">{exam.title}</h3>
+                    <p className="text-xs text-slate-600 line-clamp-2">{exam.description}</p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-2 mb-4">
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${getStatusColor(exam.status)}`}>
-                  {getStatusIcon(exam.status)}
-                  {exam.status.charAt(0).toUpperCase() + exam.status.slice(1)}
-                </span>
-                {!exam.is_question_complete && (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-lg bg-amber-100 text-amber-700 border border-amber-200">
-                    <AlertCircle className="w-3 h-3" />
-                    {`${effectiveAdded}/${requiredQuestions} questions`}
+                <div className="flex items-center gap-2 mb-4">
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${getStatusColor(exam.status)}`}>
+                    {getStatusIcon(exam.status)}
+                    {exam.status.charAt(0).toUpperCase() + exam.status.slice(1)}
                   </span>
-                )}
-              </div>
-
-              <div className="mb-4">
-                <div className="flex items-center justify-between text-[11px] text-slate-600 mb-1">
-                  <span>Question completion</span>
-                <span className="font-medium text-slate-900">
-                  {percent}%
-                </span>
-                </div>
-                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${exam.is_question_complete ? 'bg-green-500' : 'bg-blue-500'} transition-all`}
-                  style={{
-                    width: `${percent}%`,
-                  }}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2.5 mb-5">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <Calendar className="w-4 h-4" />
-                    <span className="text-xs">Start</span>
-                  </div>
-                  <span className="text-xs font-medium text-slate-900">{new Date(exam.start_date).toLocaleDateString()}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <Clock className="w-4 h-4" />
-                    <span className="text-xs">Duration</span>
-                  </div>
-                  <span className="text-xs font-medium text-slate-900">{exam.duration_minutes} min</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <BookOpen className="w-4 h-4" />
-                    <span className="text-xs">Questions</span>
-                  </div>
-                  <span className="text-xs font-medium text-slate-900">
-                    {effectiveAdded}/{requiredQuestions}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <BarChart3 className="w-4 h-4" />
-                    <span className="text-xs">Marks</span>
-                  </div>
-                  <span className="text-xs font-medium text-slate-900">{exam.total_marks}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 pt-4 border-t border-slate-100">
-                <Link
-                  to={`/exams/${exam.id}`}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  View
-                </Link>
-                <Link
-                  to={`/exams/${exam.id}/edit`}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-slate-50 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
-                >
-                  <Edit className="w-3.5 h-3.5" />
-                  Edit
-                </Link>
-                <div 
-                  className="relative" 
-                  ref={(el) => {
-                    dropdownRefs.current[exam.id] = el;
-                  }}
-                >
-                  <button 
-                    onClick={() => toggleDropdown(exam.id)}
-                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    <MoreVertical className="w-3.5 h-3.5" />
-                  </button>
-                  
-                  {/* Dropdown Menu */}
-                  {openDropdown === exam.id && (
-                    <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-10">
-                      <div className="py-1">
-                        {canShareExam && (
-                          <>
-                            <button
-                              onClick={() => {
-                                setShareExam(exam);
-                                setOpenDropdown(null);
-                              }}
-                              className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 flex items-center gap-2"
-                            >
-                              <Share2 className="w-4 h-4" />
-                              View Public Link
-                            </button>
-                            <button
-                              onClick={async () => {
-                                setOpenDropdown(null);
-                                await handleCopyExamLink(exam);
-                              }}
-                              className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 flex items-center gap-2"
-                            >
-                              <Copy className="w-4 h-4" />
-                              Copy Public Link
-                            </button>
-                            <div className="border-t border-slate-100 my-1"></div>
-                          </>
-                        )}
-                        <button
-                          onClick={() => {
-                            setDeleteConfirm(exam.id);
-                            setOpenDropdown(null);
-                          }}
-                          className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Delete Exam
-                        </button>
-                      </div>
-                    </div>
+                  {!exam.is_question_complete && (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-lg bg-amber-100 text-amber-700 border border-amber-200">
+                      <AlertCircle className="w-3 h-3" />
+                      {`${effectiveAdded}/${requiredQuestions} questions`}
+                    </span>
                   )}
                 </div>
-              </div>
 
-            </div>
+                <div className="mb-4">
+                  <div className="flex items-center justify-between text-[11px] text-slate-600 mb-1">
+                    <span>Question completion</span>
+                    <span className="font-medium text-slate-900">
+                      {percent}%
+                    </span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${exam.is_question_complete ? 'bg-green-500' : 'bg-blue-500'} transition-all`}
+                      style={{
+                        width: `${percent}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2.5 mb-5">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <Calendar className="w-4 h-4" />
+                      <span className="text-xs">Start</span>
+                    </div>
+                    <span className="text-xs font-medium text-slate-900">{new Date(exam.start_date).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <Clock className="w-4 h-4" />
+                      <span className="text-xs">Duration</span>
+                    </div>
+                    <span className="text-xs font-medium text-slate-900">{exam.duration_minutes} min</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <BookOpen className="w-4 h-4" />
+                      <span className="text-xs">Questions</span>
+                    </div>
+                    <span className="text-xs font-medium text-slate-900">
+                      {effectiveAdded}/{requiredQuestions}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <BarChart3 className="w-4 h-4" />
+                      <span className="text-xs">Marks</span>
+                    </div>
+                    <span className="text-xs font-medium text-slate-900">{exam.total_marks}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-4 border-t border-slate-100">
+                  <Link
+                    to={`${basePath}/exams/${exam.id}`}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    View
+                  </Link>
+                  <Link
+                    to={`${basePath}/exams/${exam.id}/edit`}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-slate-50 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                    Edit
+                  </Link>
+                  <div
+                    className="relative"
+                    ref={(el) => {
+                      dropdownRefs.current[exam.id] = el;
+                    }}
+                  >
+                    <button
+                      onClick={() => toggleDropdown(exam.id)}
+                      className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      <MoreVertical className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {openDropdown === exam.id && (
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-10">
+                        <div className="py-1">
+                          {canShareExam && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setShareExam(exam);
+                                  setOpenDropdown(null);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 flex items-center gap-2"
+                              >
+                                <Share2 className="w-4 h-4" />
+                                View Public Link
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  setOpenDropdown(null);
+                                  await handleCopyExamLink(exam);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 flex items-center gap-2"
+                              >
+                                <Copy className="w-4 h-4" />
+                                Copy Public Link
+                              </button>
+                              <div className="border-t border-slate-100 my-1"></div>
+                            </>
+                          )}
+                          {exam.status === 'draft' && (
+                            <button
+                              onClick={() => {
+                                handlePublishExam(exam.id);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Publish Exam
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setDeleteConfirm(exam.id);
+                              setOpenDropdown(null);
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Delete Exam
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
             );
           })}
         </div>
 
-        {filteredExams.length === 0 && (
+        {exams.length === 0 && (
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <BookOpen className="w-8 h-8 text-slate-400" />
             </div>
             <h3 className="text-lg font-semibold text-slate-900 mb-2">No exams found</h3>
             <p className="text-xs text-slate-600 mb-6 max-w-sm mx-auto">
-              {searchTerm || statusFilter !== 'all' 
-                ? 'Try adjusting your search or filter criteria.' 
+              {searchTerm || statusFilter !== 'all' || visibilityFilter !== 'all' || selectedCenter || selectedBatch
+                ? 'Try adjusting your search or filter criteria.'
                 : 'Get started by creating your first exam.'}
             </p>
-            {!searchTerm && statusFilter === 'all' && (
+            {!searchTerm && statusFilter === 'all' && visibilityFilter === 'all' && !selectedCenter && !selectedBatch && (
               <Link
-                to="/exams/create"
+                to={`${basePath}/exams/create`}
                 className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 <Plus className="w-4 h-4" />
@@ -606,11 +755,11 @@ export default function ExamManagement() {
                 <p className="text-sm text-slate-600">This action cannot be undone.</p>
               </div>
             </div>
-            
+
             <p className="text-sm text-slate-700 mb-6">
               Are you sure you want to delete this exam? All associated data including attempts, results, and invitations will be permanently removed.
             </p>
-            
+
             <div className="flex items-center gap-3 justify-end">
               <button
                 onClick={() => setDeleteConfirm(null)}

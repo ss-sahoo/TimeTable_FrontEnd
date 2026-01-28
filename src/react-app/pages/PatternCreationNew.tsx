@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, useLocation } from 'react-router';
 import {
   ArrowLeft,
   Save,
@@ -60,13 +60,16 @@ interface ExamPattern {
 
 export default function PatternCreation() {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
+  const { id } = useParams<{ id: string }>();
   const { user } = useAuthContext();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sectionErrors, setSectionErrors] = useState<Record<number, Record<string, string>>>({});
-  
+
   const [pattern, setPattern] = useState<ExamPattern>({
     name: '',
     description: '',
@@ -82,7 +85,7 @@ export default function PatternCreation() {
   const isEditing = Boolean(id);
 
   // Fetch subjects
-  const { data: subjectsData } = useApi<{results: Subject[]}>('/patterns/subjects/');
+  const { data: subjectsData } = useApi<{ results: Subject[] }>('/patterns/subjects/');
 
   useEffect(() => {
     if (isEditing && id) {
@@ -125,7 +128,7 @@ export default function PatternCreation() {
   // Helper function to group sections by subject
   const getSubjectsWithSections = (): SubjectWithSections[] => {
     const subjectMap = new Map<string, PatternSection[]>();
-    
+
     pattern.sections.forEach(section => {
       if (!subjectMap.has(section.subject)) {
         subjectMap.set(section.subject, []);
@@ -286,7 +289,7 @@ export default function PatternCreation() {
         await api.post('/patterns/patterns/', patternData);
       }
 
-      navigate('/patterns');
+      navigate(`${basePath}/patterns`);
     } catch (error: any) {
       console.error('Failed to save pattern:', error);
       if (error.response?.data) {
@@ -315,7 +318,7 @@ export default function PatternCreation() {
         await api.post('/patterns/patterns/', patternData);
       }
 
-      navigate('/patterns');
+      navigate(`${basePath}/patterns`);
     } catch (error: any) {
       console.error('Failed to publish pattern:', error);
       if (error.response?.data) {
@@ -377,7 +380,7 @@ export default function PatternCreation() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <button
-            onClick={() => navigate('/patterns')}
+            onClick={() => navigate(`${basePath}/patterns`)}
             className="p-2 hover:bg-slate-200 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-4 h-4 text-slate-600" />
@@ -414,9 +417,8 @@ export default function PatternCreation() {
                     type="text"
                     value={pattern.name}
                     onChange={(e) => handleInputChange('name', e.target.value)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.name ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.name ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     placeholder="e.g., JEE Main Pattern"
                   />
                   {errors.name && (
@@ -435,9 +437,8 @@ export default function PatternCreation() {
                     type="number"
                     value={pattern.total_questions}
                     onChange={(e) => handleInputChange('total_questions', parseInt(e.target.value) || 0)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.total_questions ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.total_questions ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     min="1"
                     max="500"
                   />
@@ -457,9 +458,8 @@ export default function PatternCreation() {
                     type="number"
                     value={pattern.total_marks}
                     onChange={(e) => handleInputChange('total_marks', parseInt(e.target.value) || 0)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.total_marks ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.total_marks ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     min="1"
                   />
                   {errors.total_marks && (
@@ -478,9 +478,8 @@ export default function PatternCreation() {
                     type="number"
                     value={pattern.total_duration}
                     onChange={(e) => handleInputChange('total_duration', parseInt(e.target.value) || 60)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.total_duration ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.total_duration ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     min="1"
                   />
                   {errors.total_duration && (
@@ -612,9 +611,8 @@ export default function PatternCreation() {
                                   type="text"
                                   value={section.name}
                                   onChange={(e) => updateSection(globalIndex, 'name', e.target.value)}
-                                  className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                    sectionErrors[globalIndex]?.name ? 'border-red-300' : 'border-slate-300'
-                                  }`}
+                                  className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors ${sectionErrors[globalIndex]?.name ? 'border-red-300' : 'border-slate-300'
+                                    }`}
                                   placeholder="Section name"
                                 />
                                 {sectionErrors[globalIndex]?.name && (
@@ -652,9 +650,8 @@ export default function PatternCreation() {
                                   type="number"
                                   value={section.start_question}
                                   onChange={(e) => updateSection(globalIndex, 'start_question', parseInt(e.target.value) || 1)}
-                                  className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                    sectionErrors[globalIndex]?.start_question ? 'border-red-300' : 'border-slate-300'
-                                  }`}
+                                  className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors ${sectionErrors[globalIndex]?.start_question ? 'border-red-300' : 'border-slate-300'
+                                    }`}
                                   min="1"
                                 />
                                 {sectionErrors[globalIndex]?.start_question && (
@@ -668,9 +665,8 @@ export default function PatternCreation() {
                                   type="number"
                                   value={section.end_question}
                                   onChange={(e) => updateSection(globalIndex, 'end_question', parseInt(e.target.value) || 1)}
-                                  className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                    sectionErrors[globalIndex]?.end_question ? 'border-red-300' : 'border-slate-300'
-                                  }`}
+                                  className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors ${sectionErrors[globalIndex]?.end_question ? 'border-red-300' : 'border-slate-300'
+                                    }`}
                                   min="1"
                                 />
                                 {sectionErrors[globalIndex]?.end_question && (
@@ -684,9 +680,8 @@ export default function PatternCreation() {
                                   type="number"
                                   value={section.marks_per_question}
                                   onChange={(e) => updateSection(globalIndex, 'marks_per_question', parseInt(e.target.value) || 1)}
-                                  className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                    sectionErrors[globalIndex]?.marks_per_question ? 'border-red-300' : 'border-slate-300'
-                                  }`}
+                                  className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors ${sectionErrors[globalIndex]?.marks_per_question ? 'border-red-300' : 'border-slate-300'
+                                    }`}
                                   min="1"
                                 />
                                 {sectionErrors[globalIndex]?.marks_per_question && (
@@ -701,9 +696,8 @@ export default function PatternCreation() {
                                   step="0.01"
                                   value={section.negative_marking}
                                   onChange={(e) => updateSection(globalIndex, 'negative_marking', parseFloat(e.target.value) || 1.0)}
-                                  className={`w-full px-2 py-1 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                    section.question_type === 'subjective' ? 'bg-gray-50' : ''
-                                  }`}
+                                  className={`w-full px-2 py-1 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors ${section.question_type === 'subjective' ? 'bg-gray-50' : ''
+                                    }`}
                                   min="0"
                                   max="10"
                                   disabled={section.question_type === 'subjective'}

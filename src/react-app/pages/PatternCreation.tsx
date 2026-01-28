@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, useLocation } from 'react-router';
 import {
   ArrowLeft,
   Save,
@@ -64,6 +64,9 @@ interface ExamPattern {
 
 export default function PatternCreation() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
   const { id } = useParams();
   const { user } = useAuthContext();
   const [loading, setLoading] = useState(false);
@@ -71,7 +74,7 @@ export default function PatternCreation() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sectionErrors, setSectionErrors] = useState<Record<number, Record<string, string>>>({});
   const [marksValidationError, setMarksValidationError] = useState('');
-  
+
   const [pattern, setPattern] = useState<ExamPattern>({
     name: '',
     description: '',
@@ -83,7 +86,7 @@ export default function PatternCreation() {
   });
 
   const [nextSectionOrder, setNextSectionOrder] = useState(1);
-  
+
   // Subject management state
   const [newSubjectName, setNewSubjectName] = useState('');
   const [addingSubject, setAddingSubject] = useState(false);
@@ -96,7 +99,7 @@ export default function PatternCreation() {
   const isEditing = Boolean(id);
 
   // Fetch subjects
-  const { data: subjectsData, refetch: refetchSubjects } = useApi<{results: Subject[]}>('/patterns/subjects/');
+  const { data: subjectsData, refetch: refetchSubjects } = useApi<{ results: Subject[] }>('/patterns/subjects/');
 
   useEffect(() => {
     if (isEditing && id) {
@@ -137,7 +140,7 @@ export default function PatternCreation() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
-    
+
     // Clear marks validation error when total marks change
     if (field === 'total_marks' && marksValidationError) {
       setMarksValidationError('');
@@ -147,7 +150,7 @@ export default function PatternCreation() {
   // Handle subject input change with autocomplete
   const handleSubjectInputChange = (value: string) => {
     setNewSubjectName(value);
-    
+
     if (value.trim().length > 0 && subjectsData?.results) {
       const filtered = subjectsData.results.filter(subject =>
         subject.name.toLowerCase().includes(value.toLowerCase())
@@ -167,7 +170,7 @@ export default function PatternCreation() {
     setShowSubjectSuggestions(false);
     setFilteredSubjects([]);
     setSubjectError('');
-    
+
     // Directly add a section with this subject (don't create new subject)
     addSectionToSubject(subjectName);
   };
@@ -187,7 +190,7 @@ export default function PatternCreation() {
   const validateMarks = () => {
     const calculatedMarks = calculateTotalSectionMarks();
     const totalMarks = typeof pattern.total_marks === 'string' ? parseInt(pattern.total_marks) || 0 : pattern.total_marks;
-    
+
     // Only validate if total_marks is not empty
     if (pattern.total_marks && pattern.total_marks !== '' && calculatedMarks !== totalMarks) {
       setMarksValidationError(
@@ -204,13 +207,13 @@ export default function PatternCreation() {
   const getNextQuestionNumberForSubject = (subjectName: string) => {
     // Filter sections for this specific subject
     const subjectSections = pattern.sections.filter(s => s.subject === subjectName);
-    
+
     if (subjectSections.length === 0) {
       return 1; // First section of this subject starts from question 1
     }
-    
+
     // Find the highest end_question number within THIS SUBJECT only
-    const maxEndQuestion = Math.max(...subjectSections.map(section => 
+    const maxEndQuestion = Math.max(...subjectSections.map(section =>
       typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question
     ));
     return maxEndQuestion + 1;
@@ -229,16 +232,16 @@ export default function PatternCreation() {
 
     try {
       await api.delete(`/patterns/subjects/${subjectId}/`);
-      
+
       // Refresh subjects data
       await refetchSubjects();
-      
+
       // Remove any sections that belong to this subject
       setPattern(prev => ({
         ...prev,
         sections: prev.sections.filter(section => section.subject !== subjectName)
       }));
-      
+
       console.log('Subject removed successfully');
     } catch (error: any) {
       console.error('Failed to remove subject:', error);
@@ -257,7 +260,7 @@ export default function PatternCreation() {
     const existingSubject = subjectsData?.results?.find(
       subject => subject.name.toLowerCase() === newSubjectName.trim().toLowerCase()
     );
-    
+
     if (existingSubject) {
       setSubjectError('Subject already exists');
       return;
@@ -266,7 +269,7 @@ export default function PatternCreation() {
     try {
       setAddingSubject(true);
       setSubjectError('');
-      
+
       const response = await api.post('/patterns/subjects/', {
         name: newSubjectName.trim(),
         description: `Subject for ${newSubjectName.trim()}`,
@@ -276,18 +279,18 @@ export default function PatternCreation() {
       // Mark this subject as recently added (for visual highlighting)
       const subjectName = newSubjectName.trim();
       setRecentlyAddedSubjects(prev => new Set(prev).add(subjectName));
-      
+
       // Clear the input
       setNewSubjectName('');
-      
+
       // Refresh subjects data by refetching
       await refetchSubjects();
-      
+
       // Automatically add a section for the new subject
       setTimeout(() => {
         addSectionToSubject(subjectName);
       }, 300);
-      
+
     } catch (error: any) {
       console.error('Failed to add subject:', error);
       setSubjectError(error.response?.data?.name?.[0] || 'Failed to add subject. Please try again.');
@@ -299,7 +302,7 @@ export default function PatternCreation() {
   // Helper function to group sections by subject
   const getSubjectsWithSections = (): SubjectWithSections[] => {
     const subjectMap = new Map<string, PatternSection[]>();
-    
+
     pattern.sections.forEach(section => {
       if (!subjectMap.has(section.subject)) {
         subjectMap.set(section.subject, []);
@@ -318,7 +321,7 @@ export default function PatternCreation() {
     const nextStartQuestion = getNextQuestionNumberForSubject(subjectName);
     const suggestedEndQuestion = getSuggestedEndQuestion(nextStartQuestion, 5);
     const totalQuestions = suggestedEndQuestion - nextStartQuestion + 1;
-    
+
     const defaultMarkingScheme: MarkingScheme = {
       max_marks: 4,  // Default to 4 marks per question
       negative_marks: 0,
@@ -351,9 +354,9 @@ export default function PatternCreation() {
     setTimeout(() => {
       const sectionElement = document.querySelector(`[data-section-id="${newSection.id}"]`);
       if (sectionElement) {
-        sectionElement.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center' 
+        sectionElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
         });
         // Add a subtle highlight effect
         sectionElement.classList.add('ring-2', 'ring-blue-300', 'ring-opacity-50');
@@ -373,11 +376,11 @@ export default function PatternCreation() {
     let errorMessage = '';
 
     if (field === 'start_question' || field === 'end_question') {
-      const startQ = field === 'start_question' ? 
+      const startQ = field === 'start_question' ?
         (typeof value === 'string' ? parseInt(value) || 0 : value) :
         (typeof section.start_question === 'string' ? parseInt(section.start_question) || 0 : section.start_question);
-      
-      const endQ = field === 'end_question' ? 
+
+      const endQ = field === 'end_question' ?
         (typeof value === 'string' ? parseInt(value) || 0 : value) :
         (typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question);
 
@@ -429,23 +432,23 @@ export default function PatternCreation() {
       }
 
       updatedSections[index] = currentSection;
-      
+
       // Auto-update subsequent sections' start_question when end_question changes
       // Only update sections within the same subject
       if (field === 'end_question') {
         const currentSubject = currentSection.subject;
         let currentEndQuestion = typeof value === 'string' ? parseInt(value) || 0 : value;
-        
+
         for (let i = index + 1; i < updatedSections.length; i++) {
           // Skip sections from different subjects
           if (updatedSections[i].subject !== currentSubject) {
             continue;
           }
-          
+
           const nextStartQuestion = currentEndQuestion + 1;
-          updatedSections[i] = { 
-            ...updatedSections[i], 
-            start_question: nextStartQuestion 
+          updatedSections[i] = {
+            ...updatedSections[i],
+            start_question: nextStartQuestion
           };
           // Update end_question to maintain the same number of questions
           const currentStartQ = typeof updatedSections[i].start_question === 'string' ? parseInt(updatedSections[i].start_question as string) || 0 : updatedSections[i].start_question;
@@ -453,15 +456,15 @@ export default function PatternCreation() {
           const questionsInSection = (currentEndQ as number) - (currentStartQ as number) + 1;
           const newEndQuestion = nextStartQuestion + questionsInSection - 1;
           const totalInSection = Math.max(newEndQuestion - nextStartQuestion + 1, 1);
-          updatedSections[i] = { 
-            ...updatedSections[i], 
+          updatedSections[i] = {
+            ...updatedSections[i],
             end_question: newEndQuestion,
             min_questions_to_attempt: totalInSection,
           };
           currentEndQuestion = newEndQuestion;
         }
       }
-      
+
       return {
         ...prev,
         sections: updatedSections
@@ -495,7 +498,7 @@ export default function PatternCreation() {
   const removeSection = (index: number) => {
     setPattern(prev => {
       const updatedSections = prev.sections.filter((_, i) => i !== index);
-      
+
       // Recalculate question numbers for remaining sections
       let currentQuestion = 1;
       const recalculatedSections = updatedSections.map(section => {
@@ -510,7 +513,7 @@ export default function PatternCreation() {
         currentQuestion += questionsInSection;
         return newSection;
       });
-      
+
       return {
         ...prev,
         sections: recalculatedSections
@@ -572,7 +575,7 @@ export default function PatternCreation() {
 
       const startQ = typeof section.start_question === 'string' ? parseInt(section.start_question) || 0 : section.start_question;
       const endQ = typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question;
-      
+
       if (startQ >= endQ) {
         sectionError.start_question = 'Start question must be less than end question';
       }
@@ -581,10 +584,10 @@ export default function PatternCreation() {
       pattern.sections.forEach((otherSection, otherIndex) => {
         if (otherIndex === index) return; // Skip self
         if (otherSection.subject !== section.subject) return; // Skip different subjects
-        
+
         const otherStartQ = typeof otherSection.start_question === 'string' ? parseInt(otherSection.start_question) || 0 : otherSection.start_question;
         const otherEndQ = typeof otherSection.end_question === 'string' ? parseInt(otherSection.end_question) || 0 : otherSection.end_question;
-        
+
         // Check for overlap within the same subject
         if ((startQ >= otherStartQ && startQ <= otherEndQ) || (endQ >= otherStartQ && endQ <= otherEndQ)) {
           sectionError.start_question = `Questions ${startQ}-${endQ} overlap with another section in ${section.subject}`;
@@ -595,12 +598,12 @@ export default function PatternCreation() {
       // Find previous section in the same subject
       const subjectSections = pattern.sections.filter(s => s.subject === section.subject);
       const indexInSubject = subjectSections.findIndex(s => s === section);
-      
+
       if (indexInSubject > 0) {
         // Not the first section in this subject - should continue from previous section
         const prevSectionInSubject = subjectSections[indexInSubject - 1];
         const prevEndQ = typeof prevSectionInSubject.end_question === 'string' ? parseInt(prevSectionInSubject.end_question) || 0 : prevSectionInSubject.end_question;
-        
+
         if (startQ !== prevEndQ + 1) {
           sectionError.start_question = `Should start from ${prevEndQ + 1} (previous ${section.subject} section ended at ${prevEndQ})`;
         }
@@ -645,7 +648,7 @@ export default function PatternCreation() {
     console.log('✅ Marks validation result:', marksValid);
     console.log('📋 Current errors:', errors);
     console.log('📋 Section errors:', sectionErrors);
-    
+
     if (!isValid) {
       alert('Please fix all validation errors before saving.');
       return;
@@ -676,11 +679,11 @@ export default function PatternCreation() {
       }
 
       alert('Pattern saved successfully!');
-      navigate('/patterns');
+      navigate(`${basePath}/patterns`);
     } catch (error: any) {
       console.error('❌ Failed to save pattern:', error);
       console.error('❌ Error response:', error.response?.data);
-      
+
       let errorMessage = 'Failed to save pattern. ';
       if (error.response?.data) {
         if (error.response.data.error) {
@@ -694,7 +697,7 @@ export default function PatternCreation() {
       } else {
         errorMessage += error.message || 'Unknown error';
       }
-      
+
       alert(errorMessage);
     } finally {
       setSaving(false);
@@ -704,7 +707,7 @@ export default function PatternCreation() {
   const handlePublish = async () => {
     console.log('🔍 Starting validation for publish...');
     const isValid = validateForm();
-    
+
     if (!isValid) {
       alert('Please fix all validation errors before publishing.');
       return;
@@ -731,11 +734,11 @@ export default function PatternCreation() {
       }
 
       alert('Pattern published successfully!');
-      navigate('/patterns');
+      navigate(`${basePath}/patterns`);
     } catch (error: any) {
       console.error('❌ Failed to publish pattern:', error);
       console.error('❌ Error response:', error.response?.data);
-      
+
       let errorMessage = 'Failed to publish pattern. ';
       if (error.response?.data) {
         if (error.response.data.error) {
@@ -749,7 +752,7 @@ export default function PatternCreation() {
       } else {
         errorMessage += error.message || 'Unknown error';
       }
-      
+
       alert(errorMessage);
     } finally {
       setSaving(false);
@@ -807,7 +810,7 @@ export default function PatternCreation() {
         {/* Header */}
         <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
           <button
-            onClick={() => navigate('/patterns')}
+            onClick={() => navigate(`${basePath}/patterns`)}
             className="p-1.5 sm:p-2 hover:bg-slate-200 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-4 h-4 text-slate-600" />
@@ -844,9 +847,8 @@ export default function PatternCreation() {
                     type="text"
                     value={pattern.name}
                     onChange={(e) => handleInputChange('name', e.target.value)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.name ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.name ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     placeholder="e.g., JEE Main Pattern"
                   />
                   {errors.name && (
@@ -865,9 +867,8 @@ export default function PatternCreation() {
                     type="number"
                     value={pattern.total_questions}
                     onChange={(e) => handleInputChange('total_questions', e.target.value)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                      errors.total_questions ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${errors.total_questions ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     min="1"
                     max="500"
                     placeholder="Enter total questions"
@@ -888,9 +889,8 @@ export default function PatternCreation() {
                     type="number"
                     value={pattern.total_marks}
                     onChange={(e) => handleInputChange('total_marks', e.target.value)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                      errors.total_marks ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${errors.total_marks ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     min="1"
                     placeholder="Enter total marks"
                   />
@@ -910,9 +910,8 @@ export default function PatternCreation() {
                     type="number"
                     value={pattern.total_duration}
                     onChange={(e) => handleInputChange('total_duration', e.target.value)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                      errors.total_duration ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${errors.total_duration ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     min="1"
                     placeholder="Enter duration in minutes"
                   />
@@ -933,9 +932,8 @@ export default function PatternCreation() {
                   value={pattern.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   rows={2}
-                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${
-                    errors.description ? 'border-red-300' : 'border-slate-300'
-                  }`}
+                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${errors.description ? 'border-red-300' : 'border-slate-300'
+                    }`}
                   placeholder="Describe the pattern structure and purpose..."
                   required
                 />
@@ -994,7 +992,7 @@ export default function PatternCreation() {
                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-colors"
                       placeholder="Search existing (PHY, MAT) or type new subject name"
                     />
-                    
+
                     {/* Autocomplete Suggestions Dropdown */}
                     {showSubjectSuggestions && filteredSubjects.length > 0 && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
@@ -1134,25 +1132,22 @@ export default function PatternCreation() {
               <div className="space-y-4">
                 {getSubjectsWithSections().map((subjectGroup, subjectIndex) => {
                   const isNewlyAdded = recentlyAddedSubjects.has(subjectGroup.name);
-                  
+
                   return (
-                    <div 
-                      key={subjectIndex} 
-                      data-subject-group 
-                      className={`border rounded-lg p-4 transition-all ${
-                        isNewlyAdded 
-                          ? 'border-green-300 bg-green-50 shadow-md' 
-                          : 'border-slate-200'
-                      }`}
+                    <div
+                      key={subjectIndex}
+                      data-subject-group
+                      className={`border rounded-lg p-4 transition-all ${isNewlyAdded
+                        ? 'border-green-300 bg-green-50 shadow-md'
+                        : 'border-slate-200'
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${
-                            isNewlyAdded ? 'bg-green-500' : 'bg-blue-500'
-                          }`}></div>
-                          <h4 className={`font-semibold text-sm ${
-                            isNewlyAdded ? 'text-green-800' : 'text-slate-800'
-                          }`}>
+                          <div className={`w-2 h-2 rounded-full ${isNewlyAdded ? 'bg-green-500' : 'bg-blue-500'
+                            }`}></div>
+                          <h4 className={`font-semibold text-sm ${isNewlyAdded ? 'text-green-800' : 'text-slate-800'
+                            }`}>
                             {subjectGroup.name}
                           </h4>
                           {isNewlyAdded && (
@@ -1174,188 +1169,184 @@ export default function PatternCreation() {
                         </div>
                         <button
                           onClick={() => addSectionToSubject(subjectGroup.name)}
-                          className={`inline-flex items-center gap-1 px-2 py-1 text-xs text-white rounded-md transition-colors ${
-                            isNewlyAdded 
-                              ? 'bg-green-600 hover:bg-green-700' 
-                              : 'bg-blue-600 hover:bg-blue-700'
-                          }`}
+                          className={`inline-flex items-center gap-1 px-2 py-1 text-xs text-white rounded-md transition-colors ${isNewlyAdded
+                            ? 'bg-green-600 hover:bg-green-700'
+                            : 'bg-blue-600 hover:bg-blue-700'
+                            }`}
                         >
                           <Plus className="w-3 h-3" />
                           Add Section
                         </button>
                       </div>
 
-                    <div className="space-y-2">
-                      {subjectGroup.sections.map((section, sectionIndex) => {
-                        const globalIndex = pattern.sections.findIndex(s => s === section);
-                        return (
-                          <div key={globalIndex} data-section-id={section.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className="w-6 h-6 bg-slate-200 rounded flex items-center justify-center text-xs font-medium text-slate-600">
-                                  {sectionIndex + 1}
-                                </span>
-                                <h5 className="text-sm font-medium text-slate-900">{section.name || 'Untitled Section'}</h5>
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getQuestionTypeColor(section.question_type)}`}>
-                                  {getQuestionTypeIcon(section.question_type)}
-                                  {section.question_type.toUpperCase()}
-                                </span>
-                              </div>
-                              <button
-                                onClick={() => removeSection(globalIndex)}
-                                className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
-                              <div>
-                                <label className="block text-xs font-medium text-slate-600 mb-1">Section Name</label>
-                                <input
-                                  type="text"
-                                  value={section.name}
-                                  onChange={(e) => updateSection(globalIndex, 'name', e.target.value)}
-                                  className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                                    sectionErrors[globalIndex]?.name ? 'border-red-300' : 'border-slate-300'
-                                  }`}
-                                  placeholder="Section name"
-                                />
-                                {sectionErrors[globalIndex]?.name && (
-                                  <p className="text-red-600 text-xs mt-1">{sectionErrors[globalIndex].name}</p>
-                                )}
-                              </div>
-
-                              <div>
-                                <label className="block text-xs font-medium text-slate-600 mb-1">Question Type</label>
-                                <select
-                                  value={section.question_type}
-                                  onChange={(e) => {
-                                    const newType = e.target.value as PatternSection['question_type'];
-                                    updateSection(globalIndex, 'question_type', newType);
-                                    
-                                    // Update marking scheme based on question type
-                                    const updatedScheme = { ...section.marking_scheme };
-                                    if (newType === 'Subjective') {
-                                      updatedScheme.manual_grading = true;
-                                      updatedScheme.negative_marks = 0;
-                                    } else if (newType === 'Multiple Correct MCQ') {
-                                      updatedScheme.partial_marking = true;
-                                      updatedScheme.marks_per_correct_option = updatedScheme.max_marks / 2; // Default assumption
-                                    } else if (newType === 'Numerical') {
-                                      updatedScheme.tolerance_range = 0.1;
-                                      updatedScheme.decimal_precision = 2;
-                                    }
-                                    updateSection(globalIndex, 'marking_scheme', updatedScheme);
-                                  }}
-                                  className="w-full px-2 py-1 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors"
-                                >
-                                  <option value="Single Correct MCQ">Single Correct MCQ</option>
-                                  <option value="Multiple Correct MCQ">Multiple Correct MCQ</option>
-                                  <option value="Numerical">Numerical</option>
-                                  <option value="Subjective">Subjective</option>
-                                  <option value="True/False">True/False</option>
-                                  <option value="Fill in the Blanks">Fill in the Blanks</option>
-                                </select>
-                              </div>
-
-                              <div>
-                                <label className="block text-xs font-medium text-slate-600 mb-1">Start Q</label>
-                                <input
-                                  type="number"
-                                  value={section.start_question}
-                                  onChange={(e) => updateSection(globalIndex, 'start_question', e.target.value === '' ? '' : parseInt(e.target.value) || '')}
-                                  className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                                    sectionErrors[globalIndex]?.start_question ? 'border-red-300' : 'border-slate-300'
-                                  }`}
-                                  min="1"
-                                />
-                                {sectionErrors[globalIndex]?.start_question && (
-                                  <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
-                                    <AlertCircle className="w-3 h-3" />
-                                    {sectionErrors[globalIndex].start_question}
-                                  </p>
-                                )}
-                              </div>
-
-                              <div>
-                                <label className="block text-xs font-medium text-slate-600 mb-1">End Q</label>
-                                <input
-                                  type="number"
-                                  value={section.end_question}
-                                  onChange={(e) => updateSection(globalIndex, 'end_question', e.target.value === '' ? '' : parseInt(e.target.value) || '')}
-                                  className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                                    sectionErrors[globalIndex]?.end_question ? 'border-red-300' : 'border-slate-300'
-                                  }`}
-                                  min="1"
-                                />
-                                {sectionErrors[globalIndex]?.end_question && (
-                                  <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
-                                    <AlertCircle className="w-3 h-3" />
-                                    {sectionErrors[globalIndex].end_question}
-                                  </p>
-                                )}
-                              </div>
-
-                              <div>
-                                <label className="block text-xs font-medium text-slate-600 mb-1">Min to Attempt</label>
-                                <input
-                                  type="number"
-                                  value={section.min_questions_to_attempt}
-                                  className="w-full px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 text-slate-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                  readOnly
-                                />
-                                {sectionErrors[globalIndex]?.min_questions_to_attempt && (
-                                  <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
-                                    <AlertCircle className="w-3 h-3" />
-                                    {sectionErrors[globalIndex].min_questions_to_attempt}
-                                  </p>
-                                )}
-                              </div>
-
-                            </div>
-
-                            {/* Marking Scheme Configuration */}
-                            <div className="mt-4">
-                              <MarkingSchemeConfig
-                                questionType={section.question_type}
-                                markingScheme={section.marking_scheme}
-                                onChange={(scheme) => updateSection(globalIndex, 'marking_scheme', scheme)}
-                              />
-                            </div>
-
-                            <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
-                              <div className="flex items-center gap-2">
-                                <span className="flex items-center gap-1">
-                                  <Hash className="w-3 h-3" />
-                                  Questions {section.start_question}-{section.end_question}
-                                </span>
-                                <span>•</span>
-                                <span>{(() => {
-                                  const startQ = typeof section.start_question === 'string' ? parseInt(section.start_question) || 0 : section.start_question;
-                                  const endQ = typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question;
-                                  return endQ - startQ + 1;
-                                })()} questions</span>
-                                {sectionIndex === 0 && (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs" title="Each subject starts from question 1">
-                                    <Zap className="w-3 h-3" />
-                                    Subject Q1
+                      <div className="space-y-2">
+                        {subjectGroup.sections.map((section, sectionIndex) => {
+                          const globalIndex = pattern.sections.findIndex(s => s === section);
+                          return (
+                            <div key={globalIndex} data-section-id={section.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-6 h-6 bg-slate-200 rounded flex items-center justify-center text-xs font-medium text-slate-600">
+                                    {sectionIndex + 1}
                                   </span>
-                                )}
+                                  <h5 className="text-sm font-medium text-slate-900">{section.name || 'Untitled Section'}</h5>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getQuestionTypeColor(section.question_type)}`}>
+                                    {getQuestionTypeIcon(section.question_type)}
+                                    {section.question_type.toUpperCase()}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => removeSection(globalIndex)}
+                                  className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
                               </div>
-                              <div className="font-medium">
-                                Total: {(() => {
-                                  const startQ = typeof section.start_question === 'string' ? parseInt(section.start_question) || 0 : section.start_question;
-                                  const endQ = typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question;
-                                  return (endQ - startQ + 1) * section.marking_scheme.max_marks;
-                                })()} marks
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">Section Name</label>
+                                  <input
+                                    type="text"
+                                    value={section.name}
+                                    onChange={(e) => updateSection(globalIndex, 'name', e.target.value)}
+                                    className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors ${sectionErrors[globalIndex]?.name ? 'border-red-300' : 'border-slate-300'
+                                      }`}
+                                    placeholder="Section name"
+                                  />
+                                  {sectionErrors[globalIndex]?.name && (
+                                    <p className="text-red-600 text-xs mt-1">{sectionErrors[globalIndex].name}</p>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">Question Type</label>
+                                  <select
+                                    value={section.question_type}
+                                    onChange={(e) => {
+                                      const newType = e.target.value as PatternSection['question_type'];
+                                      updateSection(globalIndex, 'question_type', newType);
+
+                                      // Update marking scheme based on question type
+                                      const updatedScheme = { ...section.marking_scheme };
+                                      if (newType === 'Subjective') {
+                                        updatedScheme.manual_grading = true;
+                                        updatedScheme.negative_marks = 0;
+                                      } else if (newType === 'Multiple Correct MCQ') {
+                                        updatedScheme.partial_marking = true;
+                                        updatedScheme.marks_per_correct_option = updatedScheme.max_marks / 2; // Default assumption
+                                      } else if (newType === 'Numerical') {
+                                        updatedScheme.tolerance_range = 0.1;
+                                        updatedScheme.decimal_precision = 2;
+                                      }
+                                      updateSection(globalIndex, 'marking_scheme', updatedScheme);
+                                    }}
+                                    className="w-full px-2 py-1 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors"
+                                  >
+                                    <option value="Single Correct MCQ">Single Correct MCQ</option>
+                                    <option value="Multiple Correct MCQ">Multiple Correct MCQ</option>
+                                    <option value="Numerical">Numerical</option>
+                                    <option value="Subjective">Subjective</option>
+                                    <option value="True/False">True/False</option>
+                                    <option value="Fill in the Blanks">Fill in the Blanks</option>
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">Start Q</label>
+                                  <input
+                                    type="number"
+                                    value={section.start_question}
+                                    onChange={(e) => updateSection(globalIndex, 'start_question', e.target.value === '' ? '' : parseInt(e.target.value) || '')}
+                                    className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${sectionErrors[globalIndex]?.start_question ? 'border-red-300' : 'border-slate-300'
+                                      }`}
+                                    min="1"
+                                  />
+                                  {sectionErrors[globalIndex]?.start_question && (
+                                    <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                                      <AlertCircle className="w-3 h-3" />
+                                      {sectionErrors[globalIndex].start_question}
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">End Q</label>
+                                  <input
+                                    type="number"
+                                    value={section.end_question}
+                                    onChange={(e) => updateSection(globalIndex, 'end_question', e.target.value === '' ? '' : parseInt(e.target.value) || '')}
+                                    className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${sectionErrors[globalIndex]?.end_question ? 'border-red-300' : 'border-slate-300'
+                                      }`}
+                                    min="1"
+                                  />
+                                  {sectionErrors[globalIndex]?.end_question && (
+                                    <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                                      <AlertCircle className="w-3 h-3" />
+                                      {sectionErrors[globalIndex].end_question}
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">Min to Attempt</label>
+                                  <input
+                                    type="number"
+                                    value={section.min_questions_to_attempt}
+                                    className="w-full px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 text-slate-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    readOnly
+                                  />
+                                  {sectionErrors[globalIndex]?.min_questions_to_attempt && (
+                                    <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                                      <AlertCircle className="w-3 h-3" />
+                                      {sectionErrors[globalIndex].min_questions_to_attempt}
+                                    </p>
+                                  )}
+                                </div>
+
+                              </div>
+
+                              {/* Marking Scheme Configuration */}
+                              <div className="mt-4">
+                                <MarkingSchemeConfig
+                                  questionType={section.question_type}
+                                  markingScheme={section.marking_scheme}
+                                  onChange={(scheme) => updateSection(globalIndex, 'marking_scheme', scheme)}
+                                />
+                              </div>
+
+                              <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
+                                <div className="flex items-center gap-2">
+                                  <span className="flex items-center gap-1">
+                                    <Hash className="w-3 h-3" />
+                                    Questions {section.start_question}-{section.end_question}
+                                  </span>
+                                  <span>•</span>
+                                  <span>{(() => {
+                                    const startQ = typeof section.start_question === 'string' ? parseInt(section.start_question) || 0 : section.start_question;
+                                    const endQ = typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question;
+                                    return endQ - startQ + 1;
+                                  })()} questions</span>
+                                  {sectionIndex === 0 && (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs" title="Each subject starts from question 1">
+                                      <Zap className="w-3 h-3" />
+                                      Subject Q1
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="font-medium">
+                                  Total: {(() => {
+                                    const startQ = typeof section.start_question === 'string' ? parseInt(section.start_question) || 0 : section.start_question;
+                                    const endQ = typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question;
+                                    return (endQ - startQ + 1) * section.marking_scheme.max_marks;
+                                  })()} marks
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
                   );
                 })}
               </div>

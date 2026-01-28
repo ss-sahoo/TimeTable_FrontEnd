@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router";
 import { AuthProvider, useAuthContext } from "@/react-app/contexts/AuthContext";
 import { ThemeProvider } from "@/react-app/contexts/ThemeContext";
 import { OnboardingTourProvider } from "@/react-app/contexts/OnboardingTourContext";
@@ -34,6 +34,7 @@ import ExamResults from "@/react-app/pages/ExamResults";
 import ExamResultsByExamId from "@/react-app/pages/ExamResultsByExamId";
 import TestResults from "@/react-app/pages/TestResults";
 import ViolationDashboard from "@/react-app/pages/ViolationDashboard";
+import ActivityLogs from "@/react-app/pages/ActivityLogs";
 import ExamAnalytics from "@/react-app/pages/ExamAnalytics";
 import Results from "@/react-app/pages/Results";
 import ExamReview from "@/react-app/pages/ExamReview";
@@ -63,6 +64,15 @@ import CenterAdminDashboard from "@/react-app/pages/CenterAdminDashboard";
 import Timetable from "@/react-app/pages/Timetable";
 import Batches from "@/react-app/pages/Batches";
 import ExamHub from "@/react-app/pages/ExamHub";
+import SuperAdminLayout from "@/react-app/components/superadmin/SuperAdminLayout";
+import InstituteContent from "@/react-app/components/superadmin/InstituteContent";
+import CentersContent from "@/react-app/components/superadmin/CentersContent";
+import UsersContent from "@/react-app/components/superadmin/UsersContent";
+import ExamsContent from "@/react-app/components/superadmin/ExamsContent";
+import BatchesContent from "@/react-app/components/superadmin/BatchesContent";
+import TimetableContent from "@/react-app/components/superadmin/TimetableContent";
+import SettingsContent from "@/react-app/components/superadmin/SettingsContent";
+import ProfileContent from "@/react-app/components/superadmin/ProfileContent";
 import {
   AdminRoleDashboard,
   TeacherRoleDashboard,
@@ -107,6 +117,28 @@ function FullscreenProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   return isAuthenticated ? children : <Navigate to="/login" />;
+}
+
+// Role-based Redirect Component
+function RoleBasedRedirect({ children, targetPath }: { children: React.ReactNode, targetPath: string }) {
+  const { user, isAuthenticated, loading } = useAuthContext();
+  const location = useLocation();
+
+  if (loading) return null;
+
+  if (isAuthenticated && (user?.role?.toUpperCase() === 'SUPER_ADMIN' || user?.role?.toUpperCase() === 'SUPERADMIN')) {
+    // Handle dynamic paths
+    let path = targetPath;
+    if (targetPath.includes(':')) {
+      // This is a bit complex for a simple component, but we can handle common cases
+      // For now, let's just use the current pathname if it matches the pattern
+      path = location.pathname.startsWith('/superadmin') ? location.pathname : `/superadmin${location.pathname}`;
+      return <Navigate to={path} replace />;
+    }
+    return <Navigate to={`/superadmin${targetPath}`} replace />;
+  }
+
+  return <>{children}</>;
 }
 
 // Role-based Protected Route Component
@@ -326,19 +358,64 @@ function AppRoutes() {
       } />
 
       {/* Role-specific dashboards */}
-      <Route path="/superadmin/dashboard" element={
+      <Route path="/superadmin/*" element={
         <FullscreenProtectedRoute>
-          <NewSuperAdminDashboard />
+          <SuperAdminLayout>
+            <Routes>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<NewSuperAdminDashboard />} />
+              <Route path="users" element={<UsersContent />} />
+              <Route path="institutes" element={<CentersContent />} />
+              <Route path="exams" element={<ExamsContent />} />
+              <Route path="exams/create" element={<ExamCreation />} />
+              <Route path="exams/:examId/edit" element={<ExamCreation />} />
+              <Route path="exams/:examId" element={<ExamView />} />
+              <Route path="exams/:examId/analytics" element={<ExamAnalytics />} />
+              <Route path="exams/:examId/results-analytics" element={<ExamResultsAnalyticsEnhanced />} />
+              <Route path="exams/:examId/results-analytics/*" element={<ExamAnalyticsDashboard />}>
+                <Route path="statistics" element={<StatisticsPage />} />
+                <Route path="heatmap" element={<HeatMapPage />} />
+                <Route path="histogram" element={<HistogramPage />} />
+                <Route path="boxplot" element={<BoxPlotPage />} />
+                <Route path="questions" element={<QuestionsPage />} />
+                <Route path="students" element={<StudentsPage />} />
+                <Route path="student/:studentId" element={<StudentDetailPage />} />
+                <Route path="evaluation" element={<EvaluationPage />} />
+                <Route path="graphs" element={<GraphsPage />} />
+              </Route>
+              <Route path="exams/:examId/evaluation" element={<TeacherEvaluationDashboard />} />
+              <Route path="exam-results/:attemptId" element={<ExamResults />} />
+              <Route path="exam-review/:attemptId" element={<ExamReview />} />
+              <Route path="proctoring-snapshots/:attemptId" element={<ProctoringSnapshotsView />} />
+              <Route path="violation-dashboard" element={<ViolationDashboard />} />
+              <Route path="patterns" element={<ExamsContent />} />
+              <Route path="patterns/create" element={<PatternCreation />} />
+              <Route path="patterns/:id/edit" element={<PatternCreation />} />
+              <Route path="patterns/:patternId/view" element={<PatternView />} />
+              <Route path="patterns/:patternId/questions/create" element={<QuestionCreation />} />
+              <Route path="patterns/:patternId/sections/:sectionId/questions/create" element={<QuestionCreation />} />
+              <Route path="pattern/:patternId/sections/:sectionId/questions/create" element={<QuestionCreation />} />
+              <Route path="pattern/:patternId/question/:subjectSlug/:questionNumber" element={<QuestionCreationEnhanced />} />
+              <Route path="pattern/:patternId/question/:questionNumber" element={<QuestionCreationEnhanced />} />
+              <Route path="exam/:examId/pattern/:patternId/bulk-import" element={<BulkImportPage />} />
+              <Route path="questions" element={<QuestionManagement />} />
+              <Route path="batches" element={<BatchesContent />} />
+              <Route path="timetable" element={<TimetableContent />} />
+              <Route path="billing" element={<ActivityLogs />} />
+              <Route path="settings" element={<SettingsContent />} />
+              <Route path="profile" element={<ProfileContent />} />
+              <Route path="*" element={<Navigate to="/superadmin/dashboard" replace />} />
+            </Routes>
+          </SuperAdminLayout>
         </FullscreenProtectedRoute>
       } />
-      <Route path="/superadmin" element={<Navigate to="/superadmin/dashboard" replace />} />
       <Route path="/center-admin/dashboard" element={
         <FullscreenProtectedRoute>
           <CenterAdminDashboard />
         </FullscreenProtectedRoute>
       } />
       <Route path="/center-admin" element={<Navigate to="/center-admin/dashboard" replace />} />
-      
+
       {/* Manager Dashboard - Company level management */}
       <Route path="/manager" element={
         <FullscreenProtectedRoute>
@@ -346,7 +423,7 @@ function AppRoutes() {
         </FullscreenProtectedRoute>
       } />
       <Route path="/manager/dashboard" element={<Navigate to="/manager" replace />} />
-      
+
       <Route path="/timetable" element={
         <ProtectedRoute>
           <Timetable />
@@ -370,7 +447,9 @@ function AppRoutes() {
       <Route path="/staff" element={<StaffDashboard />} />
       <Route path="/exams" element={
         <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-          <ExamManagement />
+          <RoleBasedRedirect targetPath="/exams">
+            <ExamManagement />
+          </RoleBasedRedirect>
         </RoleProtectedRoute>
       } />
       <Route path="/exams/create" element={
@@ -389,9 +468,9 @@ function AppRoutes() {
         </RoleProtectedRoute>
       } />
       <Route path="/exams/:examId/results-analytics" element={
-        <FullscreenProtectedRoute>
-          <Navigate to="statistics" replace />
-        </FullscreenProtectedRoute>
+        <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
+          <ExamResultsAnalyticsEnhanced />
+        </RoleProtectedRoute>
       } />
       <Route path="/exams/:examId/results-analytics/*" element={
         <FullscreenProtectedRoute>
@@ -450,7 +529,9 @@ function AppRoutes() {
       } />
       <Route path="/student-analytics" element={
         <ProtectedRoute>
-          <StudentAnalyticsOverview />
+          <RoleBasedRedirect targetPath="/student-analytics">
+            <StudentAnalyticsOverview />
+          </RoleBasedRedirect>
         </ProtectedRoute>
       } />
       <Route path="/student-analytics/:examId" element={
@@ -475,7 +556,9 @@ function AppRoutes() {
       } />
       <Route path="/exam-results/:attemptId" element={
         <ProtectedRoute>
-          <ExamResults />
+          <RoleBasedRedirect targetPath="/exam-results/:attemptId">
+            <ExamResults />
+          </RoleBasedRedirect>
         </ProtectedRoute>
       } />
       <Route path="/exam-results/exam/:examId" element={
@@ -507,12 +590,16 @@ function AppRoutes() {
       } />
       <Route path="/violation-dashboard" element={
         <ProtectedRoute>
-          <ViolationDashboard />
+          <RoleBasedRedirect targetPath="/violation-dashboard">
+            <ViolationDashboard />
+          </RoleBasedRedirect>
         </ProtectedRoute>
       } />
       <Route path="/proctoring-snapshots/:attemptId" element={
         <ProtectedRoute>
-          <ProctoringSnapshotsView />
+          <RoleBasedRedirect targetPath="/proctoring-snapshots/:attemptId">
+            <ProctoringSnapshotsView />
+          </RoleBasedRedirect>
         </ProtectedRoute>
       } />
       <Route path="/proctoring-test" element={
@@ -520,7 +607,9 @@ function AppRoutes() {
       } />
       <Route path="/patterns" element={
         <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
-          <PatternManagement />
+          <RoleBasedRedirect targetPath="/patterns">
+            <PatternManagement />
+          </RoleBasedRedirect>
         </RoleProtectedRoute>
       } />
       <Route path="/patterns/create" element={

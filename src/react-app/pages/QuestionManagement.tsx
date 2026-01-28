@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import {
   Plus,
   BookOpen,
@@ -29,9 +29,10 @@ interface Pattern {
 
 export default function QuestionManagement() {
   const navigate = useNavigate();
-  const { data: patternsData, loading, refetch } = useApi<{results: Pattern[]}>('/patterns/patterns/');
-  const [showBulkImport, setShowBulkImport] = useState(false);
-
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
+  const { data: patternsData, loading, refetch } = useApi<{ results: Pattern[] }>('/patterns/patterns/');
   const patterns = patternsData?.results || [];
 
   if (loading) {
@@ -64,14 +65,7 @@ export default function QuestionManagement() {
             </div>
             <div className="flex gap-3">
               <button
-                onClick={() => setShowBulkImport(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 transition-colors"
-              >
-                <Upload className="w-4 h-4" />
-                Bulk Import
-              </button>
-              <button
-                onClick={() => navigate('/patterns/create')}
+                onClick={() => navigate(`${basePath}/patterns/create`)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 transition-colors"
               >
                 <Plus className="w-4 h-4" />
@@ -85,11 +79,11 @@ export default function QuestionManagement() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {patterns.map((pattern) => {
             const totalSections = pattern.sections?.length || 0;
-            
+
             return (
               <div
                 key={pattern.id}
-                onClick={() => navigate(`/pattern/${pattern.id}/question/1`)}
+                onClick={() => navigate(`${basePath}/pattern/${pattern.id}/question/1`)}
                 className="group bg-white rounded-2xl border-2 border-slate-200 hover:border-blue-400 shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden cursor-pointer transform hover:scale-[1.02]"
               >
                 {/* Card Header */}
@@ -153,7 +147,7 @@ export default function QuestionManagement() {
             <h3 className="text-xl font-bold text-slate-700 mb-2">No Patterns Found</h3>
             <p className="text-slate-600 mb-6">Create a pattern first to start adding questions</p>
             <button
-              onClick={() => navigate('/patterns/create')}
+              onClick={() => navigate(`${basePath}/patterns/create`)}
               className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
             >
               <Plus className="w-5 h-5" />
@@ -162,16 +156,6 @@ export default function QuestionManagement() {
           </div>
         )}
       </div>
-
-      {/* Bulk Import Modal */}
-      <BulkImportModal
-        isOpen={showBulkImport}
-        onClose={() => setShowBulkImport(false)}
-        onSuccess={() => {
-          setShowBulkImport(false);
-          refetch();
-        }}
-      />
     </div>
   );
 }

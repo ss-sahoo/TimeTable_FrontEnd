@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router';
-import { 
-  ArrowLeft, 
-  Eye, 
-  Edit, 
-  Plus, 
-  Clock, 
-  BookOpen, 
-  BarChart3, 
-  Users, 
-  CheckCircle, 
+import { useParams, useNavigate, Link, useLocation } from 'react-router';
+import {
+  ArrowLeft,
+  Eye,
+  Edit,
+  Plus,
+  Clock,
+  BookOpen,
+  BarChart3,
+  Users,
+  CheckCircle,
   AlertCircle,
   Calculator,
   FileText,
@@ -62,9 +62,12 @@ interface ExamPattern {
 export default function PatternView() {
   const { patternId } = useParams<{ patternId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
   const [activeTab, setActiveTab] = useState<'overview' | 'sections' | 'questions'>('overview');
   const [showBulkImport, setShowBulkImport] = useState(false);
-  
+
   const { data: pattern, loading, error, refetch } = useApi<ExamPattern>(`/patterns/patterns/${patternId}/`);
 
   const getQuestionTypeIcon = (type: string) => {
@@ -145,7 +148,7 @@ export default function PatternView() {
           <h2 className="text-xl font-semibold text-slate-900 mb-2">Pattern Not Found</h2>
           <p className="text-slate-600 mb-4">The pattern you're looking for doesn't exist or you don't have permission to view it.</p>
           <Link
-            to="/patterns"
+            to={`${basePath}/patterns`}
             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -164,7 +167,7 @@ export default function PatternView() {
           <div className="flex items-center justify-between py-6">
             <div className="flex items-center gap-3">
               <Link
-                to="/patterns"
+                to={`${basePath}/patterns`}
                 className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -172,11 +175,10 @@ export default function PatternView() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-lg font-semibold text-slate-900">{pattern.name}</h1>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                    pattern.is_active 
-                      ? 'bg-green-100 text-green-700' 
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${pattern.is_active
+                      ? 'bg-green-100 text-green-700'
                       : 'bg-slate-200 text-slate-600'
-                  }`}>
+                    }`}>
                     {pattern.is_active ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
                     {pattern.is_active ? 'Active' : 'Inactive'}
                   </span>
@@ -184,10 +186,10 @@ export default function PatternView() {
                 <p className="text-slate-600 mt-1 text-xs">{pattern.description}</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <Link
-                to={`/patterns/${pattern.id}/edit`}
+                to={`${basePath}/patterns/${pattern.id}/edit`}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Edit className="w-3.5 h-3.5" />
@@ -264,11 +266,10 @@ export default function PatternView() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all border-b-2 ${
-                      activeTab === tab.id
+                    className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all border-b-2 ${activeTab === tab.id
                         ? 'border-blue-600 text-blue-600'
                         : 'border-transparent text-slate-600 hover:text-slate-900'
-                    }`}
+                      }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
                     {tab.label}
@@ -303,9 +304,8 @@ export default function PatternView() {
                       <div className="flex items-center gap-3">
                         <Settings className="w-4 h-4 text-slate-400" />
                         <span className="text-sm text-slate-600">Status:</span>
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          pattern.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'
-                        }`}>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${pattern.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'
+                          }`}>
                           {pattern.is_active ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
                           {pattern.is_active ? 'Active' : 'Inactive'}
                         </span>
@@ -408,7 +408,7 @@ export default function PatternView() {
                     <h3 className="text-sm font-semibold text-slate-900 mb-2">No Sections Found</h3>
                     <p className="text-xs text-slate-600 mb-4">Add sections to structure your exam.</p>
                     <Link
-                      to={`/patterns/${pattern.id}/edit`}
+                      to={`${basePath}/patterns/${pattern.id}/edit`}
                       className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
                     >
                       <Plus className="w-4 h-4" />
@@ -432,7 +432,7 @@ export default function PatternView() {
                       Bulk Import (AI)
                     </button>
                     <Link
-                      to={`/patterns/${pattern.id}/questions/create`}
+                      to={`${basePath}/patterns/${pattern.id}/questions/create`}
                       className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       <Plus className="w-4 h-4" />
@@ -465,7 +465,7 @@ export default function PatternView() {
                             return (
                               <Link
                                 key={questionNumber}
-                                to={`/pattern/${pattern.id}/question/${questionNumber}`}
+                                to={`${basePath}/pattern/${pattern.id}/question/${questionNumber}`}
                                 className="w-10 h-10 bg-slate-100 hover:bg-blue-100 border border-slate-200 hover:border-blue-300 rounded-lg flex items-center justify-center text-sm font-medium text-slate-700 hover:text-blue-700 transition-colors"
                               >
                                 {questionNumber}
@@ -480,7 +480,7 @@ export default function PatternView() {
                               Questions {section.start_question}-{section.end_question} • {section.marks_per_question}m each
                             </span>
                             <Link
-                              to={`/pattern/${pattern.id}/question/${section.start_question}`}
+                              to={`${basePath}/pattern/${pattern.id}/question/${section.start_question}`}
                               className="text-blue-600 hover:text-blue-700 font-medium"
                             >
                               Start from Q{section.start_question} →
@@ -504,7 +504,7 @@ export default function PatternView() {
                         Bulk Import (AI)
                       </button>
                       <Link
-                        to={`/patterns/${pattern.id}/questions/create`}
+                        to={`${basePath}/patterns/${pattern.id}/questions/create`}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                       >
                         <Plus className="w-4 h-4" />

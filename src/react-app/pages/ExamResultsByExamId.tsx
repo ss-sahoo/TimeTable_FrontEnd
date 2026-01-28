@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, useLocation } from 'react-router';
 import { api } from '../hooks/useApi';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
 
 const ExamResultsByExamId: React.FC = () => {
   const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,19 +22,19 @@ const ExamResultsByExamId: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       console.log('Loading latest attempt for exam ID:', examId);
-      
+
       // Get the latest attempt for this exam
       const response = await api.get(`/exams/exams/${examId}/attempts/latest/`);
       const attemptData = response.data;
-      
+
       console.log('Latest attempt data:', attemptData);
-      
+
       if (attemptData && attemptData.attempt_id) {
         console.log('Redirecting to exam results with attempt ID:', attemptData.attempt_id);
         // Redirect to the actual exam results page with the attempt ID
-        navigate(`/exam-results/${attemptData.attempt_id}`, { replace: true });
+        navigate(`${basePath}/exam-results/${attemptData.attempt_id}`, { replace: true });
       } else {
         console.log('No attempt ID found in response');
         setError('No exam attempts found for this exam');
@@ -68,7 +71,7 @@ const ExamResultsByExamId: React.FC = () => {
           <p className="text-sm text-slate-600 mb-4">{error}</p>
           <div className="flex justify-center gap-3">
             <button
-              onClick={() => navigate('/student-dashboard')}
+              onClick={() => navigate(`${basePath}/student-dashboard`)}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />

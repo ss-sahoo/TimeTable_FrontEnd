@@ -7,12 +7,11 @@ import { BarChart3, Zap, BookOpen, FileText, Settings } from 'lucide-react';
 import PatternManagement from '@/react-app/pages/PatternManagement';
 import ExamManagement from '@/react-app/pages/ExamManagementNew';
 import Results from '@/react-app/pages/Results';
-import SettingsPage from '@/react-app/pages/Settings';
 
 // Import Statistics components
 import StatisticsTab from '@/react-app/pages/ExamHubStatistics';
 
-type TabType = 'statistics' | 'patterns' | 'exams' | 'results' | 'settings';
+type TabType = 'statistics' | 'patterns' | 'exams' | 'results';
 
 export default function ExamHub() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -29,7 +28,6 @@ export default function ExamHub() {
     { id: 'patterns' as const, label: 'Patterns', icon: Zap },
     { id: 'exams' as const, label: 'Exams', icon: BookOpen },
     { id: 'results' as const, label: 'Results', icon: FileText },
-    { id: 'settings' as const, label: 'Settings', icon: Settings },
   ];
 
   return (
@@ -45,11 +43,10 @@ export default function ExamHub() {
                 <button
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
-                  className={`flex-1 min-w-[100px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                    isActive
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-700/50'
-                  }`}
+                  className={`flex-1 min-w-[100px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-700/50'
+                    }`}
                 >
                   <Icon className="w-4 h-4" />
                   <span>{tab.label}</span>
@@ -61,10 +58,10 @@ export default function ExamHub() {
       </div>
 
       {/* Tab Content */}
-      <motion.div 
-        key={activeTab} 
-        initial={{ opacity: 0 }} 
-        animate={{ opacity: 1 }} 
+      <motion.div
+        key={activeTab}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.15 }}
         className="min-h-[calc(100vh-200px)]"
       >
@@ -72,7 +69,6 @@ export default function ExamHub() {
         {activeTab === 'patterns' && <PatternManagement />}
         {activeTab === 'exams' && <ExamManagement />}
         {activeTab === 'results' && <Results />}
-        {activeTab === 'settings' && <SettingsPage />}
       </motion.div>
     </div>
   );

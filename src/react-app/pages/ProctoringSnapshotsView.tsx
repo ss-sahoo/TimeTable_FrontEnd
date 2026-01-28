@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, useLocation } from 'react-router';
 import { ArrowLeft, Camera, AlertTriangle, CheckCircle, Clock, User, FileText, Filter } from 'lucide-react';
 import { api } from '../hooks/useApi';
 
@@ -42,6 +42,9 @@ interface SnapshotsResponse {
 const ProctoringSnapshotsView: React.FC = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
   const [data, setData] = useState<SnapshotsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -138,7 +141,7 @@ const ProctoringSnapshotsView: React.FC = () => {
     );
   }
 
-  const snapshotsToShow = showViolationsOnly 
+  const snapshotsToShow = showViolationsOnly
     ? data.snapshots.filter(s => s.stored_reason === 'violation_detected')
     : data.snapshots;
 
@@ -221,8 +224,8 @@ const ProctoringSnapshotsView: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600 text-lg">
-              {showViolationsOnly 
-                ? 'No violation snapshots found' 
+              {showViolationsOnly
+                ? 'No violation snapshots found'
                 : 'No snapshots available'}
             </p>
           </div>
@@ -231,11 +234,10 @@ const ProctoringSnapshotsView: React.FC = () => {
             {snapshotsToShow.map((snapshot, index) => (
               <div
                 key={index}
-                className={`bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer transition-all hover:shadow-md ${
-                  snapshot.stored_reason === 'violation_detected' 
-                    ? 'border-2 border-red-300' 
+                className={`bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer transition-all hover:shadow-md ${snapshot.stored_reason === 'violation_detected'
+                    ? 'border-2 border-red-300'
                     : 'border border-gray-200'
-                }`}
+                  }`}
                 onClick={() => setSelectedSnapshot(snapshot)}
               >
                 {/* Image */}

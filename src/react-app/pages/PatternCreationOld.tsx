@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router';
-import { 
-  ArrowLeft, 
-  Save, 
-  Plus, 
-  Trash2, 
-  Edit, 
+import { useNavigate, useParams, useLocation } from 'react-router';
+import {
+  ArrowLeft,
+  Save,
+  Plus,
+  Trash2,
+  Edit,
   CheckCircle,
   AlertCircle,
   BookOpen,
@@ -60,13 +60,16 @@ interface ExamPattern {
 
 export default function PatternCreation() {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
+  const { id } = useParams<{ id: string }>();
   const { user } = useAuthContext();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sectionErrors, setSectionErrors] = useState<Record<number, Record<string, string>>>({});
-  
+
   const [pattern, setPattern] = useState<ExamPattern>({
     name: '',
     description: '',
@@ -82,7 +85,7 @@ export default function PatternCreation() {
   const isEditing = Boolean(id);
 
   // Fetch subjects
-  const { data: subjectsData } = useApi<{results: Subject[]}>('/patterns/subjects/');
+  const { data: subjectsData } = useApi<{ results: Subject[] }>('/patterns/subjects/');
 
   useEffect(() => {
     if (isEditing && id) {
@@ -113,7 +116,7 @@ export default function PatternCreation() {
   // Helper function to group sections by subject
   const getSubjectsWithSections = (): SubjectWithSections[] => {
     const subjectMap = new Map<string, PatternSection[]>();
-    
+
     pattern.sections.forEach(section => {
       if (!subjectMap.has(section.subject)) {
         subjectMap.set(section.subject, []);
@@ -173,7 +176,7 @@ export default function PatternCreation() {
   const updateSection = (index: number, field: keyof PatternSection, value: any) => {
     setPattern(prev => ({
       ...prev,
-      sections: prev.sections.map((section, i) => 
+      sections: prev.sections.map((section, i) =>
         i === index ? { ...section, [field]: value } : section
       ),
     }));
@@ -195,10 +198,10 @@ export default function PatternCreation() {
   };
 
   const calculateTotals = () => {
-    const totalQuestions = pattern.sections.reduce((sum, section) => 
+    const totalQuestions = pattern.sections.reduce((sum, section) =>
       sum + (section.end_question - section.start_question + 1), 0
     );
-    const totalMarks = pattern.sections.reduce((sum, section) => 
+    const totalMarks = pattern.sections.reduce((sum, section) =>
       sum + ((section.end_question - section.start_question + 1) * section.marks_per_question), 0
     );
 
@@ -286,8 +289,8 @@ export default function PatternCreation() {
       } else {
         await api.post('/patterns/patterns/', patternData);
       }
-      
-      navigate('/patterns');
+
+      navigate(`${basePath}/patterns`);
     } catch (error: any) {
       console.error('Failed to save pattern:', error);
       if (error.response?.data) {
@@ -350,7 +353,7 @@ export default function PatternCreation() {
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-6">
             <button
-              onClick={() => navigate('/patterns')}
+              onClick={() => navigate(`${basePath}/patterns`)}
               className="p-2 hover:bg-slate-200 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-slate-600" />
@@ -390,9 +393,8 @@ export default function PatternCreation() {
                     type="text"
                     value={pattern.name}
                     onChange={(e) => handleInputChange('name', e.target.value)}
-                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.name ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.name ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     placeholder="Enter pattern name..."
                   />
                   {errors.name && (
@@ -411,9 +413,8 @@ export default function PatternCreation() {
                     value={pattern.description}
                     onChange={(e) => handleInputChange('description', e.target.value)}
                     rows={4}
-                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${
-                      errors.description ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${errors.description ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     placeholder="Describe the exam pattern..."
                   />
                   {errors.description && (
@@ -432,9 +433,8 @@ export default function PatternCreation() {
                     type="number"
                     value={pattern.total_duration}
                     onChange={(e) => handleInputChange('total_duration', parseInt(e.target.value) || 60)}
-                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.total_duration ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.total_duration ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     min="1"
                   />
                   {errors.total_duration && (
@@ -520,9 +520,8 @@ export default function PatternCreation() {
                           type="text"
                           value={section.name}
                           onChange={(e) => updateSection(index, 'name', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                            sectionErrors[index]?.name ? 'border-red-300' : 'border-slate-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${sectionErrors[index]?.name ? 'border-red-300' : 'border-slate-300'
+                            }`}
                           placeholder="e.g., Physics, Mathematics"
                         />
                         {sectionErrors[index]?.name && (
@@ -537,9 +536,8 @@ export default function PatternCreation() {
                         <select
                           value={section.subject}
                           onChange={(e) => updateSection(index, 'subject', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                            sectionErrors[index]?.subject ? 'border-red-300' : 'border-slate-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${sectionErrors[index]?.subject ? 'border-red-300' : 'border-slate-300'
+                            }`}
                         >
                           <option value="">Select a subject</option>
                           {subjectsData?.results?.map((subject) => (
@@ -554,7 +552,7 @@ export default function PatternCreation() {
                         <div className="mt-2">
                           <button
                             type="button"
-                            onClick={() => {/* TODO: Add create subject modal */}}
+                            onClick={() => {/* TODO: Add create subject modal */ }}
                             className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
                           >
                             <Plus className="w-3 h-3" />
@@ -588,9 +586,8 @@ export default function PatternCreation() {
                           type="number"
                           value={section.marks_per_question}
                           onChange={(e) => updateSection(index, 'marks_per_question', parseInt(e.target.value) || 1)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                            sectionErrors[index]?.marks_per_question ? 'border-red-300' : 'border-slate-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${sectionErrors[index]?.marks_per_question ? 'border-red-300' : 'border-slate-300'
+                            }`}
                           min="1"
                         />
                         {sectionErrors[index]?.marks_per_question && (
@@ -606,9 +603,8 @@ export default function PatternCreation() {
                           type="number"
                           value={section.start_question}
                           onChange={(e) => updateSection(index, 'start_question', parseInt(e.target.value) || 1)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                            sectionErrors[index]?.start_question ? 'border-red-300' : 'border-slate-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${sectionErrors[index]?.start_question ? 'border-red-300' : 'border-slate-300'
+                            }`}
                           min="1"
                         />
                         {sectionErrors[index]?.start_question && (
@@ -624,9 +620,8 @@ export default function PatternCreation() {
                           type="number"
                           value={section.end_question}
                           onChange={(e) => updateSection(index, 'end_question', parseInt(e.target.value) || 1)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                            sectionErrors[index]?.end_question ? 'border-red-300' : 'border-slate-300'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${sectionErrors[index]?.end_question ? 'border-red-300' : 'border-slate-300'
+                            }`}
                           min="1"
                         />
                         {sectionErrors[index]?.end_question && (
@@ -795,7 +790,7 @@ export default function PatternCreation() {
                 </button>
 
                 <button
-                  onClick={() => navigate('/patterns')}
+                  onClick={() => navigate(`${basePath}/patterns`)}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors"
                 >
                   Cancel

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   GraduationCap,
   Search,
@@ -12,8 +12,18 @@ import {
   Clock,
   CheckCircle,
   TrendingUp,
+  MapPin,
+  ArrowUpRight,
+  FileText,
+  PlusCircle,
+  Building2,
+  ChevronRight,
+  BookOpen,
+  Layers,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../hooks/useApi';
+import { useAuthContext } from '../contexts/AuthContext';
 
 interface Batch {
   id: string;
@@ -36,9 +46,13 @@ interface Program {
   name: string;
   center: string;
   center_id: string;
+  category?: string;
+  description?: string;
 }
 
 export default function Batches() {
+  const { user } = useAuthContext();
+  const [activeTab, setActiveTab] = useState<'batches' | 'programs'>('batches');
   const [batches, setBatches] = useState<Batch[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [centers, setCenters] = useState<any[]>([]);
@@ -46,11 +60,16 @@ export default function Batches() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [programFilter, setProgramFilter] = useState('all');
-  
+  const [centerFilter, setCenterFilter] = useState('all');
+
   // Create batch modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showProgramModal, setShowProgramModal] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [creatingProgram, setCreatingProgram] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [programError, setProgramError] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -60,11 +79,23 @@ export default function Batches() {
     end_date: '',
   });
 
+  const [programData, setProgramData] = useState({
+    name: '',
+    description: '',
+    category: '',
+    center_id: '',
+  });
+
   useEffect(() => {
     fetchBatches();
-    fetchPrograms();
     fetchCenters();
   }, []);
+
+  useEffect(() => {
+    if (centers.length > 0) {
+      fetchPrograms();
+    }
+  }, [centers]);
 
   const fetchBatches = async () => {
     try {
@@ -83,7 +114,15 @@ export default function Batches() {
   const fetchPrograms = async () => {
     try {
       const response = await api.get('/timetable/programs/');
-      setPrograms(response.data.programs || []);
+      const allPrograms = response.data.programs || [];
+
+      // Filter programs to only show those belonging to the institute's centers
+      if (centers.length > 0) {
+        const centerIds = new Set(centers.map(c => String(c.id)));
+        setPrograms(allPrograms.filter((p: any) => centerIds.has(String(p.center_id))));
+      } else {
+        setPrograms(allPrograms);
+      }
     } catch (err) {
       console.error('Failed to fetch programs:', err);
     }
@@ -93,7 +132,21 @@ export default function Batches() {
     try {
       const response = await api.get('/timetable/centers/');
       const centersData = response.data.results || response.data.centers || response.data || [];
-      setCenters(Array.isArray(centersData) ? centersData : []);
+      const allCenters = Array.isArray(centersData) ? centersData : [];
+
+      // Get institute ID from either top-level or nested institute object
+      const userInstituteId = user?.institute_id || user?.institute?.id;
+
+      if (userInstituteId) {
+        const targetId = String(userInstituteId);
+        const filtered = allCenters.filter((c: any) => {
+          const centerInstituteId = c.institute_id || c.institute?.id || c.institute;
+          return String(centerInstituteId) === targetId;
+        });
+        setCenters(filtered);
+      } else {
+        setCenters(allCenters);
+      }
     } catch (err) {
       console.error('Failed to fetch centers:', err);
     }
@@ -101,7 +154,7 @@ export default function Batches() {
 
   const handleCreateBatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.code.trim()) {
       setCreateError('Batch code is required');
       return;
@@ -110,14 +163,14 @@ export default function Batches() {
     try {
       setCreating(true);
       setCreateError(null);
-      
+
       const payload: any = {
         code: formData.code.trim(),
         name: formData.name.trim() || undefined,
         start_date: formData.start_date || undefined,
         end_date: formData.end_date || undefined,
       };
-      
+
       if (formData.program_id) {
         payload.program_id = formData.program_id;
       }
@@ -127,12 +180,9 @@ export default function Batches() {
       }
 
       await api.post('/timetable/admin/batches/create/', payload);
-      
-      // Reset form and close modal
+
       setFormData({ code: '', name: '', program_id: '', center_id: '', start_date: '', end_date: '' });
       setShowCreateModal(false);
-      
-      // Refresh batches list
       fetchBatches();
     } catch (err: any) {
       console.error('Failed to create batch:', err);
@@ -142,37 +192,66 @@ export default function Batches() {
     }
   };
 
-  const filteredBatches = batches.filter(
-    (batch) => {
-      const matchesSearch = batch.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        batch.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (batch.program && batch.program.toLowerCase().includes(searchQuery.toLowerCase()));
-      
-      const matchesProgram = programFilter === 'all' || batch.program === programFilter;
-      
-      return matchesSearch && matchesProgram;
+  const handleCreateProgram = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setCreatingProgram(true);
+      setProgramError(null);
+
+      const payload = {
+        ...programData,
+        center_id: programData.center_id || centers[0]?.id
+      };
+
+      await api.post('/timetable/superadmin/programs/create/', payload);
+
+      await fetchPrograms();
+      setProgramData({ name: '', description: '', category: '', center_id: '' });
+      setShowProgramModal(false);
+    } catch (err: any) {
+      console.error('Failed to create program:', err);
+      setProgramError(err.response?.data?.detail || 'Failed to create program');
+    } finally {
+      setCreatingProgram(false);
     }
-  );
+  };
 
-  // Calculate stats
-  const activeBatches = batches.filter(b => {
-    if (!b.end_date) return true;
-    return new Date(b.end_date) >= new Date();
-  }).length;
-  
-  const totalStudents = batches.reduce((sum, b) => sum + b.students_count, 0);
-  const upcomingBatches = batches.filter(b => {
-    if (!b.start_date) return false;
-    return new Date(b.start_date) > new Date();
-  }).length;
+  const filteredBatches = useMemo(() => {
+    return batches.filter(
+      (batch) => {
+        const matchesSearch = batch.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          batch.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (batch.program && batch.program.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  // Get batch status
+        const matchesProgram = programFilter === 'all' || batch.program === programFilter;
+        const matchesCenter = centerFilter === 'all' || String(batch.center_id) === centerFilter;
+
+        return matchesSearch && matchesProgram && matchesCenter;
+      }
+    );
+  }, [batches, searchQuery, programFilter, centerFilter]);
+
+  const programsByCenter = useMemo(() => {
+    return centers.map(center => {
+      const centerPrograms = programs.filter(p => String(p.center_id) === String(center.id));
+      const filteredCenterPrograms = centerPrograms.filter(p =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+      return {
+        ...center,
+        programs: filteredCenterPrograms,
+        totalPrograms: centerPrograms.length
+      };
+    }).filter(c => c.programs.length > 0 || (searchQuery === '' && c.totalPrograms > 0));
+  }, [centers, programs, searchQuery]);
+
   const getBatchStatus = (batch: Batch) => {
     if (!batch.start_date) return 'draft';
     const now = new Date();
     const start = new Date(batch.start_date);
     const end = batch.end_date ? new Date(batch.end_date) : null;
-    
+
     if (start > now) return 'upcoming';
     if (end && end < now) return 'completed';
     return 'active';
@@ -180,23 +259,23 @@ export default function Batches() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-500';
-      case 'upcoming': return 'bg-yellow-500';
-      case 'completed': return 'bg-gray-300';
-      default: return 'bg-blue-500';
+      case 'active': return 'bg-emerald-500';
+      case 'upcoming': return 'bg-amber-500';
+      case 'completed': return 'bg-slate-300';
+      default: return 'bg-indigo-500';
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return 'bg-green-50 text-green-700 ring-green-600/20';
+        return 'bg-emerald-50 text-emerald-700 ring-emerald-600/20';
       case 'upcoming':
-        return 'bg-yellow-50 text-yellow-800 ring-yellow-600/20';
+        return 'bg-amber-50 text-amber-800 ring-amber-600/20';
       case 'completed':
-        return 'bg-gray-100 text-gray-600 ring-gray-500/10';
+        return 'bg-slate-100 text-slate-600 ring-slate-500/10';
       default:
-        return 'bg-blue-50 text-blue-700 ring-blue-600/20';
+        return 'bg-indigo-50 text-indigo-700 ring-indigo-600/20';
     }
   };
 
@@ -211,10 +290,10 @@ export default function Batches() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'active': return <GraduationCap className="w-6 h-6" />;
-      case 'upcoming': return <Clock className="w-6 h-6" />;
-      case 'completed': return <CheckCircle className="w-6 h-6" />;
-      default: return <GraduationCap className="w-6 h-6" />;
+      case 'active': return <GraduationCap className="w-5 h-5" />;
+      case 'upcoming': return <Clock className="w-5 h-5" />;
+      case 'completed': return <CheckCircle className="w-5 h-5" />;
+      default: return <GraduationCap className="w-5 h-5" />;
     }
   };
 
@@ -233,406 +312,536 @@ export default function Batches() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
-          <p className="text-sm text-gray-600">Loading batches...</p>
+          <Loader2 className="w-10 h-10 text-indigo-600 animate-spin mx-auto mb-4" />
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Loading Academic Data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-full px-6 py-8 bg-gray-50">
-      {/* Header & Actions */}
-      <div className="md:flex md:items-center md:justify-between mb-8">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
-            Batch Management
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Organize classes, track syllabus progress, and manage student enrollments.
-          </p>
-        </div>
-        <div className="mt-4 flex md:ml-4 md:mt-0">
-          <button
-            type="button"
-            className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 mr-3"
-          >
-            <Filter className="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400" />
-            Filter
-          </button>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            type="button"
-            className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-          >
-            <Plus className="-ml-0.5 mr-1.5 h-5 w-5" />
-            Create Batch
-          </button>
-        </div>
-      </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+    <div className="min-h-screen bg-slate-50">
+      {/* Tab Navigation */}
+      <div className="sticky top-0 z-10 bg-slate-50 p-4 md:p-6 pb-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <p className="text-sm font-medium text-red-800">{error}</p>
-            <button 
-              onClick={fetchBatches}
-              className="text-sm text-red-600 hover:text-red-700 mt-1"
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">
+              Academic Management
+            </h2>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+              {activeTab === 'batches' ? 'Batches & Enrollments' : 'Programs & Curriculum'}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowProgramModal(true)}
+              className="inline-flex items-center rounded-xl bg-white px-4 py-2 text-[10px] font-black text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 transition-all uppercase tracking-widest"
             >
-              Try again
+              <Plus className="mr-2 h-3.5 w-3.5 text-slate-400" />
+              New Program
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* KPI Stats Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-        <div className="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6 border border-gray-100">
-          <dt className="truncate text-sm font-medium text-gray-500">Active Batches</dt>
-          <dd className="mt-1 text-3xl font-semibold tracking-tight text-gray-900">{activeBatches}</dd>
-        </div>
-        <div className="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6 border border-gray-100">
-          <dt className="truncate text-sm font-medium text-gray-500">Total Students Enrolled</dt>
-          <dd className="mt-1 text-3xl font-semibold tracking-tight text-gray-900">{totalStudents.toLocaleString()}</dd>
-        </div>
-        <div className="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6 border border-gray-100">
-          <dt className="truncate text-sm font-medium text-gray-500">Avg. Syllabus Completion</dt>
-          <dd className="mt-1 text-3xl font-semibold tracking-tight text-indigo-600">68%</dd>
-        </div>
-        <div className="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6 border border-gray-100">
-          <dt className="truncate text-sm font-medium text-gray-500">Upcoming Batches</dt>
-          <dd className="mt-1 text-3xl font-semibold tracking-tight text-gray-900">{upcomingBatches}</dd>
-        </div>
-      </div>
-
-      {/* Filter & Search Bar */}
-      <div className="mb-6 flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-grow">
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            <Search className="h-5 w-5 text-gray-400" />
-          </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="block w-full rounded-md border-0 py-2.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 shadow-sm"
-            placeholder="Search batches by name, code, or program..."
-          />
-        </div>
-        <div className="flex gap-2">
-          <select
-            value={programFilter}
-            onChange={(e) => setProgramFilter(e.target.value)}
-            className="block w-full rounded-md border-0 py-2.5 pl-3 pr-8 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6 shadow-sm"
-          >
-            <option value="all">All Programs</option>
-            {programs.map((program) => (
-              <option key={program.id} value={program.name}>{program.name}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Batch Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredBatches.map((batch) => {
-          const status = getBatchStatus(batch);
-          const statusColor = getStatusColor(status);
-          const statusBadge = getStatusBadge(status);
-          const statusLabel = getStatusLabel(status);
-          const statusIcon = getStatusIcon(status);
-          const maxCapacity = 50; // Default capacity
-          
-          return (
-            <div key={batch.id} className="group relative flex flex-col overflow-hidden rounded-xl bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-              {/* Status Strip */}
-              <div className={`absolute top-0 h-1 w-full ${statusColor}`}></div>
-              
-              <div className="p-6 flex-1">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${statusBadge}`}>
-                        {statusLabel}
-                      </span>
-                      <span className="text-xs text-gray-400">{batch.code}</span>
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
-                      {batch.name}
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-1">{batch.program || 'No Program'}</p>
-                  </div>
-                  <div className={`h-10 w-10 flex-shrink-0 rounded-full ${status === 'active' ? 'bg-indigo-50 text-indigo-600' : status === 'upcoming' ? 'bg-yellow-50 text-yellow-600' : 'bg-gray-100 text-gray-500'} flex items-center justify-center`}>
-                    {statusIcon}
-                  </div>
-                </div>
-
-                {/* Details */}
-                <div className="mt-6 grid grid-cols-2 gap-4 border-t border-gray-100 pt-4">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500">Students</p>
-                    <p className="mt-1 text-sm font-semibold text-gray-900">
-                      {batch.students_count} <span className="text-xs font-normal text-gray-400">/ {maxCapacity}</span>
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-gray-500">
-                      {status === 'upcoming' ? 'Starts In' : 'Start Date'}
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-gray-900">
-                      {status === 'upcoming' && batch.start_date
-                        ? `${getDaysUntilStart(batch.start_date)} Days`
-                        : formatDate(batch.start_date)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Progress */}
-                <div className="mt-4">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-medium text-gray-500">
-                      {status === 'completed' ? 'Syllabus Completion' : status === 'upcoming' ? 'Setup Status' : 'Syllabus Completion'}
-                    </span>
-                    <span className={`text-xs font-bold ${status === 'completed' ? 'text-green-600' : status === 'upcoming' ? 'text-gray-600' : 'text-indigo-600'}`}>
-                      {status === 'completed' ? '100%' : status === 'upcoming' ? 'Ready' : '35%'}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5">
-                    <div 
-                      className={`${status === 'completed' ? 'bg-green-600' : status === 'upcoming' ? 'bg-gray-300' : 'bg-indigo-600'} h-1.5 rounded-full`}
-                      style={{ width: status === 'completed' ? '100%' : status === 'upcoming' ? '100%' : '35%' }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="bg-gray-50 px-6 py-3 flex items-center justify-between border-t border-gray-200">
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  {batch.teachers_count > 0 ? (
-                    <>
-                      <Users className="w-4 h-4" />
-                      <span>{batch.teachers_count} Teachers</span>
-                    </>
-                  ) : (
-                    <span className="italic">No teachers assigned</span>
-                  )}
-                </div>
-                <a href="#" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
-                  {status === 'upcoming' ? 'Setup Now' : status === 'completed' ? 'View Report' : 'Manage Batch'} →
-                </a>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Empty State */}
-      {filteredBatches.length === 0 && !loading && !error && (
-        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-          <GraduationCap className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No batches found</h3>
-          <p className="text-gray-600 mb-6">
-            {searchQuery ? 'Try adjusting your search or filters.' : 'Get started by creating your first batch.'}
-          </p>
-          {!searchQuery && (
-            <button 
+            <button
               onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm"
+              className="inline-flex items-center rounded-xl bg-indigo-600 px-4 py-2 text-[10px] font-black text-white shadow-md shadow-indigo-200 hover:bg-indigo-500 transition-all uppercase tracking-widest"
             >
-              <Plus className="w-4 h-4" />
-              Create Batch
+              <Plus className="mr-2 h-3.5 w-3.5" />
+              New Batch
             </button>
-          )}
+          </div>
         </div>
-      )}
+
+        <div className="bg-white rounded-xl border border-slate-200 p-1 shadow-sm max-w-md">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setActiveTab('batches')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'batches'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-500 hover:bg-slate-50'
+                }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              Batches
+            </button>
+            <button
+              onClick={() => setActiveTab('programs')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'programs'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-500 hover:bg-slate-50'
+                }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              Programs
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-4 md:px-6 pb-12">
+        {/* Search & Filters */}
+        <div className="mb-8 flex flex-col md:flex-row gap-4">
+          <div className="relative flex-grow">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-slate-400" />
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="block w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 placeholder:text-slate-400 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+              placeholder={activeTab === 'batches' ? "Search batches..." : "Search programs..."}
+            />
+          </div>
+          <div className="flex gap-2">
+            <div className="relative min-w-[180px]">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Building2 className="h-3.5 w-3.5 text-slate-400" />
+              </div>
+              <select
+                value={centerFilter}
+                onChange={(e) => setCenterFilter(e.target.value)}
+                className="block w-full pl-10 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black text-slate-700 appearance-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all uppercase tracking-widest"
+              >
+                <option value="all">All Centers</option>
+                {centers.map((center) => (
+                  <option key={center.id} value={center.id}>{center.name}</option>
+                ))}
+              </select>
+            </div>
+            {activeTab === 'batches' && (
+              <div className="relative min-w-[180px]">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Filter className="h-3.5 w-3.5 text-slate-400" />
+                </div>
+                <select
+                  value={programFilter}
+                  onChange={(e) => setProgramFilter(e.target.value)}
+                  className="block w-full pl-10 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black text-slate-700 appearance-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all uppercase tracking-widest"
+                >
+                  <option value="all">All Programs</option>
+                  {programs.map((program) => (
+                    <option key={program.id} value={program.name}>{program.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {activeTab === 'batches' ? (
+            <motion.div
+              key="batches-tab"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {filteredBatches.map((batch) => {
+                  const status = getBatchStatus(batch);
+                  const statusColor = getStatusColor(status);
+                  const statusBadge = getStatusBadge(status);
+                  const statusLabel = getStatusLabel(status);
+                  const statusIcon = getStatusIcon(status);
+                  const maxCapacity = 50;
+
+                  return (
+                    <div key={batch.id} className="group relative flex flex-col overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                      <div className={`absolute top-0 h-1.5 w-full ${statusColor}`}></div>
+
+                      <div className="p-5 flex-1">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ring-1 ring-inset ${statusBadge}`}>
+                                {statusLabel}
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{batch.code}</span>
+                            </div>
+                            <h3 className="text-base font-black text-slate-900 group-hover:text-indigo-600 transition-colors">
+                              {batch.name}
+                            </h3>
+                            <p className="text-xs font-bold text-slate-400 flex items-center gap-1">
+                              <BookOpen className="w-3 h-3" /> {batch.program || 'General Track'}
+                            </p>
+                          </div>
+                          <div className={`h-10 w-10 flex-shrink-0 rounded-xl ${status === 'active' ? 'bg-emerald-50 text-emerald-600' : status === 'upcoming' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'} flex items-center justify-center shadow-inner`}>
+                            {statusIcon}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 py-4 border-y border-slate-50">
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Students</p>
+                            <p className="mt-1 text-sm font-black text-slate-700">
+                              {batch.students_count} <span className="text-xs font-bold text-slate-300">/ {maxCapacity}</span>
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                              {status === 'upcoming' ? 'Commencing' : 'Launched'}
+                            </p>
+                            <p className="mt-1 text-sm font-black text-slate-700">
+                              {status === 'upcoming' && batch.start_date
+                                ? `${getDaysUntilStart(batch.start_date)} Days`
+                                : formatDate(batch.start_date)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Syllabus Progress</span>
+                            <span className="text-xs font-black text-indigo-600">68%</span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: '68%' }}
+                              className="bg-indigo-600 h-full rounded-full shadow-sm"
+                            ></motion.div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50/50 px-5 py-3 flex items-center justify-between border-t border-slate-100">
+                        <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          <Users className="w-3.5 h-3.5" />
+                          <span>{batch.teachers_count} Mentors</span>
+                        </div>
+                        <button className="text-xs font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 group/btn">
+                          Manage <ChevronRight className="w-3 h-3 group-hover/btn:translate-x-0.5 transition-transform" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {filteredBatches.length === 0 && (
+                <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
+                  <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Layers className="w-10 h-10 text-slate-200" />
+                  </div>
+                  <h3 className="text-lg font-black text-slate-900 mb-1">No batches found</h3>
+                  <p className="text-sm font-bold text-slate-400">Try adjusting your filters or search query</p>
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="programs-tab"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-8"
+            >
+              {programsByCenter.map((centerGroup) => (
+                <div key={centerGroup.id} className="space-y-4">
+                  <div className="flex items-center gap-3 px-2">
+                    <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-slate-200 flex items-center justify-center">
+                      <Building2 className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-slate-900">{centerGroup.name}</h3>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        {centerGroup.programs.length} Active Programs
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {centerGroup.programs.map((program) => (
+                      <div key={program.id} className="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
+                            <BookOpen className="w-5 h-5 text-slate-400 group-hover:text-indigo-600" />
+                          </div>
+                          <button className="p-2 text-slate-300 hover:text-indigo-600 transition-colors">
+                            <ArrowUpRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <h4 className="text-sm font-black text-slate-800 mb-1">{program.name}</h4>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
+                          {program.category || 'Academic Track'}
+                        </p>
+                        <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+                          <div className="flex items-center gap-1.5">
+                            <div className="flex -space-x-2">
+                              {[1, 2, 3].map(i => (
+                                <div key={i} className="w-6 h-6 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[8px] font-black text-slate-400">
+                                  {i}
+                                </div>
+                              ))}
+                            </div>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">12 Batches</span>
+                          </div>
+                          <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-widest">Active</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {programsByCenter.length === 0 && (
+                <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
+                  <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <BookOpen className="w-10 h-10 text-slate-200" />
+                  </div>
+                  <h3 className="text-lg font-black text-slate-900 mb-1">No programs found</h3>
+                  <p className="text-sm font-bold text-slate-400">Try adjusting your filters or search query</p>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Create Batch Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 backdrop-blur-sm transition-opacity" onClick={() => setShowCreateModal(false)}></div>
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-              <div className="relative transform overflow-hidden rounded-xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
-                {/* Modal Header */}
-                <div className="bg-indigo-600 px-4 py-4 sm:px-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base font-semibold leading-6 text-white" id="modal-title">
-                      Create New Batch
-                    </h3>
-                    <button
-                      type="button"
-                      className="text-indigo-200 hover:text-white"
-                      onClick={() => {
-                        setShowCreateModal(false);
-                        setCreateError(null);
-                        setFormData({ code: '', name: '', program_id: '', center_id: '', start_date: '', end_date: '' });
-                      }}
-                    >
-                      <X className="h-6 w-6" />
-                    </button>
+        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-center justify-center min-h-screen p-4 text-center sm:p-0">
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setShowCreateModal(false)}></div>
+            <div className="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+              <div className="bg-indigo-600 px-6 py-8 text-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center border border-white/30">
+                      <PlusCircle className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black tracking-tight">Create New Batch</h3>
+                      <p className="text-indigo-100 text-xs font-bold opacity-90 uppercase tracking-widest">Configure basic details</p>
+                    </div>
                   </div>
-                  <p className="mt-1 text-sm text-indigo-100">
-                    Configure the basic details for the new batch. You can assign students later.
-                  </p>
+                  <button onClick={() => setShowCreateModal(false)} className="text-white/60 hover:text-white transition-colors">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+              </div>
+
+              <form onSubmit={handleCreateBatch} className="p-8">
+                {createError && (
+                  <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
+                    <p className="text-xs font-bold text-red-600">{createError}</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Batch Name</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+                      placeholder="e.g. Super 30 - Batch A"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Batch Code *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.code}
+                      onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+                      placeholder="e.g. BATCH-2025-A"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Center *</label>
+                    <select
+                      required
+                      value={formData.center_id}
+                      onChange={(e) => setFormData({ ...formData, center_id: e.target.value, program_id: '' })}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">Select Center</option>
+                      {centers.map((center) => (
+                        <option key={center.id} value={center.id}>{center.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Program (Optional)</label>
+                    <select
+                      value={formData.program_id}
+                      onChange={(e) => setFormData({ ...formData, program_id: e.target.value })}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">Select Program</option>
+                      {programs
+                        .filter(p => !formData.center_id || String(p.center_id) === String(formData.center_id))
+                        .map((program) => (
+                          <option key={program.id} value={program.id}>{program.name}</option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Start Date</label>
+                    <input
+                      type="date"
+                      value={formData.start_date}
+                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">End Date</label>
+                    <input
+                      type="date"
+                      value={formData.end_date}
+                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+                    />
+                  </div>
                 </div>
 
-                {/* Modal Body */}
-                <form onSubmit={handleCreateBatch}>
-                  <div className="px-4 py-6 sm:p-8">
-                    {createError && (
-                      <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-                        {createError}
-                      </div>
-                    )}
+                <div className="mt-8 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl text-sm font-black hover:bg-slate-200 transition-all uppercase tracking-widest"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creating}
+                    className="flex-[2] py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all flex items-center justify-center disabled:opacity-50 uppercase tracking-widest"
+                  >
+                    {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Batch'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
-                    <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-                      {/* Batch Name (Full Width) */}
-                      <div className="sm:col-span-2">
-                        <label htmlFor="batch-name" className="block text-sm font-medium leading-6 text-gray-900">
-                          Batch Name
-                        </label>
-                        <div className="mt-1">
-                          <input
-                            type="text"
-                            name="batch-name"
-                            id="batch-name"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                            placeholder="e.g. Super 30 - Batch A (2025)"
-                          />
+      {/* Manage Programs Modal */}
+      {showProgramModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-center justify-center min-h-screen p-4 text-center sm:p-0">
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setShowProgramModal(false)}></div>
+            <div className="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+              <div className="bg-gradient-to-br from-indigo-600 to-violet-700 px-6 py-8 text-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center border border-white/30">
+                      <GraduationCap className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black tracking-tight">Manage Programs</h3>
+                      <p className="text-indigo-100 text-xs font-bold opacity-90 uppercase tracking-widest">Define academic tracks</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowProgramModal(false)} className="text-white/60 hover:text-white transition-colors">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-8 space-y-8">
+                <div>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Active Programs ({programs.length})</h4>
+                  <div className="max-h-48 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+                    {programs.map(p => (
+                      <div key={p.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100 group hover:bg-indigo-50 transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100">
+                            <BookOpen className="w-4 h-4 text-indigo-600" />
+                          </div>
+                          <div>
+                            <span className="block text-sm font-black text-slate-700">{p.name}</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{p.center}</span>
+                          </div>
                         </div>
+                        <button className="text-slate-300 hover:text-indigo-600 transition-colors">
+                          <ArrowUpRight className="w-4 h-4" />
+                        </button>
                       </div>
+                    ))}
+                  </div>
+                </div>
 
-                      {/* Batch Code & Center */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
+                  <div className="relative flex justify-center"><span className="px-4 bg-white text-[10px] font-black text-slate-300 uppercase tracking-widest">New Program</span></div>
+                </div>
+
+                <form onSubmit={handleCreateProgram} className="space-y-5">
+                  {programError && (
+                    <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
+                      <p className="text-xs font-bold text-red-600">{programError}</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Program Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={programData.name}
+                        onChange={(e) => setProgramData({ ...programData, name: e.target.value })}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+                        placeholder="e.g. JEE Excellence 2026"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label htmlFor="batch-code" className="block text-sm font-medium leading-6 text-gray-900">
-                          Batch Code <span className="text-red-500">*</span>
-                        </label>
-                        <div className="mt-1">
-                          <input
-                            type="text"
-                            name="batch-code"
-                            id="batch-code"
-                            value={formData.code}
-                            onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                            className="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                            placeholder="e.g. BATCH-2025-A"
-                            required
-                          />
-                        </div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Category</label>
+                        <input
+                          type="text"
+                          value={programData.category}
+                          onChange={(e) => setProgramData({ ...programData, category: e.target.value })}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+                          placeholder="e.g. Engineering"
+                        />
                       </div>
-
                       <div>
-                        <label htmlFor="center" className="block text-sm font-medium leading-6 text-gray-900">
-                          Center <span className="text-red-500">*</span>
-                        </label>
-                        <div className="mt-1">
-                          <select
-                            id="center"
-                            name="center"
-                            value={formData.center_id}
-                            onChange={(e) => setFormData({ ...formData, center_id: e.target.value })}
-                            className="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                            required
-                          >
-                            <option value="">Select a center...</option>
-                            {centers.map((center) => (
-                              <option key={center.id} value={center.id}>
-                                {center.name} - {center.city}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Program */}
-                      <div className="sm:col-span-2">
-                        <label htmlFor="program" className="block text-sm font-medium leading-6 text-gray-900">
-                          Program <span className="text-xs text-gray-500">(Optional)</span>
-                        </label>
-                        <div className="mt-1">
-                          <select
-                            id="program"
-                            name="program"
-                            value={formData.program_id}
-                            onChange={(e) => setFormData({ ...formData, program_id: e.target.value })}
-                            className="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                          >
-                            <option value="">Select a program...</option>
-                            {programs.map((program) => (
-                              <option key={program.id} value={program.id}>
-                                {program.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Dates */}
-                      <div>
-                        <label htmlFor="start-date" className="block text-sm font-medium leading-6 text-gray-900">
-                          Start Date
-                        </label>
-                        <div className="mt-1">
-                          <input
-                            type="date"
-                            name="start-date"
-                            id="start-date"
-                            value={formData.start_date}
-                            onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                            className="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label htmlFor="end-date" className="block text-sm font-medium leading-6 text-gray-900">
-                          End Date
-                        </label>
-                        <div className="mt-1">
-                          <input
-                            type="date"
-                            name="end-date"
-                            id="end-date"
-                            value={formData.end_date}
-                            onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                            className="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                          />
-                        </div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Center</label>
+                        <select
+                          required
+                          value={programData.center_id}
+                          onChange={(e) => setProgramData({ ...programData, center_id: e.target.value })}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all appearance-none cursor-pointer"
+                        >
+                          <option value="">Select Center</option>
+                          {centers.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   </div>
 
-                  {/* Modal Footer */}
-                  <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 border-t border-gray-200">
-                    <button
-                      type="submit"
-                      disabled={creating}
-                      className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {creating ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Creating...
-                        </>
-                      ) : (
-                        'Create Batch'
-                      )}
-                    </button>
+                  <div className="pt-4 flex gap-3">
                     <button
                       type="button"
-                      className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
-                      onClick={() => {
-                        setShowCreateModal(false);
-                        setCreateError(null);
-                        setFormData({ code: '', name: '', program_id: '', center_id: '', start_date: '', end_date: '' });
-                      }}
+                      onClick={() => setShowProgramModal(false)}
+                      className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl text-sm font-black hover:bg-slate-200 transition-all uppercase tracking-widest"
                     >
                       Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={creatingProgram}
+                      className="flex-[2] py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all flex items-center justify-center disabled:opacity-50 uppercase tracking-widest"
+                    >
+                      {creatingProgram ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Deploy Program'}
                     </button>
                   </div>
                 </form>

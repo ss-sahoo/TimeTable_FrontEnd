@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Eye, 
-  Edit, 
-  Copy, 
-  Trash2, 
-  Users, 
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreVertical,
+  Eye,
+  Edit,
+  Copy,
+  Trash2,
+  Users,
   BarChart3,
   Calendar,
   Clock,
@@ -61,18 +61,83 @@ export default function ExamManagement() {
   const { user } = useAuthContext();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filters
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [visibilityFilter, setVisibilityFilter] = useState<string>('all');
+  const [selectedCenter, setSelectedCenter] = useState<string>('');
+  const [selectedBatch, setSelectedBatch] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
 
+  // Data for filters
+  const [centers, setCenters] = useState<any[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchCenters();
+    fetchBatches();
+  }, []);
+
+  // Debounce search term
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  // Fetch exams when filters change
   useEffect(() => {
     fetchExams();
-  }, []);
+  }, [debouncedSearchTerm, statusFilter, visibilityFilter, selectedCenter, selectedBatch]);
+
+  const fetchCenters = async () => {
+    try {
+      const response = await api.get('/timetable/centers/');
+      setCenters(response.data.results || response.data.centers || response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch centers:', error);
+    }
+  };
+
+  const fetchBatches = async () => {
+    try {
+      const response = await api.get('/timetable/batches/');
+      setBatches(response.data.batches || response.data.results || response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch batches:', error);
+    }
+  };
 
   const fetchExams = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/exams/exams/');
+
+      const params = new URLSearchParams();
+
+      if (debouncedSearchTerm) {
+        params.append('search', debouncedSearchTerm);
+      }
+
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter);
+      }
+
+      if (visibilityFilter !== 'all') {
+        params.append('visibility_scope', visibilityFilter);
+      }
+
+      if (selectedCenter) {
+        params.append('center_id', selectedCenter);
+      }
+
+      if (selectedBatch) {
+        params.append('batch_id', selectedBatch);
+      }
+
+      const response = await api.get(`/exams/exams/?${params.toString()}`);
       setExams(response.data.results || response.data);
     } catch (error) {
       console.error('Failed to fetch exams:', error);
@@ -115,13 +180,9 @@ export default function ExamManagement() {
     }
   };
 
-  const filteredExams = exams.filter(exam => {
-    const matchesSearch = exam.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         exam.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || exam.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
+  // Stats are now calculated on the frontend based on the fetched (filtered) exams
+  // Or we might want to fetch stats separately if we want global stats.
+  // For now, let's keep it based on current view for simplicity, or just calculate from 'exams'
   const getExamStats = () => {
     return {
       total: exams.length,
@@ -179,8 +240,8 @@ export default function ExamManagement() {
             data-tour-id="cta-create-exam"
             className="inline-flex items-center gap-2 px-3 py-2 text-sm text-white rounded-lg transition-colors"
             style={{ backgroundColor: '#216865' }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = '#1a524f'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = '#216865'}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a524f'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#216865'}
           >
             <Plus className="w-4 h-4" />
             Create Exam
@@ -285,9 +346,8 @@ export default function ExamManagement() {
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-lg transition-colors ${
-                showFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-300 text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:bg-gray-900'
-              }`}
+              className={`inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-lg transition-colors ${showFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-300 text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:bg-gray-900'
+                }`}
             >
               <Filter className="w-4 h-4" />
               Filter
@@ -295,13 +355,13 @@ export default function ExamManagement() {
           </div>
 
           {showFilters && (
-            <div className="mt-4 pt-4 border-t border-slate-200">
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-medium text-slate-600 dark:text-gray-400">Status:</span>
+            <div className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <span className="text-xs font-medium text-slate-600 dark:text-gray-400">Status</span>
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-2 py-1 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="all">All Status</option>
                   <option value="draft">Draft</option>
@@ -311,13 +371,56 @@ export default function ExamManagement() {
                   <option value="archived">Archived</option>
                 </select>
               </div>
+
+              <div className="space-y-1">
+                <span className="text-xs font-medium text-slate-600 dark:text-gray-400">Visibility</span>
+                <select
+                  value={visibilityFilter}
+                  onChange={(e) => setVisibilityFilter(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Scopes</option>
+                  <option value="institute">Institute-Wide</option>
+                  <option value="centers">Specific Centers</option>
+                  <option value="batches">Specific Batches</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-xs font-medium text-slate-600 dark:text-gray-400">Center</span>
+                <select
+                  value={selectedCenter}
+                  onChange={(e) => setSelectedCenter(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={visibilityFilter === 'batches'} // Optional logic: centers not relevant if filtering by batch? Actually centers IS relevant for batch too usually, but let's keep it simple.
+                >
+                  <option value="">All Centers</option>
+                  {centers.map(center => (
+                    <option key={center.id} value={center.id}>{center.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-xs font-medium text-slate-600 dark:text-gray-400">Batch</span>
+                <select
+                  value={selectedBatch}
+                  onChange={(e) => setSelectedBatch(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">All Batches</option>
+                  {batches.map(batch => (
+                    <option key={batch.id} value={batch.id}>{batch.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           )}
         </div>
 
         {/* Exams Grid */}
         <div id="exam-grid" data-tour-id="exam-list" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredExams.map((exam) => (
+          {exams.map((exam) => (
             <div key={exam.id} className="bg-white rounded-lg border border-slate-200 p-4 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
@@ -374,8 +477,8 @@ export default function ExamManagement() {
                   to={`/exams/${exam.id}`}
                   className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1 text-xs text-white rounded transition-colors"
                   style={{ backgroundColor: '#3f5fd4' }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#2d4bb8'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#3f5fd4'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2d4bb8'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3f5fd4'}
                 >
                   <Eye className="w-3 h-3" />
                   View
@@ -384,8 +487,8 @@ export default function ExamManagement() {
                   to={`/exams/${exam.id}/analytics`}
                   className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1 text-xs text-white rounded transition-colors"
                   style={{ backgroundColor: '#059669' }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#047857'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#059669'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#047857'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#059669'}
                 >
                   <BarChart3 className="w-3 h-3" />
                   Analytics
@@ -394,13 +497,13 @@ export default function ExamManagement() {
                   to={`/exams/${exam.id}/edit`}
                   className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1 text-xs text-white rounded transition-colors"
                   style={{ backgroundColor: '#6b6b6b' }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#5a5a5a'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#6b6b6b'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#5a5a5a'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#6b6b6b'}
                 >
                   <Edit className="w-3 h-3" />
                   Edit
                 </Link>
-                <button 
+                <button
                   className="p-1 rounded hover:bg-gray-200 transition-colors"
                   style={{ color: '#6b6b6b' }}
                   onClick={() => handleDeleteExam(exam.id)}
@@ -413,22 +516,22 @@ export default function ExamManagement() {
           ))}
         </div>
 
-        {filteredExams.length === 0 && (
+        {exams.length === 0 && (
           <div className="text-center py-12">
             <BookOpen className="w-12 h-12 mx-auto mb-4" style={{ color: '#6b6b6b' }} />
             <h3 className="text-lg font-medium text-black mb-2">No exams found</h3>
             <p className="text-sm mb-4" style={{ color: '#6b6b6b' }}>
-              {searchTerm || statusFilter !== 'all' 
-                ? 'Try adjusting your search or filter criteria.' 
+              {searchTerm || statusFilter !== 'all' || visibilityFilter !== 'all' || selectedCenter || selectedBatch
+                ? 'Try adjusting your search or filter criteria.'
                 : 'Get started by creating your first exam.'}
             </p>
-            {!searchTerm && statusFilter === 'all' && (
+            {!searchTerm && statusFilter === 'all' && visibilityFilter === 'all' && !selectedCenter && !selectedBatch && (
               <Link
                 to="/exams/create"
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg transition-colors"
                 style={{ backgroundColor: '#216865' }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#1a524f'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#216865'}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a524f'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#216865'}
               >
                 <Plus className="w-4 h-4" />
                 Create Exam

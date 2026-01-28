@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router';
-import { 
-  ArrowLeft, 
-  Save, 
-  Eye, 
-  Calendar, 
-  Clock, 
-  Users, 
-  BookOpen, 
+import { useNavigate, useParams, useLocation } from 'react-router';
+import {
+  ArrowLeft,
+  Save,
+  Eye,
+  Calendar,
+  Clock,
+  Users,
+  BookOpen,
   Settings,
   Plus,
   Trash2,
@@ -151,7 +151,7 @@ interface ExamFormData {
   shuffle_seed_per_student: boolean;
   show_results_immediately: boolean;
   instructions: string;
-  
+
   // Missing fields from Exam model
   status: string;
   timezone: string;
@@ -174,6 +174,10 @@ interface ExamFormData {
   public_allowed_ip_ranges_text: string;
   public_allow_multiple_devices: boolean;
   institute?: number | null;
+  // Visibility scope fields
+  visibility_scope: 'institute' | 'centers' | 'batches';
+  center_ids: string[];
+  batch_ids: string[];
 }
 
 const getDefaultFormData = (): ExamFormData => ({
@@ -198,7 +202,7 @@ const getDefaultFormData = (): ExamFormData => ({
   show_results_immediately: true,
   instructions: '',
 
-  status: 'published',  // Changed default from 'draft' to 'published' so students can see exams immediately
+  status: 'draft',  // Default to draft so admins can review before publishing
   timezone: userDefaultTimezone,
   grace_period_minutes: 0,
   buffer_time_minutes: 15,
@@ -219,10 +223,17 @@ const getDefaultFormData = (): ExamFormData => ({
   public_allowed_ip_ranges_text: '',
   public_allow_multiple_devices: false,
   institute: null,
+  // Visibility scope defaults
+  visibility_scope: 'institute',
+  center_ids: [],
+  batch_ids: [],
 });
 
 export default function ExamCreation() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
   const { examId } = useParams<{ examId: string }>();
   const { user } = useAuthContext();
   const [loading, setLoading] = useState(false);
@@ -238,7 +249,13 @@ export default function ExamCreation() {
   const [publicLinkLoading, setPublicLinkLoading] = useState(false);
   const [publicLinkError, setPublicLinkError] = useState<string | null>(null);
   const [publicLinkCopyMessage, setPublicLinkCopyMessage] = useState<string | null>(null);
+
+  // Centers and batches for visibility scope
+  const [centers, setCenters] = useState<any[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
+
   const [creationSuccess, setCreationSuccess] = useState<{
+
     examId: number;
     shareUrl?: string | null;
     token?: string | null;
@@ -247,10 +264,13 @@ export default function ExamCreation() {
 
   const [formData, setFormData] = useState<ExamFormData>(getDefaultFormData());
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
+  const [isFlexibleWindow, setIsFlexibleWindow] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
       const fetchedPatterns = await fetchPatterns();
+      fetchCenters();
+      fetchBatches();
       if (isEditMode && examId) {
         await fetchExamData(fetchedPatterns);
       }
@@ -258,11 +278,45 @@ export default function ExamCreation() {
     loadData();
   }, [examId, isEditMode]);
 
+  const fetchCenters = async () => {
+    try {
+      const response = await api.get('/timetable/centers/');
+      const centersData = response.data.results || response.data.centers || response.data || [];
+      const allCenters = Array.isArray(centersData) ? centersData : [];
+
+      const userInstituteId = user?.institute_id || user?.institute?.id;
+
+      if (userInstituteId) {
+        const targetId = String(userInstituteId);
+        const filtered = allCenters.filter((c: any) => {
+          const centerInstituteId = c.institute_id || c.institute?.id || c.institute;
+          return String(centerInstituteId) === targetId;
+        });
+        setCenters(filtered);
+      } else {
+        setCenters(allCenters);
+      }
+    } catch (error) {
+      console.error('Failed to fetch centers:', error);
+    }
+  };
+
+  const fetchBatches = async () => {
+    try {
+      const response = await api.get('/timetable/batches/');
+      const batchesData = response.data.batches || response.data.results || response.data || [];
+      setBatches(Array.isArray(batchesData) ? batchesData : []);
+    } catch (error) {
+      console.error('Failed to fetch batches:', error);
+    }
+  };
+
+
   useEffect(() => {
     if (isEditMode && examId && formData.is_public) {
       fetchPublicLinkInfo(examId);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.is_public]);
 
   const fetchPatterns = async () => {
@@ -335,7 +389,13 @@ export default function ExamCreation() {
         public_allowed_ip_ranges_text: Array.isArray(exam.public_allowed_ip_ranges) ? exam.public_allowed_ip_ranges.join('\n') : '',
         public_allow_multiple_devices: exam.public_allow_multiple_devices ?? true,
         institute: exam.institute ?? exam.institute_id ?? (user?.institute_id ?? null),
+        // Visibility scope fields
+        visibility_scope: exam.visibility_scope || 'institute',
+        center_ids: exam.allowed_centers_data ? exam.allowed_centers_data.map((c: any) => String(c.id)) : [],
+        batch_ids: exam.allowed_batches_data ? exam.allowed_batches_data.map((b: any) => String(b.id)) : [],
       });
+
+
       setAdvancedExpanded(false);
 
       if (exam.pattern?.id) {
@@ -345,6 +405,16 @@ export default function ExamCreation() {
 
       if (examId) {
         fetchPublicLinkInfo(examId);
+      }
+
+      // If end date is significantly different from start + duration, enable flexible window
+      if (exam.start_date && exam.end_date && exam.duration_minutes) {
+        const start = new Date(exam.start_date);
+        const end = new Date(exam.end_date);
+        const diff = (end.getTime() - start.getTime()) / 60000;
+        if (Math.abs(diff - exam.duration_minutes) > 1) {
+          setIsFlexibleWindow(true);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch exam data:', error);
@@ -368,13 +438,22 @@ export default function ExamCreation() {
       setPatternQuestions([]);
       return;
     }
-    
+
     const pattern = patterns.find(p => p.id === patternId);
     setSelectedPattern(pattern || null);
     handleInputChange('pattern', patternId);
     if (pattern) {
       // Auto-fill duration from pattern
-      handleInputChange('duration_minutes', pattern.total_duration);
+      const newDuration = pattern.total_duration;
+      setFormData(prev => {
+        const newData = { ...prev, pattern: patternId, duration_minutes: newDuration };
+        if (!isFlexibleWindow && prev.start_date) {
+          const startDate = new Date(prev.start_date);
+          const endDate = new Date(startDate.getTime() + newDuration * 60000);
+          newData.end_date = formatDateTimeLocal(endDate.toISOString(), prev.timezone);
+        }
+        return newData;
+      });
     }
     // Reset pattern option when changing pattern
     setPatternOption(null);
@@ -453,11 +532,11 @@ export default function ExamCreation() {
     if (formData.start_date && formData.end_date) {
       const startDate = new Date(formData.start_date);
       const endDate = new Date(formData.end_date);
-      
+
       if (startDate >= endDate) {
         newErrors.end_date = 'End date must be after start date';
       }
-      
+
       // Check if exam window is reasonable (at least as long as duration + buffer)
       const examWindowMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
       if (examWindowMinutes < formData.duration_minutes) {
@@ -482,11 +561,20 @@ export default function ExamCreation() {
       newErrors.passing_marks = 'Passing marks cannot be negative';
     }
 
+    // Visibility scope validation
+    if (formData.visibility_scope === 'centers' && formData.center_ids.length === 0) {
+      newErrors.visibility_scope = 'Please select at least one center';
+    }
+
+    if (formData.visibility_scope === 'batches' && formData.batch_ids.length === 0) {
+      newErrors.visibility_scope = 'Please select at least one batch';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (saveAsDraft: boolean = false) => {
     if (!validateForm()) return;
 
     setSaving(true);
@@ -521,27 +609,18 @@ export default function ExamCreation() {
         created_by: user?.id,
         institute: institute ?? user?.institute_id ?? user?.institute?.id ?? null,
         timezone: rest.timezone,
-        status: rest.status,  // Add status field
-        grace_period_minutes: rest.grace_period_minutes,
-        buffer_time_minutes: rest.buffer_time_minutes,
-        auto_start: rest.auto_start,
-        auto_end: rest.auto_end,
-        reschedule_allowed: rest.reschedule_allowed,
-        max_reschedules: rest.max_reschedules,
-        allow_late_submission: rest.allow_late_submission,
-        late_submission_penalty: rest.late_submission_penalty,
-        require_fullscreen: rest.require_fullscreen,
-        disable_copy_paste: rest.disable_copy_paste,
-        disable_right_click: rest.disable_right_click,
-        enable_webcam_proctoring: rest.enable_webcam_proctoring,
-        allow_tab_switching: rest.allow_tab_switching,
-        is_public: rest.is_public,
-        public_allow_multiple_devices: rest.public_allow_multiple_devices,
+        status: saveAsDraft ? 'draft' : 'published',  // Set status based on button clicked
+        is_published: !saveAsDraft,  // Set is_published based on status
+        // Visibility scope data
+        visibility_scope: formData.visibility_scope,
+        center_ids: formData.visibility_scope === 'centers' ? formData.center_ids : [],
+        batch_ids: formData.visibility_scope === 'batches' ? formData.batch_ids : [],
       };
+
 
       if (isEditMode && examId) {
         await api.put(`/exams/exams/${examId}/`, examData);
-        navigate('/exams');
+        navigate(`${basePath}/exams`);
       } else {
         // Create new exam
         const response = await api.post('/exams/exams/', examData);
@@ -565,7 +644,7 @@ export default function ExamCreation() {
           setErrors({});
           window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
-          navigate('/exams');
+          navigate(`${basePath}/exams`);
         }
       }
     } catch (error: any) {
@@ -704,7 +783,7 @@ export default function ExamCreation() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <button
-            onClick={() => navigate('/exams')}
+            onClick={() => navigate(`${basePath}/exams`)}
             className="p-2 hover:bg-slate-200 rounded-lg transition-colors text-slate-600"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -740,7 +819,7 @@ export default function ExamCreation() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate(`/exams/${creationSuccess.examId}/edit`)}
+                  onClick={() => navigate(`${basePath}/exams/${creationSuccess.examId}/edit`)}
                   className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-blue-700 bg-white border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
                 >
                   <Settings className="w-3.5 h-3.5" />
@@ -748,7 +827,7 @@ export default function ExamCreation() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate('/exams')}
+                  onClick={() => navigate(`${basePath}/exams`)}
                   className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
                 >
                   <Eye className="w-3.5 h-3.5" />
@@ -781,9 +860,8 @@ export default function ExamCreation() {
                     type="text"
                     value={formData.title}
                     onChange={(e) => handleInputChange('title', e.target.value)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.title ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.title ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     placeholder="Enter exam title..."
                   />
                   {errors.title && (
@@ -799,9 +877,8 @@ export default function ExamCreation() {
                     value={formData.description}
                     onChange={(e) => handleInputChange('description', e.target.value)}
                     rows={3}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${
-                      errors.description ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${errors.description ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     placeholder="Describe the exam..."
                   />
                   {errors.description && (
@@ -824,7 +901,7 @@ export default function ExamCreation() {
 
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Start Date * 
+                    Start Date *
                     <span className="ml-2 text-xs font-normal text-blue-600">
                       ({formData.timezone || userDefaultTimezone})
                     </span>
@@ -832,17 +909,21 @@ export default function ExamCreation() {
                   <input
                     type="datetime-local"
                     value={formData.start_date}
-                    onChange={(e) => handleInputChange('start_date', e.target.value)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.start_date ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    onChange={(e) => {
+                      const newStartDate = e.target.value;
+                      setFormData(prev => {
+                        const newData = { ...prev, start_date: newStartDate };
+                        if (!isFlexibleWindow && newStartDate && prev.duration_minutes) {
+                          const startDate = new Date(newStartDate);
+                          const endDate = new Date(startDate.getTime() + prev.duration_minutes * 60000);
+                          newData.end_date = formatDateTimeLocal(endDate.toISOString(), prev.timezone);
+                        }
+                        return newData;
+                      });
+                    }}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.start_date ? 'border-red-300' : 'border-slate-300'
+                      }`}
                   />
-                  {!errors.start_date && formData.start_date && (
-                    <p className="text-green-600 text-xs mt-1 flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" />
-                      Exam starts at this exact time in {formData.timezone}
-                    </p>
-                  )}
                   {errors.start_date && (
                     <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" /> {errors.start_date}
@@ -852,33 +933,239 @@ export default function ExamCreation() {
 
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
-                    End Date *
-                    <span className="ml-2 text-xs font-normal text-blue-600">
-                      ({formData.timezone || userDefaultTimezone})
-                    </span>
+                    Duration (minutes) *
                   </label>
                   <input
-                    type="datetime-local"
-                    value={formData.end_date}
-                    onChange={(e) => handleInputChange('end_date', e.target.value)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.end_date ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    type="number"
+                    value={formData.duration_minutes}
+                    onChange={(e) => {
+                      const newDuration = parseInt(e.target.value) || 0;
+                      setFormData(prev => {
+                        const newData = { ...prev, duration_minutes: newDuration };
+                        if (!isFlexibleWindow && prev.start_date && newDuration) {
+                          const startDate = new Date(prev.start_date);
+                          const endDate = new Date(startDate.getTime() + newDuration * 60000);
+                          newData.end_date = formatDateTimeLocal(endDate.toISOString(), prev.timezone);
+                        }
+                        return newData;
+                      });
+                    }}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.duration_minutes ? 'border-red-300' : 'border-slate-300'
+                      }`}
+                    min="1"
                   />
-                  {!errors.end_date && formData.end_date && (
-                    <p className="text-green-600 text-xs mt-1 flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" />
-                      Exam ends at this exact time in {formData.timezone}
+                  {errors.duration_minutes && (
+                    <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> {errors.duration_minutes}
                     </p>
                   )}
-                  {errors.end_date && (
-                    <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" /> {errors.end_date}
+                </div>
+
+                <div className="col-span-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isFlexibleWindow}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setIsFlexibleWindow(checked);
+                          if (!checked && formData.start_date && formData.duration_minutes) {
+                            const startDate = new Date(formData.start_date);
+                            const endDate = new Date(startDate.getTime() + formData.duration_minutes * 60000);
+                            handleInputChange('end_date', formatDateTimeLocal(endDate.toISOString(), formData.timezone));
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium text-slate-700">Flexible Exam Window</span>
+                    </label>
+                    <p className="text-xs text-slate-500">
+                      {isFlexibleWindow
+                        ? "Set a custom end date for a wider availability window."
+                        : "Exam ends automatically after the duration."}
                     </p>
+                  </div>
+
+                  {isFlexibleWindow ? (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        End Date *
+                        <span className="ml-2 text-xs font-normal text-blue-600">
+                          ({formData.timezone || userDefaultTimezone})
+                        </span>
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={formData.end_date}
+                        onChange={(e) => handleInputChange('end_date', e.target.value)}
+                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.end_date ? 'border-red-300' : 'border-slate-300'
+                          }`}
+                      />
+                      {errors.end_date && (
+                        <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> {errors.end_date}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] text-blue-600 uppercase font-bold tracking-wider mb-1">Calculated End Date</p>
+                        <p className="text-sm font-semibold text-slate-900">
+                          {formData.start_date && formData.duration_minutes
+                            ? new Date(new Date(formData.start_date).getTime() + formData.duration_minutes * 60000).toLocaleString('en-US', {
+                              timeZone: formData.timezone,
+                              dateStyle: 'medium',
+                              timeStyle: 'short'
+                            }) + ` (${formData.timezone})`
+                            : "Select start date and duration"}
+                        </p>
+                      </div>
+                      <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm">
+                        <Clock className="w-4 h-4 text-blue-600" />
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
             </div>
+
+            {/* Exam Visibility Section */}
+            <div className="bg-white rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-4 h-4 text-indigo-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Exam Visibility</h2>
+                  <p className="text-xs text-slate-600">Control which students can see and take this exam</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {/* Visibility Scope Options */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <label className={`flex flex-col p-3 border rounded-xl cursor-pointer transition-all ${formData.visibility_scope === 'institute' ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold text-slate-900">Institute-Wide</span>
+                      <input
+                        type="radio"
+                        name="visibility_scope"
+                        checked={formData.visibility_scope === 'institute'}
+                        onChange={() => handleInputChange('visibility_scope', 'institute')}
+                        className="w-4 h-4 text-indigo-600"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500">All students in your institute can take this exam.</p>
+                  </label>
+
+                  <label className={`flex flex-col p-3 border rounded-xl cursor-pointer transition-all ${formData.visibility_scope === 'centers' ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold text-slate-900">Specific Centers</span>
+                      <input
+                        type="radio"
+                        name="visibility_scope"
+                        checked={formData.visibility_scope === 'centers'}
+                        onChange={() => handleInputChange('visibility_scope', 'centers')}
+                        className="w-4 h-4 text-indigo-600"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500">Only students in selected centers can take this exam.</p>
+                  </label>
+
+                  <label className={`flex flex-col p-3 border rounded-xl cursor-pointer transition-all ${formData.visibility_scope === 'batches' ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold text-slate-900">Specific Batches</span>
+                      <input
+                        type="radio"
+                        name="visibility_scope"
+                        checked={formData.visibility_scope === 'batches'}
+                        onChange={() => handleInputChange('visibility_scope', 'batches')}
+                        className="w-4 h-4 text-indigo-600"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500">Only students in selected batches can take this exam.</p>
+                  </label>
+                </div>
+
+                {/* Center Selection (shown when centers scope is selected) */}
+                {formData.visibility_scope === 'centers' && (
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <p className="text-xs font-medium text-slate-700 mb-2">Select Centers:</p>
+                    {centers.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic">No centers available</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                        {centers.map((center) => (
+                          <label key={center.id} className="flex items-center gap-2 p-2 rounded border border-slate-100 bg-white hover:bg-indigo-50 cursor-pointer transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={formData.center_ids.includes(String(center.id))}
+                              onChange={(e) => {
+                                const centerId = String(center.id);
+                                if (e.target.checked) {
+                                  handleInputChange('center_ids', [...formData.center_ids, centerId]);
+                                } else {
+                                  handleInputChange('center_ids', formData.center_ids.filter((id: string) => id !== centerId));
+                                }
+                              }}
+                              className="rounded text-indigo-600"
+                            />
+                            <span className="text-xs font-medium text-slate-700">{center.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {errors.visibility_scope && formData.visibility_scope === 'centers' && (
+                      <p className="text-red-600 text-[10px] mt-2 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> {errors.visibility_scope}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Batch Selection (shown when batches scope is selected) */}
+                {formData.visibility_scope === 'batches' && (
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <p className="text-xs font-medium text-slate-700 mb-2">Select Batches:</p>
+                    {batches.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic">No batches available</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                        {batches.map((batch) => (
+                          <label key={batch.id} className="flex items-center gap-2 p-2 rounded border border-slate-100 bg-white hover:bg-indigo-50 cursor-pointer transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={formData.batch_ids.includes(String(batch.id))}
+                              onChange={(e) => {
+                                const batchId = String(batch.id);
+                                if (e.target.checked) {
+                                  handleInputChange('batch_ids', [...formData.batch_ids, batchId]);
+                                } else {
+                                  handleInputChange('batch_ids', formData.batch_ids.filter((id: string) => id !== batchId));
+                                }
+                              }}
+                              className="rounded text-indigo-600"
+                            />
+                            <div>
+                              <span className="text-xs font-medium text-slate-700">{batch.name}</span>
+                              <span className="text-[10px] text-slate-400 ml-1">({batch.code})</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {errors.visibility_scope && formData.visibility_scope === 'batches' && (
+                      <p className="text-red-600 text-[10px] mt-2 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> {errors.visibility_scope}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
 
             {/* Pattern Selection */}
             <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -900,9 +1187,8 @@ export default function ExamCreation() {
                     const value = e.target.value;
                     handlePatternSelect(value ? parseInt(value) : 0);
                   }}
-                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                    errors.pattern ? 'border-red-300' : 'border-slate-300'
-                  }`}
+                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.pattern ? 'border-red-300' : 'border-slate-300'
+                    }`}
                 >
                   <option value="">Select a pattern...</option>
                   {patterns.map((pattern) => (
@@ -916,7 +1202,7 @@ export default function ExamCreation() {
                     <AlertCircle className="w-3 h-3" /> {errors.pattern}
                   </p>
                 )}
-                
+
                 {/* Pattern Details Display */}
                 {selectedPattern && (
                   <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
@@ -991,33 +1277,6 @@ export default function ExamCreation() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Duration (minutes) *
-                    {selectedPattern && (
-                      <span className="ml-1 text-xs font-normal text-blue-600">(from pattern)</span>
-                    )}
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.duration_minutes}
-                    onChange={(e) => handleInputChange('duration_minutes', parseInt(e.target.value) || 60)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.duration_minutes ? 'border-red-300' : 'border-slate-300'
-                    }`}
-                    min="1"
-                  />
-                  {!errors.duration_minutes && selectedPattern && formData.duration_minutes === selectedPattern.total_duration && (
-                    <p className="text-green-600 text-xs mt-1 flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" /> Matches pattern duration
-                    </p>
-                  )}
-                  {errors.duration_minutes && (
-                    <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" /> {errors.duration_minutes}
-                    </p>
-                  )}
-                </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Max Attempts *</label>
@@ -1025,9 +1284,8 @@ export default function ExamCreation() {
                     type="number"
                     value={formData.max_attempts}
                     onChange={(e) => handleInputChange('max_attempts', parseInt(e.target.value) || 1)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.max_attempts ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.max_attempts ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     min="1"
                   />
                   {errors.max_attempts && (
@@ -1043,9 +1301,8 @@ export default function ExamCreation() {
                     type="number"
                     value={formData.passing_marks}
                     onChange={(e) => handleInputChange('passing_marks', parseInt(e.target.value) || 0)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      errors.passing_marks ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.passing_marks ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     min="0"
                     max="100"
                   />
@@ -1172,9 +1429,8 @@ export default function ExamCreation() {
                   </span>
                 </span>
                 <ChevronDown
-                  className={`w-5 h-5 text-slate-500 transition-transform ${
-                    advancedExpanded ? 'rotate-180' : ''
-                  }`}
+                  className={`w-5 h-5 text-slate-500 transition-transform ${advancedExpanded ? 'rotate-180' : ''
+                    }`}
                 />
               </button>
 
@@ -1303,7 +1559,7 @@ export default function ExamCreation() {
 
                   <div className="pt-3 border-t border-slate-100 space-y-3">
                     <h4 className="text-xs font-semibold text-slate-700 mb-2">Question Shuffling</h4>
-                    
+
                     <div className="flex items-center justify-between">
                       <div>
                         <label className="text-xs font-medium text-slate-700">Enable Shuffling</label>
@@ -1567,6 +1823,20 @@ export default function ExamCreation() {
             <div className="bg-white rounded-xl border border-slate-200 p-4">
               <h3 className="text-sm font-semibold text-slate-900 mb-3">Exam Summary</h3>
               <div className="space-y-3">
+                {isEditMode && (
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <Info className="w-3 h-3 text-slate-400" />
+                      <span className="text-xs text-slate-600">Status</span>
+                    </div>
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${formData.status === 'published'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-slate-100 text-slate-700'
+                      }`}>
+                      {formData.status === 'published' ? 'Published' : 'Draft'}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-3 h-3 text-slate-400" />
@@ -1622,17 +1892,41 @@ export default function ExamCreation() {
             <div className="bg-white rounded-xl border border-slate-200 p-4">
               <h3 className="text-sm font-semibold text-slate-900 mb-3">Actions</h3>
               <div className="space-y-2">
-                <button
-                  onClick={handleSubmit}
-                  disabled={saving}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Save className="w-3 h-3" />
-                  {saving ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Exam' : 'Create Exam')}
-                </button>
+                {!isEditMode && (
+                  <>
+                    <button
+                      onClick={() => handleSubmit(false)}
+                      disabled={saving}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <CheckCircle className="w-3 h-3" />
+                      {saving ? 'Publishing...' : 'Publish Exam'}
+                    </button>
+
+                    <button
+                      onClick={() => handleSubmit(true)}
+                      disabled={saving}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Save className="w-3 h-3" />
+                      {saving ? 'Saving...' : 'Save as Draft'}
+                    </button>
+                  </>
+                )}
+
+                {isEditMode && (
+                  <button
+                    onClick={() => handleSubmit(formData.status === 'draft')}
+                    disabled={saving}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Save className="w-3 h-3" />
+                    {saving ? 'Updating...' : 'Update Exam'}
+                  </button>
+                )}
 
                 <button
-                  onClick={() => navigate('/exams')}
+                  onClick={() => navigate(`${basePath}/exams`)}
                   className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
                 >
                   Cancel

@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router';
-import { 
-  ArrowLeft, 
-  Save, 
-  Calendar, 
-  Clock, 
-  BookOpen, 
+import { useNavigate, useParams, useLocation } from 'react-router';
+import {
+  ArrowLeft,
+  Save,
+  Calendar,
+  Clock,
+  BookOpen,
   Settings,
   AlertCircle,
   Zap
@@ -52,6 +52,9 @@ interface ExamFormData {
 
 export default function ExamCreationImproved() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
   const { examId } = useParams<{ examId: string }>();
   const { user } = useAuthContext();
   const [loading, setLoading] = useState(false);
@@ -125,7 +128,7 @@ export default function ExamCreationImproved() {
       setLoading(true);
       const response = await api.get(`/exams/exams/${examId}/`);
       const exam = response.data;
-      
+
       setFormData({
         title: exam.title,
         description: exam.description,
@@ -202,14 +205,14 @@ export default function ExamCreationImproved() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     try {
       setSaving(true);
-      
+
       // Format datetime properly for backend - convert local time to ISO string
       const formatDateTimeForBackend = (datetimeString: string) => {
         if (!datetimeString) return '';
@@ -229,7 +232,7 @@ export default function ExamCreationImproved() {
         created_by: user?.id,
         duration_minutes: selectedPattern?.duration_minutes || 60, // Get duration from selected pattern
       };
-      
+
       // Remove the pattern field since we're using pattern_id
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { pattern, ...examDataWithoutPattern } = examData;
@@ -240,7 +243,7 @@ export default function ExamCreationImproved() {
         await api.post('/exams/exams/', examDataWithoutPattern);
       }
 
-      navigate('/exams');
+      navigate(`${basePath}/exams`);
     } catch (error: any) {
       console.error('Failed to save exam:', error);
       if (error.response?.data) {
@@ -268,7 +271,7 @@ export default function ExamCreationImproved() {
         {/* Header */}
         <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
           <button
-            onClick={() => navigate('/exams')}
+            onClick={() => navigate(`${basePath}/exams`)}
             className="p-1.5 sm:p-2 hover:bg-slate-200 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-4 h-4 text-slate-600" />
@@ -306,9 +309,8 @@ export default function ExamCreationImproved() {
                       type="text"
                       value={formData.title}
                       onChange={(e) => handleInputChange('title', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                        errors.title ? 'border-red-300' : 'border-slate-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.title ? 'border-red-300' : 'border-slate-300'
+                        }`}
                       placeholder="Enter exam title"
                     />
                     {errors.title && (
@@ -334,9 +336,8 @@ export default function ExamCreationImproved() {
                     <select
                       value={formData.pattern || ''}
                       onChange={(e) => handlePatternChange(parseInt(e.target.value))}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                        errors.pattern ? 'border-red-300' : 'border-slate-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.pattern ? 'border-red-300' : 'border-slate-300'
+                        }`}
                     >
                       <option value="">Choose a pattern...</option>
                       {patterns.map((pattern) => (
@@ -351,8 +352,8 @@ export default function ExamCreationImproved() {
                       </p>
                     )}
                   </div>
-            </div>
-          </div>
+                </div>
+              </div>
 
               {/* Pattern Information Display */}
               {selectedPattern && (
@@ -410,10 +411,9 @@ export default function ExamCreationImproved() {
                       type="datetime-local"
                       value={formData.start_date}
                       onChange={(e) => handleInputChange('start_date', e.target.value)}
-                      className={`w-full px-3 py-3 text-sm border-2 rounded-lg focus:ring-2 focus:outline-none transition-colors ${
-                        errors.start_date ? 'border-red-300' : 'border-blue-300'
-                      }`}
-                      style={{ 
+                      className={`w-full px-3 py-3 text-sm border-2 rounded-lg focus:ring-2 focus:outline-none transition-colors ${errors.start_date ? 'border-red-300' : 'border-blue-300'
+                        }`}
+                      style={{
                         borderColor: errors.start_date ? '#ef4444' : '#93c5fd',
                         color: '#000000',
                         backgroundColor: '#f8fafc'
@@ -448,10 +448,9 @@ export default function ExamCreationImproved() {
                       type="datetime-local"
                       value={formData.end_date}
                       onChange={(e) => handleInputChange('end_date', e.target.value)}
-                      className={`w-full px-3 py-3 text-sm border-2 rounded-lg focus:ring-2 focus:outline-none transition-colors ${
-                        errors.end_date ? 'border-red-300' : 'border-blue-300'
-                      }`}
-                      style={{ 
+                      className={`w-full px-3 py-3 text-sm border-2 rounded-lg focus:ring-2 focus:outline-none transition-colors ${errors.end_date ? 'border-red-300' : 'border-blue-300'
+                        }`}
+                      style={{
                         borderColor: errors.end_date ? '#ef4444' : '#93c5fd',
                         color: '#000000',
                         backgroundColor: '#f8fafc'
@@ -481,9 +480,8 @@ export default function ExamCreationImproved() {
                       type="number"
                       value={formData.max_attempts}
                       onChange={(e) => handleInputChange('max_attempts', parseInt(e.target.value) || 1)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                        errors.max_attempts ? 'border-red-300' : 'border-slate-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.max_attempts ? 'border-red-300' : 'border-slate-300'
+                        }`}
                       min="1"
                     />
                     {errors.max_attempts && (
@@ -493,134 +491,134 @@ export default function ExamCreationImproved() {
                     )}
                   </div>
 
-            </div>
+                </div>
 
-            <div className="mt-6 space-y-4">
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                <div>
-                  <label className="text-sm font-medium text-slate-700">Public Exam</label>
-                  <p className="text-xs text-slate-500">Allow any student to access this exam</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_public}
-                    onChange={(e) => handleInputChange('is_public', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
+                <div className="mt-6 space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                    <div>
+                      <label className="text-sm font-medium text-slate-700">Public Exam</label>
+                      <p className="text-xs text-slate-500">Allow any student to access this exam</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.is_public}
+                        onChange={(e) => handleInputChange('is_public', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
 
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                <div>
-                  <label className="text-sm font-medium text-slate-700">Allow Late Submission</label>
-                  <p className="text-xs text-slate-500">Allow submissions after the end time</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.allow_late_submission}
-                    onChange={(e) => handleInputChange('allow_late_submission', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 text-slate-600">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                    <div>
+                      <label className="text-sm font-medium text-slate-700">Allow Late Submission</label>
+                      <p className="text-xs text-slate-500">Allow submissions after the end time</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.allow_late_submission}
+                        onChange={(e) => handleInputChange('allow_late_submission', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-slate-700">Require Fullscreen</label>
-                    <p className="text-xs text-slate-500">Force fullscreen mode during exam</p>
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 text-slate-600">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-slate-700">Require Fullscreen</label>
+                        <p className="text-xs text-slate-500">Force fullscreen mode during exam</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.require_fullscreen}
+                        onChange={(e) => handleInputChange('require_fullscreen', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
                   </div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.require_fullscreen}
-                    onChange={(e) => handleInputChange('require_fullscreen', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
 
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 text-slate-600">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 text-slate-600">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-slate-700">Disable Copy/Paste</label>
+                        <p className="text-xs text-slate-500">Prevent copying and pasting during exam</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.disable_copy_paste}
+                        onChange={(e) => handleInputChange('disable_copy_paste', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-slate-700">Disable Copy/Paste</label>
-                    <p className="text-xs text-slate-500">Prevent copying and pasting during exam</p>
-                  </div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.disable_copy_paste}
-                    onChange={(e) => handleInputChange('disable_copy_paste', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
 
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 text-slate-600">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 text-slate-600">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-slate-700">Disable Right Click</label>
+                        <p className="text-xs text-slate-500">Prevent right-click context menu</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.disable_right_click}
+                        onChange={(e) => handleInputChange('disable_right_click', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-slate-700">Disable Right Click</label>
-                    <p className="text-xs text-slate-500">Prevent right-click context menu</p>
-                  </div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.disable_right_click}
-                    onChange={(e) => handleInputChange('disable_right_click', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
 
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 text-slate-600">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-slate-700">Enable Webcam Proctoring</label>
-                    <p className="text-xs text-slate-500">Monitor students via webcam</p>
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 text-slate-600">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-slate-700">Enable Webcam Proctoring</label>
+                        <p className="text-xs text-slate-500">Monitor students via webcam</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.enable_webcam_proctoring}
+                        onChange={(e) => handleInputChange('enable_webcam_proctoring', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
                   </div>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.enable_webcam_proctoring}
-                    onChange={(e) => handleInputChange('enable_webcam_proctoring', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
               </div>
-            </div>
-          </div>
             </form>
           </div>
 
@@ -690,7 +688,7 @@ export default function ExamCreationImproved() {
 
                 <button
                   type="button"
-                  onClick={() => navigate('/exams')}
+                  onClick={() => navigate(`${basePath}/exams`)}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
                 >
                   Cancel

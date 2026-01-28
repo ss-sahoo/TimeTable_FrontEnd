@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router';
+import { useParams, useNavigate, Link, useLocation } from 'react-router';
 import { api } from '../hooks/useApi';
-import { 
+import {
   ArrowLeft,
-  CheckCircle, 
-  Clock, 
-  Award, 
-  BarChart3, 
+  CheckCircle,
+  Clock,
+  Award,
+  BarChart3,
   Eye,
   AlertTriangle,
   Trophy,
@@ -124,9 +124,12 @@ interface Violation {
   metadata: any;
 }
 
-export default function ExamReview() {
+const ExamReview: React.FC = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
   const [reviewData, setReviewData] = useState<ExamReviewData | null>(null);
   const [violations, setViolations] = useState<Violation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -146,11 +149,11 @@ export default function ExamReview() {
   const loadExamReview = async () => {
     try {
       setLoading(true);
-      
+
       // Load exam results
       const resultsResponse = await api.get(`/exams/attempts/${attemptId}/results/`);
       setReviewData(resultsResponse.data);
-      
+
       // Load violations
       try {
         const violationsResponse = await api.get(`/exams/attempts/${attemptId}/violations/history/`);
@@ -159,7 +162,7 @@ export default function ExamReview() {
         console.warn('Could not load violations:', violationsError);
         setViolations([]);
       }
-      
+
     } catch (error: any) {
       console.error('Error loading exam review:', error);
       setError(error.message || 'Failed to load exam review');
@@ -268,7 +271,7 @@ export default function ExamReview() {
 
   const exportResults = () => {
     if (!reviewData) return;
-    
+
     const exportData = {
       student: reviewData.attempt.student_name,
       exam: reviewData.attempt.exam_title,
@@ -279,7 +282,7 @@ export default function ExamReview() {
       answers: reviewData.detailed_answers,
       violations: violations
     };
-    
+
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -457,11 +460,10 @@ export default function ExamReview() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                 >
                   <tab.icon className="w-4 h-4" />
                   {tab.name}
@@ -493,9 +495,8 @@ export default function ExamReview() {
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Status:</span>
-                          <span className={`font-medium ${
-                            section.status === 'available' ? 'text-green-600' : 'text-yellow-600'
-                          }`}>
+                          <span className={`font-medium ${section.status === 'available' ? 'text-green-600' : 'text-yellow-600'
+                            }`}>
                             {section.status === 'available' ? 'Graded' : 'Pending Review'}
                           </span>
                         </div>
@@ -541,9 +542,8 @@ export default function ExamReview() {
                               Flagged
                             </span>
                           )}
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            answer.is_correct ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${answer.is_correct ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }`}>
                             {answer.is_correct ? <CheckCircle className="w-3 h-3 mr-1" /> : <X className="w-3 h-3 mr-1" />}
                             {answer.is_correct ? 'Correct' : 'Incorrect'}
                           </span>
@@ -563,13 +563,11 @@ export default function ExamReview() {
                             <h4 className="font-medium text-gray-900 mb-2">Options:</h4>
                             <div className="bg-white p-4 rounded-lg border">
                               {answer.options.map((option, index) => (
-                                <div key={index} className={`flex items-center gap-2 p-2 rounded ${
-                                  option.is_selected ? 'bg-blue-50' : ''
-                                }`}>
-                                  <span className={`w-4 h-4 rounded-full border-2 ${
-                                    option.is_correct ? 'bg-green-500 border-green-500' : 
+                                <div key={index} className={`flex items-center gap-2 p-2 rounded ${option.is_selected ? 'bg-blue-50' : ''
+                                  }`}>
+                                  <span className={`w-4 h-4 rounded-full border-2 ${option.is_correct ? 'bg-green-500 border-green-500' :
                                     option.is_selected ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
-                                  }`}></span>
+                                    }`}></span>
                                   <LaTeXRenderer content={option.text} />
                                   {option.is_correct && <CheckCircle className="w-4 h-4 text-green-500" />}
                                 </div>
@@ -618,7 +616,7 @@ export default function ExamReview() {
             {activeTab === 'violations' && (
               <div className="space-y-6">
                 <h3 className="text-lg font-semibold text-gray-900">Proctoring Violations</h3>
-                
+
                 {violations.length === 0 ? (
                   <div className="text-center py-12">
                     <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-500" />
@@ -687,23 +685,23 @@ export default function ExamReview() {
                             step="0.5"
                             placeholder="Marks"
                             value={marks[questionId] || answer.user_marks || ''}
-                            onChange={(e) => setMarks({...marks, [questionId]: parseFloat(e.target.value)})}
+                            onChange={(e) => setMarks({ ...marks, [questionId]: parseFloat(e.target.value) })}
                             className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
                           />
                         </div>
                       </div>
-                      
+
                       <div className="mb-4">
                         <LaTeXRenderer content={answer.question_text} />
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Feedback for this question:
                         </label>
                         <textarea
                           value={feedback[questionId] || ''}
-                          onChange={(e) => setFeedback({...feedback, [questionId]: e.target.value})}
+                          onChange={(e) => setFeedback({ ...feedback, [questionId]: e.target.value })}
                           placeholder="Provide feedback for the student's answer..."
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           rows={3}
@@ -719,4 +717,6 @@ export default function ExamReview() {
       </div>
     </div>
   );
-}
+};
+
+export default ExamReview;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import {
   ArrowLeft,
   Users,
@@ -66,6 +66,9 @@ interface ExamAttempt {
 export default function Results() {
   const { user } = useAuthContext();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
   const [attempts, setAttempts] = useState<ExamAttempt[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +77,7 @@ export default function Results() {
   const [exporting, setExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
-  
+
   // Filter states
   const [selectedExamId, setSelectedExamId] = useState<string>('');
   const [studentName, setStudentName] = useState('');
@@ -143,7 +146,7 @@ export default function Results() {
       console.log('Fetching results with params:', params);
       const response = await api.get('/exams/attempts/', { params });
       console.log('Results response:', response.data);
-      
+
       // Handle different response structures
       let attemptsData = response.data;
       if (attemptsData && typeof attemptsData === 'object') {
@@ -155,7 +158,7 @@ export default function Results() {
       } else if (!Array.isArray(attemptsData)) {
         attemptsData = [];
       }
-      
+
       setAttempts(attemptsData);
     } catch (error: any) {
       console.error('Error loading results:', error);
@@ -275,11 +278,11 @@ export default function Results() {
   const completedAttempts = attempts.filter(a => a.status === 'submitted' || a.status === 'auto_submitted').length;
   const disqualifiedAttempts = attempts.filter(a => a.status === 'disqualified').length;
   const inProgressAttempts = attempts.filter(a => a.status === 'in_progress').length;
-  
+
   const averageScore = attempts.length > 0
     ? attempts
-        .filter(a => a.percentage && !isNaN(parseFloat(a.percentage)))
-        .reduce((sum, a) => sum + parseFloat(a.percentage), 0) / attempts.length
+      .filter(a => a.percentage && !isNaN(parseFloat(a.percentage)))
+      .reduce((sum, a) => sum + parseFloat(a.percentage), 0) / attempts.length
     : 0;
 
   if (loading && attempts.length === 0) {
@@ -292,14 +295,14 @@ export default function Results() {
               <SkeletonText lines={1} variant="xl" className="w-1/3 mb-2" />
               <SkeletonText lines={1} variant="md" className="w-1/2" />
             </div>
-            
+
             {/* Stats Grid Skeleton */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {Array.from({ length: 4 }).map((_, index) => (
                 <SkeletonStatsCard key={index} />
               ))}
             </div>
-            
+
             {/* Table Skeleton */}
             <SkeletonTable rows={8} columns={4} />
           </div>
@@ -344,7 +347,7 @@ export default function Results() {
               <p className="text-slate-600 mt-2">View and manage all student exam results with advanced filtering</p>
             </div>
             <button
-              onClick={loadResults}
+              onClick={() => loadResults()}
               disabled={applying}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50"
             >
@@ -598,8 +601,8 @@ export default function Results() {
               </div>
               <h3 className="text-lg font-medium text-slate-900 mb-2">No Results Found</h3>
               <p className="text-slate-600">
-                {hasActiveFilters 
-                  ? 'No results match your current filters. Try adjusting your search criteria.' 
+                {hasActiveFilters
+                  ? 'No results match your current filters. Try adjusting your search criteria.'
                   : 'No students have completed any exams yet.'}
               </p>
             </div>
@@ -687,32 +690,31 @@ export default function Results() {
                         {formatDate(attempt.started_at)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                          attempt.violations_count > 0 
-                            ? 'bg-red-100 text-red-800 border border-red-200' 
-                            : 'bg-green-100 text-green-800 border border-green-200'
-                        }`}>
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${attempt.violations_count > 0
+                          ? 'bg-red-100 text-red-800 border border-red-200'
+                          : 'bg-green-100 text-green-800 border border-green-200'
+                          }`}>
                           {attempt.violations_count} / {attempt.max_violations_allowed}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => navigate(`/exam-results/${attempt.id}`)}
+                            onClick={() => navigate(`${basePath}/exam-results/${attempt.id}`)}
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="View Results"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => navigate(`/exam-review/${attempt.id}`)}
+                            onClick={() => navigate(`${basePath}/exam-review/${attempt.id}`)}
                             className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                             title="Review Exam"
                           >
                             <FileText className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => navigate(`/exams/${attempt.exam.id}/analytics`)}
+                            onClick={() => navigate(`${basePath}/exams/${attempt.exam.id}/analytics`)}
                             className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                             title="View Analytics"
                           >

@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Eye, 
-  Edit, 
-  Copy, 
-  Trash2, 
-  BookOpen, 
-  Clock, 
-  Users, 
+import { Link, useNavigate, useLocation } from 'react-router';
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreVertical,
+  Eye,
+  Edit,
+  Copy,
+  Trash2,
+  BookOpen,
+  Clock,
+  Users,
   Settings,
   CheckCircle,
   CheckSquare,
@@ -56,6 +56,9 @@ interface ExamPattern {
 
 export default function PatternManagement() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
   const { user } = useAuthContext();
   const [patterns, setPatterns] = useState<ExamPattern[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,10 +79,10 @@ export default function PatternManagement() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      const isClickInsideAnyDropdown = Object.values(dropdownRefs.current).some(ref => 
+      const isClickInsideAnyDropdown = Object.values(dropdownRefs.current).some(ref =>
         ref && ref.contains(target)
       );
-      
+
       if (!isClickInsideAnyDropdown) {
         setOpenDropdown(null);
       }
@@ -163,10 +166,10 @@ export default function PatternManagement() {
 
   const filteredPatterns = patterns.filter(pattern => {
     const matchesSearch = pattern.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         pattern.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'active' && pattern.is_active) ||
-                         (statusFilter === 'inactive' && !pattern.is_active);
+      pattern.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' ||
+      (statusFilter === 'active' && pattern.is_active) ||
+      (statusFilter === 'inactive' && !pattern.is_active);
     return matchesSearch && matchesStatus;
   });
 
@@ -218,7 +221,7 @@ export default function PatternManagement() {
               </button>
             </div>
             <Link
-              to="/patterns/create"
+              to={`${basePath}/patterns/create`}
               data-tour-id="cta-create-pattern"
               className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
@@ -284,9 +287,8 @@ export default function PatternManagement() {
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-lg transition-colors ${
-                showFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 dark:bg-gray-900'
-              }`}
+              className={`inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-lg transition-colors ${showFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 dark:bg-gray-900'
+                }`}
             >
               <Filter className="w-4 h-4" />
               Filter
@@ -320,19 +322,19 @@ export default function PatternManagement() {
                   <h3 className="text-base font-semibold text-slate-900 dark:text-gray-100 truncate">{pattern.name}</h3>
                   <p className="text-xs text-slate-600 dark:text-gray-400 mt-1 line-clamp-2">{pattern.description}</p>
                 </div>
-                <div 
-                  className="relative ml-2" 
+                <div
+                  className="relative ml-2"
                   ref={(el) => {
                     dropdownRefs.current[pattern.id] = el;
                   }}
                 >
-                  <button 
+                  <button
                     onClick={() => toggleDropdown(pattern.id)}
                     className="p-1 text-slate-400 hover:text-slate-600 dark:text-gray-400 rounded"
                   >
                     <MoreVertical className="w-4 h-4" />
                   </button>
-                  
+
                   {/* Dropdown Menu */}
                   {openDropdown === pattern.id && (
                     <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 dark:border-gray-700 rounded-lg shadow-lg z-10">
@@ -354,9 +356,8 @@ export default function PatternManagement() {
               </div>
 
               <div className="flex items-center gap-2 mb-3">
-                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                  pattern.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'
-                }`}>
+                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${pattern.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'
+                  }`}>
                   {pattern.is_active ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
                   {pattern.is_active ? 'Active' : 'Inactive'}
                 </span>
@@ -420,8 +421,8 @@ export default function PatternManagement() {
                           {/* Horizontal sections layout */}
                           <div className="flex flex-wrap gap-1">
                             {sections.map((section: any) => (
-                              <div 
-                                key={section.id} 
+                              <div
+                                key={section.id}
                                 className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-md text-xs"
                               >
                                 <span className="text-slate-700 font-medium">{section.name}</span>
@@ -448,14 +449,14 @@ export default function PatternManagement() {
 
               <div className="flex items-center gap-2">
                 <Link
-                  to={`/patterns/${pattern.id}/view`}
+                  to={`${basePath}/patterns/${pattern.id}/view`}
                   className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
                 >
                   <Eye className="w-3 h-3" />
                   View
                 </Link>
                 <Link
-                  to={`/patterns/${pattern.id}/edit`}
+                  to={`${basePath}/patterns/${pattern.id}/edit`}
                   className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1 text-xs bg-slate-50 dark:bg-gray-900 text-slate-700 rounded hover:bg-slate-100 transition-colors"
                 >
                   <Edit className="w-3 h-3" />
@@ -471,13 +472,13 @@ export default function PatternManagement() {
             <Zap className="w-12 h-12 text-slate-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-slate-900 dark:text-gray-100 mb-2">No patterns found</h3>
             <p className="text-sm text-slate-600 dark:text-gray-400 mb-4">
-              {searchTerm || statusFilter !== 'all' 
-                ? 'Try adjusting your search or filter criteria.' 
+              {searchTerm || statusFilter !== 'all'
+                ? 'Try adjusting your search or filter criteria.'
                 : 'Get started by creating your first exam pattern.'}
             </p>
             {!searchTerm && statusFilter === 'all' && (
               <Link
-                to="/patterns/create"
+                to={`${basePath}/patterns/create`}
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Plus className="w-4 h-4" />
@@ -501,11 +502,11 @@ export default function PatternManagement() {
                 <p className="text-sm text-slate-600 dark:text-gray-400">This action cannot be undone.</p>
               </div>
             </div>
-            
+
             <p className="text-sm text-slate-700 mb-6">
               Are you sure you want to delete this pattern? All associated sections, questions, and exam data will be permanently removed.
             </p>
-            
+
             <div className="flex items-center gap-3 justify-end">
               <button
                 onClick={() => setDeleteConfirm(null)}

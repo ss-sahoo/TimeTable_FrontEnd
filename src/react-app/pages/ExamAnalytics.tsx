@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router';
+import { useParams, useNavigate, Link, useLocation } from 'react-router';
 import {
   ArrowLeft,
   BarChart3,
@@ -71,7 +71,10 @@ interface ExamDashboardData {
 const ExamAnalytics: React.FC = () => {
   const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
-  
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
+
   const [dashboardData, setDashboardData] = useState<ExamDashboardData | null>(null);
   const [allAttempts, setAllAttempts] = useState<ExamAttempt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,15 +89,15 @@ const ExamAnalytics: React.FC = () => {
   const loadExamData = React.useCallback(async () => {
     try {
       setLoading(true);
-      
+
       // Load exam dashboard data
       const dashboardResponse = await api.get(`/exams/exams/${examId}/dashboard/`);
       setDashboardData(dashboardResponse.data);
-      
+
       // Load all attempts
       const attemptsResponse = await api.get(`/exams/exams/${examId}/attempts/`);
       console.log('Attempts API response:', attemptsResponse.data);
-      
+
       // Handle different response structures
       let attemptsData = attemptsResponse.data;
       if (attemptsData && typeof attemptsData === 'object') {
@@ -120,9 +123,9 @@ const ExamAnalytics: React.FC = () => {
       } else {
         attemptsData = [];
       }
-      
+
       setAllAttempts(attemptsData);
-      
+
     } catch (error: unknown) {
       console.error('Error loading exam data:', error);
       setError(error instanceof Error ? error.message : 'Failed to load exam data');
@@ -154,7 +157,7 @@ const ExamAnalytics: React.FC = () => {
 
     return filtered.sort((a, b) => {
       let aValue, bValue;
-      
+
       switch (sortBy) {
         case 'student_name':
           aValue = a.student_name;
@@ -189,7 +192,7 @@ const ExamAnalytics: React.FC = () => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes}m ${secs}s`;
     } else if (minutes > 0) {
@@ -244,8 +247,8 @@ const ExamAnalytics: React.FC = () => {
         <div className="text-center">
           <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <p className="text-red-600 mb-4">{error || 'Failed to load exam data'}</p>
-          <button 
-            onClick={() => navigate('/exams')} 
+          <button
+            onClick={() => navigate(`${basePath}/exams`)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             Back to Exams
@@ -265,7 +268,7 @@ const ExamAnalytics: React.FC = () => {
           <div className="flex items-center justify-between py-6">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/exams')}
+                onClick={() => navigate(`${basePath}/exams`)}
                 className="p-2.5 hover:bg-slate-100 rounded-xl transition-all duration-200 hover:scale-105"
               >
                 <ArrowLeft className="w-5 h-5 text-slate-600" />
@@ -293,7 +296,7 @@ const ExamAnalytics: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <button
                 onClick={refreshData}
@@ -307,7 +310,7 @@ const ExamAnalytics: React.FC = () => {
                 Export
               </button>
               <Link
-                to={`/exams/${examId}`}
+                to={`${basePath}/exams/${examId}`}
                 className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 flex items-center gap-2 font-medium shadow-lg hover:shadow-xl"
               >
                 <Eye className="w-4 h-4" />
@@ -331,22 +334,19 @@ const ExamAnalytics: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as 'overview' | 'attempts' | 'questions' | 'violations')}
-                className={`group flex items-center gap-3 py-4 px-6 rounded-xl font-medium text-sm transition-all duration-200 relative ${
-                  activeTab === tab.id
+                className={`group flex items-center gap-3 py-4 px-6 rounded-xl font-medium text-sm transition-all duration-200 relative ${activeTab === tab.id
                     ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 shadow-sm'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                }`}
+                  }`}
               >
-                <tab.icon className={`w-5 h-5 transition-colors ${
-                  activeTab === tab.id ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'
-                }`} />
+                <tab.icon className={`w-5 h-5 transition-colors ${activeTab === tab.id ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'
+                  }`} />
                 <span>{tab.label}</span>
                 {tab.count > 0 && (
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                    activeTab === tab.id 
-                      ? 'bg-blue-100 text-blue-700' 
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${activeTab === tab.id
+                      ? 'bg-blue-100 text-blue-700'
                       : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
-                  }`}>
+                    }`}>
                     {tab.count}
                   </span>
                 )}
@@ -667,15 +667,15 @@ const ExamAnalytics: React.FC = () => {
                         <td className="px-4 py-4 whitespace-nowrap">
                           {attempt.percentage ? (
                             <div className="flex items-center gap-2">
-                            <div className="text-sm font-semibold text-slate-900">
-                              {parseFloat(String(attempt.percentage)).toFixed(1)}%
-                            </div>
-                            <div className="w-12 bg-slate-200 rounded-full h-1.5">
-                              <div 
-                                className="bg-gradient-to-r from-blue-500 to-indigo-500 h-1.5 rounded-full transition-all duration-300"
-                                style={{ width: `${Math.min(parseFloat(String(attempt.percentage)), 100)}%` }}
-                              />
-                            </div>
+                              <div className="text-sm font-semibold text-slate-900">
+                                {parseFloat(String(attempt.percentage)).toFixed(1)}%
+                              </div>
+                              <div className="w-12 bg-slate-200 rounded-full h-1.5">
+                                <div
+                                  className="bg-gradient-to-r from-blue-500 to-indigo-500 h-1.5 rounded-full transition-all duration-300"
+                                  style={{ width: `${Math.min(parseFloat(String(attempt.percentage)), 100)}%` }}
+                                />
+                              </div>
                             </div>
                           ) : (
                             <span className="text-sm text-slate-500">-</span>
@@ -703,14 +703,14 @@ const ExamAnalytics: React.FC = () => {
                         <td className="px-4 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-1">
                             <Link
-                              to={`/exam-results/${attempt.id}`}
+                              to={`${basePath}/exam-results/${attempt.id}`}
                               className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200"
                             >
                               <Eye className="w-3 h-3" />
                               Results
                             </Link>
                             <Link
-                              to={`/exam-review/${attempt.id}`}
+                              to={`${basePath}/exam-review/${attempt.id}`}
                               className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-all duration-200"
                             >
                               <FileText className="w-3 h-3" />
@@ -732,7 +732,7 @@ const ExamAnalytics: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-              
+
               {(!Array.isArray(filteredAndSortedAttempts) || filteredAndSortedAttempts.length === 0) && (
                 <div className="text-center py-16">
                   <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center">
@@ -742,7 +742,7 @@ const ExamAnalytics: React.FC = () => {
                     {searchTerm || statusFilter !== 'all' ? 'No Matching Attempts' : 'No Attempts Yet'}
                   </h3>
                   <p className="text-slate-600 mb-6 max-w-md mx-auto">
-                    {searchTerm || statusFilter !== 'all' 
+                    {searchTerm || statusFilter !== 'all'
                       ? 'Try adjusting your search criteria or filters to find attempts.'
                       : 'No students have attempted this exam yet. Check back after the exam period begins.'
                     }
@@ -784,7 +784,7 @@ const ExamAnalytics: React.FC = () => {
                     <div className="text-left">
                       <p className="text-blue-800 font-semibold mb-2">Coming Soon</p>
                       <p className="text-blue-700 text-sm">
-                        Question-level analytics including difficulty analysis, common misconceptions, 
+                        Question-level analytics including difficulty analysis, common misconceptions,
                         and performance metrics for each question will be available in a future update.
                       </p>
                     </div>

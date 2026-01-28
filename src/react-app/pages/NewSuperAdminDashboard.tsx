@@ -43,7 +43,7 @@ import BatchesContent from "../components/superadmin/BatchesContent";
 import TimetableContent from "../components/superadmin/TimetableContent";
 import SettingsContent from "../components/superadmin/SettingsContent";
 import ProfileContent from "../components/superadmin/ProfileContent";
-import { ref } from "process"; 
+import { ref } from "process";
 
 type TabType = "overview" | "users" | "institutes" | "exams" | "batches" | "timetable" | "billing" | "settings" | "profile";
 
@@ -61,22 +61,8 @@ const operationsNavItems = [
 ];
 
 export default function NewSuperAdminDashboard() {
-  const { user, isAuthenticated, loading: authLoading, logout } = useAuthContext();
+  const { user, isAuthenticated, loading: authLoading } = useAuthContext();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<TabType>((searchParams.get("tab") as TabType) || "overview");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSearchResults, setShowSearchResults] = useState(false);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const tab = searchParams.get("tab") as TabType;
-    if (tab && tab !== activeTab) {
-      setActiveTab(tab);
-    }
-  }, [searchParams]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -87,116 +73,6 @@ export default function NewSuperAdminDashboard() {
     }
   }, [user, isAuthenticated, authLoading, navigate]);
 
-  const handleTabChange = (tab: TabType) => {
-    setActiveTab(tab);
-    setSearchParams({ tab });
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login");
-  };
-
-  // Search functionality
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-        setShowSearchResults(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    if (searchQuery.trim().length > 0) {
-      performSearch(searchQuery);
-      setShowSearchResults(true);
-    } else {
-      setSearchResults([]);
-      setShowSearchResults(false);
-    }
-  }, [searchQuery]);
-
-  const performSearch = async (query: string) => {
-    const lowerQuery = query.toLowerCase();
-    const results: any[] = [];
-
-    // Search navigation items
-    const allNavItems = [...platformNavItems, ...operationsNavItems];
-    allNavItems.forEach((item) => {
-      if (item.label.toLowerCase().includes(lowerQuery)) {
-        results.push({
-          type: "navigation",
-          id: item.id,
-          title: item.label,
-          icon: item.icon,
-          action: () => handleTabChange(item.id),
-        });
-      }
-    });
-
-    // Search exams if we have institute data
-    const instituteId = user?.institute_id || user?.institute?.id;
-    if (instituteId) {
-      try {
-        const examsRes = await api.get(`/exams/exams/?institute_id=${instituteId}`);
-        const exams = examsRes.data?.results || examsRes.data || [];
-        
-        exams.forEach((exam: any) => {
-          if (exam.title?.toLowerCase().includes(lowerQuery)) {
-            results.push({
-              type: "exam",
-              id: exam.id,
-              title: exam.title,
-              subtitle: `${exam.total_questions || 0} questions`,
-              icon: FileText,
-              action: () => {
-                handleTabChange("exams");
-                setSearchQuery("");
-                setShowSearchResults(false);
-              },
-            });
-          }
-        });
-      } catch (error) {
-        console.error("Error searching exams:", error);
-      }
-    }
-
-    // Add quick actions
-    if ("settings".includes(lowerQuery)) {
-      results.push({
-        type: "action",
-        id: "settings",
-        title: "Settings",
-        subtitle: "Manage system settings",
-        icon: Settings,
-        action: () => handleTabChange("settings"),
-      });
-    }
-
-    if ("logout".includes(lowerQuery) || "sign out".includes(lowerQuery)) {
-      results.push({
-        type: "action",
-        id: "logout",
-        title: "Sign Out",
-        subtitle: "Log out of your account",
-        icon: LogOut,
-        action: handleLogout,
-      });
-    }
-
-    setSearchResults(results.slice(0, 8)); // Limit to 8 results
-  };
-
-  const handleSearchSelect = (result: any) => {
-    result.action();
-    setSearchQuery("");
-    setShowSearchResults(false);
-  };
-
   if (authLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -205,287 +81,7 @@ export default function NewSuperAdminDashboard() {
     );
   }
 
-  return (
-    <div className="bg-slate-50 text-slate-600 font-sans antialiased h-screen flex overflow-hidden">
-      {/* SIDEBAR */}
-      <aside className={`${sidebarCollapsed ? 'w-20' : 'w-72'} bg-white border-r border-slate-200 flex flex-col z-30 transition-all duration-300`}>
-        {/* Context Switcher (Organization Selector) */}
-        <div className="h-16 flex items-center px-4 border-b border-slate-100">
-          {!sidebarCollapsed ? (
-            <div className="flex items-center gap-3 w-full hover:bg-slate-50 cursor-pointer transition-colors py-2 px-2 rounded-md -mx-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-violet-700 rounded-lg flex items-center justify-center text-white shadow-sm">
-                <Zap className="w-4 h-4" />
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <h1 className="font-bold text-sm text-slate-900 leading-tight">
-                  {user?.institute?.name || user?.institute_name || "DashoExams"}
-                </h1>
-                <p className="text-[10px] text-slate-500 font-medium tracking-wide">ENTERPRISE PLAN</p>
-              </div>
-            </div>
-          ) : (
-            <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-violet-700 rounded-lg flex items-center justify-center text-white shadow-sm mx-auto">
-              <Zap className="w-4 h-4" />
-            </div>
-          )}
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          {!sidebarCollapsed && (
-            <div className="flex items-center gap-2 px-3 mb-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Platform</span>
-            </div>
-          )}
-          {platformNavItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleTabChange(item.id)}
-                className={`nav-item w-full flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 text-sm font-medium rounded-md transition-all group relative ${
-                  isActive
-                    ? "bg-violet-50 text-violet-700"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-                title={sidebarCollapsed ? item.label : undefined}
-              >
-                {isActive && !sidebarCollapsed && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[70%] bg-violet-600 rounded-r" />
-                )}
-                <Icon className={`w-[18px] h-[18px] ${isActive ? "text-violet-600" : "text-slate-400 group-hover:text-slate-600"}`} />
-                {!sidebarCollapsed && item.label}
-              </button>
-            );
-          })}
-
-          {!sidebarCollapsed && (
-            <div className="flex items-center gap-2 px-3 mb-2 mt-6">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Operations</span>
-            </div>
-          )}
-          {sidebarCollapsed && <div className="h-4" />}
-          {operationsNavItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleTabChange(item.id)}
-                className={`nav-item w-full flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 text-sm font-medium rounded-md transition-all group relative ${
-                  isActive
-                    ? "bg-violet-50 text-violet-700"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-                title={sidebarCollapsed ? item.label : undefined}
-              >
-                {isActive && !sidebarCollapsed && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[70%] bg-violet-600 rounded-r" />
-                )}
-                <Icon className={`w-[18px] h-[18px] ${isActive ? "text-violet-600" : "text-slate-400 group-hover:text-slate-600"}`} />
-                {!sidebarCollapsed && (
-                  <>
-                    {item.label}
-                    {item.badge && (
-                      <span className="ml-auto bg-slate-100 text-slate-500 py-0.5 px-2 rounded-full text-[10px] font-bold border border-slate-200">
-                        14
-                      </span>
-                    )}
-                  </>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Sidebar Footer */}
-        <div className="border-t border-slate-100 bg-slate-50/50">
-          {!sidebarCollapsed ? (
-            <div className="p-4">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white shadow-sm">
-                  {user?.first_name?.[0] || "S"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-slate-900 truncate">
-                    {user?.first_name || "Super"} {user?.last_name || "Admin"}
-                  </p>
-                  <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
-                </div>
-                <button onClick={() => handleTabChange("settings")} className="text-slate-400 hover:text-slate-600">
-                  <Settings className="w-[18px] h-[18px]" />
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleLogout}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Sign Out
-                </button>
-                <button
-                  onClick={() => setSidebarCollapsed(true)}
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
-                  title="Collapse sidebar"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="p-4 flex flex-col items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white shadow-sm">
-                {user?.first_name?.[0] || "S"}
-              </div>
-              <button 
-                onClick={() => handleTabChange("settings")} 
-                className="text-slate-400 hover:text-slate-600"
-                title="Settings"
-              >
-                <Settings className="w-[18px] h-[18px]" />
-              </button>
-              <button
-                onClick={handleLogout}
-                className="text-red-600 hover:text-red-700"
-                title="Sign Out"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-              <div className="w-full h-px bg-slate-200 my-1"></div>
-              <button
-                onClick={() => setSidebarCollapsed(false)}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
-                title="Expand sidebar"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-        </div>
-      </aside>
-
-      {/* MAIN CONTENT */}
-      <main className="flex-1 flex flex-col min-w-0 h-full relative">
-        {/* HEADER (Global Command Center) */}
-        <header className="bg-white/95 backdrop-blur-sm border-b border-slate-200 h-16 sticky top-0 z-20 flex justify-between items-center px-6">
-          {/* Left: Search Bar */}
-          <div className="flex-1 max-w-md" ref={searchRef}>
-            <div className="relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => searchQuery && setShowSearchResults(true)}
-                className="block w-full pl-10 pr-12 py-2 bg-slate-100 border-none rounded-lg text-sm text-slate-900 placeholder-slate-500 focus:outline-none focus:bg-white focus:ring-2 focus:ring-violet-500/20 focus:shadow-sm transition-all"
-                placeholder="Search exams, navigation, or settings..."
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setShowSearchResults(false);
-                  }}
-                  className="absolute right-12 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 z-10"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 z-10">
-                <kbd className="inline-flex items-center border border-slate-200 rounded px-2 text-[10px] font-sans font-medium text-slate-400 bg-white">
-                  ⌘K
-                </kbd>
-              </div>
-
-              {/* Search Results Dropdown */}
-              {showSearchResults && searchResults.length > 0 && (
-                <div className="absolute top-full mt-2 w-full bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden z-50">
-                  <div className="py-2">
-                    {searchResults.map((result, index) => {
-                      const Icon = result.icon;
-                      return (
-                        <button
-                          key={`${result.type}-${result.id}-${index}`}
-                          onClick={() => handleSearchSelect(result)}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors text-left"
-                        >
-                          <div className={`w-8 h-8 rounded-md flex items-center justify-center ${
-                            result.type === "navigation" ? "bg-violet-50" :
-                            result.type === "exam" ? "bg-blue-50" :
-                            "bg-slate-50"
-                          }`}>
-                            <Icon className={`w-4 h-4 ${
-                              result.type === "navigation" ? "text-violet-600" :
-                              result.type === "exam" ? "text-blue-600" :
-                              "text-slate-600"
-                            }`} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-900 truncate">{result.title}</p>
-                            {result.subtitle && (
-                              <p className="text-xs text-slate-500 truncate">{result.subtitle}</p>
-                            )}
-                          </div>
-                          <span className="text-[10px] text-slate-400 uppercase font-medium">
-                            {result.type}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* No Results */}
-              {showSearchResults && searchQuery && searchResults.length === 0 && (
-                <div className="absolute top-full mt-2 w-full bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden z-50">
-                  <div className="py-8 text-center">
-                    <Search className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="text-sm text-slate-500">No results found for "{searchQuery}"</p>
-                    <p className="text-xs text-slate-400 mt-1">Try searching for exams, settings, or navigation</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Actions */}
-          <div className="flex items-center gap-3 pl-4">
-            <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
-            </button>
-            <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-              <HelpCircle className="w-5 h-5" />
-            </button>
-            <div className="h-6 w-px bg-slate-200 mx-1"></div>
-            {/* Organization Status */}
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="text-xs font-medium text-slate-600">System Operational</span>
-            </div>
-          </div>
-        </header>
-
-        {/* SCROLLABLE CANVAS */}
-        <div className="flex-1 overflow-y-auto bg-slate-50 p-6 lg:p-8">
-          <div className="max-w-[1600px] mx-auto">
-            {activeTab === "overview" && <DashboardContent user={user} />}
-            {activeTab === "institutes" && <CentersContent />}
-            {activeTab === "users" && <UsersContent />}
-            {activeTab === "exams" && <ExamsContent />}
-            {activeTab === "batches" && <BatchesContent />}
-            {activeTab === "timetable" && <TimetableContent />}
-            {activeTab === "billing" && <DashboardContent user={user} />}
-            {activeTab === "settings" && <SettingsContent />}
-            {activeTab === "profile" && <ProfileContent />}
-          </div>
-        </div>
-      </main>
-    </div>
-  );
+  return <DashboardContent user={user} />;
 }
 
 // Dashboard Content Component
@@ -574,6 +170,7 @@ function DashboardContent({ user }: { user: any }) {
             teachers: teacherCount,
             completionRate: 85,
             uptime: 99.99,
+            capacity: (Array.isArray(centers) ? centers.length : 0) * 300,
           });
 
           if (Array.isArray(exams)) {
@@ -686,18 +283,16 @@ function DashboardContent({ user }: { user: any }) {
             {regions.map((region, idx) => (
               <div key={idx} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${
-                    region.status === "operational" ? "bg-emerald-500" : 
-                    region.status === "degraded" ? "bg-amber-500" : 
-                    "bg-red-500"
-                  }`}></div>
+                  <div className={`w-2 h-2 rounded-full ${region.status === "operational" ? "bg-emerald-500" :
+                    region.status === "degraded" ? "bg-amber-500" :
+                      "bg-red-500"
+                    }`}></div>
                   <div className="text-sm font-medium text-slate-700">{region.name}</div>
                 </div>
-                <span className={`text-xs font-mono ${
-                  region.status === "operational" ? "text-slate-500" : 
-                  region.status === "degraded" ? "text-amber-600" : 
-                  "text-red-600"
-                }`}>
+                <span className={`text-xs font-mono ${region.status === "operational" ? "text-slate-500" :
+                  region.status === "degraded" ? "text-amber-600" :
+                    "text-red-600"
+                  }`}>
                   {region.latency}
                 </span>
               </div>

@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router';
-import { 
-  ArrowLeft, 
-  Save, 
-  Clock, 
-  Users, 
-  BookOpen, 
+import { useNavigate, useParams, useLocation } from 'react-router';
+import {
+  ArrowLeft,
+  Save,
+  Clock,
+  Users,
+  BookOpen,
   Settings,
   CheckCircle,
   AlertCircle,
   Info,
-  Zap
+  Zap,
+  Building2,
+  Layers,
+  Globe,
+  Target
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
@@ -34,6 +38,7 @@ interface PatternSection {
   end_question: number;
   marks_per_question: number;
   question_type: 'mcq' | 'numerical' | 'subjective';
+  negative_marking?: number;
 }
 
 interface PatternQuestion {
@@ -57,10 +62,23 @@ interface ExamFormData {
   allow_tab_switching: boolean;
   instructions: string;
   status: string;
+  duration_minutes: number;
+  passing_marks: number;
+  allow_negative_marking: boolean;
+  negative_marking_percentage: number;
+  shuffle_questions: boolean;
+  late_submission_penalty: number;
+  // Visibility scope fields
+  visibility_scope: 'institute' | 'centers' | 'batches';
+  center_ids: string[];
+  batch_ids: string[];
 }
 
 export default function ExamCreation() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
   const { examId } = useParams<{ examId: string }>();
   const { user } = useAuthContext();
   const [loading, setLoading] = useState(false);
@@ -71,6 +89,11 @@ export default function ExamCreation() {
   const [patterns, setPatterns] = useState<ExamPattern[]>([]);
   const [selectedPattern, setSelectedPattern] = useState<ExamPattern | null>(null);
   const [patternOption, setPatternOption] = useState<'use_existing' | 'template' | null>(null);
+
+  // Centers and batches for visibility scope
+  const [centers, setCenters] = useState<any[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
+
 
   // Helper function to format datetime for input
   const formatDateTimeForInput = (dateString: string) => {
@@ -110,10 +133,23 @@ export default function ExamCreation() {
     allow_tab_switching: false,
     instructions: '',
     status: 'published',
+    duration_minutes: 60,
+    passing_marks: 33,
+    allow_negative_marking: false,
+    negative_marking_percentage: 25,
+    shuffle_questions: false,
+    late_submission_penalty: 0,
+    // Visibility scope defaults
+    visibility_scope: 'institute',
+    center_ids: [],
+    batch_ids: [],
   });
+
 
   useEffect(() => {
     fetchPatterns();
+    fetchCenters();
+    fetchBatches();
     if (isEditing && examId) {
       fetchExam();
     }
@@ -131,16 +167,51 @@ export default function ExamCreation() {
     }
   };
 
+  const fetchCenters = async () => {
+    try {
+      const response = await api.get('/timetable/centers/');
+      const centersData = response.data.results || response.data.centers || response.data || [];
+      const allCenters = Array.isArray(centersData) ? centersData : [];
+
+      // Get institute ID from either top-level or nested institute object
+      const userInstituteId = user?.institute_id || user?.institute?.id;
+
+      if (userInstituteId) {
+        const targetId = String(userInstituteId);
+        const filtered = allCenters.filter((c: any) => {
+          const centerInstituteId = c.institute_id || c.institute?.id || c.institute;
+          return String(centerInstituteId) === targetId;
+        });
+        setCenters(filtered);
+      } else {
+        setCenters(allCenters);
+      }
+    } catch (error) {
+      console.error('Failed to fetch centers:', error);
+    }
+  };
+
+  const fetchBatches = async () => {
+    try {
+      const response = await api.get('/timetable/batches/');
+      const batchesData = response.data.batches || response.data.results || response.data || [];
+      setBatches(Array.isArray(batchesData) ? batchesData : []);
+    } catch (error) {
+      console.error('Failed to fetch batches:', error);
+    }
+  };
+
+
   const fetchExam = async () => {
     if (!examId) return;
-    
+
     try {
       setLoading(true);
       console.log('Fetching exam for editing with ID:', examId);
       const response = await api.get(`/exams/exams/${examId}/`);
       const exam = response.data;
       console.log('Exam data for editing:', exam);
-      
+
       // Populate form with existing exam data
       setFormData({
         title: exam.title || '',
@@ -159,7 +230,17 @@ export default function ExamCreation() {
         allow_tab_switching: exam.allow_tab_switching || false,
         instructions: exam.instructions || '',
         status: exam.status || 'published',
+        duration_minutes: exam.duration_minutes || 60,
+        passing_marks: exam.passing_marks || 33,
+        allow_negative_marking: exam.allow_negative_marking || false,
+        negative_marking_percentage: exam.negative_marking_percentage || 25,
+        shuffle_questions: exam.shuffle_questions || false,
+        // Visibility scope fields
+        visibility_scope: exam.visibility_scope || 'institute',
+        center_ids: exam.center_ids || [],
+        batch_ids: exam.batch_ids || [],
       });
+
 
       // Set selected pattern
       if (exam.pattern) {
@@ -230,9 +311,19 @@ export default function ExamCreation() {
       newErrors.passing_marks = 'Passing marks cannot be negative';
     }
 
+    // Visibility scope validation
+    if (formData.visibility_scope === 'centers' && formData.center_ids.length === 0) {
+      newErrors.visibility_scope = 'Please select at least one center';
+    }
+
+    if (formData.visibility_scope === 'batches' && formData.batch_ids.length === 0) {
+      newErrors.visibility_scope = 'Please select at least one batch';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
@@ -258,8 +349,13 @@ export default function ExamCreation() {
         start_date: formatDateTimeForBackend(formData.start_date),
         end_date: formatDateTimeForBackend(formData.end_date),
         created_by: user?.id,
-        institute: user?.institute_id,
+        institute: user?.institute_id || user?.institute?.id,
+        // Include visibility scope data
+        visibility_scope: formData.visibility_scope,
+        center_ids: formData.visibility_scope === 'centers' ? formData.center_ids : [],
+        batch_ids: formData.visibility_scope === 'batches' ? formData.batch_ids : [],
       };
+
 
       if (isEditing && examId) {
         // Update existing exam
@@ -289,7 +385,7 @@ export default function ExamCreation() {
                   question_number: q.question_number_in_pattern || 1,
                   section_name: section.name,
                   marks: section.marks_per_question,
-                  negative_marks: section.marks_per_question ? Number(section as any).negative_marking ?? 0.25 : 0.25,
+                  negative_marks: section.negative_marking ?? 0.25,
                   order: q.question_number_in_pattern || 1,
                 });
               }
@@ -299,8 +395,8 @@ export default function ExamCreation() {
           }
         }
       }
-      
-      navigate('/exams');
+
+      navigate(`${basePath}/exams`);
     } catch (error: any) {
       console.error(`Failed to ${isEditing ? 'update' : 'create'} exam:`, error);
       if (error.response?.data) {
@@ -356,7 +452,7 @@ export default function ExamCreation() {
         {/* Header */}
         <div className="flex items-center gap-2 mb-3">
           <button
-            onClick={() => navigate('/exams')}
+            onClick={() => navigate(`${basePath}/exams`)}
             className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
             style={{ color: '#6b6b6b' }}
           >
@@ -404,10 +500,9 @@ export default function ExamCreation() {
                     type="text"
                     value={formData.title}
                     onChange={(e) => handleInputChange('title', e.target.value)}
-                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${
-                      errors.title ? 'border-red-300' : ''
-                    }`}
-                    style={{ 
+                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${errors.title ? 'border-red-300' : ''
+                      }`}
+                    style={{
                       borderColor: errors.title ? '#ef4444' : '#e5e7eb',
                       color: '#000000'
                     }}
@@ -453,10 +548,9 @@ export default function ExamCreation() {
                     value={formData.description}
                     onChange={(e) => handleInputChange('description', e.target.value)}
                     rows={2}
-                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors resize-none ${
-                      errors.description ? 'border-red-300' : ''
-                    }`}
-                    style={{ 
+                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors resize-none ${errors.description ? 'border-red-300' : ''
+                      }`}
+                    style={{
                       borderColor: errors.description ? '#ef4444' : '#e5e7eb',
                       color: '#000000'
                     }}
@@ -481,10 +575,9 @@ export default function ExamCreation() {
                     type="datetime-local"
                     value={formData.start_date}
                     onChange={(e) => handleInputChange('start_date', e.target.value)}
-                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${
-                      errors.start_date ? 'border-red-300' : ''
-                    }`}
-                    style={{ 
+                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${errors.start_date ? 'border-red-300' : ''
+                      }`}
+                    style={{
                       borderColor: errors.start_date ? '#ef4444' : '#e5e7eb',
                       color: '#000000'
                     }}
@@ -510,10 +603,9 @@ export default function ExamCreation() {
                     type="datetime-local"
                     value={formData.end_date}
                     onChange={(e) => handleInputChange('end_date', e.target.value)}
-                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${
-                      errors.end_date ? 'border-red-300' : ''
-                    }`}
-                    style={{ 
+                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${errors.end_date ? 'border-red-300' : ''
+                      }`}
+                    style={{
                       borderColor: errors.end_date ? '#ef4444' : '#e5e7eb',
                       color: '#000000'
                     }}
@@ -535,7 +627,174 @@ export default function ExamCreation() {
               </div>
             </div>
 
+            {/* Exam Visibility Scope */}
+            <div className="bg-white rounded-lg border p-3" style={{ borderColor: '#e5e7eb' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#7c3aed' }}>
+                  <Target className="w-3 h-3 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xs font-semibold text-black">Exam Visibility</h2>
+                  <p className="text-xs" style={{ color: '#6b6b6b' }}>Choose who can take this exam</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {/* Institute-wide option */}
+                <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formData.visibility_scope === 'institute'
+                  ? 'border-violet-500 bg-violet-50'
+                  : 'border-slate-200 hover:bg-slate-50'
+                  }`}>
+                  <input
+                    type="radio"
+                    name="visibility_scope"
+                    value="institute"
+                    checked={formData.visibility_scope === 'institute'}
+                    onChange={() => handleInputChange('visibility_scope', 'institute')}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-violet-600" />
+                      <span className="text-xs font-semibold text-slate-900">Institute-Wide</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      All students in your institute ({user?.institute?.name || 'Current Institute'}) can access this exam
+                    </p>
+                  </div>
+                </label>
+
+                {/* Specific Centers option */}
+                <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formData.visibility_scope === 'centers'
+                  ? 'border-violet-500 bg-violet-50'
+                  : 'border-slate-200 hover:bg-slate-50'
+                  }`}>
+                  <input
+                    type="radio"
+                    name="visibility_scope"
+                    value="centers"
+                    checked={formData.visibility_scope === 'centers'}
+                    onChange={() => handleInputChange('visibility_scope', 'centers')}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-violet-600" />
+                      <span className="text-xs font-semibold text-slate-900">Specific Centers</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Only students enrolled in selected centers can access this exam
+                    </p>
+                  </div>
+                </label>
+
+                {/* Center selection (shown when centers scope is selected) */}
+                {formData.visibility_scope === 'centers' && (
+                  <div className="ml-6 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <p className="text-xs font-medium text-slate-700 mb-2">Select Centers:</p>
+                    {centers.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic">No centers available</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                        {centers.map((center) => (
+                          <label key={center.id} className="flex items-center gap-2 p-2 rounded border border-slate-100 bg-white hover:bg-violet-50 cursor-pointer transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={formData.center_ids.includes(String(center.id))}
+                              onChange={(e) => {
+                                const centerId = String(center.id);
+                                if (e.target.checked) {
+                                  handleInputChange('center_ids', [...formData.center_ids, centerId]);
+                                } else {
+                                  handleInputChange('center_ids', formData.center_ids.filter((id: string) => id !== centerId));
+                                }
+                              }}
+                              className="rounded text-violet-600"
+                            />
+                            <div>
+                              <span className="text-xs font-medium text-slate-700">{center.name}</span>
+                              {center.city && <span className="text-xs text-slate-400 ml-1">- {center.city}</span>}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {formData.visibility_scope === 'centers' && formData.center_ids.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> Select at least one center
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Specific Batches option */}
+                <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formData.visibility_scope === 'batches'
+                  ? 'border-violet-500 bg-violet-50'
+                  : 'border-slate-200 hover:bg-slate-50'
+                  }`}>
+                  <input
+                    type="radio"
+                    name="visibility_scope"
+                    value="batches"
+                    checked={formData.visibility_scope === 'batches'}
+                    onChange={() => handleInputChange('visibility_scope', 'batches')}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-violet-600" />
+                      <span className="text-xs font-semibold text-slate-900">Specific Batches</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Only students enrolled in selected batches can access this exam
+                    </p>
+                  </div>
+                </label>
+
+                {/* Batch selection (shown when batches scope is selected) */}
+                {formData.visibility_scope === 'batches' && (
+                  <div className="ml-6 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <p className="text-xs font-medium text-slate-700 mb-2">Select Batches:</p>
+                    {batches.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic">No batches available</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                        {batches.map((batch) => (
+                          <label key={batch.id} className="flex items-center gap-2 p-2 rounded border border-slate-100 bg-white hover:bg-violet-50 cursor-pointer transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={formData.batch_ids.includes(String(batch.id))}
+                              onChange={(e) => {
+                                const batchId = String(batch.id);
+                                if (e.target.checked) {
+                                  handleInputChange('batch_ids', [...formData.batch_ids, batchId]);
+                                } else {
+                                  handleInputChange('batch_ids', formData.batch_ids.filter((id: string) => id !== batchId));
+                                }
+                              }}
+                              className="rounded text-violet-600"
+                            />
+                            <div>
+                              <span className="text-xs font-medium text-slate-700">{batch.name}</span>
+                              <span className="text-xs text-slate-400 ml-1">({batch.code})</span>
+                              {batch.program && <span className="text-xs text-slate-400 block">{batch.program}</span>}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {formData.visibility_scope === 'batches' && formData.batch_ids.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> Select at least one batch
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Pattern Selection */}
+
             <div className="bg-white rounded-lg border p-3" style={{ borderColor: '#e5e7eb' }}>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#723e11' }}>
@@ -554,11 +813,10 @@ export default function ExamCreation() {
                     <button
                       key={pattern.id}
                       onClick={() => handlePatternSelect(pattern.id)}
-                      className={`p-2 text-left border rounded transition-colors ${
-                        formData.pattern === pattern.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                      }`}
+                      className={`p-2 text-left border rounded transition-colors ${formData.pattern === pattern.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <h3 className="text-xs font-medium text-slate-900">{pattern.name}</h3>
@@ -677,9 +935,8 @@ export default function ExamCreation() {
                     type="number"
                     value={formData.duration_minutes}
                     onChange={(e) => handleInputChange('duration_minutes', parseInt(e.target.value) || 60)}
-                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${
-                      errors.duration_minutes ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${errors.duration_minutes ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     min="1"
                   />
                   {errors.duration_minutes && (
@@ -695,9 +952,8 @@ export default function ExamCreation() {
                     type="number"
                     value={formData.max_attempts}
                     onChange={(e) => handleInputChange('max_attempts', parseInt(e.target.value) || 1)}
-                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${
-                      errors.max_attempts ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${errors.max_attempts ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     min="1"
                   />
                   {errors.max_attempts && (
@@ -713,9 +969,8 @@ export default function ExamCreation() {
                     type="number"
                     value={formData.passing_marks}
                     onChange={(e) => handleInputChange('passing_marks', parseInt(e.target.value) || 0)}
-                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${
-                      errors.passing_marks ? 'border-red-300' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${errors.passing_marks ? 'border-red-300' : 'border-slate-300'
+                      }`}
                     min="0"
                     max="100"
                   />
@@ -968,7 +1223,7 @@ export default function ExamCreation() {
                 </button>
 
                 <button
-                  onClick={() => navigate('/exams')}
+                  onClick={() => navigate(`${basePath}/exams`)}
                   className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors"
                 >
                   Cancel

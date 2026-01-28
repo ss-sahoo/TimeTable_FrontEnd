@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router';
+import { useNavigate, useParams, Link, useLocation } from 'react-router';
 import {
   Activity,
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Search,
   TrendingUp,
+  AlertCircle,
 } from 'lucide-react';
 import { api } from '@/react-app/hooks/useApi';
 
@@ -95,6 +96,9 @@ type AnalyticsView = 'statistics' | 'heatmap' | 'histogram' | 'boxplot' | 'quest
 export default function ExamResultsAnalyticsEnhanced() {
   const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+  const basePath = isSuperAdminPath ? '/superadmin' : '';
 
   const [resultsData, setResultsData] = useState<ResultsResponse | null>(null);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsResponse | null>(null);
@@ -260,7 +264,7 @@ export default function ExamResultsAnalyticsEnhanced() {
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <div className="flex min-w-0 items-center gap-3">
             <button
-              onClick={() => navigate('/exams')}
+              onClick={() => navigate(`${basePath}/exams`)}
               className="rounded-md border border-slate-200 p-2 hover:bg-slate-100"
               aria-label="Back to exams"
             >
@@ -428,11 +432,10 @@ export default function ExamResultsAnalyticsEnhanced() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveAnalyticsView(tab.id as AnalyticsView)}
-                  className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-[11px] font-medium ${
-                    activeAnalyticsView === tab.id
-                      ? 'border-blue-400 bg-blue-50 text-blue-700'
-                      : 'border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
+                  className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-[11px] font-medium ${activeAnalyticsView === tab.id
+                    ? 'border-blue-400 bg-blue-50 text-blue-700'
+                    : 'border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
                 >
                   <tab.icon className="h-3.5 w-3.5" />
                   {tab.label}
@@ -519,7 +522,9 @@ export default function ExamResultsAnalyticsEnhanced() {
                     ].map(([label, value]) => (
                       <div key={label} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-center">
                         <p className="text-[11px] text-slate-500">{label}</p>
-                        <p className="text-sm font-semibold text-slate-900">{value.toFixed(2)}</p>
+                        <p className="text-sm font-semibold text-slate-900">
+                          {typeof value === 'number' ? value.toFixed(2) : value}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -560,7 +565,7 @@ export default function ExamResultsAnalyticsEnhanced() {
                   <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-700">
                     <p>Manage grading and qualitative feedback in the evaluation workspace.</p>
                     <Link
-                      to={`/exams/${examId}/evaluation`}
+                      to={`${basePath}/exams/${examId}/evaluation`}
                       className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
                     >
                       <CheckCircle className="h-3.5 w-3.5" />
