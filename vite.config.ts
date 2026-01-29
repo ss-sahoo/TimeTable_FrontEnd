@@ -20,16 +20,6 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 5000,
     minify: 'esbuild',
     sourcemap: false,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'vendor-tf': ['@tensorflow/tfjs', 'face-api.js'],
-          'vendor-ui': ['lucide-react', 'framer-motion'],
-          'vendor-graphics': ['three', '@react-three/fiber', '@react-three/drei'],
-          'vendor-charts': ['recharts'],
-        }
-      }
-    }
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(mode === 'production' ? 'production' : 'development'),
