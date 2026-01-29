@@ -65,8 +65,8 @@ export default function AdminBatchesContent() {
     const [createError, setCreateError] = useState<string | null>(null);
     const [programError, setProgramError] = useState<string | null>(null);
 
-    // Admin's center ID
-    const centerId = user?.center_id;
+    // Admin's center ID - with fallback to profile API
+    const [centerId, setCenterId] = useState<string | null>(null);
 
     const [formData, setFormData] = useState({
         code: '',
@@ -81,6 +81,26 @@ export default function AdminBatchesContent() {
         description: '',
         category: '',
     });
+
+    // Get admin's center ID - with fallback to profile API
+    useEffect(() => {
+        const getCenterId = async () => {
+            if (user?.center_id) {
+                setCenterId(user.center_id);
+            } else {
+                // Fallback: fetch from profile API
+                try {
+                    const res = await api.get('/auth/profile/');
+                    if (res.data?.center_id) {
+                        setCenterId(res.data.center_id);
+                    }
+                } catch (err) {
+                    console.error('Failed to fetch center from profile:', err);
+                }
+            }
+        };
+        getCenterId();
+    }, [user]);
 
     useEffect(() => {
         if (centerId) {

@@ -31,7 +31,8 @@ export default function QuestionManagement() {
   const navigate = useNavigate();
   const location = useLocation();
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
-  const basePath = isSuperAdminPath ? '/superadmin' : '';
+  const isCenterAdminPath = location.pathname.startsWith('/center-admin');
+  const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
   const { data: patternsData, loading, refetch } = useApi<{ results: Pattern[] }>('/patterns/patterns/');
   const patterns = patternsData?.results || [];
 

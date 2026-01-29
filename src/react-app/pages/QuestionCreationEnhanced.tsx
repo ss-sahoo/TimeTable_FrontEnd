@@ -18,7 +18,11 @@ import {
   Zap,
   BookOpen,
   RefreshCw,
-  Loader2
+  Loader2,
+  MessageSquare,
+  X,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { useApi, api } from '../hooks/useApi';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -116,10 +120,10 @@ interface AIQuestionPayload {
 const stripOptionContent = (value?: string | null) =>
   value
     ? value
-        .replace(/<[^>]*>/g, ' ')
-        .replace(/&nbsp;/gi, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
     : '';
 
 const normalizeOptionValue = (value?: string | null) =>
@@ -131,9 +135,9 @@ const normalizeOptionValue = (value?: string | null) =>
  */
 const convertLetterAnswerToOptionText = (answer: string, options: string[]): string => {
   if (!answer || !options || options.length === 0) return answer;
-  
+
   const trimmedAnswer = answer.trim().toUpperCase();
-  
+
   // Check if it's a single letter A-Z
   if (trimmedAnswer.length === 1 && /^[A-Z]$/.test(trimmedAnswer)) {
     const index = trimmedAnswer.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
@@ -141,7 +145,7 @@ const convertLetterAnswerToOptionText = (answer: string, options: string[]): str
       return options[index];
     }
   }
-  
+
   // For multiple choice answers like "A, B, C" or "A|B|C"
   if (/^[A-Z]([,|]\s*[A-Z])*$/i.test(trimmedAnswer.replace(/\s/g, ''))) {
     const letters = trimmedAnswer.split(/[,|]/).map(l => l.trim().toUpperCase());
@@ -153,7 +157,7 @@ const convertLetterAnswerToOptionText = (answer: string, options: string[]): str
       .filter(Boolean);
     return convertedOptions.join('|');
   }
-  
+
   // Return as-is if not a letter format
   return answer;
 };
@@ -184,6 +188,7 @@ export default function EnhancedQuestionEditor() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiSolving, setAiSolving] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiSuccess, setAiSuccess] = useState<string | null>(null);
 
@@ -208,13 +213,15 @@ export default function EnhancedQuestionEditor() {
   const [existingQuestionsBySection, setExistingQuestionsBySection] = useState<Record<number, Map<number, QuestionData>>>({});
   const [sectionAbsoluteRanges, setSectionAbsoluteRanges] = useState<Record<number, { start: number; end: number; length: number }>>({});
   const [bulkDataLoaded, setBulkDataLoaded] = useState(false);
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(true); // Default to true as per user request
 
   const computeAbsoluteQuestionNumber = useCallback(
     (section: SubjectSection | null, subjectQuestionNumber: number) => {
       if (!section) {
         return subjectQuestionNumber;
       }
-      
+
       // First check if we have a cached question with this subject-local number
       const sectionMap = existingQuestionsBySection[section.id];
       const existingQuestion = sectionMap?.get(subjectQuestionNumber);
@@ -293,11 +300,10 @@ export default function EnhancedQuestionEditor() {
     async (patternIdToLoad: string, sections: SubjectSection[]) => {
       try {
         const res = await api.get(
-          `/questions/pattern-questions/?pattern_id=${patternIdToLoad}${
-            examIdFromQuery ? `&exam_id=${examIdFromQuery}` : ''
+          `/questions/pattern-questions/?pattern_id=${patternIdToLoad}${examIdFromQuery ? `&exam_id=${examIdFromQuery}` : ''
           }`,
         );
-        
+
         const data = res.data as {
           questions_by_section: Record<string | number, QuestionData[]>;
           existing_numbers_by_section: Record<string | number, number[]>;
@@ -308,25 +314,25 @@ export default function EnhancedQuestionEditor() {
             progress_percentage: number;
           }>;
         };
-        
+
         // Process all sections at once
         const newExistingNumbersBySection: Record<number, Set<number>> = {};
         const newExistingQuestionsBySection: Record<number, Map<number, QuestionData>> = {};
-        
+
         sections.forEach((section) => {
           // JSON serializes object keys as strings, so we need to handle both
-          const sectionQuestions = data.questions_by_section[section.id] || 
-                                   data.questions_by_section[String(section.id)] || 
-                                   [];
+          const sectionQuestions = data.questions_by_section[section.id] ||
+            data.questions_by_section[String(section.id)] ||
+            [];
           const { numbers: nums, map } = buildNumbersSetForSection(section, sectionQuestions);
           newExistingNumbersBySection[section.id] = nums;
           newExistingQuestionsBySection[section.id] = map;
         });
-        
+
         setExistingNumbersBySection(newExistingNumbersBySection);
         setExistingQuestionsBySection(newExistingQuestionsBySection);
         setBulkDataLoaded(true);
-        
+
         // Update section stats from bulk response - merge with section data
         if (data.sections) {
           setSectionStats(data.sections.map(s => {
@@ -343,7 +349,7 @@ export default function EnhancedQuestionEditor() {
             };
           }));
         }
-        
+
         return true;
       } catch (err) {
         console.error('Failed to load bulk pattern questions, falling back to individual loads', err);
@@ -362,21 +368,20 @@ export default function EnhancedQuestionEditor() {
         }
         return;
       }
-      
+
       try {
         // Fetch ALL questions for this section using optimized endpoint
         const res = await api.get(
-          `/questions/section-questions/${section.id}/${
-            examIdFromQuery ? `?exam_id=${examIdFromQuery}` : ''
+          `/questions/section-questions/${section.id}/${examIdFromQuery ? `?exam_id=${examIdFromQuery}` : ''
           }`,
         );
-        
+
         const data = res.data as {
           questions: QuestionData[];
           existing_numbers: number[];
           questions_map: Record<number, QuestionData>;
         };
-        
+
         const resultsArray = data.questions || [];
         const { numbers: nums, map } = buildNumbersSetForSection(section, resultsArray);
 
@@ -405,34 +410,34 @@ export default function EnhancedQuestionEditor() {
 
   const fetchSectionStats = useCallback(async (patternData: Pattern) => {
     try {
-    const stats: SectionStats[] = [];
-    
-    const queryExam = examIdFromQuery ? `&exam=${examIdFromQuery}` : '';
+      const stats: SectionStats[] = [];
 
-    for (const section of patternData.sections) {
-      const totalNeeded = section.end_question - section.start_question + 1;
-      
-      // Fetch questions for this section - use count from paginated response
-      const response = await api.get(`/questions/questions/?pattern_section=${section.id}${queryExam}`);
-      // Use 'count' from paginated response for total, not results.length which is just the first page
-      const totalAdded = response.data?.count ?? response.data?.results?.length ?? response.data?.length ?? 0;
-      
-      // Map question type to display name
-      const questionTypeDisplay = getQuestionTypeDisplayName(section.question_type);
-      
-      stats.push({
-        section_id: section.id,
-        section_name: section.name,
-        subject: section.subject,
-        question_type: questionTypeDisplay,
-        total_needed: totalNeeded,
-        total_added: totalAdded,
-        remaining: totalNeeded - totalAdded,
-        progress_percentage: totalNeeded > 0 ? (totalAdded / totalNeeded) * 100 : 0,
-      });
-    }
-    
-    setSectionStats(stats);
+      const queryExam = examIdFromQuery ? `&exam=${examIdFromQuery}` : '';
+
+      for (const section of patternData.sections) {
+        const totalNeeded = section.end_question - section.start_question + 1;
+
+        // Fetch questions for this section - use count from paginated response
+        const response = await api.get(`/questions/questions/?pattern_section=${section.id}${queryExam}`);
+        // Use 'count' from paginated response for total, not results.length which is just the first page
+        const totalAdded = response.data?.count ?? response.data?.results?.length ?? response.data?.length ?? 0;
+
+        // Map question type to display name
+        const questionTypeDisplay = getQuestionTypeDisplayName(section.question_type);
+
+        stats.push({
+          section_id: section.id,
+          section_name: section.name,
+          subject: section.subject,
+          question_type: questionTypeDisplay,
+          total_needed: totalNeeded,
+          total_added: totalAdded,
+          remaining: totalNeeded - totalAdded,
+          progress_percentage: totalNeeded > 0 ? (totalAdded / totalNeeded) * 100 : 0,
+        });
+      }
+
+      setSectionStats(stats);
     } catch (err) {
       console.error('Failed to fetch section stats:', err);
     }
@@ -520,13 +525,13 @@ export default function EnhancedQuestionEditor() {
       setSubjectGroups(groups);
       const ranges = computeSectionAbsoluteRanges(patternData);
       setSectionAbsoluteRanges(ranges);
-      
+
       // Flatten all sections from groups for bulk loading
       const allSections = groups.flatMap(g => g.sections);
-      
+
       // Try bulk loading first (much faster)
       const bulkSuccess = await loadAllPatternQuestions(id, allSections);
-      
+
       // Fall back to individual section stats if bulk fails
       if (!bulkSuccess) {
         await fetchSectionStats(patternData);
@@ -547,9 +552,8 @@ export default function EnhancedQuestionEditor() {
     results?: QuestionData[];
   } | QuestionData[]>(
     patternId && currentSection
-      ? `/questions/questions/?pattern_section=${currentSection.id}&question_number=${absoluteQuestionNumber}${
-          examIdFromQuery ? `&exam=${examIdFromQuery}` : ''
-        }`
+      ? `/questions/questions/?pattern_section=${currentSection.id}&question_number=${absoluteQuestionNumber}${examIdFromQuery ? `&exam=${examIdFromQuery}` : ''
+      }`
       : ''
   );
 
@@ -669,7 +673,7 @@ export default function EnhancedQuestionEditor() {
       const correctAnswer = (questionType === 'single_mcq' || questionType === 'mcq' || questionType === 'multiple_mcq')
         ? convertLetterAnswerToOptionText(rawAnswer, options)
         : rawAnswer;
-      
+
       setFormData({
         question_text: mappedExisting.question_text || '',
         question_type: questionType,
@@ -687,10 +691,14 @@ export default function EnhancedQuestionEditor() {
       return;
     }
 
-    console.log('Loading question data from API response:', { existingQuestion, currentSection, currentQuestionNumber });
-    
     if (existingQuestion && 'results' in existingQuestion && existingQuestion.results && existingQuestion.results.length > 0) {
       const question = existingQuestion.results[0] as QuestionData;
+
+      // SAFETY: Only load if it matches the current slot we're editing
+      if (question.question_number !== absoluteQuestionNumber && absoluteQuestionNumber !== null) {
+        return;
+      }
+
       console.log('Loading existing question from results:', question);
       const options = question.options || ['', '', '', ''];
       const rawAnswer = question.correct_answer || '';
@@ -698,7 +706,7 @@ export default function EnhancedQuestionEditor() {
       const correctAnswer = (questionType === 'single_mcq' || questionType === 'mcq' || questionType === 'multiple_mcq')
         ? convertLetterAnswerToOptionText(String(rawAnswer), options)
         : String(rawAnswer);
-      
+
       setFormData({
         question_text: question.question_text || '',
         question_type: questionType,
@@ -715,6 +723,12 @@ export default function EnhancedQuestionEditor() {
       });
     } else if (existingQuestion && Array.isArray(existingQuestion) && existingQuestion.length > 0) {
       const question = existingQuestion[0] as QuestionData;
+
+      // SAFETY: Only load if it matches the current slot we're editing
+      if (question.question_number !== absoluteQuestionNumber && absoluteQuestionNumber !== null) {
+        return;
+      }
+
       console.log('Loading existing question from array:', question);
       const options = question.options || ['', '', '', ''];
       const rawAnswer = question.correct_answer || '';
@@ -722,7 +736,7 @@ export default function EnhancedQuestionEditor() {
       const correctAnswer = (questionType === 'single_mcq' || questionType === 'mcq' || questionType === 'multiple_mcq')
         ? convertLetterAnswerToOptionText(String(rawAnswer), options)
         : String(rawAnswer);
-      
+
       setFormData({
         question_text: question.question_text || '',
         question_type: questionType,
@@ -738,26 +752,28 @@ export default function EnhancedQuestionEditor() {
         pattern_section: question.pattern_section,
       });
     } else {
-      // No existing question found - reset form to defaults for new question
-      console.log('No existing question found, resetting form');
-      if (currentSection) {
+      // If we've reached here and questionLoading is false (API finished)
+      // and we didn't find data in cache OR API results
+      // Reset the form for a NEW question
+      if (!questionLoading && !mappedExisting) {
+        console.log('Resetting form for new question slot...');
         setFormData({
           question_text: '',
-          question_type: currentSection.question_type,
+          question_type: currentSection?.question_type || 'mcq',
           difficulty: 'medium',
           options: ['', '', '', ''],
           correct_answer: '',
           solution: '',
           explanation: '',
-          marks: currentSection.marks_per_question,
-          negative_marks: currentSection.negative_marking,
-          subject: currentSection.subject,
+          marks: currentSection?.marks_per_question || 1,
+          negative_marks: currentSection?.negative_marking || 1,
+          subject: currentSection?.subject || '',
           topic: '',
-          pattern_section: currentSection.id,
+          pattern_section: currentSection?.id ?? null,
         });
       }
     }
-  }, [existingQuestion, currentSection, currentQuestionNumber, existingQuestionsBySection]);
+  }, [existingQuestion, currentSection, currentQuestionNumber, existingQuestionsBySection, absoluteQuestionNumber, questionLoading]);
 
   const getQuestionTypeDisplayName = (type: string): string => {
     const typeMapping: Record<string, string> = {
@@ -780,7 +796,7 @@ export default function EnhancedQuestionEditor() {
 
   const renderQuestionTypeSpecificUI = () => {
     const questionType = formData.question_type.toLowerCase();
-    
+
     if (questionType === 'single_mcq' || questionType === 'single correct mcq' || questionType === 'mcq') {
       return (
         <div>
@@ -798,7 +814,7 @@ export default function EnhancedQuestionEditor() {
               Add Option
             </button>
           </div>
-          
+
           <div className="space-y-4">
             {formData.options.map((option, index) => (
               <div key={index} className="flex items-start gap-3 group">
@@ -827,7 +843,7 @@ export default function EnhancedQuestionEditor() {
         </div>
       );
     }
-    
+
     if (questionType === 'multiple_mcq' || questionType === 'multiple correct mcq') {
       return (
         <div>
@@ -845,7 +861,7 @@ export default function EnhancedQuestionEditor() {
               Add Option
             </button>
           </div>
-          
+
           <div className="space-y-4">
             {formData.options.map((option, index) => (
               <div key={index} className="flex items-start gap-3 group">
@@ -871,17 +887,17 @@ export default function EnhancedQuestionEditor() {
               </div>
             ))}
           </div>
-          
+
           <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
             <p className="text-sm text-purple-700">
-              <strong>Note:</strong> For Multiple Correct MCQ, students can select more than one correct option. 
+              <strong>Note:</strong> For Multiple Correct MCQ, students can select more than one correct option.
               You'll specify the correct answers in the "Correct Answer" field below.
             </p>
           </div>
         </div>
       );
     }
-    
+
     if (questionType === 'numerical') {
       return (
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200">
@@ -918,7 +934,7 @@ export default function EnhancedQuestionEditor() {
         </div>
       );
     }
-    
+
     if (questionType === 'subjective') {
       return (
         <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border-2 border-purple-200">
@@ -955,7 +971,7 @@ export default function EnhancedQuestionEditor() {
         </div>
       );
     }
-    
+
     if (questionType === 'true_false') {
       return (
         <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border-2 border-green-200">
@@ -970,24 +986,24 @@ export default function EnhancedQuestionEditor() {
               </p>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input 
-                    type="radio" 
-                    name="tf_answer" 
-                    value="True" 
+                  <input
+                    type="radio"
+                    name="tf_answer"
+                    value="True"
                     checked={formData.correct_answer === 'True'}
                     onChange={(e) => handleInputChange('correct_answer', e.target.value)}
-                    className="text-green-600" 
+                    className="text-green-600"
                   />
                   <span className="text-green-800 font-medium">True</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input 
-                    type="radio" 
-                    name="tf_answer" 
-                    value="False" 
+                  <input
+                    type="radio"
+                    name="tf_answer"
+                    value="False"
                     checked={formData.correct_answer === 'False'}
                     onChange={(e) => handleInputChange('correct_answer', e.target.value)}
-                    className="text-green-600" 
+                    className="text-green-600"
                   />
                   <span className="text-green-800 font-medium">False</span>
                 </label>
@@ -997,7 +1013,7 @@ export default function EnhancedQuestionEditor() {
         </div>
       );
     }
-    
+
     if (questionType === 'fill_blank') {
       return (
         <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6 border-2 border-orange-200">
@@ -1041,7 +1057,7 @@ export default function EnhancedQuestionEditor() {
         </div>
       );
     }
-    
+
     return null;
   };
 
@@ -1113,8 +1129,8 @@ export default function EnhancedQuestionEditor() {
         ...formData,
         options:
           formData.question_type === 'single_mcq' ||
-          formData.question_type === 'multiple_mcq' ||
-          formData.question_type === 'mcq'
+            formData.question_type === 'multiple_mcq' ||
+            formData.question_type === 'mcq'
             ? formData.options.filter(opt => opt.trim())
             : [],
         question_number: absoluteQuestionNumberForSave,
@@ -1125,30 +1141,45 @@ export default function EnhancedQuestionEditor() {
         institute: user?.institute?.id || user?.institute_id,
       };
 
-      // Check if we have an existing question to update
-      const sectionMap = currentSection ? existingQuestionsBySection[currentSection.id] : undefined;
-      const mappedExisting = sectionMap?.get(currentQuestionNumber) ?? null;
-
       let questionToUpdate: QuestionData | null = null;
 
-      if (mappedExisting) {
-        questionToUpdate = mappedExisting;
-      } else if (existingQuestion) {
+      // SAFETY CHECK: Only use existing question if we are NOT currently loading data
+      // and the data we have matches BOTH the absolute question number AND the section.
+      if (!questionLoading && existingQuestion) {
+        let candidate: QuestionData | null = null;
         if ('results' in existingQuestion && existingQuestion.results && existingQuestion.results.length > 0) {
-          questionToUpdate = existingQuestion.results[0] as QuestionData;
+          candidate = existingQuestion.results[0] as QuestionData;
         } else if (Array.isArray(existingQuestion) && existingQuestion.length > 0) {
-          questionToUpdate = existingQuestion[0] as QuestionData;
+          candidate = existingQuestion[0] as QuestionData;
+        }
+
+        // Only update if it's the SAME question number AND section we're currently looking at
+        if (
+          candidate &&
+          candidate.question_number === absoluteQuestionNumberForSave &&
+          candidate.pattern_section_id === patternSectionId
+        ) {
+          questionToUpdate = candidate;
         }
       }
-      
-      console.log('Save operation:', { 
-        mappedExisting,
-        existingQuestion, 
-        dataToSave, 
+
+      // Fallback to cached bulk-loaded data if API result is pending or mismatch
+      if (!questionToUpdate) {
+        const sectionMap = currentSection ? existingQuestionsBySection[currentSection.id] : undefined;
+        const mappedExisting = sectionMap?.get(currentQuestionNumber) ?? null;
+        if (mappedExisting && mappedExisting.question_number === absoluteQuestionNumberForSave) {
+          questionToUpdate = mappedExisting;
+        }
+      }
+
+      console.log('Save operation:', {
+        questionToUpdate,
+        existingQuestion,
+        dataToSave,
         userInstitute: user?.institute?.id || user?.institute_id,
-        userObject: user 
+        userObject: user
       });
-      
+
       if (questionToUpdate) {
         const targetId = questionToUpdate.id;
         console.log('Updating existing question:', targetId, dataToSave);
@@ -1159,10 +1190,10 @@ export default function EnhancedQuestionEditor() {
         await api.post('/questions/questions/', dataToSave);
       }
       setSaveStatus('saved');
-      
+
       // Refresh the question data to get the updated version
       await refetchQuestion();
-      
+
       // Refresh the section data - use bulk reload if available
       if (pattern && patternId) {
         const allSections = subjectGroups.flatMap(g => g.sections);
@@ -1176,7 +1207,7 @@ export default function EnhancedQuestionEditor() {
           setExistingNumbers(existingNumbersBySection[currentSection.id]);
         }
       }
-      
+
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {
       console.error('Save error:', error);
@@ -1189,7 +1220,7 @@ export default function EnhancedQuestionEditor() {
 
   const handleFixQuestionNumbers = async () => {
     if (!patternId) return;
-    
+
     setFixingNumbers(true);
     try {
       const payload: { pattern_id: number; exam_id?: number } = {
@@ -1198,13 +1229,13 @@ export default function EnhancedQuestionEditor() {
       if (examIdFromQuery) {
         payload.exam_id = examIdFromQuery;
       }
-      
+
       await api.post('/questions/fix-question-numbers/', payload);
-      
+
       // Reload all data after fix
       const allSections = subjectGroups.flatMap(g => g.sections);
       await loadAllPatternQuestions(patternId, allSections);
-      
+
       if (currentSection && existingNumbersBySection[currentSection.id]) {
         setExistingNumbers(existingNumbersBySection[currentSection.id]);
       }
@@ -1351,6 +1382,89 @@ export default function EnhancedQuestionEditor() {
     }
   };
 
+  const handleAISolve = async () => {
+    if (!formData.question_text) {
+      setAiError('Please enter question text before solving.');
+      return;
+    }
+
+    setAiSolving(true);
+    setAiError(null);
+    setAiSuccess(null);
+
+    try {
+      const response = await api.post('/questions/ai/solve-question/', {
+        question_text: formData.question_text,
+        options: formData.options,
+        question_type: formData.question_type,
+        subject: formData.subject || currentSection?.subject,
+      });
+
+      const { correct_answer, solution, explanation } = response.data;
+
+      // Extract raw result
+      let finalCorrectAnswer = correct_answer || '';
+      const currentOptions = formData.options || [];
+      const questionType = formData.question_type.toLowerCase();
+
+      // Mapping logic for MCQs to ensure the correct option is selected in the dropdown
+      const isMCQ = ['single_mcq', 'mcq', 'multiple_mcq', 'multiple correct mcq'].includes(questionType);
+
+      if (isMCQ && finalCorrectAnswer) {
+        const mapValue = (val: any): string => {
+          const textVal = String(val).trim();
+          if (!textVal) return '';
+
+          // 1. Check if it's already an exact match with an option
+          if (currentOptions.includes(textVal)) return textVal;
+
+          // 2. Check if it's a single letter (A, B, C, D)
+          const letterMatch = textVal.match(/^([A-Z])(?:\)|:|\.)?\s*$/i);
+          if (letterMatch) {
+            const idx = letterMatch[1].toUpperCase().charCodeAt(0) - 65;
+            return currentOptions[idx] || textVal;
+          }
+
+          // 3. Check for "Option A", "Choice A", etc.
+          const wordMatch = textVal.match(/^(?:Option|Choice|Answer)\s+([A-Z])/i);
+          if (wordMatch) {
+            const idx = wordMatch[1].toUpperCase().charCodeAt(0) - 65;
+            return currentOptions[idx] || textVal;
+          }
+
+          return textVal;
+        };
+
+        if (Array.isArray(finalCorrectAnswer)) {
+          finalCorrectAnswer = finalCorrectAnswer.map(mapValue).join('|');
+        } else if (questionType.includes('multiple')) {
+          const parts = String(finalCorrectAnswer).split(/[|,]/).map(p => p.trim());
+          finalCorrectAnswer = parts.map(mapValue).filter(Boolean).join('|');
+        } else {
+          finalCorrectAnswer = mapValue(finalCorrectAnswer);
+        }
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        correct_answer: finalCorrectAnswer || prev.correct_answer,
+        solution: solution || prev.solution,
+        explanation: explanation || prev.explanation
+      }));
+
+      setAiSuccess('AI has solved the question successfully.');
+    } catch (error: any) {
+      console.error('AI solver failed:', error);
+      const responseMessage =
+        typeof error === 'object' && error !== null && 'response' in error && (error as { response?: { data?: { error?: string } } }).response?.data?.error;
+      const fallbackMessage =
+        typeof error === 'object' && error !== null && 'message' in error ? String((error as { message?: unknown }).message) : undefined;
+      setAiError(responseMessage || fallbackMessage || 'Failed to solve question with AI.');
+    } finally {
+      setAiSolving(false);
+    }
+  };
+
   const navigateToQuestion = (subjectSlug: string, newQuestionNumber: number) => {
     if (!patternId) return;
     const group = subjectGroups.find(g => g.slug === subjectSlug);
@@ -1385,18 +1499,18 @@ export default function EnhancedQuestionEditor() {
 
   const getAnswerPreviewExample = () => {
     const { question_type, correct_answer, marks, negative_marks } = formData;
-    
+
     if (!correct_answer) return null;
 
     switch (question_type) {
       case 'numerical': {
         const numAnswer = parseFloat(correct_answer);
         if (isNaN(numAnswer)) return null;
-        
+
         const tolerance = 0.1;
         const minRange = (numAnswer - tolerance).toFixed(2);
         const maxRange = (numAnswer + tolerance).toFixed(2);
-        
+
         return (
           <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-2xl p-5 shadow-lg">
             <div className="flex items-center gap-3 mb-4">
@@ -1408,7 +1522,7 @@ export default function EnhancedQuestionEditor() {
                 <p className="text-xs text-purple-700">Live evaluation examples</p>
               </div>
             </div>
-            
+
             <div className="space-y-4">
               <div className="bg-white rounded-xl p-4 shadow-sm">
                 <p className="text-sm font-semibold text-slate-700 mb-2">Correct Answer:</p>
@@ -1419,10 +1533,10 @@ export default function EnhancedQuestionEditor() {
                   Accepted Range: <span className="font-semibold">{minRange}</span> to <span className="font-semibold">{maxRange}</span> (±{tolerance})
                 </p>
               </div>
-              
+
               <div className="bg-white rounded-xl p-4 shadow-sm space-y-2.5">
                 <p className="text-xs font-bold text-slate-800 mb-3">📊 Student Answer Scenarios:</p>
-                
+
                 <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
@@ -1432,7 +1546,7 @@ export default function EnhancedQuestionEditor() {
                   </div>
                   <span className="text-green-600 font-bold text-sm">+{marks} marks ✓</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
@@ -1442,7 +1556,7 @@ export default function EnhancedQuestionEditor() {
                   </div>
                   <span className="text-green-600 font-bold text-sm">+{marks} marks ✓</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between p-3 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
@@ -1452,7 +1566,7 @@ export default function EnhancedQuestionEditor() {
                   </div>
                   <span className="text-red-600 font-bold text-sm">{negative_marks} marks ✗</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 bg-slate-400 rounded-full flex items-center justify-center">
@@ -1467,7 +1581,7 @@ export default function EnhancedQuestionEditor() {
           </div>
         );
       }
-      
+
       case 'single_mcq':
       case 'mcq': {
         const correctIndex = formData.options.findIndex(
@@ -1484,7 +1598,7 @@ export default function EnhancedQuestionEditor() {
                 <p className="text-xs text-blue-700">Marking breakdown</p>
               </div>
             </div>
-            
+
             <div className="space-y-3">
               <div className="bg-white rounded-xl p-4 shadow-sm">
                 <p className="text-sm text-slate-600 mb-2">Correct Answer:</p>
@@ -1492,20 +1606,20 @@ export default function EnhancedQuestionEditor() {
                   Option {correctIndex >= 0 ? String.fromCharCode(65 + correctIndex) : '?'}
                 </p>
               </div>
-              
+
               <div className="bg-white rounded-xl p-4 shadow-sm space-y-2">
                 <p className="text-xs font-bold text-slate-800 mb-3">📊 Marking Scenarios:</p>
-                
+
                 <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
                   <span className="text-sm text-slate-700">Selects correct option</span>
                   <span className="text-green-600 font-bold">+{marks} marks</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between p-3 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-lg">
                   <span className="text-sm text-slate-700">Selects wrong option</span>
                   <span className="text-red-600 font-bold">{negative_marks} marks</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg">
                   <span className="text-sm text-slate-700">No selection</span>
                   <span className="text-slate-600 font-bold">0 marks</span>
@@ -1515,7 +1629,7 @@ export default function EnhancedQuestionEditor() {
           </div>
         );
       }
-      
+
       case 'multiple_mcq': {
         const selectedAnswers = correct_answer
           ? correct_answer.split('|').filter(Boolean)
@@ -1534,7 +1648,7 @@ export default function EnhancedQuestionEditor() {
                 <p className="text-xs text-purple-700">Marking breakdown</p>
               </div>
             </div>
-            
+
             <div className="space-y-3">
               <div className="bg-white rounded-xl p-4 shadow-sm">
                 <p className="text-sm text-slate-600 mb-2">Correct Answers:</p>
@@ -1551,20 +1665,20 @@ export default function EnhancedQuestionEditor() {
                   })}
                 </div>
               </div>
-              
+
               <div className="bg-white rounded-xl p-4 shadow-sm space-y-2">
                 <p className="text-xs font-bold text-slate-800 mb-3">📊 Marking Scenarios:</p>
-                
+
                 <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
                   <span className="text-sm text-slate-700">Selects all correct options</span>
                   <span className="text-green-600 font-bold">+{marks} marks</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg">
                   <span className="text-sm text-slate-700">Selects some correct options</span>
                   <span className="text-yellow-600 font-bold">Partial marks</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between p-3 bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-lg">
                   <span className="text-sm text-slate-700">Selects wrong options</span>
                   <span className="text-red-600 font-bold">-{negative_marks} marks</span>
@@ -1574,7 +1688,7 @@ export default function EnhancedQuestionEditor() {
           </div>
         );
       }
-      
+
       case 'subjective': {
         return (
           <div className="bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-200 rounded-2xl p-5 shadow-lg">
@@ -1587,7 +1701,7 @@ export default function EnhancedQuestionEditor() {
                 <p className="text-xs text-orange-700">Manual grading required</p>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-xl p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <AlertCircle className="w-5 h-5 text-orange-500" />
@@ -1611,7 +1725,7 @@ export default function EnhancedQuestionEditor() {
           </div>
         );
       }
-      
+
       default:
         return null;
     }
@@ -1646,16 +1760,7 @@ export default function EnhancedQuestionEditor() {
     );
   }
 
-  if (questionLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600 font-medium">Loading question data...</p>
-        </div>
-      </div>
-    );
-  }
+  // Removed full-screen questionLoading blocker to prevent "refresh" feeling
 
   if (!user?.institute?.id && !user?.institute_id) {
     return (
@@ -1678,15 +1783,18 @@ export default function EnhancedQuestionEditor() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className={`${isFullscreen ? 'fixed inset-0 z-[100] overflow-y-auto' : 'min-h-screen'} bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50`}>
       {/* Modern Header */}
-      <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10 backdrop-blur-lg bg-white/95">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+      <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50 backdrop-blur-lg bg-white/95">
+        <div className="max-w-screen-2xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Left Side */}
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate(`/patterns/${patternId}`)}
+                onClick={() => {
+                  const prefix = location.pathname.startsWith('/superadmin') ? '/superadmin' : '/center-admin';
+                  navigate(`${prefix}/patterns/${patternId}/view`);
+                }}
                 className="p-2 hover:bg-slate-100 rounded-xl transition-all duration-200 hover:scale-110"
               >
                 <ArrowLeft className="w-5 h-5 text-slate-600" />
@@ -1708,8 +1816,8 @@ export default function EnhancedQuestionEditor() {
               >
                 <ChevronLeft className="w-5 h-5 text-slate-700" />
               </button>
-              
-              <div className="flex items-center gap-3 px-6 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl shadow-lg">
+
+              <div className="flex items-center gap-3 px-6 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl shadow-lg transition-all transform hover:scale-105">
                 {sectionInfo && (
                   <span className="px-3 py-1 bg-white/20 backdrop-blur text-white text-xs font-semibold rounded-lg">
                     {sectionInfo.name}
@@ -1731,7 +1839,7 @@ export default function EnhancedQuestionEditor() {
                   </span>
                 )}
               </div>
-              
+
               <button
                 onClick={() => navigateToQuestion(currentSubjectSlug || subjectGroups[0].slug, currentQuestionNumber + 1)}
                 disabled={currentQuestionNumber >= max}
@@ -1741,13 +1849,23 @@ export default function EnhancedQuestionEditor() {
               </button>
             </div>
 
-            {/* Right Side - Save Status */}
+            {/* Right Side - Actions & Save */}
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsAiChatOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold transition-all border border-indigo-200 hover:scale-105 shadow-sm"
+              >
+                <Sparkles className="w-4 h-4" />
+                AI Assistant
+              </button>
+
+              <div className="h-6 w-px bg-slate-200 mx-1"></div>
+
               <button
                 onClick={handleFixQuestionNumbers}
                 disabled={fixingNumbers}
-                className="p-2.5 bg-amber-100 hover:bg-amber-200 rounded-xl transition-all hover:scale-110 disabled:opacity-50"
-                title="Fix question numbering (use if imported questions don't show)"
+                className="p-2.5 bg-amber-50 hover:bg-amber-100 rounded-xl transition-all hover:scale-110 disabled:opacity-50 border border-amber-200"
+                title="Fix question numbering"
               >
                 {fixingNumbers ? (
                   <Loader2 className="w-4 h-4 text-amber-700 animate-spin" />
@@ -1755,32 +1873,30 @@ export default function EnhancedQuestionEditor() {
                   <Zap className="w-4 h-4 text-amber-700" />
                 )}
               </button>
+
               <button
-                onClick={() => refetchQuestion()}
-                className="p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all hover:scale-110"
-                title="Refresh question data"
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="p-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all hover:scale-110 border border-slate-200"
+                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
               >
-                <RefreshCw className="w-4 h-4 text-slate-700" />
+                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
-              {saveStatus === 'saved' && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-xl">
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                  <span className="text-green-700 text-sm font-medium">Saved!</span>
-                </div>
-              )}
-              {saveStatus === 'error' && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-xl">
-                  <AlertCircle className="w-4 h-4 text-red-600" />
-                  <span className="text-red-700 text-sm font-medium">Error</span>
-                </div>
-              )}
+
+              <button
+                onClick={handleSave}
+                disabled={loading || saveStatus === 'saving'}
+                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold transition-all hover:scale-105 shadow-md shadow-blue-200 disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Save
+              </button>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-screen-2xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Editor Panel - 2 cols */}
           <div className="lg:col-span-2 space-y-6">
@@ -1806,65 +1922,18 @@ export default function EnhancedQuestionEditor() {
             )}
 
             {/* Main Question Form */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8">
-              <div className="space-y-6">
-                <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-5">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <h3 className="flex items-center gap-2 font-semibold text-blue-900">
-                        <Sparkles className="w-4 h-4" />
-                        AI Question Assistant
-                      </h3>
-                      <p className="mt-1 text-xs text-blue-700">
-                        Describe the concept or nuance you want covered. We&apos;ll draft a {getQuestionTypeDisplayName(currentSection?.question_type || formData.question_type)} using Google Gemini.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleGenerateAIQuestion}
-                      disabled={aiGenerating}
-                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:from-indigo-600 hover:to-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {aiGenerating ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4" />
-                          Generate Question
-                        </>
-                      )}
-                    </button>
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8 relative">
+              {/* Inline Loading Overlay (only if no cache) */}
+              {questionLoading && !((currentSection && existingQuestionsBySection[currentSection.id]?.get(currentQuestionNumber))) && (
+                <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[2px] rounded-2xl flex items-center justify-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+                    <p className="text-sm font-bold text-slate-600">Syncing Question Data...</p>
                   </div>
-                  <textarea
-                    value={aiPrompt}
-                    onChange={(e) => {
-                      setAiPrompt(e.target.value);
-                      if (aiError) setAiError(null);
-                      if (aiSuccess) setAiSuccess(null);
-                    }}
-                    placeholder="e.g., Create a challenging problem on friction involving inclined planes with real-world context."
-                    className="mt-4 w-full rounded-xl border border-blue-200 bg-white/80 px-4 py-3 text-sm text-blue-900 shadow-inner focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    rows={3}
-                  />
-                  {aiError && (
-                    <div className="mt-3 rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 text-xs text-red-600 flex items-start gap-2">
-                      <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                      <span>{aiError}</span>
-                    </div>
-                  )}
-                  {aiSuccess && (
-                    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-xs text-emerald-700 flex items-start gap-2">
-                      <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                      <span>{aiSuccess}</span>
-                    </div>
-                  )}
-                  <p className="mt-3 text-[11px] uppercase tracking-[0.25em] text-blue-500">
-                    Powered by Google Gemini · Review the generated content before publishing.
-                  </p>
                 </div>
+              )}
+              <div className="space-y-6">
+                {/* AI Question Assistant Banner - Removed from here to floating drawer */}
 
                 {/* Question Text */}
                 <div>
@@ -1883,59 +1952,71 @@ export default function EnhancedQuestionEditor() {
                 {renderQuestionTypeSpecificUI()}
 
                 {/* Correct Answer - Hide for true_false and fill_blank as they're handled above */}
-                {formData.question_type !== 'true_false' && formData.question_type !== 'fill_blank' && (
-                <div>
-                  <label className="block text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                    Correct Answer *
-                  </label>
-                  {(formData.question_type === 'single_mcq' || formData.question_type === 'mcq') ? (
-                    <select
-                      value={
-                        formData.correct_answer
-                          ? String(
+                {/* Correct Answer Section */}
+                {!['subjective'].includes(formData.question_type.toLowerCase()) && (
+                  <div className="bg-slate-50/50 rounded-2xl p-6 border border-slate-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <label className="block text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        Correct Answer *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleAISolve}
+                        disabled={aiSolving || !formData.question_text}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all border border-indigo-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:hover:scale-100 transform hover:scale-105"
+                      >
+                        {aiSolving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        Solve with AI
+                      </button>
+                    </div>
+                    {(formData.question_type === 'single_mcq' || formData.question_type === 'mcq') ? (
+                      <select
+                        value={
+                          formData.correct_answer
+                            ? String(
                               formData.options.findIndex(
                                 (opt) =>
                                   normalizeOptionValue(opt) ===
                                   normalizeOptionValue(formData.correct_answer),
                               ),
                             )
-                          : ''
-                      }
-                      onChange={(e) => {
-                        if (e.target.value === '') {
-                          handleInputChange('correct_answer', '');
-                          return;
+                            : ''
                         }
-                        const selectedIndex = Number(e.target.value);
-                        if (!Number.isNaN(selectedIndex) && formData.options[selectedIndex]) {
-                          handleInputChange('correct_answer', formData.options[selectedIndex]);
-                        } else {
-                          handleInputChange('correct_answer', '');
-                        }
-                      }}
-                      className="w-full px-4 py-3.5 border-2 border-green-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all bg-green-50 font-medium"
-                    >
-                      <option value="">Select correct option...</option>
-                      {formData.options.map((option, index) => {
-                        if (!option.trim()) return null;
-                        return (
-                          <option key={index} value={index}>
-                            {String.fromCharCode(65 + index)}:{' '}
-                            {stripOptionContent(option).substring(0, 50) || 'Option'}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  ) : formData.question_type === 'multiple_mcq' ? (
-                    <div className="space-y-3">
-                      <p className="text-sm text-purple-700 font-medium">Select all correct options:</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        {formData.options.filter(o => o.trim()).map((option, index) => {
-                          const isChecked =
-                            normalizeOptionValue(option) !== '' &&
-                            (formData.correct_answer
-                              ? formData.correct_answer
+                        onChange={(e) => {
+                          if (e.target.value === '') {
+                            handleInputChange('correct_answer', '');
+                            return;
+                          }
+                          const selectedIndex = Number(e.target.value);
+                          if (!Number.isNaN(selectedIndex) && formData.options[selectedIndex]) {
+                            handleInputChange('correct_answer', formData.options[selectedIndex]);
+                          } else {
+                            handleInputChange('correct_answer', '');
+                          }
+                        }}
+                        className="w-full px-4 py-3.5 border-2 border-green-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all bg-green-50 font-medium"
+                      >
+                        <option value="">Select correct option...</option>
+                        {formData.options.map((option, index) => {
+                          if (!option.trim()) return null;
+                          return (
+                            <option key={index} value={index}>
+                              {String.fromCharCode(65 + index)}:{' '}
+                              {stripOptionContent(option).substring(0, 50) || 'Option'}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    ) : formData.question_type === 'multiple_mcq' ? (
+                      <div className="space-y-3">
+                        <p className="text-sm text-purple-700 font-medium">Select all correct options:</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          {formData.options.filter(o => o.trim()).map((option, index) => {
+                            const isChecked =
+                              normalizeOptionValue(option) !== '' &&
+                              (formData.correct_answer
+                                ? formData.correct_answer
                                   .split('|')
                                   .filter(Boolean)
                                   .some(
@@ -1943,75 +2024,75 @@ export default function EnhancedQuestionEditor() {
                                       normalizeOptionValue(answer) ===
                                       normalizeOptionValue(option),
                                   )
-                              : false);
-                          return (
-                            <label
-                              key={index}
-                              className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 cursor-pointer transition-colors"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  const currentAnswers = formData.correct_answer
-                                    ? formData.correct_answer.split('|').filter(Boolean)
-                                    : [];
-                                  if (e.target.checked) {
-                                    const exists = currentAnswers.some(
-                                      (answer) =>
-                                        normalizeOptionValue(answer) ===
-                                        normalizeOptionValue(option),
-                                    );
-                                    if (!exists) {
-                                      currentAnswers.push(option);
+                                : false);
+                            return (
+                              <label
+                                key={index}
+                                className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 cursor-pointer transition-colors"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    const currentAnswers = formData.correct_answer
+                                      ? formData.correct_answer.split('|').filter(Boolean)
+                                      : [];
+                                    if (e.target.checked) {
+                                      const exists = currentAnswers.some(
+                                        (answer) =>
+                                          normalizeOptionValue(answer) ===
+                                          normalizeOptionValue(option),
+                                      );
+                                      if (!exists) {
+                                        currentAnswers.push(option);
+                                      }
+                                    } else {
+                                      const filtered = currentAnswers.filter(
+                                        (answer) =>
+                                          normalizeOptionValue(answer) !==
+                                          normalizeOptionValue(option),
+                                      );
+                                      currentAnswers.splice(0, currentAnswers.length, ...filtered);
                                     }
-                                  } else {
-                                    const filtered = currentAnswers.filter(
-                                      (answer) =>
-                                        normalizeOptionValue(answer) !==
-                                        normalizeOptionValue(option),
-                                    );
-                                    currentAnswers.splice(0, currentAnswers.length, ...filtered);
-                                  }
-                                  const uniqueAnswers: string[] = [];
-                                  currentAnswers.forEach((answer) => {
-                                    const normalized = normalizeOptionValue(answer);
-                                    const exists = uniqueAnswers.some(
-                                      (existing) =>
-                                        normalizeOptionValue(existing) === normalized,
-                                    );
-                                    if (!exists) {
-                                      uniqueAnswers.push(answer);
-                                    }
-                                  });
-                                  handleInputChange('correct_answer', uniqueAnswers.join('|'));
-                                }}
-                                className="w-4 h-4 text-purple-600 border-purple-300 rounded focus:ring-purple-500"
-                              />
-                              <span className="text-sm font-medium text-purple-800">
-                                {String.fromCharCode(65 + index)}: {option.replace(/<[^>]*>/g, '').substring(0, 30)}...
-                              </span>
-                            </label>
-                          );
-                        })}
+                                    const uniqueAnswers: string[] = [];
+                                    currentAnswers.forEach((answer) => {
+                                      const normalized = normalizeOptionValue(answer);
+                                      const exists = uniqueAnswers.some(
+                                        (existing) =>
+                                          normalizeOptionValue(existing) === normalized,
+                                      );
+                                      if (!exists) {
+                                        uniqueAnswers.push(answer);
+                                      }
+                                    });
+                                    handleInputChange('correct_answer', uniqueAnswers.join('|'));
+                                  }}
+                                  className="w-4 h-4 text-purple-600 border-purple-300 rounded focus:ring-purple-500"
+                                />
+                                <span className="text-sm font-medium text-purple-800">
+                                  {String.fromCharCode(65 + index)}: {option.replace(/<[^>]*>/g, '').substring(0, 30)}...
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-purple-600">
+                          Selected answers will be stored as: {formData.correct_answer || 'None selected'}
+                        </p>
                       </div>
-                      <p className="text-xs text-purple-600">
-                        Selected answers will be stored as: {formData.correct_answer || 'None selected'}
-                      </p>
-                    </div>
-                  ) : (
-                    <input
-                      type="text"
-                      value={formData.correct_answer}
-                      onChange={(e) => handleInputChange('correct_answer', e.target.value)}
-                      className="w-full px-4 py-3.5 border-2 border-green-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all bg-green-50 font-medium"
-                      placeholder={
-                        formData.question_type === 'numerical' ? 'e.g., 3.14, 42, 6.02×10²³' :
-                        'Enter correct answer'
-                      }
-                    />
-                  )}
-                </div>
+                    ) : (
+                      <input
+                        type="text"
+                        value={formData.correct_answer}
+                        onChange={(e) => handleInputChange('correct_answer', e.target.value)}
+                        className="w-full px-4 py-3.5 border-2 border-green-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all bg-green-50 font-medium"
+                        placeholder={
+                          formData.question_type === 'numerical' ? 'e.g., 3.14, 42, 6.02×10²³' :
+                            'Enter correct answer'
+                        }
+                      />
+                    )}
+                  </div>
                 )}
 
                 {/* Solution */}
@@ -2073,102 +2154,99 @@ export default function EnhancedQuestionEditor() {
 
           {/* Right Sidebar - 1 col */}
           <div className="space-y-6">
-                    {/* Question Number Navigator (for current section) */}
-                    {currentSubjectGroup && (
-                      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-6 space-y-4">
-                        <div className="flex items-center justify-between">
+            {/* Question Number Navigator (for current section) */}
+            {currentSubjectGroup && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-slate-900">Question Navigator</h3>
+                    <p className="text-xs text-slate-600">Navigate questions grouped by subject & section</p>
+                  </div>
+                  <div className="text-xs text-slate-500 text-right">
+                    {currentSubjectGroup.subject} • {currentSubjectGroup.total_questions} questions
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {subjectGroups.map(group => {
+                    const isActive = group.slug === currentSubjectGroup.slug;
+                    return (
+                      <button
+                        key={group.slug}
+                        onClick={() => handleSubjectChange(group.slug)}
+                        className={`px-3 py-2 text-xs font-semibold rounded-full border transition-all ${isActive
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                          : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                          }`}
+                      >
+                        {group.subject}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="space-y-5">
+                  {currentSubjectGroup.sections.map(section => {
+                    const isCurrentSection = section.id === currentSection?.id;
+                    const cachedNumbers = existingNumbersBySection[section.id];
+                    const numbersSet = cachedNumbers
+                      ? cachedNumbers
+                      : isCurrentSection
+                        ? existingNumbers
+                        : new Set<number>();
+
+                    return (
+                      <div
+                        key={section.id}
+                        className={`rounded-xl border transition-all p-4 ${isCurrentSection
+                          ? 'border-blue-400 bg-blue-50 shadow-md'
+                          : 'border-slate-200 bg-slate-50'
+                          }`}
+                      >
+                        <div className="flex items-center justify-between mb-3">
                           <div>
-                            <h3 className="font-bold text-slate-900">Question Navigator</h3>
-                            <p className="text-xs text-slate-600">Navigate questions grouped by subject & section</p>
+                            <h4 className="text-sm font-bold text-slate-800">{section.name}</h4>
+                            <p className="text-xs text-slate-500">
+                              Section {section.subject_section_index} • Q{section.subject_start}–{section.subject_end}
+                            </p>
                           </div>
-                          <div className="text-xs text-slate-500 text-right">
-                            {currentSubjectGroup.subject} • {currentSubjectGroup.total_questions} questions
+                          <div className="text-xs text-slate-500">
+                            {section.marks_per_question} marks/question
                           </div>
                         </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          {subjectGroups.map(group => {
-                            const isActive = group.slug === currentSubjectGroup.slug;
+                        <div className="grid grid-cols-5 gap-2">
+                          {Array.from({ length: section.subject_end - section.subject_start + 1 }).map((_, idx) => {
+                            const num = section.subject_start + idx;
+                            const isCurrent = isCurrentSection && num === currentQuestionNumber;
+                            const isExisting = numbersSet.has(num);
                             return (
                               <button
-                                key={group.slug}
-                                onClick={() => handleSubjectChange(group.slug)}
-                                className={`px-3 py-2 text-xs font-semibold rounded-full border transition-all ${
-                                  isActive
-                                    ? 'bg-blue-600 text-white border-blue-600 shadow-md'
-                                    : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
-                                }`}
+                                key={`${section.id}-${num}`}
+                                onClick={() => navigateToQuestion(currentSubjectGroup.slug, num)}
+                                className={`h-10 rounded-lg border text-sm font-semibold transition-all ${isCurrent
+                                  ? 'border-blue-500 bg-blue-600 text-white shadow-md'
+                                  : isExisting
+                                    ? 'border-emerald-400 bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                                  }`}
+                                title={isExisting ? 'Already added' : 'Empty'}
                               >
-                                {group.subject}
+                                {num}
                               </button>
                             );
                           })}
                         </div>
-
-                        <div className="space-y-5">
-                          {currentSubjectGroup.sections.map(section => {
-                            const isCurrentSection = section.id === currentSection?.id;
-                            const cachedNumbers = existingNumbersBySection[section.id];
-                            const numbersSet = cachedNumbers
-                              ? cachedNumbers
-                              : isCurrentSection
-                                ? existingNumbers
-                                : new Set<number>();
-                            
-                            return (
-                              <div
-                                key={section.id}
-                                className={`rounded-xl border transition-all p-4 ${
-                                  isCurrentSection
-                                    ? 'border-blue-400 bg-blue-50 shadow-md'
-                                    : 'border-slate-200 bg-slate-50'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between mb-3">
-                                  <div>
-                                    <h4 className="text-sm font-bold text-slate-800">{section.name}</h4>
-                                    <p className="text-xs text-slate-500">
-                                      Section {section.subject_section_index} • Q{section.subject_start}–{section.subject_end}
-                                    </p>
-                                  </div>
-                                  <div className="text-xs text-slate-500">
-                                    {section.marks_per_question} marks/question
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-5 gap-2">
-                                  {Array.from({ length: section.subject_end - section.subject_start + 1 }).map((_, idx) => {
-                                    const num = section.subject_start + idx;
-                                    const isCurrent = isCurrentSection && num === currentQuestionNumber;
-                                    const isExisting = numbersSet.has(num);
-                                    return (
-                                      <button
-                                        key={`${section.id}-${num}`}
-                                        onClick={() => navigateToQuestion(currentSubjectGroup.slug, num)}
-                                        className={`h-10 rounded-lg border text-sm font-semibold transition-all ${
-                                          isCurrent
-                                            ? 'border-blue-500 bg-blue-600 text-white shadow-md'
-                                            : isExisting
-                                              ? 'border-emerald-400 bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                                              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
-                                        }`}
-                                        title={isExisting ? 'Already added' : 'Empty'}
-                                      >
-                                        {num}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        <div className="pt-2 flex items-center gap-3 text-xs text-slate-600">
-                          <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-300 inline-block"></span> Added</span>
-                          <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-200 inline-block"></span> Current</span>
-                        </div>
                       </div>
-                    )}
+                    );
+                  })}
+                </div>
+
+                <div className="pt-2 flex items-center gap-3 text-xs text-slate-600">
+                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-300 inline-block"></span> Added</span>
+                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-200 inline-block"></span> Current</span>
+                </div>
+              </div>
+            )}
 
             {/* AI Assistant */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
@@ -2179,7 +2257,7 @@ export default function EnhancedQuestionEditor() {
                 </h3>
               </div>
               <div className="p-4">
-                <AIImageToText 
+                <AIImageToText
                   onExtractedText={(text) => {
                     // Set the extracted text as question text
                     handleInputChange('question_text', text);
@@ -2255,13 +2333,12 @@ export default function EnhancedQuestionEditor() {
                         return (
                           <div
                             key={section.id}
-                            className={`p-4 rounded-xl border-2 transition-all ${
-                              isCurrent
-                                ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-300 shadow-lg'
-                                : isComplete
+                            className={`p-4 rounded-xl border-2 transition-all ${isCurrent
+                              ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-300 shadow-lg'
+                              : isComplete
                                 ? 'bg-green-50 border-green-300'
                                 : 'bg-slate-50 border-slate-200'
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center justify-between mb-2">
                               <div>
@@ -2278,19 +2355,17 @@ export default function EnhancedQuestionEditor() {
 
                             <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden shadow-inner">
                               <div
-                                className={`h-3 rounded-full transition-all duration-700 ${
-                                  isComplete
-                                    ? 'bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500'
-                                    : 'bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500'
-                                }`}
+                                className={`h-3 rounded-full transition-all duration-700 ${isComplete
+                                  ? 'bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500'
+                                  : 'bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500'
+                                  }`}
                                 style={{ width: `${progressPercentage}%` }}
                               ></div>
                             </div>
 
                             <div className="mt-2 flex items-center justify-between">
-                              <span className={`text-xs font-semibold ${
-                                isComplete ? 'text-green-600' : remaining <= 3 ? 'text-orange-600' : 'text-blue-600'
-                              }`}>
+                              <span className={`text-xs font-semibold ${isComplete ? 'text-green-600' : remaining <= 3 ? 'text-orange-600' : 'text-blue-600'
+                                }`}>
                                 {isComplete ? '✓ Complete!' : `${remaining} remaining`}
                               </span>
                               {isCurrent && (
@@ -2338,6 +2413,118 @@ export default function EnhancedQuestionEditor() {
           </div>
         </div>
       </div>
+      {/* AI Chatbot Floating Drawer */}
+      <div
+        className={`fixed inset-y-0 right-0 w-96 bg-white shadow-2xl z-[110] transform transition-transform duration-300 ease-in-out border-l border-slate-200 ${isAiChatOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        <div className="h-full flex flex-col">
+          {/* Drawer Header */}
+          <div className="p-6 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-6 h-6" />
+              <div>
+                <h3 className="font-bold text-lg">AI Assistant</h3>
+                <p className="text-xs text-blue-100">Powered by Gemini Pro</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setIsAiChatOpen(false);
+                setAiPrompt('');
+                setAiError(null);
+                setAiSuccess(null);
+              }}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Drawer Body - Chat interface */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 italic text-slate-600 text-sm">
+              "Describe the concept or nuance you want covered. I'll draft a {getQuestionTypeDisplayName(currentSection?.question_type || formData.question_type)} for you."
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Your Prompt</label>
+                <textarea
+                  value={aiPrompt}
+                  onChange={(e) => {
+                    setAiPrompt(e.target.value);
+                    if (aiError) setAiError(null);
+                    if (aiSuccess) setAiSuccess(null);
+                  }}
+                  placeholder="e.g., Create a challenging problem on friction involving inclined planes..."
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 min-h-[120px] resize-none"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGenerateAIQuestion}
+                disabled={aiGenerating}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg transition hover:from-indigo-700 hover:to-blue-700 disabled:cursor-not-allowed disabled:opacity-60 transform hover:scale-[1.02]"
+              >
+                {aiGenerating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analyzing & Drafting...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Draft Question
+                  </>
+                )}
+              </button>
+
+              {aiError && (
+                <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-600 flex items-start gap-2 animate-in fade-in slide-in-from-top-2">
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <span>{aiError}</span>
+                </div>
+              )}
+              {aiSuccess && (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-700 flex items-start gap-2 animate-in fade-in slide-in-from-top-2">
+                  <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <span>{aiSuccess}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-slate-200">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Quick Suggestions</h4>
+              <div className="flex flex-wrap gap-2">
+                {['Basic concept', 'Problem solving', 'Complex scenario', 'Theoretical'].map(sug => (
+                  <button
+                    key={sug}
+                    onClick={() => setAiPrompt(prev => prev + (prev ? ' ' : '') + sug)}
+                    className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-600 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+                  >
+                    + {sug}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-white border-t border-slate-200 text-center">
+            <p className="text-[10px] uppercase tracking-widest text-slate-400">
+              Gemini Pro AI • Verify generated content
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Backdrop for Drawer */}
+      {isAiChatOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-[105] transition-opacity duration-300"
+          onClick={() => setIsAiChatOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -68,7 +68,8 @@ export default function ExamManagement() {
   const navigate = useNavigate();
   const location = useLocation();
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
-  const basePath = isSuperAdminPath ? '/superadmin' : '';
+  const isCenterAdminPath = location.pathname.startsWith('/center-admin');
+  const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
   const { user } = useAuthContext();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);

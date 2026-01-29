@@ -5,21 +5,21 @@ import axios from 'axios';
 const getDefaultApiUrl = () => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    
+
     // Domain-specific API routing
     if (hostname === 'timetable.dashoapp.com') {
       return 'https://exams.dashoapp.com/api'; // Timetable uses same backend
     }
-    
+
     // For development
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:8001/api';
     }
-    
+
     // For production exams domain or any other domain
     return 'https://exams.dashoapp.com/api';
   }
-  
+
   // Fallback
   return 'https://exams.dashoapp.com/api';
 };
@@ -40,13 +40,13 @@ api.interceptors.request.use(
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
-    
+
     // Add device fingerprint to headers if available
     const deviceFingerprint = localStorage.getItem('device_fingerprint');
     if (deviceFingerprint) {
       config.headers['X-Device-Fingerprint'] = deviceFingerprint;
     }
-    
+
     return config;
   },
   (error) => {
@@ -59,7 +59,7 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
+
     // Check if this is a device session invalidation error
     if (error.response?.status === 401 && error.response?.data?.error_code === 'DEVICE_SESSION_INVALID') {
       // Device session was invalidated (user logged in on another device)
@@ -67,12 +67,12 @@ api.interceptors.response.use(
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user_data');
       localStorage.removeItem('device_fingerprint');
-      
+
       // Redirect to login with a message
       window.location.href = '/login?reason=device_switched';
       return Promise.reject(error);
     }
-    
+
     // If error status is 401 (Unauthorized) and it's not a login/refresh request
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true; // Mark request as retried
@@ -112,7 +112,8 @@ api.interceptors.response.use(
 
 // Custom hook for API calls
 export function useApi<T>(
-  endpoint: string
+  endpoint: string,
+  options: { clearDataOnFetch?: boolean } = {}
 ): {
   data: T | null;
   loading: boolean;
@@ -129,6 +130,10 @@ export function useApi<T>(
       return;
     }
 
+    if (options.clearDataOnFetch) {
+      setData(null);
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -140,7 +145,7 @@ export function useApi<T>(
     } finally {
       setLoading(false);
     }
-  }, [endpoint]);
+  }, [endpoint, options.clearDataOnFetch]);
 
   useEffect(() => {
     fetchData();

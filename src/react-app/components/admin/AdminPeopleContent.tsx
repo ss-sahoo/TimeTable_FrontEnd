@@ -70,13 +70,33 @@ const AdminPeopleContent = () => {
         role: "student"
     });
     const [error, setError] = useState<string>("");
+    const [centerId, setCenterId] = useState<string | null>(null);
     const itemsPerPage = 10;
 
-    // Get admin's center ID
-    const centerId = currentUser?.center_id;
+    // Get admin's center ID - with fallback to profile API
+    useEffect(() => {
+        const getCenterId = async () => {
+            if (currentUser?.center_id) {
+                setCenterId(currentUser.center_id);
+            } else {
+                // Fallback: fetch from profile API
+                try {
+                    const res = await api.get('/auth/profile/');
+                    if (res.data?.center_id) {
+                        setCenterId(res.data.center_id);
+                    }
+                } catch (err) {
+                    console.error('Failed to fetch center from profile:', err);
+                }
+            }
+        };
+        getCenterId();
+    }, [currentUser]);
 
     useEffect(() => {
-        fetchUsers();
+        if (centerId) {
+            fetchUsers();
+        }
     }, [centerId]);
 
     const fetchUsers = async () => {
@@ -499,8 +519,8 @@ const AdminPeopleContent = () => {
                                 <button
                                     onClick={() => setActiveTab("all")}
                                     className={`${activeTab === "all"
-                                            ? "border-blue-500 text-blue-600"
-                                            : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                                        ? "border-blue-500 text-blue-600"
+                                        : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                                         } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                                 >
                                     All Users
@@ -512,8 +532,8 @@ const AdminPeopleContent = () => {
                                 <button
                                     onClick={() => setActiveTab("teacher")}
                                     className={`${activeTab === "teacher"
-                                            ? "border-blue-500 text-blue-600"
-                                            : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                                        ? "border-blue-500 text-blue-600"
+                                        : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                                         } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                                 >
                                     Teachers
@@ -525,8 +545,8 @@ const AdminPeopleContent = () => {
                                 <button
                                     onClick={() => setActiveTab("student")}
                                     className={`${activeTab === "student"
-                                            ? "border-blue-500 text-blue-600"
-                                            : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                                        ? "border-blue-500 text-blue-600"
+                                        : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                                         } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                                 >
                                     Students
@@ -538,8 +558,8 @@ const AdminPeopleContent = () => {
                                 <button
                                     onClick={() => setActiveTab("staff")}
                                     className={`${activeTab === "staff"
-                                            ? "border-blue-500 text-blue-600"
-                                            : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                                        ? "border-blue-500 text-blue-600"
+                                        : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                                         } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                                 >
                                     Staff
@@ -650,8 +670,8 @@ const AdminPeopleContent = () => {
                                             </td>
                                             <td className="whitespace-nowrap px-3 py-4">
                                                 <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${user.is_active
-                                                        ? "bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20"
-                                                        : "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20"
+                                                    ? "bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20"
+                                                    : "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20"
                                                     }`}>
                                                     {user.is_active ? "Active" : "Inactive"}
                                                 </span>
@@ -721,8 +741,8 @@ const AdminPeopleContent = () => {
                                             key={page}
                                             onClick={() => setCurrentPage(page)}
                                             className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${page === currentPage
-                                                    ? 'z-10 bg-blue-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600'
-                                                    : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
+                                                ? 'z-10 bg-blue-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600'
+                                                : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
                                                 }`}
                                         >
                                             {page}

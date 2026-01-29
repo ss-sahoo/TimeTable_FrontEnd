@@ -9,7 +9,6 @@ import {
   ChevronDown,
   Zap,
   LogOut,
-  Grid3x3,
   Users as UsersIcon,
   Settings as SettingsIcon,
   Layers,
@@ -17,17 +16,15 @@ import {
 import { useAuthContext } from "../contexts/AuthContext";
 
 // Import existing page components
-import Dashboard from "./Dashboard";
-import PatternManagementNew from "./PatternManagementNew";
-import ExamManagementNew from "./ExamManagementNew";
-import ExamCreationNew from "./ExamCreationNew";
+import ExamHub from "./ExamHub";
 import Settings from "./Settings";
 
 // Import new admin components
+import AdminHomeContent from "../components/admin/AdminHomeContent";
 import AdminPeopleContent from "../components/admin/AdminPeopleContent";
 import AdminBatchesContent from "../components/admin/AdminBatchesContent";
 
-type SidebarTab = "home" | "patterns" | "exams" | "exam-create" | "people" | "batches" | "settings";
+type SidebarTab = "home" | "exams" | "people" | "batches" | "settings";
 
 export default function CenterAdminDashboard() {
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("home");
@@ -80,14 +77,6 @@ export default function CenterAdminDashboard() {
             label="Home"
             active={sidebarTab === "home"}
             onClick={() => setSidebarTab("home")}
-            collapsed={sidebarCollapsed}
-          />
-          <SidebarNavItem
-            icon={Grid3x3}
-            label="Patterns"
-            badge="New"
-            active={sidebarTab === "patterns"}
-            onClick={() => setSidebarTab("patterns")}
             collapsed={sidebarCollapsed}
           />
           <SidebarNavItem
@@ -182,9 +171,7 @@ export default function CenterAdminDashboard() {
             <div>
               <h1 className="text-xl font-semibold text-slate-900">
                 {sidebarTab === "home" && "Dashboard"}
-                {sidebarTab === "patterns" && "Patterns"}
-                {sidebarTab === "exams" && "Exams"}
-                {sidebarTab === "exam-create" && "Create Exam"}
+                {sidebarTab === "exams" && "Exam Hub"}
                 {sidebarTab === "people" && "People Management"}
                 {sidebarTab === "batches" && "Batches & Programs"}
                 {sidebarTab === "settings" && "Settings"}
@@ -205,10 +192,8 @@ export default function CenterAdminDashboard() {
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto bg-slate-50 p-6 lg:p-8">
           <div className="max-w-[1600px] mx-auto">
-            {sidebarTab === "home" && <Dashboard />}
-            {sidebarTab === "patterns" && <PatternManagementNew />}
-            {sidebarTab === "exams" && <ExamManagementWrapper onCreateExam={() => setSidebarTab("exam-create")} />}
-            {sidebarTab === "exam-create" && <ExamCreationNew />}
+            {sidebarTab === "home" && <AdminHomeContent />}
+            {sidebarTab === "exams" && <ExamHub />}
             {sidebarTab === "people" && <AdminPeopleContent />}
             {sidebarTab === "batches" && <AdminBatchesContent />}
             {sidebarTab === "settings" && <Settings />}
@@ -240,17 +225,6 @@ export default function CenterAdminDashboard() {
                   active={sidebarTab === "home"}
                   onClick={() => {
                     setSidebarTab("home");
-                    setMobileMenuOpen(false);
-                  }}
-                  collapsed={false}
-                />
-                <SidebarNavItem
-                  icon={Grid3x3}
-                  label="Patterns"
-                  badge="New"
-                  active={sidebarTab === "patterns"}
-                  onClick={() => {
-                    setSidebarTab("patterns");
                     setMobileMenuOpen(false);
                   }}
                   collapsed={false}
@@ -366,22 +340,5 @@ function SidebarNavItem({
         </>
       )}
     </button>
-  );
-}
-
-// Wrapper component to intercept navigation in ExamManagement
-function ExamManagementWrapper({ onCreateExam }: { onCreateExam: () => void }) {
-  return (
-    <div onClick={(e) => {
-      const target = e.target as HTMLElement;
-      // Check if the clicked element or its parent is a link to /exams/create
-      const link = target.closest('a[href="/exams/create"]');
-      if (link) {
-        e.preventDefault();
-        onCreateExam();
-      }
-    }}>
-      <ExamManagementNew />
-    </div>
   );
 }

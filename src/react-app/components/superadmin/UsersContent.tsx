@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { api } from "../../hooks/useApi";
 import { useAuthContext } from "../../contexts/AuthContext";
-import { 
-  UserPlus, 
-  Upload, 
-  Search, 
-  Filter, 
-  Edit2, 
+import {
+  UserPlus,
+  Upload,
+  Search,
+  Filter,
+  Edit2,
   Trash2,
   ChevronLeft,
   ChevronRight,
@@ -59,7 +59,7 @@ const UsersContent = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAssignCenterModal, setShowAssignCenterModal] = useState(false);
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
-  const [userCredentials, setUserCredentials] = useState<{username: string; password: string} | null>(null);
+  const [userCredentials, setUserCredentials] = useState<{ username: string; password: string } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [centers, setCenters] = useState<any[]>([]);
@@ -102,7 +102,7 @@ const UsersContent = () => {
   const fetchCenters = async () => {
     const instituteId = currentUser?.institute_id || currentUser?.institute?.id;
     if (!instituteId) return;
-    
+
     try {
       // Use timetable centers endpoint
       const response = await api.get(`/timetable/centers/?institute_id=${instituteId}`);
@@ -125,16 +125,16 @@ const UsersContent = () => {
     try {
       setError("");
       setLoading(true);
-      
+
       await api.post('/auth/assign-center/', {
         user_id: selectedUser.id,
         center_id: selectedCenterId
       });
-      
+
       setShowAssignCenterModal(false);
       setSelectedUser(null);
       setSelectedCenterId("");
-      
+
       alert(`Successfully assigned center to ${selectedUser.email}`);
       fetchUsers();
     } catch (error: any) {
@@ -167,13 +167,13 @@ const UsersContent = () => {
     try {
       setError("");
       setLoading(true);
-      
+
       const fullName = `${newUser.first_name} ${newUser.last_name}`.trim();
       let response;
       let endpoint = '';
       let useAutoGeneration = false;
       let requiresPassword = false;
-      
+
       // Determine if this role requires password or uses auto-generation
       const roleLower = newUser.role.toLowerCase();
       if (roleLower === 'super_admin') {
@@ -181,7 +181,7 @@ const UsersContent = () => {
       } else {
         useAutoGeneration = true;
       }
-      
+
       // Validate password for roles that require it
       if (requiresPassword) {
         if (!newUser.password) {
@@ -195,38 +195,54 @@ const UsersContent = () => {
           return;
         }
       }
-      
+
       // Use appropriate endpoint based on role
       switch (roleLower) {
         case 'admin':
           // For admin, use registration endpoint with auto-generated credentials
           const adminUsername = newUser.username || `ADM-${newUser.email.split('@')[0]}`;
           const adminPassword = newUser.password || `Admin@${new Date().getFullYear()}`;
-          
-          response = await api.post('/auth/register/', {
+
+          // Build payload with center_id if selected
+          const adminPayload: any = {
             username: adminUsername,
             email: newUser.email,
             password: adminPassword,
             password_confirm: adminPassword,
             first_name: newUser.first_name,
             last_name: newUser.last_name,
-            role: 'admin',  // Changed to lowercase
+            role: 'admin',
             institute_id: instituteId
-          });
-          
-          // If center was selected, assign it after creation
-          if (selectedCenterId && response.data.id) {
+          };
+
+          // Include center_id directly in registration if selected
+          if (selectedCenterId) {
+            adminPayload.center_id = selectedCenterId;
+          }
+
+          response = await api.post('/auth/register/', adminPayload);
+
+          // If center assignment failed in registration, try update endpoint
+          if (selectedCenterId && response.data.id && !response.data.center_id) {
             try {
-              await api.post('/auth/assign-center/', {
-                user_id: response.data.id,
+              // Try PATCH to update user with center_id
+              await api.patch(`/auth/users/${response.data.id}/`, {
                 center_id: selectedCenterId
               });
             } catch (centerError) {
-              console.error('Failed to assign center:', centerError);
-              // Continue anyway - center can be assigned later
+              console.error('Failed to assign center via update:', centerError);
+              // Try alternative endpoint
+              try {
+                await api.post('/auth/assign-center/', {
+                  user_id: response.data.id,
+                  center_id: selectedCenterId
+                });
+              } catch (altCenterError) {
+                console.error('Failed to assign center via assign-center:', altCenterError);
+              }
             }
           }
-          
+
           // Set credentials for display
           response.data = {
             ...response.data,
@@ -235,7 +251,7 @@ const UsersContent = () => {
           };
           useAutoGeneration = true;
           break;
-          
+
         case 'teacher':
           endpoint = '/timetable/superadmin/teachers/create/';
           response = await api.post(endpoint, {
@@ -247,7 +263,7 @@ const UsersContent = () => {
             subjects: 'General',
           });
           break;
-          
+
         case 'staff':
           endpoint = '/timetable/superadmin/staff/create/';
           response = await api.post(endpoint, {
@@ -257,12 +273,12 @@ const UsersContent = () => {
             phone_number: newUser.username || '',
           });
           break;
-          
+
         case 'student':
           // For students, use registration endpoint with auto-generated username
           const autoUsername = newUser.username || `STU-${newUser.email.split('@')[0]}`;
           const autoPassword = newUser.password || `Student@${new Date().getFullYear()}`;
-          
+
           response = await api.post('/auth/register/', {
             username: autoUsername,
             email: newUser.email,
@@ -273,7 +289,7 @@ const UsersContent = () => {
             role: 'student',  // Changed to lowercase
             institute_id: instituteId
           });
-          
+
           // Set credentials for display
           response.data = {
             ...response.data,
@@ -282,7 +298,7 @@ const UsersContent = () => {
           };
           useAutoGeneration = true;
           break;
-          
+
         case 'super_admin':
         default:
           // For super_admin, use registration endpoint with provided password
@@ -298,7 +314,7 @@ const UsersContent = () => {
           });
           break;
       }
-      
+
       setShowAddUserModal(false);
       setNewUser({
         username: "",
@@ -312,7 +328,7 @@ const UsersContent = () => {
       setSelectedCenterId("");
       setCurrentPage(1);
       await fetchUsers();
-      
+
       // Show credentials if they were auto-generated
       if (useAutoGeneration && response?.data?.username && response?.data?.password) {
         setUserCredentials({
@@ -325,11 +341,11 @@ const UsersContent = () => {
       }
     } catch (error: any) {
       console.error("Error adding user:", error);
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          error.response?.data?.error ||
-                          JSON.stringify(error.response?.data) ||
-                          "Failed to add user";
+      const errorMessage = error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        JSON.stringify(error.response?.data) ||
+        "Failed to add user";
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -338,7 +354,7 @@ const UsersContent = () => {
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm("Are you sure you want to delete this user?")) return;
-    
+
     try {
       await api.delete(`/auth/users/${userId}/`);
       fetchUsers(); // Refresh the list
@@ -385,7 +401,7 @@ const UsersContent = () => {
 
   const downloadTemplate = () => {
     let template: string[][];
-    
+
     switch (importRole) {
       case 'teacher':
         template = [
@@ -474,11 +490,11 @@ const UsersContent = () => {
       setImportFile(null);
       setImportRole('student');
       setImportCenterId('');
-      
+
       const successCount = response.data.success || response.data.created_count || 0;
       const totalCount = response.data.total || 0;
       alert(`Successfully imported ${successCount} out of ${totalCount} users!`);
-      
+
       fetchUsers();
     } catch (error: any) {
       console.error("Error importing users:", error);
@@ -489,20 +505,20 @@ const UsersContent = () => {
   };
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = 
+    const matchesSearch =
       user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (user.first_name?.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (user.last_name?.toLowerCase().includes(searchQuery.toLowerCase()));
-    
+
     if (activeTab === "all") return matchesSearch;
-    
+
     // Handle admin role variations
     if (activeTab === "admin") {
       const userRole = user.role.toLowerCase();
       return matchesSearch && (userRole === 'admin' || userRole === 'institute_admin');
     }
-    
+
     return matchesSearch && user.role.toLowerCase() === activeTab.toLowerCase();
   });
 
@@ -551,7 +567,7 @@ const UsersContent = () => {
   };
 
   const getRoleDisplayName = (role: string) => {
-    return role.replace('_', ' ').split(' ').map(word => 
+    return role.replace('_', ' ').split(' ').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
   };
@@ -651,91 +667,79 @@ const UsersContent = () => {
               <nav className="-mb-px flex space-x-6">
                 <button
                   onClick={() => setActiveTab("all")}
-                  className={`${
-                    activeTab === "all"
+                  className={`${activeTab === "all"
                       ? "border-blue-500 text-blue-600"
                       : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                  } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
+                    } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                 >
                   All Users
-                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
-                    activeTab === "all" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
-                  }`}>
+                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === "all" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
+                    }`}>
                     {roleCounts.all}
                   </span>
                 </button>
                 <button
                   onClick={() => setActiveTab("super_admin")}
-                  className={`${
-                    activeTab === "super_admin"
+                  className={`${activeTab === "super_admin"
                       ? "border-blue-500 text-blue-600"
                       : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                  } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
+                    } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                 >
                   Super Admins
-                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
-                    activeTab === "super_admin" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
-                  }`}>
+                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === "super_admin" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
+                    }`}>
                     {roleCounts.super_admin || 0}
                   </span>
                 </button>
                 <button
                   onClick={() => setActiveTab("admin")}
-                  className={`${
-                    activeTab === "admin"
+                  className={`${activeTab === "admin"
                       ? "border-blue-500 text-blue-600"
                       : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                  } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
+                    } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                 >
                   Admins
-                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
-                    activeTab === "admin" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
-                  }`}>
+                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === "admin" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
+                    }`}>
                     {roleCounts.admin || 0}
                   </span>
                 </button>
                 <button
                   onClick={() => setActiveTab("teacher")}
-                  className={`${
-                    activeTab === "teacher"
+                  className={`${activeTab === "teacher"
                       ? "border-blue-500 text-blue-600"
                       : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                  } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
+                    } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                 >
                   Teachers
-                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
-                    activeTab === "teacher" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
-                  }`}>
+                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === "teacher" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
+                    }`}>
                     {roleCounts.teacher || 0}
                   </span>
                 </button>
                 <button
                   onClick={() => setActiveTab("student")}
-                  className={`${
-                    activeTab === "student"
+                  className={`${activeTab === "student"
                       ? "border-blue-500 text-blue-600"
                       : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                  } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
+                    } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                 >
                   Students
-                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
-                    activeTab === "student" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
-                  }`}>
+                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === "student" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
+                    }`}>
                     {roleCounts.student || 0}
                   </span>
                 </button>
                 <button
                   onClick={() => setActiveTab("staff")}
-                  className={`${
-                    activeTab === "staff"
+                  className={`${activeTab === "staff"
                       ? "border-blue-500 text-blue-600"
                       : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                  } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
+                    } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                 >
                   Staff
-                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
-                    activeTab === "staff" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
-                  }`}>
+                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === "staff" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
+                    }`}>
                     {roleCounts.staff || 0}
                   </span>
                 </button>
@@ -825,7 +829,7 @@ const UsersContent = () => {
                         </div>
                         <div className="ml-4">
                           <div className="font-medium text-gray-900">
-                            {user.first_name && user.last_name 
+                            {user.first_name && user.last_name
                               ? `${user.first_name} ${user.last_name}`
                               : user.username}
                           </div>
@@ -865,13 +869,13 @@ const UsersContent = () => {
                       </div>
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                      <button 
-                        onClick={() => {/* TODO: Implement edit */}}
+                      <button
+                        onClick={() => {/* TODO: Implement edit */ }}
                         className="text-gray-400 hover:text-blue-600 mr-3"
                       >
                         <Edit2 className="w-5 h-5" />
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleDeleteUser(user.id)}
                         className="text-gray-400 hover:text-red-600"
                       >
@@ -910,11 +914,10 @@ const UsersContent = () => {
                     <button
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
-                        currentPage === pageNum
+                      className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${currentPage === pageNum
                           ? 'z-10 bg-blue-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600'
                           : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20'
-                      }`}
+                        }`}
                     >
                       {pageNum}
                     </button>
@@ -951,7 +954,7 @@ const UsersContent = () => {
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowAssignCenterModal(false)}></div>
-            
+
             <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
               <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
                 <div className="flex items-center justify-between mb-4">
@@ -1037,7 +1040,7 @@ const UsersContent = () => {
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowImportModal(false)}></div>
-            
+
             <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
               <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
                 <div className="flex items-center justify-between mb-4">
@@ -1205,7 +1208,7 @@ const UsersContent = () => {
         <div className="fixed inset-0 z-50 overflow-y-auto" onLoad={() => fetchCenters()}>
           <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowAddUserModal(false)}></div>
-            
+
             <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
               <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
                 <div className="flex items-center justify-between mb-4">
@@ -1233,7 +1236,7 @@ const UsersContent = () => {
                       <input
                         type="text"
                         value={newUser.first_name}
-                        onChange={(e) => setNewUser({...newUser, first_name: e.target.value})}
+                        onChange={(e) => setNewUser({ ...newUser, first_name: e.target.value })}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
                       />
                     </div>
@@ -1242,7 +1245,7 @@ const UsersContent = () => {
                       <input
                         type="text"
                         value={newUser.last_name}
-                        onChange={(e) => setNewUser({...newUser, last_name: e.target.value})}
+                        onChange={(e) => setNewUser({ ...newUser, last_name: e.target.value })}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
                       />
                     </div>
@@ -1255,7 +1258,7 @@ const UsersContent = () => {
                     <input
                       type="text"
                       value={newUser.username}
-                      onChange={(e) => setNewUser({...newUser, username: e.target.value})}
+                      onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
                       placeholder="Leave empty for auto-generation"
                     />
@@ -1266,7 +1269,7 @@ const UsersContent = () => {
                     <input
                       type="email"
                       value={newUser.email}
-                      onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                      onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
                       required
                     />
@@ -1279,7 +1282,7 @@ const UsersContent = () => {
                     <input
                       type="password"
                       value={newUser.password}
-                      onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                      onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
                       placeholder={(newUser.role === 'manager' || newUser.role === 'super_admin') ? "Enter password" : "Leave empty for auto-generation"}
                     />
@@ -1292,7 +1295,7 @@ const UsersContent = () => {
                     <input
                       type="password"
                       value={newUser.password_confirm}
-                      onChange={(e) => setNewUser({...newUser, password_confirm: e.target.value})}
+                      onChange={(e) => setNewUser({ ...newUser, password_confirm: e.target.value })}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
                       placeholder={(newUser.role === 'manager' || newUser.role === 'super_admin') ? "Confirm password" : "Confirm password if provided"}
                     />
@@ -1303,7 +1306,7 @@ const UsersContent = () => {
                     <select
                       value={newUser.role}
                       onChange={(e) => {
-                        setNewUser({...newUser, role: e.target.value});
+                        setNewUser({ ...newUser, role: e.target.value });
                         // Fetch centers when admin or teacher is selected
                         if (e.target.value === 'admin' || e.target.value === 'teacher') {
                           fetchCenters();
@@ -1458,7 +1461,7 @@ const UsersContent = () => {
 
                   <div className="mt-4 rounded-md bg-blue-50 border border-blue-200 p-3">
                     <p className="text-xs text-blue-800">
-                      <span className="font-semibold">Next steps:</span> Share these credentials with the user securely. 
+                      <span className="font-semibold">Next steps:</span> Share these credentials with the user securely.
                       They can change their password after first login.
                     </p>
                   </div>

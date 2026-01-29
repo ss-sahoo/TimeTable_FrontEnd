@@ -44,7 +44,8 @@ const ProctoringSnapshotsView: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
-  const basePath = isSuperAdminPath ? '/superadmin' : '';
+  const isCenterAdminPath = location.pathname.startsWith('/center-admin');
+  const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
   const [data, setData] = useState<SnapshotsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -235,8 +236,8 @@ const ProctoringSnapshotsView: React.FC = () => {
               <div
                 key={index}
                 className={`bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer transition-all hover:shadow-md ${snapshot.stored_reason === 'violation_detected'
-                    ? 'border-2 border-red-300'
-                    : 'border border-gray-200'
+                  ? 'border-2 border-red-300'
+                  : 'border border-gray-200'
                   }`}
                 onClick={() => setSelectedSnapshot(snapshot)}
               >

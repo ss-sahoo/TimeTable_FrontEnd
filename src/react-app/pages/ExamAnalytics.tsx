@@ -73,7 +73,8 @@ const ExamAnalytics: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
-  const basePath = isSuperAdminPath ? '/superadmin' : '';
+  const isCenterAdminPath = location.pathname.startsWith('/center-admin');
+  const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
 
   const [dashboardData, setDashboardData] = useState<ExamDashboardData | null>(null);
   const [allAttempts, setAllAttempts] = useState<ExamAttempt[]>([]);
@@ -335,8 +336,8 @@ const ExamAnalytics: React.FC = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as 'overview' | 'attempts' | 'questions' | 'violations')}
                 className={`group flex items-center gap-3 py-4 px-6 rounded-xl font-medium text-sm transition-all duration-200 relative ${activeTab === tab.id
-                    ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                   }`}
               >
                 <tab.icon className={`w-5 h-5 transition-colors ${activeTab === tab.id ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'
@@ -344,8 +345,8 @@ const ExamAnalytics: React.FC = () => {
                 <span>{tab.label}</span>
                 {tab.count > 0 && (
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${activeTab === tab.id
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
                     }`}>
                     {tab.count}
                   </span>

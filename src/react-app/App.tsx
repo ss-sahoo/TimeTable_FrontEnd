@@ -23,6 +23,10 @@ import AIAssistant from "@/react-app/pages/AIAssistant";
 import Users from "@/react-app/pages/Users";
 import Settings from "@/react-app/pages/Settings";
 import StudentDashboard from "@/react-app/pages/StudentDashboard";
+// Import new admin components
+import AdminHomeContent from "./components/admin/AdminHomeContent";
+import AdminPeopleContent from "./components/admin/AdminPeopleContent";
+import AdminBatchesContent from "./components/admin/AdminBatchesContent";
 import StudentDashboardImproved from "@/react-app/pages/StudentDashboardImproved";
 import StudentAnalytics from "@/react-app/pages/StudentAnalytics";
 import StudentAnalyticsOverview from "@/react-app/pages/StudentAnalyticsOverview";
@@ -65,6 +69,7 @@ import Timetable from "@/react-app/pages/Timetable";
 import Batches from "@/react-app/pages/Batches";
 import ExamHub from "@/react-app/pages/ExamHub";
 import SuperAdminLayout from "@/react-app/components/superadmin/SuperAdminLayout";
+import CenterAdminLayout from "@/react-app/components/admin/CenterAdminLayout";
 import InstituteContent from "@/react-app/components/superadmin/InstituteContent";
 import CentersContent from "@/react-app/components/superadmin/CentersContent";
 import UsersContent from "@/react-app/components/superadmin/UsersContent";
@@ -203,22 +208,23 @@ function getDashboardRoute(role: string | undefined): string {
     return '/timetable';
   }
 
-  switch (role) {
+  const normalizedRole = role?.toLowerCase();
+
+  switch (normalizedRole) {
     case 'manager':
       return '/manager';
     case 'super_admin':
-    case 'SUPER_ADMIN':
+    case 'superadmin':
       return '/superadmin/dashboard';
-    case 'ADMIN':
+    case 'admin':
     case 'institute_admin':
+    case 'center_admin':
       return '/center-admin/dashboard';
     case 'student':
-    case 'STUDENT':
       return '/student-dashboard';
     case 'teacher':
-    case 'TEACHER':
       return '/teacher';
-    case 'STAFF':
+    case 'staff':
       return '/staff';
     default:
       return '/dashboard';
@@ -409,9 +415,34 @@ function AppRoutes() {
           </SuperAdminLayout>
         </FullscreenProtectedRoute>
       } />
-      <Route path="/center-admin/dashboard" element={
+      <Route path="/center-admin/*" element={
         <FullscreenProtectedRoute>
-          <CenterAdminDashboard />
+          <CenterAdminLayout>
+            <Routes>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<AdminHomeContent />} />
+              <Route path="exams" element={<ExamHub />} />
+              <Route path="exams/create" element={<ExamCreation />} />
+              <Route path="exams/:examId/edit" element={<ExamCreation />} />
+              <Route path="exams/:examId" element={<ExamView />} />
+              <Route path="exams/:examId/analytics" element={<ExamAnalytics />} />
+              <Route path="exams/:examId/results-analytics" element={<ExamResultsAnalyticsEnhanced />} />
+              <Route path="exam-results/:attemptId" element={<ExamResults />} />
+              <Route path="exam-review/:attemptId" element={<ExamReview />} />
+              <Route path="proctoring-snapshots/:attemptId" element={<ProctoringSnapshotsView />} />
+              <Route path="people" element={<AdminPeopleContent />} />
+              <Route path="batches" element={<AdminBatchesContent />} />
+              <Route path="patterns" element={<ExamHub />} />
+              <Route path="patterns/create" element={<PatternCreation />} />
+              <Route path="patterns/:id/edit" element={<PatternCreation />} />
+              <Route path="patterns/:patternId/view" element={<PatternView />} />
+              <Route path="patterns/:patternId/questions/create" element={<QuestionCreation />} />
+              <Route path="pattern/:patternId/question/:subjectSlug/:questionNumber" element={<QuestionCreationEnhanced />} />
+              <Route path="pattern/:patternId/question/:questionNumber" element={<QuestionCreationEnhanced />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="*" element={<Navigate to="/center-admin/dashboard" replace />} />
+            </Routes>
+          </CenterAdminLayout>
         </FullscreenProtectedRoute>
       } />
       <Route path="/center-admin" element={<Navigate to="/center-admin/dashboard" replace />} />

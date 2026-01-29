@@ -64,7 +64,8 @@ export default function PatternView() {
   const navigate = useNavigate();
   const location = useLocation();
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
-  const basePath = isSuperAdminPath ? '/superadmin' : '';
+  const isCenterAdminPath = location.pathname.startsWith('/center-admin');
+  const basePath = isSuperAdminPath ? '/superadmin' : isCenterAdminPath ? '/center-admin' : '';
   const [activeTab, setActiveTab] = useState<'overview' | 'sections' | 'questions'>('overview');
   const [showBulkImport, setShowBulkImport] = useState(false);
 
@@ -176,8 +177,8 @@ export default function PatternView() {
                 <div className="flex items-center gap-2">
                   <h1 className="text-lg font-semibold text-slate-900">{pattern.name}</h1>
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${pattern.is_active
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-slate-200 text-slate-600'
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-slate-200 text-slate-600'
                     }`}>
                     {pattern.is_active ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
                     {pattern.is_active ? 'Active' : 'Inactive'}
@@ -267,8 +268,8 @@ export default function PatternView() {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as any)}
                     className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all border-b-2 ${activeTab === tab.id
-                        ? 'border-blue-600 text-blue-600'
-                        : 'border-transparent text-slate-600 hover:text-slate-900'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-slate-600 hover:text-slate-900'
                       }`}
                   >
                     <Icon className="w-3.5 h-3.5" />

@@ -69,7 +69,8 @@ export default function QuestionCreation() {
   const navigate = useNavigate();
   const location = useLocation();
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
-  const basePath = isSuperAdminPath ? '/superadmin' : '';
+  const isCenterAdminPath = location.pathname.startsWith('/center-admin');
+  const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
   const { patternId, sectionId } = useParams();
   const { user } = useAuthContext();
   const [loading, setLoading] = useState(false);
@@ -514,8 +515,8 @@ export default function QuestionCreation() {
                       <button
                         onClick={() => setCorrectOption(index)}
                         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${option.is_correct
-                            ? 'border-green-500 bg-green-500'
-                            : 'border-slate-300 hover:border-slate-400'
+                          ? 'border-green-500 bg-green-500'
+                          : 'border-slate-300 hover:border-slate-400'
                           }`}
                       >
                         {option.is_correct && <CheckCircle className="w-4 h-4 text-white" />}

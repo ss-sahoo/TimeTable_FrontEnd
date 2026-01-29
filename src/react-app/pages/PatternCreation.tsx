@@ -66,7 +66,8 @@ export default function PatternCreation() {
   const navigate = useNavigate();
   const location = useLocation();
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
-  const basePath = isSuperAdminPath ? '/superadmin' : '';
+  const isCenterAdminPath = location.pathname.startsWith('/center-admin');
+  const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
   const { id } = useParams();
   const { user } = useAuthContext();
   const [loading, setLoading] = useState(false);
@@ -151,12 +152,13 @@ export default function PatternCreation() {
   const handleSubjectInputChange = (value: string) => {
     setNewSubjectName(value);
 
-    if (value.trim().length > 0 && subjectsData?.results) {
-      const filtered = subjectsData.results.filter(subject =>
+    if (value.trim().length > 0) {
+      const results = subjectsData?.results || [];
+      const filtered = results.filter(subject =>
         subject.name.toLowerCase().includes(value.toLowerCase())
       );
       setFilteredSubjects(filtered);
-      setShowSubjectSuggestions(filtered.length > 0);
+      setShowSubjectSuggestions(filtered.length > 0 || results.length === 0);
     } else {
       setFilteredSubjects([]);
       setShowSubjectSuggestions(false);
@@ -262,7 +264,7 @@ export default function PatternCreation() {
     );
 
     if (existingSubject) {
-      setSubjectError('Subject already exists');
+      handleSubjectSelect(existingSubject.name);
       return;
     }
 
@@ -293,7 +295,18 @@ export default function PatternCreation() {
 
     } catch (error: any) {
       console.error('Failed to add subject:', error);
-      setSubjectError(error.response?.data?.name?.[0] || 'Failed to add subject. Please try again.');
+
+      // Handle the case where the subject already exists on the server but wasn't in our local list
+      if (error.response?.status === 400 &&
+        (error.response.data?.name?.[0]?.toLowerCase().includes('already exists') ||
+          error.response.data?.non_field_errors?.[0]?.toLowerCase().includes('already exists'))) {
+
+        const subjectName = newSubjectName.trim();
+        await refetchSubjects();
+        handleSubjectSelect(subjectName);
+      } else {
+        setSubjectError(error.response?.data?.name?.[0] || error.response?.data?.error || 'Failed to add subject. Please try again.');
+      }
     } finally {
       setAddingSubject(false);
     }

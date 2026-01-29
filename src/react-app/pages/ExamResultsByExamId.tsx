@@ -8,7 +8,8 @@ const ExamResultsByExamId: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
-  const basePath = isSuperAdminPath ? '/superadmin' : '';
+  const isCenterAdminPath = location.pathname.startsWith('/center-admin');
+  const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

@@ -10,7 +10,8 @@ export default function ExamSetupDetails() {
   const navigate = useNavigate();
   const location = useLocation();
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
-  const basePath = isSuperAdminPath ? '/superadmin' : '';
+  const isCenterAdminPath = location.pathname.startsWith('/center-admin');
+  const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
   const [selectedSubject, setSelectedSubject] = useState<ExamSubject | null>(null);
   const [showSectionModal, setShowSectionModal] = useState(false);
   const [sectionLoading, setSectionLoading] = useState(false);
