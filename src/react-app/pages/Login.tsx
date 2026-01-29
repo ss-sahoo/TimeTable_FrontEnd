@@ -41,20 +41,20 @@ export default function Login() {
     if (window.location.hostname === 'timetable.dashoapp.com') {
       return '/timetable';
     }
-    
-    switch (role) {
+
+    const normalizedRole = role?.toLowerCase();
+
+    switch (normalizedRole) {
       case 'super_admin':
-      case 'SUPER_ADMIN':
+      case 'superadmin':
         return '/superadmin/dashboard';
       case 'admin':
-      case 'ADMIN':
       case 'institute_admin':
+      case 'center_admin':
         return '/center-admin/dashboard';
       case 'teacher':
-      case 'TEACHER':
         return '/teacher';
       case 'student':
-      case 'STUDENT':
         return '/student-dashboard';
       default:
         return '/dashboard';
@@ -68,11 +68,11 @@ export default function Login() {
 
     try {
       let loggedInUser: any = null;
-      
+
       // Try role-specific endpoints first (admin, super_admin, teacher, student)
       const roleAttempts = ['admin', 'super_admin', 'teacher', 'student'];
       let loginSuccess = false;
-      
+
       for (const roleType of roleAttempts) {
         try {
           loggedInUser = await login(formData.email, formData.password, roleType);
@@ -90,7 +90,7 @@ export default function Login() {
           continue;
         }
       }
-      
+
       // If role-specific login failed, try generic login
       if (!loginSuccess) {
         try {
@@ -106,7 +106,7 @@ export default function Login() {
           throw genericError;
         }
       }
-      
+
       // Redirect based on user role
       if (loggedInUser?.role) {
         const dashboardRoute = getDashboardRoute(loggedInUser.role);
@@ -131,10 +131,10 @@ export default function Login() {
       // Retry login with stored credentials and force switch flag
       const { identifier, password, role } = deviceConflict.credentials;
       const loggedInUser = await login(identifier, password, role, true); // true = forceSwitch
-      
+
       // Clear device conflict state
       setDeviceConflict(null);
-      
+
       // Redirect based on user role
       if (loggedInUser?.role) {
         const dashboardRoute = getDashboardRoute(loggedInUser.role);
@@ -164,7 +164,7 @@ export default function Login() {
           onCancel={handleCancelDeviceSwitch}
         />
       )}
-      
+
       {/* LEFT SIDE: Brand & Testimonial */}
       <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-12 text-white"
         style={{
@@ -190,7 +190,7 @@ export default function Login() {
         </div>
 
         {/* Logo Area */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5 }}
@@ -203,13 +203,13 @@ export default function Login() {
         </motion.div>
 
         {/* Testimonial / Trust Section */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
           className="relative z-10 max-w-lg"
         >
-          <div 
+          <div
             className="p-8 rounded-2xl shadow-2xl"
             style={{
               background: 'rgba(255, 255, 255, 0.1)',
@@ -223,15 +223,15 @@ export default function Login() {
                 <Star key={i} className="w-4 h-4" fill="currentColor" />
               ))}
             </div>
-            
+
             <blockquote className="text-lg font-medium leading-relaxed mb-6">
               "DashoExams transformed how we handle high-stakes assessments. The AI proctoring is seamless, and the analytics give us insights we never had before."
             </blockquote>
-            
+
             <div className="flex items-center gap-4">
-              <img 
-                src="https://ui-avatars.com/api/?name=Dr+Sarah+Chen&background=random" 
-                alt="User" 
+              <img
+                src="https://ui-avatars.com/api/?name=Dr+Sarah+Chen&background=random"
+                alt="User"
                 className="w-10 h-10 rounded-full border-2 border-white/20"
               />
               <div>
@@ -242,7 +242,7 @@ export default function Login() {
               </div>
             </div>
           </div>
-          
+
           {/* Trusted By Logos (Subtle) */}
           <div className="mt-8 flex gap-6 opacity-60">
             <div className="h-6 w-20 bg-white/20 rounded"></div>
@@ -258,7 +258,7 @@ export default function Login() {
 
       {/* RIGHT SIDE: Login Form */}
       <div className="w-full lg:w-1/2 bg-white flex flex-col justify-center items-center p-8 lg:p-12 overflow-y-auto relative">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -280,27 +280,27 @@ export default function Login() {
 
           {/* Social Login */}
           <div className="grid grid-cols-2 gap-3">
-            <button 
+            <button
               type="button"
               className="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
               </svg>
               Google
             </button>
-            <button 
+            <button
               type="button"
               className="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#00A4EF" d="M11.4 24H0V12.6h11.4V24z"/>
-                <path fill="#FFB900" d="M24 24H12.6V12.6H24V24z"/>
-                <path fill="#F25022" d="M11.4 11.4H0V0h11.4v11.4z"/>
-                <path fill="#7FBA00" d="M24 11.4H12.6V0H24v11.4z"/>
+                <path fill="#00A4EF" d="M11.4 24H0V12.6h11.4V24z" />
+                <path fill="#FFB900" d="M24 24H12.6V12.6H24V24z" />
+                <path fill="#F25022" d="M11.4 11.4H0V0h11.4v11.4z" />
+                <path fill="#7FBA00" d="M24 11.4H12.6V0H24v11.4z" />
               </svg>
               Microsoft
             </button>
@@ -340,13 +340,11 @@ export default function Login() {
               <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1.5">
                 Email or Teacher ID
               </label>
-              <div className={`relative group rounded-lg transition-all duration-200 ${
-                focusedField === 'email' ? 'ring-2 ring-indigo-500/20' : ''
-              }`}>
+              <div className={`relative group rounded-lg transition-all duration-200 ${focusedField === 'email' ? 'ring-2 ring-indigo-500/20' : ''
+                }`}>
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className={`w-4 h-4 transition-colors ${
-                    focusedField === 'email' ? 'text-indigo-600' : 'text-slate-400'
-                  }`} />
+                  <Mail className={`w-4 h-4 transition-colors ${focusedField === 'email' ? 'text-indigo-600' : 'text-slate-400'
+                    }`} />
                 </div>
                 <input
                   id="email"
@@ -371,13 +369,11 @@ export default function Login() {
                   Password
                 </label>
               </div>
-              <div className={`relative group rounded-lg transition-all duration-200 ${
-                focusedField === 'password' ? 'ring-2 ring-indigo-500/20' : ''
-              }`}>
+              <div className={`relative group rounded-lg transition-all duration-200 ${focusedField === 'password' ? 'ring-2 ring-indigo-500/20' : ''
+                }`}>
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className={`w-4 h-4 transition-colors ${
-                    focusedField === 'password' ? 'text-indigo-600' : 'text-slate-400'
-                  }`} />
+                  <Lock className={`w-4 h-4 transition-colors ${focusedField === 'password' ? 'text-indigo-600' : 'text-slate-400'
+                    }`} />
                 </div>
                 <input
                   id="password"

@@ -89,8 +89,10 @@ interface ExamResult {
   };
   detailed_answers: {
     [key: string]: {
+      question_number?: number;
       question_text: string;
       question_type: string;
+      subject?: string;
       user_answer: string;
       correct_answer: string;
       is_correct: boolean;
@@ -781,8 +783,13 @@ const ExamResults: React.FC = () => {
                           >
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                               <div>
-                                <p className="text-xs uppercase text-slate-500">Question {index + 1}</p>
-                                <h3 className="text-base font-semibold text-slate-900">{detail.question_type.toUpperCase()}</h3>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold uppercase tracking-wider">
+                                    {detail.subject || 'General'}
+                                  </span>
+                                  <p className="text-xs uppercase text-slate-500 font-medium">Question {detail.question_number || index + 1}</p>
+                                </div>
+                                <h3 className="text-base font-semibold text-slate-900">{detail.question_type.replace(/_/g, ' ').toUpperCase()}</h3>
                               </div>
                               <div className="flex items-center gap-2 text-xs text-slate-500">
                                 <span className="font-semibold text-slate-700">

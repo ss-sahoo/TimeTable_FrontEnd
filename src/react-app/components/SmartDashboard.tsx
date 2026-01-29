@@ -9,11 +9,13 @@ export default function SmartDashboard() {
   const { user } = useAuthContext();
 
   // Route based on user role
-  if (user?.role === 'super_admin' || user?.role === 'SUPER_ADMIN') {
+  const normalizedRole = user?.role?.toLowerCase();
+
+  if (normalizedRole === 'super_admin' || normalizedRole === 'superadmin') {
     return <Navigate to="/superadmin/dashboard" replace />;
-  } else if (user?.role === 'student' || user?.role === 'STUDENT') {
+  } else if (normalizedRole === 'student') {
     return <StudentDashboard />;
-  } else if (user?.role === 'teacher' || user?.role === 'TEACHER' || user?.role === 'exam_admin') {
+  } else if (normalizedRole === 'teacher' || normalizedRole === 'exam_admin') {
     return <TeacherDashboard />;
   }
 

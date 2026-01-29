@@ -70,6 +70,7 @@ import Batches from "@/react-app/pages/Batches";
 import ExamHub from "@/react-app/pages/ExamHub";
 import SuperAdminLayout from "@/react-app/components/superadmin/SuperAdminLayout";
 import CenterAdminLayout from "@/react-app/components/admin/CenterAdminLayout";
+import StudentLayout from "@/react-app/components/student/StudentLayout";
 import InstituteContent from "@/react-app/components/superadmin/InstituteContent";
 import CentersContent from "@/react-app/components/superadmin/CentersContent";
 import UsersContent from "@/react-app/components/superadmin/UsersContent";
@@ -427,6 +428,18 @@ function AppRoutes() {
               <Route path="exams/:examId" element={<ExamView />} />
               <Route path="exams/:examId/analytics" element={<ExamAnalytics />} />
               <Route path="exams/:examId/results-analytics" element={<ExamResultsAnalyticsEnhanced />} />
+              <Route path="exams/:examId/results-analytics/*" element={<ExamAnalyticsDashboard />}>
+                <Route path="statistics" element={<StatisticsPage />} />
+                <Route path="heatmap" element={<HeatMapPage />} />
+                <Route path="histogram" element={<HistogramPage />} />
+                <Route path="boxplot" element={<BoxPlotPage />} />
+                <Route path="questions" element={<QuestionsPage />} />
+                <Route path="students" element={<StudentsPage />} />
+                <Route path="student/:studentId" element={<StudentDetailPage />} />
+                <Route path="evaluation" element={<EvaluationPage />} />
+                <Route path="graphs" element={<GraphsPage />} />
+              </Route>
+              <Route path="exams/:examId/evaluation" element={<TeacherEvaluationDashboard />} />
               <Route path="exam-results/:attemptId" element={<ExamResults />} />
               <Route path="exam-review/:attemptId" element={<ExamReview />} />
               <Route path="proctoring-snapshots/:attemptId" element={<ProctoringSnapshotsView />} />
@@ -439,6 +452,7 @@ function AppRoutes() {
               <Route path="patterns/:patternId/questions/create" element={<QuestionCreation />} />
               <Route path="pattern/:patternId/question/:subjectSlug/:questionNumber" element={<QuestionCreationEnhanced />} />
               <Route path="pattern/:patternId/question/:questionNumber" element={<QuestionCreationEnhanced />} />
+              <Route path="exam/:examId/pattern/:patternId/bulk-import" element={<BulkImportPage />} />
               <Route path="settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/center-admin/dashboard" replace />} />
             </Routes>
@@ -544,36 +558,48 @@ function AppRoutes() {
         </RoleProtectedRoute>
       } />
       <Route path="/student-dashboard" element={
-        <ProtectedRoute>
-          <StudentDashboard />
-        </ProtectedRoute>
+        <FullscreenProtectedRoute>
+          <StudentLayout>
+            <StudentDashboard />
+          </StudentLayout>
+        </FullscreenProtectedRoute>
       } />
       <Route path="/my-exams" element={
-        <ProtectedRoute>
-          <StudentDashboard />
-        </ProtectedRoute>
+        <FullscreenProtectedRoute>
+          <StudentLayout>
+            <StudentDashboard />
+          </StudentLayout>
+        </FullscreenProtectedRoute>
       } />
       <Route path="/student-exams" element={
-        <ProtectedRoute>
-          <StudentExamList />
-        </ProtectedRoute>
+        <FullscreenProtectedRoute>
+          <StudentLayout>
+            <StudentExamList />
+          </StudentLayout>
+        </FullscreenProtectedRoute>
       } />
       <Route path="/student-analytics" element={
-        <ProtectedRoute>
-          <RoleBasedRedirect targetPath="/student-analytics">
-            <StudentAnalyticsOverview />
-          </RoleBasedRedirect>
-        </ProtectedRoute>
+        <FullscreenProtectedRoute>
+          <StudentLayout>
+            <RoleBasedRedirect targetPath="/student-analytics">
+              <StudentAnalyticsOverview />
+            </RoleBasedRedirect>
+          </StudentLayout>
+        </FullscreenProtectedRoute>
       } />
       <Route path="/student-analytics/:examId" element={
-        <ProtectedRoute>
-          <StudentAnalytics />
-        </ProtectedRoute>
+        <FullscreenProtectedRoute>
+          <StudentLayout>
+            <StudentAnalytics />
+          </StudentLayout>
+        </FullscreenProtectedRoute>
       } />
       <Route path="/exam-access/:examId" element={
-        <ProtectedRoute>
-          <ExamAccess />
-        </ProtectedRoute>
+        <FullscreenProtectedRoute>
+          <StudentLayout>
+            <ExamAccess />
+          </StudentLayout>
+        </FullscreenProtectedRoute>
       } />
       <Route path="/exam-setup/:examId" element={
         <FullscreenProtectedRoute>
@@ -586,16 +612,20 @@ function AppRoutes() {
         </FullscreenProtectedRoute>
       } />
       <Route path="/exam-results/:attemptId" element={
-        <ProtectedRoute>
-          <RoleBasedRedirect targetPath="/exam-results/:attemptId">
-            <ExamResults />
-          </RoleBasedRedirect>
-        </ProtectedRoute>
+        <FullscreenProtectedRoute>
+          <StudentLayout>
+            <RoleBasedRedirect targetPath="/exam-results/:attemptId">
+              <ExamResults />
+            </RoleBasedRedirect>
+          </StudentLayout>
+        </FullscreenProtectedRoute>
       } />
       <Route path="/exam-results/exam/:examId" element={
-        <ProtectedRoute>
-          <ExamResultsByExamId />
-        </ProtectedRoute>
+        <FullscreenProtectedRoute>
+          <StudentLayout>
+            <ExamResultsByExamId />
+          </StudentLayout>
+        </FullscreenProtectedRoute>
       } />
       <Route path="/test-results/:attemptId" element={
         <ProtectedRoute>
@@ -604,14 +634,18 @@ function AppRoutes() {
       } />
       {/* Test routes removed - Advanced components are now integrated into exam-specific pages */}
       <Route path="/exam-review/:attemptId" element={
-        <ProtectedRoute>
-          <ExamReview />
-        </ProtectedRoute>
+        <FullscreenProtectedRoute>
+          <StudentLayout>
+            <ExamReview />
+          </StudentLayout>
+        </FullscreenProtectedRoute>
       } />
       <Route path="/results" element={
-        <ProtectedRoute>
-          <Results />
-        </ProtectedRoute>
+        <FullscreenProtectedRoute>
+          <StudentLayout>
+            <Results />
+          </StudentLayout>
+        </FullscreenProtectedRoute>
       } />
       {/* Legacy route redirect */}
       <Route path="/exam-attempts" element={

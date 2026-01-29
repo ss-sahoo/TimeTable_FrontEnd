@@ -178,15 +178,7 @@ export const useProctoringCamera = ({
     try {
       setDetectionStatus('detecting');
       const base64Data = imageSrc.split(',')[1];
-      
-      // Enhanced logging
       const captureTimestamp = new Date().toISOString();
-      console.log('[Proctoring] Capturing snapshot:', {
-        attemptId,
-        timestamp: captureTimestamp,
-        imageSize: base64Data.length,
-        interval: captureIntervalMs
-      });
 
       const response = await api.post(`/exams/attempts/${attemptId}/proctoring/snapshot/`, {
         image_data: base64Data,
@@ -202,19 +194,7 @@ export const useProctoringCamera = ({
       });
 
       const data = response.data;
-      
-      // Enhanced logging for analysis results
-      console.log('[Proctoring] Analysis complete:', {
-        attemptId,
-        timestamp: captureTimestamp,
-        violationCount: data?.violation_count || 0,
-        violations: data?.analysis?.violations?.length || 0,
-        facesDetected: data?.analysis?.faces_detected,
-        processingTime: data?.analysis?.processing_time,
-        gazeData: data?.analysis?.gaze_data,
-        headPose: data?.analysis?.head_pose_data
-      });
-      
+
       if (typeof data?.violation_count === 'number') {
         setViolationCount(data.violation_count);
       }
@@ -225,29 +205,15 @@ export const useProctoringCamera = ({
       const analysis = data?.analysis;
       if (analysis?.violations?.length && onViolationDetected) {
         analysis.violations.forEach((violation: any) => {
-          // Enhanced violation logging
-          console.warn('[Proctoring] Violation detected:', {
-            type: violation.type,
-            severity: violation.severity,
-            confidence: violation.confidence,
-            message: violation.message,
-            timestamp: captureTimestamp,
-            gazeX: violation.gaze_x,
-            gazeY: violation.gaze_y,
-            angle: violation.angle
-          });
-          
           onViolationDetected({
             type: violation.type,
             confidence: violation.confidence,
             message: violation.message,
             timestamp: new Date(),
-            severity: violation.severity,
+            severity: violation.severity || 'medium',
             analysis
           });
         });
-      } else {
-        console.log('[Proctoring] No violations detected - student focused');
       }
 
       return data;
@@ -280,13 +246,13 @@ export const useProctoringCamera = ({
 
   useEffect(() => {
     if (!isActive) return;
-    
+
     // Initial capture using current function
     const currentCapture = captureSnapshotRef.current;
     if (currentCapture) {
       currentCapture();
     }
-    
+
     // Set up interval - use ref to always call latest version without recreating interval
     const intervalId = window.setInterval(() => {
       const latestCapture = captureSnapshotRef.current;

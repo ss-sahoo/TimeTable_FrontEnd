@@ -81,7 +81,7 @@ interface AnalyticsData {
 export default function StudentAnalyticsOverview() {
   const { user } = useAuthContext();
   const navigate = useNavigate();
-  
+
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -175,83 +175,59 @@ export default function StudentAnalyticsOverview() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
-        <div className="w-full px-4 py-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Performance Analytics</h1>
-              <p className="text-blue-100">Comprehensive overview of your academic performance</p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="p-3 bg-white/10 hover:bg-white/20 rounded-lg transition-colors backdrop-blur-sm"
-              >
-                <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-              </button>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="px-4 py-3 bg-white/10 hover:bg-white/20 rounded-lg transition-colors backdrop-blur-sm flex items-center gap-2"
-              >
-                <ChevronRight className="w-5 h-5 rotate-180" />
-                Back to Dashboard
-              </button>
+
+      {/* Main Content */}
+      <div className="w-full py-6">
+        {/* Key Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-500 text-sm">Exams Attempted</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{overview.total_exams_attempted}</p>
+              </div>
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <BookOpen className="w-6 h-6 text-blue-600" />
+              </div>
             </div>
           </div>
 
-          {/* Key Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-sm">Exams Attempted</p>
-                  <p className="text-3xl font-bold mt-1">{overview.total_exams_attempted}</p>
-                  <p className="text-blue-200 text-xs mt-1">{overview.total_exams_passed} passed</p>
-                </div>
-                <BookOpen className="w-10 h-10 text-blue-200" />
+          <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-500 text-sm">Average Score</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{overview.average_score.toFixed(1)}%</p>
+              </div>
+              <div className="p-3 bg-indigo-50 rounded-lg">
+                <TrendingUp className="w-6 h-6 text-indigo-600" />
               </div>
             </div>
+          </div>
 
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-sm">Average Score</p>
-                  <p className="text-3xl font-bold mt-1">{overview.average_score.toFixed(1)}%</p>
-                  <p className="text-blue-200 text-xs mt-1">Across all exams</p>
-                </div>
-                <TrendingUp className="w-10 h-10 text-blue-200" />
+          <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-500 text-sm">Pass Rate</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{overview.pass_percentage.toFixed(0)}%</p>
+              </div>
+              <div className="p-3 bg-green-50 rounded-lg">
+                <Trophy className="w-6 h-6 text-green-600" />
               </div>
             </div>
+          </div>
 
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-sm">Pass Rate</p>
-                  <p className="text-3xl font-bold mt-1">{overview.pass_percentage.toFixed(0)}%</p>
-                  <p className="text-blue-200 text-xs mt-1">Success rate</p>
-                </div>
-                <Trophy className="w-10 h-10 text-blue-200" />
+          <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-500 text-sm">Current Rank</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">#{overview.current_rank}</p>
               </div>
-            </div>
-
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-sm">Current Rank</p>
-                  <p className="text-3xl font-bold mt-1">#{overview.current_rank}</p>
-                  <p className="text-blue-200 text-xs mt-1">In your institute</p>
-                </div>
-                <Star className="w-10 h-10 text-blue-200" />
+              <div className="p-3 bg-amber-50 rounded-lg">
+                <Star className="w-6 h-6 text-amber-600" />
               </div>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="w-full px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           {/* Performance Distribution - Pie Chart Representation */}
           <div className="lg:col-span-1 bg-white rounded-lg border border-slate-200 p-6">
@@ -309,7 +285,7 @@ export default function StudentAnalyticsOverview() {
                 </div>
               </div>
             </div>
-            
+
             {/* Score Summary */}
             <div className="mt-6 pt-6 border-t border-slate-200">
               <div className="grid grid-cols-2 gap-4">
@@ -348,8 +324,8 @@ export default function StudentAnalyticsOverview() {
                             {getTrendIcon(item.score, previousScore)}
                           </div>
                           <p className="text-xs text-slate-600">
-                            {new Date(item.date).toLocaleDateString('en-US', { 
-                              month: 'short', 
+                            {new Date(item.date).toLocaleDateString('en-US', {
+                              month: 'short',
                               day: 'numeric',
                               year: 'numeric'
                             })}
@@ -412,11 +388,10 @@ export default function StudentAnalyticsOverview() {
                     <div className="mt-3">
                       <div className="w-full bg-slate-100 rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full transition-all ${
-                            stats.average_score >= 80 ? 'bg-green-600' :
-                            stats.average_score >= 60 ? 'bg-blue-600' :
-                            stats.average_score >= 40 ? 'bg-orange-600' : 'bg-red-600'
-                          }`}
+                          className={`h-2 rounded-full transition-all ${stats.average_score >= 80 ? 'bg-green-600' :
+                              stats.average_score >= 60 ? 'bg-blue-600' :
+                                stats.average_score >= 40 ? 'bg-orange-600' : 'bg-red-600'
+                            }`}
                           style={{ width: `${stats.average_score}%` }}
                         ></div>
                       </div>
@@ -482,17 +457,17 @@ export default function StudentAnalyticsOverview() {
               </div>
 
               {/* Performance Badge */}
-              <div className="border border-slate-200 rounded-lg p-4 bg-gradient-to-br from-blue-50 to-indigo-50">
+              <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-white rounded-full">
+                  <div className="p-3 bg-white rounded-full border border-slate-100 shadow-sm">
                     <Trophy className="w-6 h-6 text-blue-600" />
                   </div>
                   <div>
                     <p className="text-xs text-slate-600">Performance Level</p>
                     <p className="text-lg font-bold text-slate-900">
                       {overview.average_score >= 80 ? 'Excellent' :
-                       overview.average_score >= 60 ? 'Good' :
-                       overview.average_score >= 40 ? 'Average' : 'Needs Focus'}
+                        overview.average_score >= 60 ? 'Good' :
+                          overview.average_score >= 40 ? 'Average' : 'Needs Focus'}
                     </p>
                   </div>
                 </div>
@@ -557,27 +532,27 @@ export default function StudentAnalyticsOverview() {
         </div>
 
         {/* Insights & Recommendations */}
-        <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-6">
+        <div className="mt-6 bg-slate-50 rounded-lg border border-slate-200 p-6">
           <div className="flex items-center gap-2 mb-4">
             <Lightbulb className="w-5 h-5 text-blue-600" />
             <h2 className="text-lg font-bold text-slate-900">Personalized Insights</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white rounded-lg p-4">
+            <div className="bg-white border border-slate-100 rounded-lg p-4 shadow-sm">
               <Brain className="w-6 h-6 text-purple-600 mb-2" />
               <h3 className="font-semibold text-slate-900 mb-1">Study Smart</h3>
               <p className="text-sm text-slate-600">
                 Focus on subjects with lower averages to improve overall performance.
               </p>
             </div>
-            <div className="bg-white rounded-lg p-4">
+            <div className="bg-white border border-slate-100 rounded-lg p-4 shadow-sm">
               <Target className="w-6 h-6 text-green-600 mb-2" />
               <h3 className="font-semibold text-slate-900 mb-1">Set Goals</h3>
               <p className="text-sm text-slate-600">
                 Aim for consistent scores above 80% to achieve excellence level.
               </p>
             </div>
-            <div className="bg-white rounded-lg p-4">
+            <div className="bg-white border border-slate-100 rounded-lg p-4 shadow-sm">
               <Shield className="w-6 h-6 text-orange-600 mb-2" />
               <h3 className="font-semibold text-slate-900 mb-1">Stay Disciplined</h3>
               <p className="text-sm text-slate-600">

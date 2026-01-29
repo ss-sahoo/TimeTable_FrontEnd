@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, X, Clock, Shield, Eye } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AlertTriangle, X, ShieldAlert, Timer, ChevronRight, Info } from 'lucide-react';
 
 interface ViolationWarningProps {
   isOpen: boolean;
@@ -24,14 +25,14 @@ const ViolationWarning: React.FC<ViolationWarningProps> = ({
   onAcknowledge,
   onClose
 }) => {
-  const [countdown, setCountdown] = useState(10);
+  const [countdown, setCountdown] = useState(5); // Reduced to 5s for better UX, but keeping it mandatory
   const [canAcknowledge, setCanAcknowledge] = useState(false);
 
   useEffect(() => {
     if (isOpen && violation) {
-      setCountdown(10);
+      setCountdown(5);
       setCanAcknowledge(false);
-      
+
       const timer = setInterval(() => {
         setCountdown(prev => {
           if (prev <= 1) {
@@ -47,220 +48,143 @@ const ViolationWarning: React.FC<ViolationWarningProps> = ({
     }
   }, [isOpen, violation]);
 
-  const getViolationIcon = (type: string) => {
+  if (!isOpen || !violation) return null;
+
+  const getViolationContent = (type: string) => {
+    const defaultData = {
+      title: 'Security Violation Detected',
+      description: 'Your recent action has been flagged by the proctoring system.',
+      instruction: 'Please adhere to the exam guidelines to avoid automatic disqualification.'
+    };
+
     switch (type) {
       case 'tab_switch':
-        return <Eye className="w-6 h-6" />;
+        return {
+          title: 'Browser Focus Lost',
+          description: 'You switched away from the examination window.',
+          instruction: 'The exam must remain in active focus. Do not navigate away from this page.'
+        };
       case 'multiple_faces':
-        return <AlertTriangle className="w-6 h-6" />;
-      case 'no_face':
-        return <AlertTriangle className="w-6 h-6" />;
-      case 'looking_away':
-        return <Eye className="w-6 h-6" />;
+        return {
+          title: 'Multiple Persons Detected',
+          description: 'Our AI proctor detected more than one person in your camera frame.',
+          instruction: 'Ensure you are alone in a private, well-lit room.'
+        };
       case 'mobile_detected':
-        return <AlertTriangle className="w-6 h-6" />;
-      case 'copy_paste':
-        return <AlertTriangle className="w-6 h-6" />;
-      case 'fullscreen_exit':
-        return <AlertTriangle className="w-6 h-6" />;
-      default:
-        return <AlertTriangle className="w-6 h-6" />;
-    }
-  };
-
-  const getViolationTitle = (type: string) => {
-    switch (type) {
-      case 'tab_switch':
-        return 'Tab Switch Detected';
-      case 'window_blur':
-        return 'Window Lost Focus';
-      case 'multiple_faces':
-        return 'Multiple People Detected';
-      case 'no_face':
-        return 'No Face Detected';
+        return {
+          title: 'Unauthorized Device',
+          description: 'A mobile phone or electronic device was detected in your frame.',
+          instruction: 'Remove all electronic devices from your workspace immediately.'
+        };
       case 'looking_away':
-        return 'Looking Away Detected';
-      case 'mobile_detected':
-        return 'Mobile Device Detected';
-      case 'copy_paste':
-        return 'Copy/Paste Attempt';
-      case 'fullscreen_exit':
-        return 'Exited Fullscreen Mode';
-      case 'right_click':
-        return 'Right-Click Attempt';
-      case 'keyboard_shortcut':
-        return 'Blocked Keyboard Shortcut';
+        return {
+          title: 'Attention Divergence',
+          description: 'Repeated instances of looking away from the screen were recorded.',
+          instruction: 'Maintain visual focus on the exam screen at all times.'
+        };
       default:
-        return 'Security Violation';
+        return defaultData;
     }
   };
 
-  const getViolationSeverity = (type: string) => {
-    switch (type) {
-      case 'multiple_faces':
-      case 'mobile_detected':
-        return 'high';
-      case 'tab_switch':
-      case 'looking_away':
-      case 'no_face':
-        return 'medium';
-      case 'copy_paste':
-      case 'right_click':
-      case 'keyboard_shortcut':
-        return 'low';
-      default:
-        return 'medium';
-    }
-  };
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'high':
-        return 'text-red-600 bg-red-50 border-red-200';
-      case 'medium':
-        return 'text-orange-600 bg-orange-50 border-orange-200';
-      case 'low':
-        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      default:
-        return 'text-gray-600 bg-gray-50 border-gray-200';
-    }
-  };
-
-  const getViolationGuidance = (type: string) => {
-    switch (type) {
-      case 'tab_switch':
-        return 'Please return to the exam tab immediately. Do not switch tabs during the exam.';
-      case 'window_blur':
-        return 'Please return focus to the exam window. Keep the exam window active at all times.';
-      case 'multiple_faces':
-        return 'Only one person should be visible in the camera. Please ensure you are alone in the room.';
-      case 'no_face':
-        return 'Please position yourself so your face is clearly visible in the camera.';
-      case 'looking_away':
-        return 'Please keep your attention on the exam screen. Avoid looking away from the monitor.';
-      case 'mobile_detected':
-        return 'Please remove any mobile devices from the exam area. Mobile phones are not allowed.';
-      case 'copy_paste':
-        return 'Copy and paste functions are disabled during the exam. Please type your answers directly.';
-      case 'fullscreen_exit':
-        return 'Please return to fullscreen mode. The exam must be taken in fullscreen.';
-      case 'right_click':
-        return 'Right-click is disabled during the exam. Please use the provided interface.';
-      case 'keyboard_shortcut':
-        return 'This keyboard shortcut is not allowed during the exam. Please use the provided controls.';
-      default:
-        return 'Please follow the exam guidelines to avoid further violations.';
-    }
-  };
-
-  if (!isOpen || !violation) {
-    return null;
-  }
-
-  const severity = getViolationSeverity(violation.type);
-  const severityColor = getSeverityColor(severity);
-  const remainingViolations = maxViolations - violationCount;
+  const content = getViolationContent(violation.type);
+  const remainingCount = maxViolations - violationCount;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-md w-full mx-4">
-        {/* Header */}
-        <div className={`p-6 border-b border-gray-200 ${severityColor}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {getViolationIcon(violation.type)}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {getViolationTitle(violation.type)}
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Violation #{violationCount} of {maxViolations}
+    <AnimatePresence>
+      <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm"
+          onClick={canAcknowledge ? onAcknowledge : undefined}
+        />
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 20 }}
+          className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800"
+        >
+          {/* Top Banner */}
+          <div className="bg-red-600 dark:bg-red-500 p-4 flex items-center gap-3 text-white">
+            <ShieldAlert className="w-6 h-6" />
+            <h3 className="font-bold uppercase tracking-wider text-sm">Official Security Warning</h3>
+            <div className="ml-auto flex items-center gap-2 bg-black/20 px-3 py-1 rounded-full border border-white/20">
+              <span className="text-xs font-bold">Severity: High</span>
+            </div>
+          </div>
+
+          <div className="p-8">
+            <div className="flex items-start gap-6 mb-8">
+              <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-900/20 flex-shrink-0 flex items-center justify-center text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30">
+                <AlertTriangle className="w-8 h-8" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{content.title}</h2>
+                <p className="text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                  {content.description}
                 </p>
               </div>
             </div>
-            
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
-          </div>
-        </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-4">
-          {/* Violation Details */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Shield className="w-4 h-4 text-gray-600" />
-              <span className="text-sm font-medium text-gray-900">Violation Details</span>
-            </div>
-            <p className="text-sm text-gray-700 mb-2">{violation.message}</p>
-            <div className="text-xs text-gray-500">
-              Confidence: {Math.round(violation.confidence * 100)}% • 
-              Time: {violation.timestamp.toLocaleTimeString()}
-            </div>
-          </div>
-
-          {/* Guidance */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-medium text-blue-900">What to do:</span>
-            </div>
-            <p className="text-sm text-blue-800">
-              {getViolationGuidance(violation.type)}
-            </p>
-          </div>
-
-          {/* Violation Count Warning */}
-          {remainingViolations <= 2 && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="w-4 h-4 text-red-600" />
-                <span className="text-sm font-medium text-red-900">Warning</span>
+            <div className="space-y-4 mb-8">
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2 mb-3 text-slate-900 dark:text-white font-bold text-sm uppercase tracking-wide">
+                  <Info className="w-4 h-4 text-blue-600" />
+                  Corrective Action Required
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  {content.instruction}
+                </p>
               </div>
-              <p className="text-sm text-red-800">
-                {remainingViolations === 0 
-                  ? 'You have reached the maximum number of violations. Your exam may be disqualified.'
-                  : `You have ${remainingViolations} violation${remainingViolations === 1 ? '' : 's'} remaining before potential disqualification.`
-                }
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-800">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Incident No.</p>
+                  <p className="text-lg font-bold text-slate-900 dark:text-white">#{violationCount}</p>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-800">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Status</p>
+                  <p className={`text-lg font-bold ${remainingCount <= 2 ? 'text-red-600' : 'text-amber-600'}`}>
+                    {remainingCount} Left
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button
+                disabled={!canAcknowledge}
+                onClick={onAcknowledge}
+                className={`w-full py-4 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10 ${canAcknowledge
+                    ? 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98]'
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
+                  }`}
+              >
+                {canAcknowledge ? (
+                  <>
+                    I Acknowledge & Understand
+                    <ChevronRight className="w-4 h-4" />
+                  </>
+                ) : (
+                  <>
+                    <Timer className="w-4 h-4 animate-spin" />
+                    Reviewing Information ({countdown}s)
+                  </>
+                )}
+              </button>
+
+              <p className="text-[10px] text-center text-slate-500 uppercase tracking-widest font-bold mt-2">
+                This verification is electronically recorded
               </p>
             </div>
-          )}
-
-          {/* Countdown */}
-          {!canAcknowledge && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-center justify-center gap-2">
-                <Clock className="w-4 h-4 text-yellow-600" />
-                <span className="text-sm text-yellow-800">
-                  Please read this warning carefully. You can acknowledge in {countdown} seconds.
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-6 border-t border-gray-200">
-          <button
-            onClick={onAcknowledge}
-            disabled={!canAcknowledge}
-            className={`w-full px-4 py-3 rounded-lg font-medium transition-colors ${
-              canAcknowledge
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            {canAcknowledge ? 'I Understand' : `Acknowledge in ${countdown}s`}
-          </button>
-        </div>
+          </div>
+        </motion.div>
       </div>
-    </div>
+    </AnimatePresence>
   );
 };
 
 export default ViolationWarning;
-

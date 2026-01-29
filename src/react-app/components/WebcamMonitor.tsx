@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, AlertTriangle, CheckCircle, EyeOff } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Camera, AlertTriangle, CheckCircle, EyeOff, Maximize2, Minimize2, Settings, X } from 'lucide-react';
 import useProctoringCamera, { CameraStatusPayload } from '../hooks/useProctoringCamera';
 
 interface ViolationData {
@@ -13,7 +14,7 @@ interface ViolationData {
 interface WebcamMonitorProps {
   attemptId: number;
   onViolationDetected?: (violation: ViolationData) => void;
-  captureInterval?: number; // in seconds (default: 5s for maximum monitoring)
+  captureInterval?: number;
   showPreview?: boolean;
   className?: string;
   autoStart?: boolean;
@@ -23,7 +24,7 @@ interface WebcamMonitorProps {
 const WebcamMonitor: React.FC<WebcamMonitorProps> = ({
   attemptId,
   onViolationDetected,
-  captureInterval = 5, // Changed from 10s to 5s for better monitoring
+  captureInterval = 5,
   showPreview = true,
   className = '',
   autoStart = true,
@@ -31,6 +32,8 @@ const WebcamMonitor: React.FC<WebcamMonitorProps> = ({
 }) => {
   const webcamRef = useRef<Webcam>(null);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
   const {
     isActive,
     cameraStatus,
@@ -53,164 +56,191 @@ const WebcamMonitor: React.FC<WebcamMonitorProps> = ({
     onStatusChange
   });
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString();
+  const getStatusDetails = () => {
+    if (cameraError || cameraStatus === 'error') return { color: 'text-red-500', bg: 'bg-red-500/10', label: 'Camera Error', icon: <AlertTriangle className="w-3 h-3" /> };
+    if (violationCount > 0) return { color: 'text-amber-500', bg: 'bg-amber-500/10', label: `${violationCount} Violations`, icon: <AlertTriangle className="w-3 h-3" /> };
+    if (isActive) return { color: 'text-emerald-500', bg: 'bg-emerald-500/10', label: 'System Active', icon: <CheckCircle className="w-3 h-3" /> };
+    return { color: 'text-slate-400', bg: 'bg-slate-500/10', label: 'Idle', icon: <Camera className="w-3 h-3" /> };
   };
 
-  const getStatusColor = () => {
-    if (cameraError || cameraStatus === 'error') return 'text-red-600 bg-red-50 border-red-200';
-    if (violationCount > 0) return 'text-orange-600 bg-orange-50 border-orange-200';
-    if (isActive) return 'text-green-600 bg-green-50 border-green-200';
-    return 'text-gray-600 bg-gray-50 border-gray-200';
-  };
-
-  const getStatusIcon = () => {
-    if (cameraError || cameraStatus === 'error') return <AlertTriangle className="w-4 h-4" />;
-    if (violationCount > 0) return <AlertTriangle className="w-4 h-4" />;
-    if (isActive) return <CheckCircle className="w-4 h-4" />;
-    return <Camera className="w-4 h-4" />;
-  };
-
-  const getStatusText = () => {
-    if (cameraError || cameraStatus === 'error') return 'Camera Error';
-    if (violationCount > 0) return `${violationCount} Violations`;
-    if (isActive) return 'Monitoring';
-    if (permissionState === 'prompt') return 'Awaiting Permission';
-    return 'Inactive';
-  };
-
-  if (isMinimized) {
-    return (
-      <div className={`fixed bottom-4 right-4 z-50 ${className}`}>
-        <button
-          onClick={() => setIsMinimized(false)}
-          className={`p-3 rounded-full shadow-lg border-2 ${getStatusColor()} hover:shadow-xl transition-all`}
-          title="Expand webcam monitor"
-        >
-          <Camera className="w-5 h-5" />
-        </button>
-      </div>
-    );
-  }
+  const status = getStatusDetails();
 
   return (
-    <div className={`fixed bottom-4 right-4 z-50 bg-white rounded-lg shadow-lg border border-gray-200 ${className}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-200">
-        <div className="flex items-center gap-2">
-          <Camera className="w-4 h-4 text-gray-600" />
-          <span className="text-sm font-medium text-gray-900">Proctoring</span>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <div className={`px-2 py-1 rounded-full text-xs font-medium border flex items-center gap-1 ${getStatusColor()}`}>
-            {getStatusIcon()}
-            {getStatusText()}
-          </div>
-          
-          <button
-            onClick={() => setIsMinimized(true)}
-            className="p-1 hover:bg-gray-100 rounded transition-colors"
-            title="Minimize"
+    <div className={`fixed bottom-6 right-6 z-50 ${className}`}>
+      <AnimatePresence mode="wait">
+        {isMinimized ? (
+          <motion.button
+            key="minimized"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            onClick={() => setIsMinimized(false)}
+            className={`p-4 rounded-full shadow-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center gap-3 group hover:scale-105 transition-all`}
           >
-            <EyeOff className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-      </div>
-
-      {/* Camera Preview */}
-      {showPreview && (
-        <div className="p-3">
-          {cameraError ? (
-            <div className="w-48 h-36 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <AlertTriangle className="w-8 h-8 text-red-500 mx-auto mb-2" />
-                <p className="text-xs text-red-600">Camera Error</p>
-                <p className="text-xs text-red-500 mt-1">{cameraError}</p>
+            <div className={`relative w-8 h-8 rounded-full flex items-center justify-center ${status.bg} ${status.color}`}>
+              <Camera className="w-4 h-4" />
+              {violationCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900">
+                  {violationCount}
+                </span>
+              )}
+            </div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 pr-2 group-hover:text-blue-600 transition-colors">
+              Proctoring Active
+            </span>
+          </motion.button>
+        ) : (
+          <motion.div
+            key="expanded"
+            initial={{ y: 20, opacity: 0, scale: 0.95 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 20, opacity: 0, scale: 0.95 }}
+            className="w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200 dark:border-slate-800 overflow-hidden"
+          >
+            {/* Header */}
+            <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                  Proctor Feed
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-500 transition-colors"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setIsMinimized(true)}
+                  className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-500 transition-colors"
+                >
+                  <Minimize2 className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
-          ) : (
-            <div className="relative">
-              <Webcam
-                ref={webcamRef}
-                width={192}
-                height={144}
-                screenshotFormat="image/jpeg"
-                videoConstraints={{
-                  width: 192,
-                  height: 144,
-                  facingMode: 'user'
-                }}
-                onUserMedia={handleUserMedia}
-                onUserMediaError={handleCameraError}
-                className="rounded-lg border border-gray-200"
-              />
-              
-              {detectionStatus === 'detecting' && (
-                <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center">
-                  <div className="text-white text-xs">Analyzing...</div>
+
+            {/* Video Area */}
+            <div className="aspect-video bg-black relative">
+              {showPreview ? (
+                <>
+                  <Webcam
+                    ref={webcamRef}
+                    audio={false}
+                    screenshotFormat="image/jpeg"
+                    videoConstraints={{ facingMode: 'user' }}
+                    onUserMedia={handleUserMedia}
+                    onUserMediaError={handleCameraError}
+                    className="w-full h-full object-cover"
+                  />
+                  {/* Scanning Overlay */}
+                  {detectionStatus === 'detecting' && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="absolute inset-0 bg-blue-500/10 flex flex-col items-center justify-center backdrop-blur-[1px]"
+                    >
+                      <div className="w-full h-0.5 bg-blue-500/40 absolute top-0 animate-[scan_2s_infinite]" />
+                      <div className="bg-blue-600 text-white text-[8px] px-2 py-0.5 rounded-full uppercase font-bold tracking-tighter">
+                        Analyzing
+                      </div>
+                    </motion.div>
+                  )}
+                  {cameraError && (
+                    <div className="absolute inset-0 bg-red-900/40 flex items-center justify-center p-4">
+                      <p className="text-[10px] text-white text-center font-bold">{cameraError}</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                  <EyeOff className="w-6 h-6 text-slate-700" />
+                  <span className="text-[10px] text-slate-500">Preview Disabled</span>
                 </div>
               )}
             </div>
-          )}
-        </div>
-      )}
 
-      {/* Status Info */}
-      <div className="px-3 pb-3 space-y-2">
-        {lastCapture && (
-          <div className="text-xs text-gray-500">
-            Last capture: {formatTime(lastCapture)}
-          </div>
+            {/* Status Footer */}
+            <div className="p-3 bg-white dark:bg-slate-900">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className={`flex-1 flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-100 dark:border-slate-800 ${status.bg} ${status.color}`}>
+                  {status.icon}
+                  <span className="text-[10px] font-bold uppercase tracking-tight truncate">{status.label}</span>
+                </div>
+                {lastCapture && (
+                  <div className="flex items-center gap-1 text-slate-400">
+                    <span className="text-[9px] font-medium leading-none">Live</span>
+                    <div className="w-1 h-1 rounded-full bg-red-500" />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {!isActive ? (
+                  <button
+                    onClick={startMonitoring}
+                    className="col-span-2 py-1.5 bg-blue-600 text-white rounded-lg text-[10px] font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20"
+                  >
+                    Activate System
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={captureSnapshot}
+                      className="py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-[10px] font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      Force Capture
+                    </button>
+                    <button
+                      onClick={stopMonitoring}
+                      className="py-1.5 bg-red-50 text-red-600 rounded-lg text-[10px] font-bold hover:bg-red-100 transition-colors"
+                    >
+                      Standby
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Settings Overlay */}
+            {showSettings && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="absolute inset-0 bg-white dark:bg-slate-900 p-4"
+              >
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-900 dark:text-white">Settings</span>
+                  <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-900"><X className="w-3.5 h-3.5" /></button>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-600 dark:text-slate-400">Interval</span>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">{captureInterval}s</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-600 dark:text-slate-400">Permission</span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 uppercase`}>{permissionState}</span>
+                  </div>
+                  <p className="text-[9px] text-slate-400 mt-4 leading-relaxed">
+                    Visual AI and attention tracking are fully active. Data is encrypted and logged to session ID #{attemptId}.
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
         )}
-        
-        <div className="text-xs text-gray-500">
-          Capture interval: {captureInterval}s
-        </div>
-
-        {violationCount > 0 && (
-          <div className="text-xs text-orange-600 font-medium">
-            ⚠️ {violationCount} violation{violationCount !== 1 ? 's' : ''} detected
-          </div>
-        )}
-
-        {/* Controls */}
-        <div className="flex gap-2">
-          {!isActive ? (
-            <button
-              onClick={startMonitoring}
-              className="flex-1 px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
-            >
-              Start
-            </button>
-          ) : (
-            <button
-              onClick={stopMonitoring}
-              className="flex-1 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
-            >
-              Stop
-            </button>
-          )}
-          
-          <button
-            onClick={captureSnapshot}
-            disabled={!isActive || detectionStatus === 'detecting'}
-            className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-          >
-            Capture
-          </button>
-        </div>
-      </div>
-
-      {/* Warning Overlay */}
-      {violationCount > 0 && (
-        <div className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-          <span className="text-white text-xs font-bold">{violationCount}</span>
-        </div>
-      )}
+      </AnimatePresence>
+      <style>{`
+        @keyframes scan {
+          0% { transform: translateY(0); }
+          50% { transform: translateY(144px); }
+          100% { transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 };
 
 export default WebcamMonitor;
-

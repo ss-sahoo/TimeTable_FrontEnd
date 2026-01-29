@@ -103,19 +103,19 @@ export default function StudentDashboard() {
   const formatDate = (dateString: string) => {
     // Parse the UTC date string and display as-is without conversion
     const date = new Date(dateString);
-    
+
     // Extract components directly from UTC time
     const year = date.getUTCFullYear();
     const month = date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
     const day = date.getUTCDate();
     const hours = date.getUTCHours();
     const minutes = date.getUTCMinutes();
-    
+
     // Format to 12-hour time
     const period = hours >= 12 ? 'PM' : 'AM';
     const hour12 = hours % 12 || 12;
     const minuteStr = minutes.toString().padStart(2, '0');
-    
+
     return `${month} ${day}, ${year}, ${hour12}:${minuteStr} ${period}`;
   };
 
@@ -133,15 +133,15 @@ export default function StudentDashboard() {
       const response = await api.post('/exams/start-exam/', {
         exam_id: examId
       });
-      
+
       if (response.data.attempt) {
         // Redirect to secure exam view with the attempt ID
         navigate(`/secure-exam/${response.data.attempt.id}`);
       }
     } catch (error: unknown) {
       console.error('Failed to start exam:', error);
-      const errorMessage = error instanceof Error && 'response' in error 
-        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error 
+      const errorMessage = error instanceof Error && 'response' in error
+        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
         : 'Failed to start exam. Please try again.';
       alert(errorMessage);
     }
@@ -172,7 +172,7 @@ export default function StudentDashboard() {
   const getFilteredAndSortedExams = (exams: StudentExam[]) => {
     const filtered = exams.filter(exam => {
       const matchesSearch = exam.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           exam.description?.toLowerCase().includes(searchTerm.toLowerCase());
+        exam.description?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || exam.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
@@ -207,28 +207,7 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-900">
-      <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 dark:text-gray-100">Student Dashboard</h1>
-              <p className="text-sm text-slate-600 dark:text-gray-400 mt-1">
-                Welcome back, {user?.first_name} {user?.last_name}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link
-                to="/student-dashboard"
-                className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-              >
-                <BookOpen className="w-4 h-4" />
-                My Exams
-              </Link>
-            </div>
-          </div>
-        </div>
-
+      <div className="w-full py-4 sm:py-6">
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-slate-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all">
@@ -331,17 +310,15 @@ export default function StudentDashboard() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as 'current' | 'history' | 'results')}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
-                      activeTab === tab.id
-                        ? 'bg-blue-100 text-blue-700 border-2 border-blue-200'
-                        : 'text-slate-600 dark:text-gray-400 hover:bg-slate-100 border-2 border-transparent'
-                    }`}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${activeTab === tab.id
+                      ? 'bg-blue-100 text-blue-700 border-2 border-blue-200'
+                      : 'text-slate-600 dark:text-gray-400 hover:bg-slate-100 border-2 border-transparent'
+                      }`}
                   >
                     <tab.icon className="w-4 h-4" />
                     {tab.name}
-                    <span className={`px-2 py-0.5 rounded-full text-xs ${
-                      activeTab === tab.id ? 'bg-blue-200 text-blue-800' : 'bg-slate-200 text-slate-600 dark:text-gray-400'
-                    }`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === tab.id ? 'bg-blue-200 text-blue-800' : 'bg-slate-200 text-slate-600 dark:text-gray-400'
+                      }`}>
                       {tab.count}
                     </span>
                   </button>
@@ -428,28 +405,27 @@ export default function StudentDashboard() {
                         </div>
                       ) : (
                         currentExams.map((exam) => (
-                          <div key={exam.id} className="bg-gradient-to-r from-slate-50 to-blue-50 rounded-lg border border-slate-200 dark:border-gray-700 p-4 hover:shadow-md transition-all">
+                          <div key={exam.id} className="bg-white rounded-lg border border-slate-200 dark:border-gray-700 p-4 hover:shadow-md transition-all">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-2">
                                   <h3 className="text-base font-semibold text-slate-900 dark:text-gray-100">{exam.title}</h3>
-                                  <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
-                                    (exam.status === 'available' || exam.can_start) ? 'bg-green-100 text-green-700' :
+                                  <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${(exam.status === 'available' || exam.can_start) ? 'bg-green-100 text-green-700' :
                                     exam.status === 'in_progress' ? 'bg-yellow-100 text-yellow-700' :
-                                    exam.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
-                                    'bg-gray-100 text-gray-700'
-                                  }`}>
+                                      exam.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
+                                        'bg-gray-100 text-gray-700'
+                                    }`}>
                                     {(exam.status === 'available' || exam.can_start) ? <Play className="w-3 h-3" /> :
-                                     exam.status === 'in_progress' ? <Activity className="w-3 h-3" /> :
-                                     exam.status === 'scheduled' ? <Clock className="w-3 h-3" /> :
-                                     <Clock className="w-3 h-3" />}
+                                      exam.status === 'in_progress' ? <Activity className="w-3 h-3" /> :
+                                        exam.status === 'scheduled' ? <Clock className="w-3 h-3" /> :
+                                          <Clock className="w-3 h-3" />}
                                     {(exam.status === 'available' || exam.can_start) ? 'Available' :
-                                     exam.status === 'in_progress' ? 'In Progress' :
-                                     exam.status === 'scheduled' ? 'Scheduled' :
-                                     'Unknown'}
+                                      exam.status === 'in_progress' ? 'In Progress' :
+                                        exam.status === 'scheduled' ? 'Scheduled' :
+                                          'Unknown'}
                                   </span>
                                 </div>
-                                
+
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                                   <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400">
                                     <Calendar className="w-4 h-4" />
@@ -494,7 +470,7 @@ export default function StudentDashboard() {
                                 {(exam.status === 'available' || exam.can_start) && (
                                   <button
                                     onClick={() => handleStartExam(exam.id)}
-                                    className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all font-medium flex items-center gap-2 shadow-lg hover:shadow-xl"
+                                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium flex items-center gap-2 shadow-sm"
                                   >
                                     <Play className="w-4 h-4" />
                                     Start Exam
@@ -503,14 +479,14 @@ export default function StudentDashboard() {
                                 {exam.status === 'in_progress' && (
                                   <button
                                     onClick={() => handleResumeExam(exam.id)}
-                                    className="px-6 py-3 bg-gradient-to-r from-yellow-600 to-orange-600 text-white rounded-lg hover:from-yellow-700 hover:to-orange-700 transition-all font-medium flex items-center gap-2 shadow-lg hover:shadow-xl"
+                                    className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-all font-medium flex items-center gap-2 shadow-sm"
                                   >
                                     <Play className="w-4 h-4" />
                                     Resume Exam
                                   </button>
                                 )}
                                 {exam.status === 'scheduled' && (
-                                  <div className="px-6 py-3 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 rounded-lg border border-blue-200 font-medium flex items-center gap-2">
+                                  <div className="px-6 py-3 bg-blue-50 text-blue-700 rounded-lg border border-blue-100 font-medium flex items-center gap-2">
                                     <Clock className="w-4 h-4" />
                                     Starts Soon
                                   </div>
@@ -543,11 +519,10 @@ export default function StudentDashboard() {
                         historyExams.map((exam) => {
                           const isDisqualified = exam.status === 'disqualified';
                           return (
-                            <div key={exam.id} className={`rounded-lg border p-4 hover:shadow-md transition-all ${
-                              isDisqualified 
-                                ? 'bg-gradient-to-r from-red-50 to-orange-50 border-red-200 dark:border-red-800' 
-                                : 'bg-gradient-to-r from-slate-50 to-purple-50 border-slate-200 dark:border-gray-700'
-                            }`}>
+                            <div key={exam.id} className={`rounded-lg border p-4 hover:shadow-md transition-all ${isDisqualified
+                                ? 'bg-red-50 border-red-200'
+                                : 'bg-white border-slate-200 dark:border-gray-700'
+                              }`}>
                               <div className="flex items-start justify-between">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-3 mb-2">
@@ -589,77 +564,73 @@ export default function StudentDashboard() {
                                       </span>
                                     )}
                                   </div>
-                                
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                                  <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400">
-                                    <Calendar className="w-4 h-4" />
-                                    <span>{exam.submitted_at && formatDate(exam.submitted_at)}</span>
+
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400">
+                                      <Calendar className="w-4 h-4" />
+                                      <span>{exam.submitted_at && formatDate(exam.submitted_at)}</span>
+                                    </div>
+                                    <div className={`flex items-center gap-2 text-sm ${isDisqualified ? 'text-red-600 font-semibold' : 'text-slate-600 dark:text-gray-400'
+                                      }`}>
+                                      <Award className="w-4 h-4" />
+                                      <span>{exam.score || 0}/{exam.total_marks} marks</span>
+                                      {isDisqualified && <span className="text-xs">(Graded)</span>}
+                                    </div>
+                                    <div className={`flex items-center gap-2 text-sm ${isDisqualified ? 'text-red-600 font-semibold' : 'text-slate-600 dark:text-gray-400'
+                                      }`}>
+                                      <Percent className="w-4 h-4" />
+                                      <span>{exam.percentage || 0}%</span>
+                                      {isDisqualified && <span className="text-xs">(Not Counted)</span>}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400">
+                                      <Timer className="w-4 h-4" />
+                                      <span>{exam.time_spent && formatTimeRemaining(exam.time_spent)}</span>
+                                    </div>
                                   </div>
-                                  <div className={`flex items-center gap-2 text-sm ${
-                                    isDisqualified ? 'text-red-600 font-semibold' : 'text-slate-600 dark:text-gray-400'
-                                  }`}>
-                                    <Award className="w-4 h-4" />
-                                    <span>{exam.score || 0}/{exam.total_marks} marks</span>
-                                    {isDisqualified && <span className="text-xs">(Graded)</span>}
-                                  </div>
-                                  <div className={`flex items-center gap-2 text-sm ${
-                                    isDisqualified ? 'text-red-600 font-semibold' : 'text-slate-600 dark:text-gray-400'
-                                  }`}>
-                                    <Percent className="w-4 h-4" />
-                                    <span>{exam.percentage || 0}%</span>
-                                    {isDisqualified && <span className="text-xs">(Not Counted)</span>}
-                                  </div>
-                                  <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-400">
-                                    <Timer className="w-4 h-4" />
-                                    <span>{exam.time_spent && formatTimeRemaining(exam.time_spent)}</span>
-                                  </div>
+
+                                  {exam.violations_count && exam.violations_count > 0 && !isDisqualified && (
+                                    <div className="flex items-center gap-2 text-sm text-orange-600 mb-4">
+                                      <AlertCircle className="w-4 h-4" />
+                                      <span>{exam.violations_count} violation(s) detected</span>
+                                    </div>
+                                  )}
                                 </div>
 
-                                {exam.violations_count && exam.violations_count > 0 && !isDisqualified && (
-                                  <div className="flex items-center gap-2 text-sm text-orange-600 mb-4">
-                                    <AlertCircle className="w-4 h-4" />
-                                    <span>{exam.violations_count} violation(s) detected</span>
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="flex flex-col gap-2 ml-6">
-                                <div className="flex flex-col gap-2">
-                                  <button
-                                    onClick={() => handleViewResults(exam.id)}
-                                    className={`px-6 py-3 rounded-lg transition-all font-medium flex items-center gap-2 shadow-lg hover:shadow-xl ${
-                                      isDisqualified
-                                        ? 'bg-gradient-to-r from-red-600 to-orange-600 text-white hover:from-red-700 hover:to-orange-700'
-                                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
-                                    }`}
-                                  >
-                                    <BarChart3 className="w-4 h-4" />
-                                    {isDisqualified ? 'View Score (Disqualified)' : 'View Results'}
-                                  </button>
-                                  <div className="flex gap-2">
+                                <div className="flex flex-col gap-2 ml-6">
+                                  <div className="flex flex-col gap-2">
                                     <button
-                                      onClick={() => navigate(`/exams/${exam.id}`)}
-                                      className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 dark:bg-gray-900 transition-colors font-medium flex items-center gap-2"
-                                    >
-                                      <Eye className="w-4 h-4" />
-                                      Details
-                                    </button>
-                                    <button
-                                      onClick={() => navigate(`/student-analytics/${exam.id}`)}
-                                      className={`px-4 py-2 rounded-lg transition-colors font-medium flex items-center gap-2 ${
-                                        isDisqualified
-                                          ? 'bg-orange-600 text-white hover:bg-orange-700'
-                                          : 'bg-purple-600 text-white hover:bg-purple-700'
-                                      }`}
+                                      onClick={() => handleViewResults(exam.id)}
+                                      className={`px-6 py-3 rounded-lg transition-all font-medium flex items-center gap-2 shadow-lg hover:shadow-xl ${isDisqualified
+                                        ? 'bg-red-600 text-white hover:bg-red-700'
+                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                        }`}
                                     >
                                       <BarChart3 className="w-4 h-4" />
-                                      Analytics
+                                      {isDisqualified ? 'View Score (Disqualified)' : 'View Results'}
                                     </button>
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => navigate(`/exams/${exam.id}`)}
+                                        className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 dark:bg-gray-900 transition-colors font-medium flex items-center gap-2"
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                        Details
+                                      </button>
+                                      <button
+                                        onClick={() => navigate(`/student-analytics/${exam.id}`)}
+                                        className={`px-4 py-2 rounded-lg transition-colors font-medium flex items-center gap-2 ${isDisqualified
+                                          ? 'bg-orange-600 text-white hover:bg-orange-700'
+                                          : 'bg-purple-600 text-white hover:bg-purple-700'
+                                          }`}
+                                      >
+                                        <BarChart3 className="w-4 h-4" />
+                                        Analytics
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
                           );
                         })
                       )}
@@ -670,7 +641,7 @@ export default function StudentDashboard() {
                   {activeTab === 'results' && (
                     <div className="space-y-4">
                       {/* Performance Overview */}
-                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
                         <h3 className="text-base font-semibold text-slate-900 dark:text-gray-100 mb-3">Performance Overview</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
                           <div className="text-center">
@@ -711,21 +682,20 @@ export default function StudentDashboard() {
                             {[...completedExams, ...disqualifiedExams].slice(0, 5).map((exam) => {
                               const isDisqualified = exam.status === 'disqualified';
                               return (
-                                <div key={exam.id} className={`flex items-center justify-between p-3 rounded-lg border hover:shadow-sm transition-all ${
-                                  isDisqualified 
-                                    ? 'bg-red-50 border-red-200' 
-                                    : 'bg-white dark:bg-gray-800 border-slate-200 dark:border-gray-700'
-                                }`}>
+                                <div key={exam.id} className={`flex items-center justify-between p-3 rounded-lg border hover:shadow-sm transition-all ${isDisqualified
+                                  ? 'bg-red-50 border-red-200'
+                                  : 'bg-white dark:bg-gray-800 border-slate-200 dark:border-gray-700'
+                                  }`}>
                                   <div className="flex items-center gap-3">
-                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                                      isDisqualified
-                                        ? 'bg-gradient-to-br from-red-500 to-orange-500'
-                                        : 'bg-gradient-to-br from-blue-500 to-indigo-500'
-                                    }`}>
+                                    <div
+                                      className={`w-10 h-10 rounded-lg flex items-center justify-center ${isDisqualified
+                                          ? 'bg-red-100'
+                                          : 'bg-blue-100'
+                                        }`}>
                                       {isDisqualified ? (
-                                        <AlertCircle className="w-5 h-5 text-white" />
+                                        <AlertCircle className="w-5 h-5 text-red-600" />
                                       ) : (
-                                        <Award className="w-5 h-5 text-white" />
+                                        <Award className="w-5 h-5 text-blue-600" />
                                       )}
                                     </div>
                                     <div>
@@ -770,9 +740,8 @@ export default function StudentDashboard() {
                                   </div>
                                   <div className="flex items-center gap-3">
                                     <div className="text-right">
-                                      <div className={`text-base font-semibold ${
-                                        isDisqualified ? 'text-red-600 line-through' : 'text-slate-900 dark:text-gray-100'
-                                      }`}>{exam.percentage || 0}%</div>
+                                      <div className={`text-base font-semibold ${isDisqualified ? 'text-red-600 line-through' : 'text-slate-900 dark:text-gray-100'
+                                        }`}>{exam.percentage || 0}%</div>
                                       <div className="text-xs text-slate-600 dark:text-gray-400">Score</div>
                                     </div>
                                     <button

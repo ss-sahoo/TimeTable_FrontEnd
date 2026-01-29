@@ -58,13 +58,13 @@ type ExamStatus = 'all' | 'available' | 'scheduled' | 'ongoing' | 'completed';
 export default function StudentExamList() {
   const { user } = useAuthContext();
   const navigate = useNavigate();
-  
+
   const [exams, setExams] = useState<Exam[]>([]);
   const [filteredExams, setFilteredExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<ExamStatus>('all');
@@ -86,26 +86,26 @@ export default function StudentExamList() {
       setLoading(true);
       setError(null);
       const response = await api.get('/exams/student-dashboard/');
-      
+
       // Combine all exams from different categories
       const allExams = [
         ...(response.data.available_exams || []).map((e: any) => ({ ...e, status: 'available' })),
         ...(response.data.scheduled_exams || []).map((e: any) => ({ ...e, status: 'scheduled' })),
         ...(response.data.ongoing_exams || []).map((e: any) => ({ ...e, status: 'ongoing' })),
-        ...(response.data.completed_exams || []).map((e: any) => ({ 
-          ...e, 
+        ...(response.data.completed_exams || []).map((e: any) => ({
+          ...e,
           status: 'completed',
           latest_score: e.score,
           latest_percentage: e.percentage
         })),
-        ...(response.data.disqualified_exams || []).map((e: any) => ({ 
-          ...e, 
+        ...(response.data.disqualified_exams || []).map((e: any) => ({
+          ...e,
           status: 'disqualified',
           latest_score: e.score,
           latest_percentage: e.percentage
         }))
       ];
-      
+
       setExams(allExams);
     } catch (err: any) {
       console.error('Error loading exams:', err);
@@ -154,13 +154,17 @@ export default function StudentExamList() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    const date = new Date(dateString);
+    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const day = date.getDate();
+    const year = date.getFullYear();
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = hours % 12 || 12;
+    const minuteStr = minutes.toString().padStart(2, '0');
+
+    return `${month} ${day}, ${year}, ${hour12}:${minuteStr} ${period}`;
   };
 
   const formatTimeRemaining = (seconds: number) => {
@@ -178,10 +182,10 @@ export default function StudentExamList() {
       completed: { color: 'bg-purple-100 text-purple-700 border-purple-200', icon: CheckCircle, text: 'Completed' },
       disqualified: { color: 'bg-red-100 text-red-700 border-red-200', icon: AlertCircle, text: 'Disqualified' }
     };
-    
+
     const badge = badges[status as keyof typeof badges] || badges.available;
     const Icon = badge.icon;
-    
+
     return (
       <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 border ${badge.color}`}>
         <Icon className="w-3 h-3" />
@@ -196,7 +200,7 @@ export default function StudentExamList() {
         return (
           <button
             onClick={() => navigate(`/exam-access/${exam.id}`)}
-            className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all font-medium flex items-center gap-2 shadow-sm"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium flex items-center gap-2 shadow-sm"
           >
             <Play className="w-4 h-4" />
             Start Exam
@@ -216,7 +220,7 @@ export default function StudentExamList() {
         return (
           <button
             onClick={() => navigate(`/secure-exam/${exam.attempt_id}`)}
-            className="px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:from-orange-700 hover:to-red-700 transition-all font-medium flex items-center gap-2 shadow-sm animate-pulse"
+            className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-all font-medium flex items-center gap-2 shadow-sm"
           >
             <Play className="w-4 h-4" />
             Resume Exam
@@ -226,7 +230,7 @@ export default function StudentExamList() {
         return (
           <button
             onClick={() => navigate(`/exam-results/exam/${exam.id}`)}
-            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all font-medium flex items-center gap-2 shadow-sm"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium flex items-center gap-2 shadow-sm"
           >
             <Eye className="w-4 h-4" />
             View Results
@@ -236,7 +240,7 @@ export default function StudentExamList() {
         return (
           <button
             onClick={() => navigate(`/exam-results/exam/${exam.id}`)}
-            className="px-4 py-2 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-lg hover:from-red-700 hover:to-orange-700 transition-all font-medium flex items-center gap-2 shadow-sm"
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-medium flex items-center gap-2 shadow-sm"
           >
             <Eye className="w-4 h-4" />
             View Score
@@ -268,48 +272,6 @@ export default function StudentExamList() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
-        <div className="w-full px-4 py-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">My Exams</h1>
-              <p className="text-blue-100">Browse and manage all your exams</p>
-            </div>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="p-3 bg-white/10 hover:bg-white/20 rounded-lg transition-colors backdrop-blur-sm"
-            >
-              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-              <p className="text-blue-100 text-xs mb-1">Total Exams</p>
-              <p className="text-2xl font-bold">{stats.total}</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-              <p className="text-blue-100 text-xs mb-1">Available</p>
-              <p className="text-2xl font-bold">{stats.available}</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-              <p className="text-blue-100 text-xs mb-1">Scheduled</p>
-              <p className="text-2xl font-bold">{stats.scheduled}</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-              <p className="text-blue-100 text-xs mb-1">Ongoing</p>
-              <p className="text-2xl font-bold">{stats.ongoing}</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-              <p className="text-blue-100 text-xs mb-1">Completed</p>
-              <p className="text-2xl font-bold">{stats.completed}</p>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Filters Bar */}
       <div className="w-full px-4 py-4 bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
@@ -428,8 +390,8 @@ export default function StudentExamList() {
             <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-slate-900 mb-2">No Exams Found</h3>
             <p className="text-slate-600 mb-4">
-              {searchTerm || statusFilter !== 'all' 
-                ? 'Try adjusting your filters' 
+              {searchTerm || statusFilter !== 'all'
+                ? 'Try adjusting your filters'
                 : 'No exams available at the moment'}
             </p>
             {(searchTerm || statusFilter !== 'all') && (

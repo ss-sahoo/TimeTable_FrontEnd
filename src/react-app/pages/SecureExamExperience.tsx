@@ -2,17 +2,24 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { 
-  Clock, 
-  Flag, 
-  CheckCircle, 
-  AlertTriangle, 
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Clock,
+  Flag,
+  CheckCircle,
+  AlertTriangle,
   Save,
   Send,
   Eye,
   EyeOff,
   Maximize,
-  Minimize
+  Minimize,
+  ChevronLeft,
+  ChevronRight,
+  User,
+  ShieldCheck,
+  Pause,
+  Monitor
 } from 'lucide-react';
 import useExamSecurity from '../hooks/useExamSecurity';
 import WebcamMonitor from '../components/WebcamMonitor';
@@ -44,6 +51,7 @@ interface Question {
 
 interface ExamAttempt {
   id: number;
+  student_name?: string;
   exam: {
     id: number;
     title: string;
@@ -81,7 +89,7 @@ interface Answer {
 const SecureExamExperience: React.FC = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
   const navigate = useNavigate();
-  
+
   const [examAttempt, setExamAttempt] = useState<ExamAttempt | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -97,17 +105,12 @@ const SecureExamExperience: React.FC = () => {
   const [showViolationsPanel, setShowViolationsPanel] = useState(false);
   const [currentToastViolation, setCurrentToastViolation] = useState<any>(null);
   const [activeSubject, setActiveSubject] = useState<string>('All');
-  
+  const [isPaused, setIsPaused] = useState(false);
+
   // Pre-exam flow states
   const [examStarted, setExamStarted] = useState(false);
-  const [photoTaken, setPhotoTaken] = useState(false);
-  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
-  const [capturingPhoto, setCapturingPhoto] = useState(false);
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Security hook - configured based on exam settings
+  // Security hook
   const {
     violations,
     violationCount,
@@ -115,7 +118,7 @@ const SecureExamExperience: React.FC = () => {
     isFullscreen,
     requestFullscreen
   } = useExamSecurity(parseInt(attemptId!), {
-    maxViolations: examAttempt?.max_violations_allowed || 5,
+    maxViolations: examAttempt?.max_violations_allowed || 10,
     enableTabMonitoring: examAttempt ? !examAttempt.exam.allow_tab_switching : true,
     enableFullscreenEnforcement: examAttempt?.exam.require_fullscreen || false,
     enableCopyPasteBlocking: examAttempt?.exam.disable_copy_paste || false,
@@ -128,106 +131,70 @@ const SecureExamExperience: React.FC = () => {
     loadExamData();
   }, [attemptId]);
 
-  // Auto-start exam once data is loaded
+  // Auto-start exam
   useEffect(() => {
     if (examAttempt && questions.length > 0 && !examStarted) {
-      // Small delay to ensure everything is ready, then start exam
       const timer = setTimeout(() => {
         setExamStarted(true);
-      }, 1000); // 1 second delay for smooth transition
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [examAttempt, questions.length, examStarted]);
 
   // Timer effect
   useEffect(() => {
-    if (!examAttempt) return;
+    if (!examAttempt || isPaused) return;
 
     const interval = setInterval(() => {
       const now = new Date();
       const startTime = new Date(examAttempt.started_at);
       const elapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
       const remaining = (examAttempt.exam.duration_minutes * 60) - elapsed;
-      
+
       setTimeRemaining(Math.max(0, remaining));
-      
+
       if (remaining <= 0) {
         handleAutoSubmit();
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [examAttempt]);
+  }, [examAttempt, isPaused]);
 
   // Auto-save effect
   useEffect(() => {
     const interval = setInterval(() => {
       autoSaveAnswers();
-    }, 30000); // Auto-save every 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [answers]);
-
-  // Cleanup webcam on unmount
-  useEffect(() => {
-    return () => {
-      stopWebcam();
-    };
-  }, []);
-
-  // Hide palette by default on small screens for better focus
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-      setShowQuestionPalette(false);
-    }
-  }, []);
 
   // Listen for new violations and show toast
   useEffect(() => {
     if (violations.length > 0) {
       const latestViolation = violations[violations.length - 1];
-      console.log('🚨 VIOLATION DETECTED:', {
-        type: latestViolation.type,
-        timestamp: latestViolation.timestamp,
-        metadata: latestViolation.metadata,
-        totalViolations: violations.length
-      });
       setCurrentToastViolation(latestViolation);
     }
   }, [violations]);
 
   const loadExamData = async () => {
     try {
-      // Load exam attempt details
       const attemptEndpoint = `/exams/attempts/${attemptId}/`;
-      console.log('🔵 API CALL #1: GET', attemptEndpoint);
       const attemptResponse = await api.get(attemptEndpoint);
       const attemptData = attemptResponse.data;
-      console.log('✅ API RESPONSE #1:', JSON.stringify(attemptData, null, 2));
       setExamAttempt(attemptData);
 
-      console.log('==== EXAM ATTEMPT LOADED ====');
-      console.log('Exam ID:', attemptData.exam.id);
-      console.log('Exam Title:', attemptData.exam.title);
-      console.log('Max Violations Allowed:', attemptData.max_violations_allowed);
-      console.log('=================================');
-
       const examId = attemptData.exam.id;
-
       let mappedQuestions: Question[] = [];
 
       try {
         const questionsEndpoint = `/questions/exams/${examId}/questions/`;
-        console.log('🔵 API CALL #2: GET', questionsEndpoint);
         const questionsResponse = await api.get(questionsEndpoint);
-        console.log('✅ API RESPONSE #2 (RAW):', JSON.stringify(questionsResponse.data, null, 2));
-        
+
         const examQuestions = Array.isArray(questionsResponse.data)
           ? questionsResponse.data
           : (questionsResponse.data?.results ?? []);
-
-        console.log('📊 Parsed Questions Array Length:', examQuestions.length);
-        console.log('📋 First Question Sample:', examQuestions[0] ? JSON.stringify(examQuestions[0], null, 2) : 'No questions');
 
         if (examQuestions.length > 0) {
           mappedQuestions = examQuestions
@@ -255,99 +222,33 @@ const SecureExamExperience: React.FC = () => {
             .filter((question: Question) => Boolean(question.question_text));
         }
       } catch (err) {
-        console.error(`❌ Failed to load exam-question mappings for exam ${examId}:`, err);
+        console.error('Failed to load questions:', err);
       }
 
+      // Fallback logic
       if (mappedQuestions.length === 0) {
-        console.log('⚠️ No questions from primary endpoint, trying fallback...');
-        try {
-          const params = { exam: examId, page_size: 1000 };
-          const fallbackEndpoint = '/questions/questions/';
-          console.log('🔵 API CALL #3 (FALLBACK): GET', fallbackEndpoint, 'with params:', params);
-          const questionsResponse = await api.get(fallbackEndpoint, { params });
-          console.log('✅ API RESPONSE #3 (RAW):', JSON.stringify(questionsResponse.data, null, 2));
-          
-          const rawQuestions = Array.isArray(questionsResponse.data)
-            ? questionsResponse.data
-            : (questionsResponse.data?.results ?? questionsResponse.data ?? []);
+        const params = { exam: examId, page_size: 1000 };
+        const questionsResponse = await api.get('/questions/questions/', { params });
+        const rawQuestions = Array.isArray(questionsResponse.data)
+          ? questionsResponse.data
+          : (questionsResponse.data?.results ?? questionsResponse.data ?? []);
 
-          console.log('📊 Fallback Questions Array Length:', rawQuestions.length);
-
-          mappedQuestions = rawQuestions
-            .map((item: any) => {
-              const normalizedOptions =
-                Array.isArray(item.options) ? item.options : item.options ? [item.options] : [];
-
-              return {
-                id: item.id,
-                question_text: item.question_text ?? '',
-                question_type: item.question_type ?? 'mcq',
-                options: normalizedOptions,
-                correct_answer: item.correct_answer ?? '',
-                explanation: item.explanation ?? '',
-                marks: item.marks ?? 0,
-                subject: item.subject ?? '',
-                pattern_section: item.pattern_section ?? null,
-                question_number: item.question_number ?? null,
-                question_number_in_pattern: item.question_number_in_pattern ?? null,
-                section_name: item.pattern_section_name ?? '',
-                negative_marks: item.negative_marks ?? null,
-              };
-            })
-            .filter((question: Question) => Boolean(question.question_text));
-        } catch (err) {
-          console.error(`❌ Failed to load questions list for exam ${examId}:`, err);
-        }
+        mappedQuestions = rawQuestions.map((item: any) => ({
+          id: item.id,
+          question_text: item.question_text ?? '',
+          question_type: item.question_type ?? 'mcq',
+          options: Array.isArray(item.options) ? item.options : [],
+          correct_answer: item.correct_answer ?? '',
+          explanation: item.explanation ?? '',
+          marks: item.marks ?? 0,
+          subject: item.subject ?? '',
+          pattern_section: item.pattern_section ?? null,
+          question_number: item.question_number ?? null,
+          question_number_in_pattern: item.question_number_in_pattern ?? null,
+          section_name: item.pattern_section_name ?? '',
+          negative_marks: item.negative_marks ?? null,
+        })).filter((q: Question) => Boolean(q.question_text));
       }
-
-      if (mappedQuestions.length === 0 && attemptData.exam.pattern?.id) {
-        const patternId = attemptData.exam.pattern.id;
-        console.log('⚠️ Still no questions, trying pattern fallback...');
-        console.log('Pattern ID:', patternId);
-
-        try {
-          const patternEndpoint = `/patterns/patterns/${patternId}/questions/`;
-          console.log('🔵 API CALL #4 (PATTERN FALLBACK): GET', patternEndpoint);
-          const questionsResponse = await api.get(patternEndpoint);
-          console.log('✅ API RESPONSE #4 (RAW):', JSON.stringify(questionsResponse.data, null, 2));
-          
-          const sections = questionsResponse.data?.sections_with_questions ?? [];
-          console.log('📊 Pattern Sections Count:', sections.length);
-
-          sections.forEach((section: any) => {
-            const sectionQuestions = Array.isArray(section.questions) ? section.questions : [];
-            sectionQuestions.forEach((question: any) => {
-              const normalizedOptions =
-                Array.isArray(question.options)
-                  ? question.options
-                  : question.options
-                    ? [question.options]
-                    : [];
-
-              mappedQuestions.push({
-                id: question.id,
-                question_text: question.question_text ?? '',
-                question_type: question.question_type ?? 'mcq',
-                options: normalizedOptions,
-                correct_answer: question.correct_answer ?? '',
-                explanation: question.explanation ?? '',
-                marks: question.marks ?? section.section?.marks_per_question ?? 0,
-                subject: question.subject ?? section.section?.subject ?? '',
-                pattern_section: question.pattern_section ?? section.section?.id ?? null,
-                question_number: question.question_number ?? null,
-                question_number_in_pattern: question.question_number_in_pattern ?? null,
-                section_name: section.section?.name ?? '',
-                negative_marks: question.negative_marks ?? null,
-              });
-            });
-          });
-        } catch (err) {
-          console.error(`❌ Failed to load pattern questions for pattern ${patternId}:`, err);
-        }
-      }
-
-      console.log('🎯 FINAL MAPPED QUESTIONS COUNT:', mappedQuestions.length);
-      console.log('🎯 FINAL MAPPED QUESTIONS:', JSON.stringify(mappedQuestions, null, 2));
 
       mappedQuestions.sort((a, b) => {
         const numA = a.question_number_in_pattern ?? a.question_number ?? 0;
@@ -357,7 +258,6 @@ const SecureExamExperience: React.FC = () => {
 
       setQuestions(mappedQuestions);
 
-      // Load existing answers
       if (attemptData.answers) {
         const existingAnswers = new Map();
         Object.entries(attemptData.answers).forEach(([questionId, answer]: [string, any]) => {
@@ -375,26 +275,14 @@ const SecureExamExperience: React.FC = () => {
 
   const autoSaveAnswers = async () => {
     if (answers.size === 0) return;
-
     setAutoSaveStatus('saving');
     try {
       const answersObject = Object.fromEntries(answers);
-      const autoSaveEndpoint = `/exams/attempts/${attemptId}/auto-save/`;
-      
-      console.log('🔵 API CALL (AUTO-SAVE): POST', autoSaveEndpoint);
-      console.log('💾 Auto-save payload:', {
-        totalAnswers: answers.size,
+      await api.post(`/exams/attempts/${attemptId}/auto-save/`, {
         answers: answersObject
       });
-
-      await api.post(autoSaveEndpoint, {
-        answers: answersObject
-      });
-
-      console.log('✅ Auto-save successful');
       setAutoSaveStatus('saved');
     } catch (error: any) {
-      console.error('❌ Auto-save failed:', error);
       setAutoSaveStatus('error');
     }
   };
@@ -407,18 +295,7 @@ const SecureExamExperience: React.FC = () => {
       time_spent: 0
     };
 
-    const newAnswer = {
-      ...currentAnswer,
-      answer
-    };
-
-    console.log('📝 Answer changed:', {
-      questionId,
-      questionType: currentQuestion?.question_type,
-      answer: answer,
-      previousAnswer: currentAnswer.answer
-    });
-
+    const newAnswer = { ...currentAnswer, answer };
     setAnswers(prev => new Map(prev.set(questionId, newAnswer)));
   };
 
@@ -440,95 +317,6 @@ const SecureExamExperience: React.FC = () => {
     setCurrentQuestionIndex(index);
   };
 
-  const startWebcam = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: 640, height: 480 },
-        audio: false 
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch (err) {
-      console.error('Error accessing webcam:', err);
-      setPhotoError('Unable to access webcam. Please allow camera permissions.');
-    }
-  };
-
-  const stopWebcam = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-  };
-
-  const capturePhotoFromWebcam = async () => {
-    if (!videoRef.current || !canvasRef.current) {
-      setPhotoError('Camera not ready. Please refresh the page.');
-      return;
-    }
-
-    // Check if video is actually playing
-    if (videoRef.current.readyState !== 4) {
-      setPhotoError('Camera is still loading. Please wait a moment and try again.');
-      return;
-    }
-
-    setCapturingPhoto(true);
-    setPhotoError(null);
-
-    try {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      
-      const context = canvas.getContext('2d');
-      if (context) {
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const photoDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        
-        const snapshotEndpoint = `/exams/attempts/${attemptId}/proctoring/snapshot/`;
-        const snapshotPayload = {
-          image_data: photoDataUrl,
-          timestamp: new Date().toISOString(),
-          metadata: { type: 'identity_verification', source: 'pre_exam' }
-        };
-        
-        console.log('🔵 API CALL (SNAPSHOT): POST', snapshotEndpoint);
-        console.log('📸 Snapshot payload:', {
-          timestamp: snapshotPayload.timestamp,
-          metadata: snapshotPayload.metadata,
-          imageSize: photoDataUrl.length
-        });
-        
-        // Upload photo to backend
-        const response = await api.post(snapshotEndpoint, snapshotPayload);
-
-        console.log('✅ Photo upload successful');
-        console.log('📥 Snapshot response:', JSON.stringify(response.data, null, 2));
-
-        if (response.data) {
-          setCapturedPhoto(photoDataUrl);
-          setPhotoTaken(true);
-          stopWebcam(); // Stop camera after capture
-        }
-      }
-    } catch (err: any) {
-      console.error('❌ Error capturing photo:', err);
-      console.error('Error details:', err.response?.data);
-      
-      const errorMsg = err.response?.data?.error || 
-                       err.response?.data?.message || 
-                       Object.values(err.response?.data || {}).join(', ') ||
-                       'Failed to capture photo. Please try again.';
-      setPhotoError(errorMsg);
-    } finally {
-      setCapturingPhoto(false);
-    }
-  };
-
   const handleViolationDetected = (violation: any) => {
     setCurrentViolation(violation);
     setShowViolationWarning(true);
@@ -541,31 +329,15 @@ const SecureExamExperience: React.FC = () => {
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
-
     setIsSubmitting(true);
     try {
       const submissionData = {
         attempt_id: parseInt(attemptId!),
         answers: Object.fromEntries(answers)
       };
-      
-      const submitEndpoint = '/exams/submit-exam/';
-      console.log('🔵 API CALL (SUBMIT): POST', submitEndpoint);
-      console.log('📤 Submission payload:', {
-        attemptId: attemptId,
-        totalAnswers: answers.size,
-        submissionData: submissionData
-      });
-      
-      const response = await api.post(submitEndpoint, submissionData);
-      
-      console.log('✅ Submission successful!');
-      console.log('📥 Submission response:', JSON.stringify(response.data, null, 2));
-
+      await api.post('/exams/submit-exam/', submissionData);
       navigate(`/exam-results/${attemptId}`);
     } catch (error: any) {
-      console.error('❌ Submission failed:', error);
-      console.error('Error response:', error.response?.data);
       setError(error.response?.data?.error || 'Failed to submit exam');
     } finally {
       setIsSubmitting(false);
@@ -577,874 +349,340 @@ const SecureExamExperience: React.FC = () => {
   };
 
   const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    } else {
-      return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-  };
-
-  const getTimeColor = () => {
-    if (timeRemaining <= 300) return 'text-red-600'; // Last 5 minutes
-    if (timeRemaining <= 900) return 'text-orange-600'; // Last 15 minutes
-    return 'text-green-600';
-  };
-
-  const getQuestionStatus = (questionIndex: number) => {
-    const question = questions[questionIndex];
-    if (!question) return 'not-visited';
-    
-    const answer = answers.get(question.id);
-    if (!answer || !answer.answer) return 'not-visited';
-    if (answer.is_flagged) return 'flagged';
-    return 'answered';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h > 0 ? h.toString().padStart(2, '0') + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   const questionStats = useMemo(() => {
-    const base = {
-      answered: 0,
-      flagged: 0,
-      notVisited: 0,
-      subjects: {} as Record<string, { total: number; answered: number; flagged: number }>
-    };
-
-    questions.forEach((question) => {
-      const subjectKey = question.subject || 'General';
-      if (!base.subjects[subjectKey]) {
-        base.subjects[subjectKey] = { total: 0, answered: 0, flagged: 0 };
-      }
-      base.subjects[subjectKey].total += 1;
-
-      const answer = answers.get(question.id);
-      if (!answer || !answer.answer) {
-        base.notVisited += 1;
-        return;
-      }
-
-      base.subjects[subjectKey].answered += 1;
-      if (answer.is_flagged) {
-        base.flagged += 1;
-        base.subjects[subjectKey].flagged += 1;
-      } else {
-        base.answered += 1;
+    const stats = { answered: 0, flagged: 0, notVisited: 0 };
+    questions.forEach((q) => {
+      const ans = answers.get(q.id);
+      if (!ans || !ans.answer) stats.notVisited++;
+      else {
+        stats.answered++;
+        if (ans.is_flagged) stats.flagged++;
       }
     });
-
-    return base;
+    return stats;
   }, [answers, questions]);
 
-  interface SubjectSummary {
-    key: string;
-    name: string;
-    questionIds: number[];
-    questionIndices: number[];
-    answered: number;
-    flagged: number;
-    total: number;
-  }
-
-  const subjectSummaries: SubjectSummary[] = useMemo(() => {
-    const map = new Map<string, SubjectSummary>();
-
-    questions.forEach((question, index) => {
-      const subjectKey = (question.subject || 'General').trim();
-      if (!map.has(subjectKey)) {
-        map.set(subjectKey, {
-          key: subjectKey,
-          name: subjectKey,
-          questionIds: [],
-          questionIndices: [],
-          answered: 0,
-          flagged: 0,
-          total: 0
-        });
-      }
-      const summary = map.get(subjectKey)!;
-      summary.questionIds.push(question.id);
-      summary.questionIndices.push(index);
-      summary.total += 1;
-
-      const answer = answers.get(question.id);
-      if (answer?.answer) summary.answered += 1;
-      if (answer?.is_flagged) summary.flagged += 1;
+  const subjectSummaries = useMemo(() => {
+    const map = new Map<string, any>();
+    questions.forEach((q, idx) => {
+      const key = (q.subject || 'General').trim();
+      if (!map.has(key)) map.set(key, { key, name: key, questionIndices: [], answered: 0, total: 0 });
+      const s = map.get(key);
+      s.questionIndices.push(idx);
+      s.total++;
+      if (answers.get(q.id)?.answer) s.answered++;
     });
-
-    return Array.from(map.values()).sort(
-      (a, b) => (a.questionIndices[0] ?? 0) - (b.questionIndices[0] ?? 0)
-    );
+    return Array.from(map.values()).sort((a, b) => a.questionIndices[0] - b.questionIndices[0]);
   }, [questions, answers]);
 
-  const subjectSummaryEntries = useMemo(() => subjectSummaries.map(summary => ({
-    name: summary.name,
-    answered: summary.answered,
-    total: summary.total,
-    flagged: summary.flagged
-  })), [subjectSummaries]);
-
-  const paletteSubjects = useMemo(() => (
-    activeSubject === 'All'
-      ? subjectSummaries
-      : subjectSummaries.filter(summary => summary.key === activeSubject)
-  ), [activeSubject, subjectSummaries]);
-
-  const activeSubjectIndexList = useMemo(() => {
-    if (activeSubject === 'All') {
-      return questions.map((_, index) => index);
-    }
-    const summary = subjectSummaries.find(item => item.key === activeSubject);
-    return summary ? summary.questionIndices : [];
+  const filteredQuestionIndices = useMemo(() => {
+    if (activeSubject === 'All') return questions.map((_, i) => i);
+    return subjectSummaries.find(s => s.key === activeSubject)?.questionIndices || [];
   }, [activeSubject, subjectSummaries, questions]);
-
-  useEffect(() => {
-    if (activeSubject === 'All') return;
-    const exists = subjectSummaries.some(summary => summary.key === activeSubject);
-    if (!exists) {
-      setActiveSubject('All');
-    }
-  }, [activeSubject, subjectSummaries]);
-
-  useEffect(() => {
-    if (activeSubject === 'All') return;
-    const summary = subjectSummaries.find(item => item.key === activeSubject);
-    if (summary && !summary.questionIndices.includes(currentQuestionIndex)) {
-      const nextIndex = summary.questionIndices[0];
-      if (typeof nextIndex === 'number') {
-        setCurrentQuestionIndex(nextIndex);
-      }
-    }
-  }, [activeSubject, subjectSummaries, currentQuestionIndex]);
-
-  const handleSubjectFilterChange = useCallback((subjectKey: string) => {
-    setActiveSubject(subjectKey);
-    if (subjectKey === 'All') return;
-
-    const summary = subjectSummaries.find(item => item.key === subjectKey);
-    if (summary && !summary.questionIndices.includes(currentQuestionIndex)) {
-      const nextIndex = summary.questionIndices[0];
-      if (typeof nextIndex === 'number') {
-        setCurrentQuestionIndex(nextIndex);
-      }
-    }
-  }, [subjectSummaries, currentQuestionIndex]);
-
-  const totalQuestions = questions.length;
-  const attemptedCount = totalQuestions - questionStats.notVisited;
-  const progressPercent = totalQuestions === 0 ? 0 : Math.round((attemptedCount / totalQuestions) * 100);
-
-  const handleNextQuestion = () => {
-    if (activeSubject === 'All' || activeSubjectIndexList.length === 0) {
-      setCurrentQuestionIndex((prev) => (prev + 1) % questions.length);
-      return;
-    }
-
-    setCurrentQuestionIndex((prev) => {
-      const currentPos = activeSubjectIndexList.indexOf(prev);
-      if (currentPos === -1) {
-        return activeSubjectIndexList[0] ?? prev;
-      }
-      const nextPos = (currentPos + 1) % activeSubjectIndexList.length;
-      return activeSubjectIndexList[nextPos] ?? prev;
-    });
-  };
-
-  const handlePreviousQuestion = () => {
-    if (activeSubject === 'All' || activeSubjectIndexList.length === 0) {
-      setCurrentQuestionIndex((prev) => (prev - 1 + questions.length) % questions.length);
-      return;
-    }
-
-    setCurrentQuestionIndex((prev) => {
-      const currentPos = activeSubjectIndexList.indexOf(prev);
-      if (currentPos === -1) {
-        return activeSubjectIndexList[0] ?? prev;
-      }
-      const prevPos = (currentPos - 1 + activeSubjectIndexList.length) % activeSubjectIndexList.length;
-      return activeSubjectIndexList[prevPos] ?? prev;
-    });
-  };
-
-  const paletteStatusStyles: Record<string, string> = {
-    answered: 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-200',
-    flagged: 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-200',
-    'not-visited': 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200'
-  };
-
-  const getPaletteTileClasses = (status: string, isActive: boolean) => {
-    const base = paletteStatusStyles[status] || paletteStatusStyles['not-visited'];
-    return `${base} ${isActive ? 'ring-2 ring-blue-500 shadow-lg' : ''}`;
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-white mx-auto mb-4"></div>
-          <p className="text-gray-900 dark:text-white">Loading exam...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !examAttempt) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <p className="text-red-600 dark:text-red-400 mb-4">{error || 'Exam not found'}</p>
-          <button 
-            onClick={() => navigate('/student-dashboard')} 
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (isDisqualified) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Exam Disqualified</h1>
-          <p className="text-red-600 dark:text-red-400 mb-4">
-            You have exceeded the maximum number of violations allowed.
-          </p>
-          <button 
-            onClick={() => navigate('/student-dashboard')} 
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (questions.length === 0) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Questions Available</h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            This exam doesn't have any questions assigned yet.
-          </p>
-          <button 
-            onClick={() => navigate('/student-dashboard')} 
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Show brief loading/starting message while exam initializes
-  if (!examStarted) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-600 mb-4">
-            <Flag className="w-8 h-8 text-white animate-pulse" />
-          </div>
-          <h2 className="text-xl font-semibold text-slate-900 mb-2">Starting Exam...</h2>
-          <p className="text-sm text-slate-600">Please wait while we prepare your exam environment</p>
-        </div>
-      </div>
-    );
-  }
-
 
   const currentQuestion = questions[currentQuestionIndex];
   const currentAnswer = answers.get(currentQuestion?.id);
-  const currentSubject = currentQuestion?.subject || 'General';
-  const currentSection = currentQuestion?.section_name || 'Section';
-  const currentNegativeMarks = currentQuestion?.negative_marks ?? null;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center">
+        <div className="w-16 h-16 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin mb-6" />
+        <p className="text-slate-600 dark:text-slate-400 font-bold tracking-widest text-xs uppercase">Initializing Assessment Environment</p>
+      </div>
+    );
+  }
+
+  if (isDisqualified) return <ViolationWarning isOpen={true} violation={{ type: 'disqualified', message: 'Maximum violations reached.', timestamp: new Date(), confidence: 1 }} violationCount={violationCount} maxViolations={examAttempt?.max_violations_allowed || 10} onAcknowledge={() => navigate('/student-dashboard')} onClose={() => { }} />;
+
   return (
-    <div className="min-h-screen bg-[#f5f7fb] dark:bg-slate-950 text-slate-900 dark:text-white">
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm px-6 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400 mb-1">Secure Exam Session</p>
-            <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">{examAttempt.exam.title}</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Attempt ID #{examAttempt.id}</p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-2">
-              <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <div>
-                <p className={`text-lg font-mono ${getTimeColor()}`}>{formatTime(timeRemaining)}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Time Remaining</p>
+    <div className="h-screen flex flex-col bg-slate-100 dark:bg-slate-950 select-none">
+      {/* Premium Header */}
+      <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 z-30 shadow-sm transition-all">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+              <ShieldCheck className="w-5 h-5" />
             </div>
-          </div>
-          
-            <div className="bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-2">
-              <p className="text-lg font-semibold">{attemptedCount}/{totalQuestions}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Attempted ({progressPercent}%)</p>
+            <div>
+              <h1 className="text-sm font-bold text-slate-900 dark:text-white leading-none mb-1 line-clamp-1">{examAttempt?.exam.title}</h1>
+              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Candidate: {examAttempt?.student_name || 'Student Session'}</p>
             </div>
-
-            <div className="flex items-center gap-2 border border-slate-200 dark:border-slate-700 rounded-2xl px-3 py-2">
-              {autoSaveStatus === 'saving' && <Save className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />}
-              {autoSaveStatus === 'saved' && <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
-              {autoSaveStatus === 'error' && <AlertTriangle className="w-4 h-4 text-red-500" />}
-              <div>
-                <p className="text-sm font-medium">
-                  {autoSaveStatus === 'saving' ? 'Saving...' : autoSaveStatus === 'saved' ? 'Saved' : 'Save Error'}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Auto-save</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-            <button
-              onClick={requestFullscreen}
-                className="p-3 border border-slate-200 dark:border-slate-700 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                title="Request fullscreen"
-            >
-              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-                className="px-5 py-3 bg-emerald-600 text-white rounded-2xl font-semibold text-sm flex items-center gap-2 shadow-sm hover:bg-emerald-700 transition-colors disabled:opacity-70"
-            >
-              {isSubmitting ? (
-                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-              Submit Exam
-            </button>
           </div>
         </div>
-      </div>
+
+        <div className="flex items-center gap-8">
+          <div className="hidden md:flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">Status</p>
+              <div className="flex items-center gap-2 justify-end">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold text-emerald-600 uppercase">Live Connection</span>
+              </div>
+            </div>
+            <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-800" />
+            <div className="text-right">
+              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">Attempted</p>
+              <p className="text-xs font-bold text-slate-900 dark:text-white">{questionStats.answered} / {questions.length}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+            <div className={`flex items-center gap-3 px-4 py-1.5 rounded-lg bg-white dark:bg-slate-900 shadow-sm border border-slate-200 dark:border-slate-700 min-w-[120px] justify-center`}>
+              <Clock className={`w-4 h-4 ${timeRemaining < 300 ? 'text-red-500 animate-pulse' : 'text-blue-600'}`} />
+              <span className={`text-lg font-mono font-bold leading-none ${timeRemaining < 300 ? 'text-red-600' : 'text-slate-900 dark:text-white'}`}>
+                {formatTime(timeRemaining)}
+              </span>
+            </div>
+            <button
+              onClick={() => setIsPaused(!isPaused)}
+              className="p-2 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-400 transition-all"
+              title="Temporary Pause"
+            >
+              <Pause className="w-4 h-4" />
+            </button>
+          </div>
+
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
+          >
+            {isSubmitting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="w-4 h-4" />}
+            Final Submit
+          </button>
+        </div>
       </header>
 
-      <div className="px-6 py-4 h-[calc(100vh-104px)] flex gap-4 overflow-hidden">
-        <section className="flex-1 flex flex-col gap-4 overflow-hidden">
-          {currentQuestion && (
-            <>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3">
-                  <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Question</p>
-                  <p className="text-lg font-semibold">Q{currentQuestionIndex + 1} / {totalQuestions}</p>
-                </div>
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3">
-                  <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Subject</p>
-                  <p className="text-lg font-semibold">{currentSubject}</p>
-                </div>
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3">
-                  <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Section</p>
-                  <p className="text-lg font-semibold">{currentSection}</p>
-                </div>
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Marks</p>
-                    <p className="text-lg font-semibold">{currentQuestion.marks}</p>
+      {/* Main Layout Area */}
+      <main className="flex-1 flex overflow-hidden p-6 gap-6">
+        {/* Center: Question Area */}
+        <section className="flex-1 flex flex-col gap-6 overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentQuestionIndex}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+              className="flex-1 bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none flex flex-col overflow-hidden"
+            >
+              {/* Question Header */}
+              <div className="px-8 py-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100 font-bold">
+                    Q{currentQuestionIndex + 1}
                   </div>
-                  {currentNegativeMarks !== null && (
-                    <div className="text-right">
-                      <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Negative</p>
-                      <p className="text-lg font-semibold text-rose-500">-{currentNegativeMarks}</p>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">Question {currentQuestionIndex + 1} of {questions.length}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{currentQuestion?.subject}</span>
+                      <div className="w-1 h-1 rounded-full bg-slate-300" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500">{currentQuestion?.marks} Marks</span>
                     </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleFlagToggle(currentQuestion.id)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${currentAnswer?.is_flagged ? 'bg-amber-100 text-amber-700 border border-amber-200 shadow-sm' : 'bg-slate-50 text-slate-600 border border-slate-100 hover:bg-slate-100'}`}
+                >
+                  <Flag className={`w-3.5 h-3.5 ${currentAnswer?.is_flagged ? 'fill-current' : ''}`} />
+                  {currentAnswer?.is_flagged ? 'Flagged for Review' : 'Mark for Review'}
+                </button>
+              </div>
+
+              {/* Question Content */}
+              <div className="flex-1 overflow-y-auto px-10 py-8 space-y-8 question-scroll">
+                <div className="text-lg md:text-xl font-medium text-slate-800 dark:text-slate-100 leading-relaxed bg-slate-50/50 dark:bg-slate-800/30 p-8 rounded-[24px] border border-slate-100 dark:border-slate-800">
+                  <LaTeXRenderer content={currentQuestion?.question_text || ''} />
+                </div>
+
+                <div className="space-y-4">
+                  {currentQuestion?.question_type.includes('mcq') && currentQuestion.options.map((opt: any, i) => {
+                    const text = typeof opt === 'string' ? opt : opt.text;
+                    const isSelected = currentQuestion?.question_type === 'multiple_mcq'
+                      ? (currentAnswer?.answer || '').toString().split('|').includes(text)
+                      : currentAnswer?.answer === text;
+
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          if (currentQuestion.question_type === 'multiple_mcq') {
+                            const cur = (currentAnswer?.answer || '').toString().split('|').filter(Boolean);
+                            const updated = cur.includes(text) ? cur.filter(a => a !== text) : [...cur, text];
+                            handleAnswerChange(currentQuestion.id, updated.join('|'));
+                          } else {
+                            handleAnswerChange(currentQuestion.id, text);
+                          }
+                        }}
+                        className={`w-full group text-left px-6 py-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${isSelected ? 'border-blue-500 bg-blue-50/50 shadow-md ring-4 ring-blue-500/5' : 'border-slate-100 bg-white hover:border-blue-200 dark:bg-slate-800 dark:border-transparent'}`}
+                      >
+                        <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-200 dark:border-slate-600 group-hover:border-blue-300'}`}>
+                          <span className={`text-[10px] font-bold ${isSelected ? 'text-white' : 'text-slate-400 group-hover:text-blue-500'}`}>{String.fromCharCode(65 + i)}</span>
+                        </div>
+                        <div className="flex-1 text-slate-700 dark:text-slate-200 font-medium">
+                          <LaTeXRenderer content={text} />
+                        </div>
+                        {isSelected && <CheckCircle className="w-5 h-5 text-blue-600" />}
+                      </button>
+                    );
+                  })}
+
+                  {currentQuestion?.question_type === 'numerical' && (
+                    <div className="max-w-xs">
+                      <input
+                        type="number"
+                        placeholder="Type numerical value..."
+                        value={currentAnswer?.answer || ''}
+                        onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                        className="w-full px-6 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-transparent rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all text-lg font-bold"
+                      />
+                    </div>
+                  )}
+
+                  {currentQuestion?.question_type === 'subjective' && (
+                    <textarea
+                      placeholder="Input your response here..."
+                      value={currentAnswer?.answer || ''}
+                      onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                      className="w-full h-64 px-8 py-6 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-transparent rounded-[32px] focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all text-lg leading-relaxed resize-none"
+                    />
                   )}
                 </div>
               </div>
 
-              {subjectSummaries.length > 1 && (
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm px-4 py-3 flex items-center gap-2 overflow-x-auto">
+              {/* Navigation Bar */}
+              <div className="px-8 py-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
+                <div className="flex items-center gap-3">
                   <button
-                    onClick={() => handleSubjectFilterChange('All')}
-                    className={`px-4 py-2 rounded-full text-xs font-semibold transition-all border ${
-                      activeSubject === 'All'
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
+                    onClick={() => handleQuestionNavigation(Math.max(0, currentQuestionIndex - 1))}
+                    disabled={currentQuestionIndex === 0}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-white transition-all disabled:opacity-30"
                   >
-                    All Subjects
+                    <ChevronLeft className="w-4 h-4" />
+                    Previous
                   </button>
-                  {subjectSummaries.map(summary => (
-                    <button
-                      key={`subject-chip-${summary.key}`}
-                      onClick={() => handleSubjectFilterChange(summary.key)}
-                      className={`px-4 py-2 rounded-full text-xs font-semibold transition-all border flex items-center gap-2 ${
-                        activeSubject === summary.key
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
-                      }`}
-                    >
-                      <span>{summary.name}</span>
-                      <span className="text-[10px] opacity-80">{summary.answered}/{summary.total}</span>
-                    </button>
-                  ))}
                 </div>
-              )}
 
-              <div className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm flex flex-col overflow-hidden">
-                <div className="px-8 py-5 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                      {currentQuestion.question_type === 'multiple_mcq' ? 'Multiple Select' : currentQuestion.question_type.replace('_', ' ')}
-                    </span>
-                    <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
-                      {currentSubject}
-                    </span>
-                    <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold">
-                      {currentQuestion.marks} Mark{currentQuestion.marks !== 1 ? 's' : ''}
+                <div className="flex items-center gap-3">
+                  <div className="hidden sm:flex items-center gap-2 px-4 py-2 border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 rounded-xl">
+                    <div className={`w-2 h-2 rounded-full ${autoSaveStatus === 'saving' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
+                      {autoSaveStatus === 'saving' ? 'Syncing...' : 'Autosave Active'}
                     </span>
                   </div>
+
                   <button
-                    onClick={() => handleFlagToggle(currentQuestion.id)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 ${
-                      currentAnswer?.is_flagged 
-                        ? 'bg-amber-500/90 text-white shadow'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
-                    }`}
+                    onClick={() => handleQuestionNavigation(Math.min(questions.length - 1, currentQuestionIndex + 1))}
+                    className={`flex items-center gap-2 px-8 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20 active:scale-95 transition-all ${currentQuestionIndex === questions.length - 1 ? 'hidden' : ''}`}
                   >
-                    <Flag className="w-4 h-4" />
-                    {currentAnswer?.is_flagged ? 'Flagged for Review' : 'Mark for Review'}
+                    Save & Next
+                    <ChevronRight className="w-4 h-4" />
                   </button>
-              </div>
-
-                <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6 question-scroll">
-                  <div className="text-lg leading-relaxed text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-2xl px-6 py-5">
-                  <LaTeXRenderer content={currentQuestion.question_text} />
-              </div>
-
-              {(currentQuestion.question_type === 'mcq' || currentQuestion.question_type === 'single_mcq') && (
-                <div className="space-y-3">
-                  {currentQuestion.options.map((option, index) => {
-                    const optionText = typeof option === 'string' ? option : option.text;
-                    const optionId = typeof option === 'object' && option.id ? option.id : index;
-                    
-                    return (
-                      <label
-                        key={optionId}
-                            className={`block p-4 border-2 rounded-2xl cursor-pointer transition-all ${currentAnswer?.answer === optionText
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
-                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-blue-300 dark:hover:border-slate-500'}`}
-                      >
-                        <input
-                          type="radio"
-                          name={`question-${currentQuestion.id}`}
-                          value={optionText}
-                          checked={currentAnswer?.answer === optionText}
-                          onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                          className="sr-only"
-                        />
-                        <div className="flex items-center gap-3">
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                            currentAnswer?.answer === optionText
-                              ? 'border-blue-500 bg-blue-500'
-                                  : 'border-slate-300 dark:border-slate-600'
-                          }`}>
-                                {currentAnswer?.answer === optionText && <div className="w-2 h-2 bg-white rounded-full" />}
-                          </div>
-                              <span className="text-sm text-slate-900 dark:text-white">
-                            <LaTeXRenderer content={optionText} />
-                          </span>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-
-              {currentQuestion.question_type === 'multiple_mcq' && (() => {
-                    const selectedAnswers = currentAnswer?.answer ? String(currentAnswer.answer).split('|').filter(Boolean) : [];
-                return (
-                <div className="space-y-3">
-                  <p className="text-sm text-purple-600 dark:text-purple-400 font-medium mb-3">
-                          Select all correct options (multiple answers allowed)
-                  </p>
-                  {currentQuestion.options.map((option, index) => {
-                    const optionText = typeof option === 'string' ? option : option.text;
-                    const optionId = typeof option === 'object' && option.id ? option.id : index;
-                    const isSelected = selectedAnswers.includes(optionText);
-                    
-                    return (
-                      <label
-                        key={optionId}
-                              className={`block p-4 border-2 rounded-2xl cursor-pointer transition-all ${isSelected
-                            ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 shadow-md'
-                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-purple-300 dark:hover:border-slate-500'}`}
-                      >
-                        <input
-                          type="checkbox"
-                          name={`question-${currentQuestion.id}-${index}`}
-                          value={optionText}
-                          checked={isSelected}
-                          onChange={(e) => {
-                            const currentAnswers = currentAnswer?.answer ? String(currentAnswer.answer).split('|') : [];
-                                  const newAnswers = e.target.checked
-                                    ? [...currentAnswers, optionText]
-                                    : currentAnswers.filter(a => a !== optionText);
-                            handleAnswerChange(currentQuestion.id, newAnswers.join('|'));
-                          }}
-                          className="sr-only"
-                        />
-                        <div className="flex items-center gap-3">
-                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                                  isSelected ? 'border-purple-500 bg-purple-500' : 'border-slate-300 dark:border-slate-600'
-                          }`}>
-                                  {isSelected && <CheckCircle className="w-4 h-4 text-white" />}
-                          </div>
-                                <span className="text-sm text-slate-900 dark:text-white">
-                            <LaTeXRenderer content={optionText} />
-                          </span>
-                        </div>
-                      </label>
-                    );
-                  })}
-                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
-                    Selected: {selectedAnswers.length > 0 ? selectedAnswers.join(', ') : 'None'}
-                  </p>
-                </div>
-                );
-              })()}
-
-              {currentQuestion.question_type === 'numerical' && (
-                    <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-2xl p-5">
-                  <input
-                    type="number"
-                    value={currentAnswer?.answer || ''}
-                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                        className="w-full p-4 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
-                    placeholder="Enter your numerical answer"
-                    step="0.01"
-                  />
-                </div>
-              )}
-
-              {currentQuestion.question_type === 'subjective' && (
-                    <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-2xl p-5">
-                  <textarea
-                    value={currentAnswer?.answer || ''}
-                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                        className="w-full h-48 p-4 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                        placeholder="Write your answer here..."
-                  />
-                </div>
-              )}
-
-              {currentQuestion.question_type === 'true_false' && (
-                <div className="space-y-3">
-                  {['True', 'False'].map((option) => (
-                    <label
-                      key={option}
-                          className={`block p-4 border-2 rounded-2xl cursor-pointer transition-all ${
-                        currentAnswer?.answer === option
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
-                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-blue-300 dark:hover:border-slate-500'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name={`question-${currentQuestion.id}`}
-                        value={option}
-                        checked={currentAnswer?.answer === option}
-                        onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                        className="sr-only"
-                      />
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                              currentAnswer?.answer === option ? 'border-blue-500 bg-blue-500' : 'border-slate-300 dark:border-slate-600'
-                        }`}>
-                              {currentAnswer?.answer === option && <div className="w-2 h-2 bg-white rounded-full" />}
-                        </div>
-                            <span className="text-sm font-medium">{option}</span>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              {currentQuestion.question_type === 'fill_blank' && (
-                    <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-2xl p-5">
-                  <input
-                    type="text"
-                    value={currentAnswer?.answer || ''}
-                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                        className="w-full p-4 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
-                    placeholder="Fill in the blank..."
-                  />
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                    Type your answer in the blank space provided
-                  </p>
-                </div>
-              )}
-            </div>
-
-                <div className="px-8 py-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900/60">
-                  <div className="flex flex-wrap items-center gap-4 text-xs font-semibold">
-                    <span className="flex items-center gap-2 text-emerald-600">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                      Answered: {questionStats.answered}
-                    </span>
-                    <span className="flex items-center gap-2 text-amber-600">
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                      Flagged: {questionStats.flagged}
-                    </span>
-                    <span className="flex items-center gap-2 text-slate-500">
-                      <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
-                      Remaining: {questionStats.notVisited}
-                    </span>
-        </div>
-                  <div className="flex items-center gap-3">
+                  {currentQuestionIndex === questions.length - 1 && (
                     <button
-                      onClick={handlePreviousQuestion}
-                      className="px-4 py-2 rounded-full border border-slate-300 dark:border-slate-700 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      onClick={handleSubmit}
+                      className="flex items-center gap-2 px-8 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
                     >
-                      Previous
+                      Finish Assessment
                     </button>
-                    <button
-                      onClick={handleNextQuestion}
-                      className="px-5 py-2 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
-                    >
-                      Next Question
-                    </button>
-                  </div>
+                  )}
                 </div>
               </div>
-            </>
-          )}
+            </motion.div>
+          </AnimatePresence>
         </section>
 
-        {showQuestionPalette && (
-          <aside className="hidden lg:flex w-[340px] xl:w-[360px] flex-col gap-4">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm p-5 flex flex-col h-[60%]">
-            <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Question Navigator</p>
-                  <p className="text-lg font-semibold">Palette</p>
-                </div>
-              <button
-                onClick={() => setShowQuestionPalette(false)}
-                  className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <EyeOff className="w-4 h-4" />
-              </button>
-            </div>
-
-              {subjectSummaries.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto pb-3">
+        {/* Right: Progress & Subject Navigation */}
+        <aside className="w-16 md:w-80 flex flex-col gap-6 overflow-hidden">
+          <div className="flex-1 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col overflow-hidden">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800">
+              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-3">Sections</p>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => setActiveSubject('All')}
+                  className={`px-4 py-3 rounded-2xl text-xs font-bold transition-all text-left flex items-center justify-between ${activeSubject === 'All' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/10' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'}`}
+                >
+                  All Subjects
+                  <span className={`text-[10px] opacity-60 ${activeSubject === 'All' ? 'text-white' : ''}`}>{questions.length}</span>
+                </button>
+                {subjectSummaries.map(s => (
                   <button
-                    onClick={() => handleSubjectFilterChange('All')}
-                    className={`px-3 py-1.5 text-[11px] rounded-full border font-semibold ${
-                      activeSubject === 'All'
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-200'
-                    }`}
+                    key={s.key}
+                    onClick={() => setActiveSubject(s.key)}
+                    className={`px-4 py-3 rounded-2xl text-xs font-bold transition-all text-left flex items-center justify-between ${activeSubject === s.key ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/10' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'}`}
                   >
-                    All
+                    <span className="truncate pr-2">{s.name}</span>
+                    <span className={`text-[10px] opacity-60 ${activeSubject === s.key ? 'text-white' : ''}`}>{s.total}</span>
                   </button>
-                  {subjectSummaries.map(summary => (
+                ))}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 question-scroll">
+              <div className="grid grid-cols-4 lg:grid-cols-5 gap-2">
+                {filteredQuestionIndices.map(idx => {
+                  const q = questions[idx];
+                  const ans = answers.get(q.id);
+                  const isAnswered = ans && ans.answer;
+                  const isFlagged = ans && ans.is_flagged;
+                  const isCurrent = idx === currentQuestionIndex;
+
+                  return (
                     <button
-                      key={`palette-chip-${summary.key}`}
-                      onClick={() => handleSubjectFilterChange(summary.key)}
-                      className={`px-3 py-1.5 text-[11px] rounded-full border font-semibold ${
-                        activeSubject === summary.key
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-200'
-                      }`}
+                      key={q.id}
+                      onClick={() => handleQuestionNavigation(idx)}
+                      className={`h-11 rounded-xl text-xs font-bold transition-all border-2 flex items-center justify-center relative ${isCurrent ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-inner' :
+                          isFlagged ? 'border-amber-400 bg-amber-50 text-amber-700' :
+                            isAnswered ? 'border-emerald-500 bg-emerald-50 text-emerald-700' :
+                              'border-slate-100 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-800/50'
+                        }`}
                     >
-                      {summary.name}
+                      {idx + 1}
+                      {isFlagged && <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-white dark:border-slate-900" />}
                     </button>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
+            </div>
 
-              <div className="flex-1 overflow-y-auto pr-1 space-y-4">
-                {paletteSubjects.length > 0 ? paletteSubjects.map(summary => (
-                  <div key={`palette-section-${summary.key}`} className="border border-slate-100 dark:border-slate-800 rounded-2xl p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{summary.name}</p>
-                        <p className="text-xs text-slate-500">{summary.answered}/{summary.total} answered • {summary.flagged} flagged</p>
-                    </div>
-                      {activeSubject === 'All' && (
-                        <button
-                          onClick={() => handleSubjectFilterChange(summary.key)}
-                          className="text-[11px] text-blue-600 font-semibold"
-                        >
-                          Focus
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-4 gap-2">
-                      {summary.questionIndices.map(questionIndex => {
-                        const question = questions[questionIndex];
-                        const status = getQuestionStatus(questionIndex);
-                        return (
-                          <button
-                            key={`palette-${question.id}`}
-                            onClick={() => handleQuestionNavigation(questionIndex)}
-                            className={`h-16 rounded-2xl border text-xs font-semibold flex flex-col items-center justify-center transition-all ${getPaletteTileClasses(status, questionIndex === currentQuestionIndex)}`}
-                          >
-                            <span>Q{questionIndex + 1}</span>
-                            <span className="text-[11px] text-slate-500">{question.marks}m</span>
-                            {answers.get(question.id)?.is_flagged && <span className="text-[10px] text-amber-500 font-bold">⚑</span>}
-                  </button>
-                );
-              })}
-                    </div>
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                    <span className="text-[10px] font-bold text-slate-500">Answered</span>
                   </div>
-                )) : (
-                  <p className="text-xs text-slate-500">No subjects available.</p>
-                )}
-            </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] font-semibold">
-                <span className="flex items-center gap-1">
-                  <span className="w-3 h-3 rounded-full bg-emerald-500"></span> Answered
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3 h-3 rounded-full bg-amber-500"></span> Flagged
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3 h-3 rounded-full bg-slate-400"></span> Not Visited
-                </span>
+                  <span className="text-[10px] font-bold text-slate-700">{questionStats.answered}</span>
                 </div>
-                </div>
-
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm p-5">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Subject Overview</p>
-                <span className="text-xs font-semibold text-blue-600">{subjectSummaryEntries.length} Subjects</span>
-                </div>
-              <div className="space-y-3">
-                {subjectSummaryEntries.length > 0 ? subjectSummaryEntries.map(summary => (
-                  <div key={summary.name} className="flex items-center justify-between border border-slate-100 dark:border-slate-800 rounded-2xl px-3 py-2">
-                    <div>
-                      <p className="text-sm font-semibold">{summary.name}</p>
-                      <p className="text-xs text-slate-500">{summary.answered}/{summary.total} attempted</p>
-              </div>
-                    <span className="text-xs font-semibold text-amber-600">{summary.flagged} flagged</span>
-            </div>
-                )) : (
-                  <p className="text-sm text-slate-500">Subject information not provided.</p>
-                )}
-          </div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm p-5">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-semibold">Proctoring</p>
-                <span className={`px-3 py-1 text-xs rounded-full font-semibold ${violationCount > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                  {violationCount > 0 ? 'Attention' : 'Active'}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mb-4">
-                Violations recorded: {violationCount} / {examAttempt.max_violations_allowed}
-              </p>
-              {violationCount > 0 && (
-                <button
-                  onClick={() => setShowViolationsPanel(true)}
-                  className="w-full px-3 py-2 rounded-2xl text-xs font-semibold bg-amber-500/90 text-white hover:bg-amber-500 transition-colors"
-                >
-                  Review Violations
-                </button>
-              )}
-              {violationCount === 0 && (
-                <div className="text-xs text-emerald-600 font-semibold flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4" />
-                  Compliant so far
-                </div>
-              )}
-            </div>
-          </aside>
-        )}
-
-        {showQuestionPalette && (
-          <div className="lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm">
-            <div className="absolute inset-x-0 bottom-0 bg-white dark:bg-slate-950 rounded-t-3xl p-5 space-y-4 max-h-[80vh] overflow-y-auto">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Question Navigator</p>
-                  <p className="text-lg font-semibold">Palette</p>
-                </div>
-                <button
-                  onClick={() => setShowQuestionPalette(false)}
-                  className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-semibold"
-                >
-                  Close
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                {paletteSubjects.length > 0 ? paletteSubjects.map(summary => (
-                  <div key={`mobile-section-${summary.key}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm font-semibold">{summary.name}</p>
-                      {activeSubject === 'All' && (
-                        <button
-                          onClick={() => handleSubjectFilterChange(summary.key)}
-                          className="text-[11px] text-blue-600 font-semibold"
-                        >
-                          Focus
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-4 gap-2">
-                      {summary.questionIndices.map(questionIndex => {
-                        const question = questions[questionIndex];
-                        const status = getQuestionStatus(questionIndex);
-                        return (
-                          <button
-                            key={`mobile-${question.id}`}
-                            onClick={() => {
-                              handleQuestionNavigation(questionIndex);
-                              setShowQuestionPalette(false);
-                            }}
-                            className={`h-14 rounded-2xl border text-xs font-semibold flex flex-col items-center justify-center transition-all ${getPaletteTileClasses(status, questionIndex === currentQuestionIndex)}`}
-                          >
-                            <span>Q{questionIndex + 1}</span>
-                            <span className="text-[10px] text-slate-500">{question.marks}m</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                    <span className="text-[10px] font-bold text-slate-500">Flagged</span>
                   </div>
-                )) : (
-                  <p className="text-xs text-slate-500">No subjects available.</p>
-                )}
-              </div>
-
-              <div className="border border-slate-100 dark:border-slate-800 rounded-2xl p-4 space-y-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Subjects</p>
-                {subjectSummaryEntries.length > 0 ? subjectSummaryEntries.map(summary => (
-                  <div key={`mobile-summary-${summary.name}`} className="flex items-center justify-between text-sm">
-                    <span>{summary.name}</span>
-                    <span className="text-xs text-slate-500">{summary.answered}/{summary.total} attempted</span>
+                  <span className="text-[10px] font-bold text-slate-700">{questionStats.flagged}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+                    <span className="text-[10px] font-bold text-slate-500">Unanswered</span>
                   </div>
-                )) : (
-                  <p className="text-xs text-slate-500">No subject metadata</p>
-                )}
+                  <span className="text-[10px] font-bold text-slate-700">{questionStats.notVisited}</span>
+                </div>
               </div>
             </div>
           </div>
-        )}
+        </aside>
+      </main>
 
-        {!showQuestionPalette && (
-          <button
-            onClick={() => setShowQuestionPalette(true)}
-            className="fixed bottom-6 right-6 px-5 py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-lg flex items-center gap-2 text-sm font-semibold"
-          >
-            <Eye className="w-4 h-4" />
-            Open Navigator
-          </button>
-        )}
-      </div>
-
-      {/* Webcam Monitor */}
+      {/* Proctoring & Violation UI */}
       <WebcamMonitor
         attemptId={parseInt(attemptId!)}
         onViolationDetected={handleViolationDetected}
@@ -1452,30 +690,28 @@ const SecureExamExperience: React.FC = () => {
         showPreview={true}
       />
 
-      {/* Violation Warning Modal */}
       <ViolationWarning
         isOpen={showViolationWarning}
         violation={currentViolation}
         violationCount={violationCount}
-        maxViolations={examAttempt.max_violations_allowed}
+        maxViolations={examAttempt?.max_violations_allowed || 10}
         onAcknowledge={handleViolationAcknowledged}
         onClose={handleViolationAcknowledged}
       />
 
-      <ViolationsPanel
-        attemptId={parseInt(attemptId || '0')}
-        isOpen={showViolationsPanel}
-        onClose={() => setShowViolationsPanel(false)}
-      />
-
-      {/* Violation Toast Notification */}
       <ViolationToast
         violation={currentToastViolation}
         onClose={() => setCurrentToastViolation(null)}
       />
+
+      <style>{`
+        .question-scroll::-webkit-scrollbar { width: 6px; }
+        .question-scroll::-webkit-scrollbar-track { background: transparent; }
+        .question-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.05); border-radius: 10px; }
+        dark .question-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); }
+      `}</style>
     </div>
   );
 };
 
 export default SecureExamExperience;
-

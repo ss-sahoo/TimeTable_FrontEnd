@@ -177,7 +177,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Get device information
       const deviceInfo = deviceManager.getDeviceInfo();
-      
+
       // Prepare login data with device info
       const loginData = {
         user_agent: deviceInfo.userAgent,
@@ -188,7 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         os: deviceInfo.os,
         force_switch: forceSwitch,
       };
-      
+
       let response;
 
       // Determine which login endpoint to use based on role
@@ -254,7 +254,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Store tokens in localStorage
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
-      
+
       // Store device fingerprint for session validation
       if (response.data.device_session?.device_fingerprint) {
         localStorage.setItem('device_fingerprint', response.data.device_session.device_fingerprint);
@@ -282,7 +282,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log("Error response:", error.response);
       console.log("Error status:", error.response?.status);
       console.log("Error data:", error.response?.data);
-      
+
       // Check if this is a device conflict error (409 status)
       if (error.response?.status === 409 && error.response?.data?.has_conflict) {
         console.log("Device conflict detected! Setting conflict state...");
@@ -293,7 +293,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
         throw new Error('DEVICE_CONFLICT');
       }
-      
+
       logout(); // Ensure no stale tokens/user data
       setLoading(false);
 
@@ -336,7 +336,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(false);
   };
 
-  const userRole = user ? user.role : null;
+  const userRole = (user ? user.role?.toLowerCase() : null) as User['role'] | null;
 
   return (
     <AuthContext.Provider value={{ user, setUser, login, logout, isAuthenticated, loading, userRole, deviceConflict, setDeviceConflict }}>

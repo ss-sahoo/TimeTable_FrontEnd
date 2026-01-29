@@ -49,21 +49,15 @@ const useExamSecurity = (
   const [violationCount, setViolationCount] = useState(0);
   const [isDisqualified, setIsDisqualified] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  
+
+  const violationCooldowns = useRef<Record<string, number>>({});
   const lastViolationTimeRef = useRef<number>(0);
 
   // Log security configuration on initialization
   useEffect(() => {
-    console.log('🔒 EXAM SECURITY INITIALIZED:', {
-      attemptId,
-      maxViolations: config.maxViolations,
-      enableTabMonitoring: config.enableTabMonitoring,
-      enableFullscreenEnforcement: config.enableFullscreenEnforcement,
-      enableCopyPasteBlocking: config.enableCopyPasteBlocking,
-      enableRightClickBlocking: config.enableRightClickBlocking,
-      enableContextMenuBlocking: config.enableContextMenuBlocking
-    });
-  }, [attemptId, config]);
+    // Only log once on mount
+    console.log('🔒 EXAM SECURITY ACTIVE', { attemptId, max: config.maxViolations });
+  }, []);
 
   // Log violation to backend
   const logViolationToBackend = useCallback(async (type: string, metadata?: ViolationMetadata) => {
@@ -79,45 +73,44 @@ const useExamSecurity = (
       }
       return data;
     } catch (error) {
-      console.error('Failed to log violation:', error);
+      // Quiet error logging
     }
   }, [attemptId]);
 
   // Log violation
   const logViolation = useCallback((type: string, metadata?: ViolationMetadata) => {
     const now = Date.now();
-    
-    // Prevent spam violations (same type within 5 seconds)
-    if (now - lastViolationTimeRef.current < 5000) {
-      console.log(`⏸️ Violation ${type} ignored due to spam protection (< 5s)`);
+    const lastTime = violationCooldowns.current[type] || 0;
+
+    // Per-type cooldown: 10 seconds for the same type to avoid spamming the student
+    // Global cooldown: 2 seconds between any different violations
+    if (now - lastTime < 10000 || now - lastViolationTimeRef.current < 2000) {
       return;
     }
-    
+
+    violationCooldowns.current[type] = now;
     lastViolationTimeRef.current = now;
-    
+
     const violation: ViolationData = {
       type,
       timestamp: new Date(),
       metadata
     };
 
-    console.log(`🚨 LOGGING VIOLATION:`, {
-      type,
-      metadata,
-      currentCount: violationCount,
-      maxAllowed: config.maxViolations
+    setViolations(prev => {
+      // Only keep last 50 violations in state to prevent memory issues
+      const newViolations = [...prev, violation];
+      return newViolations.length > 50 ? newViolations.slice(-50) : newViolations;
     });
 
-    setViolations(prev => [...prev, violation]);
     setViolationCount(prev => prev + 1);
-    
+
     // Log to backend
     logViolationToBackend(type, metadata);
-    
+
     // Check if disqualified (only for serious violations)
-    const seriousViolations = ['tab_switch', 'window_blur', 'copy_paste', 'right_click', 'keyboard_shortcut'];
+    const seriousViolations = ['tab_switch', 'window_blur', 'copy_paste', 'right_click', 'keyboard_shortcut', 'multiple_faces', 'mobile_detected'];
     if (seriousViolations.includes(type) && violationCount + 1 >= config.maxViolations) {
-      console.warn(`❌ DISQUALIFIED: Exceeded max violations (${violationCount + 1}/${config.maxViolations})`);
       setIsDisqualified(true);
     }
   }, [violationCount, config.maxViolations, logViolationToBackend]);
@@ -127,6 +120,7 @@ const useExamSecurity = (
     setViolations([]);
     setViolationCount(0);
     setIsDisqualified(false);
+    violationCooldowns.current = {};
   }, []);
 
   // Tab visibility monitoring
@@ -181,9 +175,9 @@ const useExamSecurity = (
         doc.mozFullScreenElement ||
         doc.msFullscreenElement
       );
-      
+
       setIsFullscreen(isCurrentlyFullscreen);
-      
+
       if (!isCurrentlyFullscreen && isFullscreen) {
         logViolation('fullscreen_exit', {
           timestamp: new Date().toISOString(),
@@ -304,16 +298,16 @@ const useExamSecurity = (
         'Ctrl+F5', // Hard refresh
       ];
 
-      const keyCombo = e.ctrlKey ? `Ctrl+${e.key}` : 
-                      e.altKey ? `Alt+${e.key}` : 
-                      e.shiftKey ? `Shift+${e.key}` : 
-                      e.key;
+      const keyCombo = e.ctrlKey ? `Ctrl+${e.key}` :
+        e.altKey ? `Alt+${e.key}` :
+          e.shiftKey ? `Shift+${e.key}` :
+            e.key;
 
-      if (blockedShortcuts.includes(keyCombo) || 
-          blockedShortcuts.includes(e.key) ||
-          (e.ctrlKey && e.shiftKey && e.key === 'I') ||
-          (e.ctrlKey && e.shiftKey && e.key === 'J') ||
-          (e.ctrlKey && e.shiftKey && e.key === 'C')) {
+      if (blockedShortcuts.includes(keyCombo) ||
+        blockedShortcuts.includes(e.key) ||
+        (e.ctrlKey && e.shiftKey && e.key === 'I') ||
+        (e.ctrlKey && e.shiftKey && e.key === 'J') ||
+        (e.ctrlKey && e.shiftKey && e.key === 'C')) {
         e.preventDefault();
         logViolation('keyboard_shortcut', {
           keyCombo,
@@ -338,7 +332,7 @@ const useExamSecurity = (
         mozRequestFullScreen?: () => Promise<void>;
         msRequestFullscreen?: () => Promise<void>;
       };
-      
+
       if (element.requestFullscreen) {
         await element.requestFullscreen();
       } else if (element.webkitRequestFullscreen) {
@@ -348,7 +342,7 @@ const useExamSecurity = (
       } else if (element.msRequestFullscreen) {
         await element.msRequestFullscreen();
       }
-      
+
       setIsFullscreen(true);
     } catch (error) {
       console.error('Failed to request fullscreen:', error);
@@ -368,7 +362,7 @@ const useExamSecurity = (
         mozCancelFullScreen?: () => Promise<void>;
         msExitFullscreen?: () => Promise<void>;
       };
-      
+
       if (document.exitFullscreen) {
         await document.exitFullscreen();
       } else if (doc.webkitExitFullscreen) {
@@ -378,7 +372,7 @@ const useExamSecurity = (
       } else if (doc.msExitFullscreen) {
         await doc.msExitFullscreen();
       }
-      
+
       setIsFullscreen(false);
     } catch (error) {
       console.error('Failed to exit fullscreen:', error);
