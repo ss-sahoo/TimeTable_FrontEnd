@@ -245,11 +245,17 @@ export const useProctoringCamera = ({
   }, [captureSnapshot]);
 
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive) {
+      console.log('[Proctoring] System not active, skipping interval setup');
+      return;
+    }
+
+    console.log(`[Proctoring] System active, setting up interval: ${captureIntervalMs}ms`);
 
     // Initial capture using current function
     const currentCapture = captureSnapshotRef.current;
     if (currentCapture) {
+      console.log('[Proctoring] Performing initial capture');
       currentCapture();
     }
 
@@ -257,11 +263,13 @@ export const useProctoringCamera = ({
     const intervalId = window.setInterval(() => {
       const latestCapture = captureSnapshotRef.current;
       if (latestCapture) {
+        console.log('[Proctoring] Performing interval capture');
         latestCapture();
       }
     }, captureIntervalMs);
 
     return () => {
+      console.log('[Proctoring] Cleaning up interval');
       window.clearInterval(intervalId);
     };
   }, [captureIntervalMs, isActive]); // Only recreate when interval or active state changes

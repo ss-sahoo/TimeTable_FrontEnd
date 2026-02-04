@@ -260,6 +260,42 @@ const ExamResults: React.FC = () => {
   );
   const canDownloadAnswerSheet = activeTab === 'detailed' && detailedEntries.length > 0;
 
+  const RenderStudentAnswer = ({ answer }: { answer: string }) => {
+    if (!answer) return <span>Not attempted</span>;
+
+    try {
+      const parsed = JSON.parse(answer);
+      if (typeof parsed === 'object' && parsed !== null) {
+        if (parsed.selected_choice) {
+          return (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded uppercase">Selected: {parsed.selected_choice}</span>
+              </div>
+
+              {parsed.parts && parsed.parts[parsed.selected_choice] ? (
+                <div className="space-y-3 pl-3 border-l-2 border-slate-200">
+                  {Object.entries(parsed.parts[parsed.selected_choice]).map(([key, value]: [string, any]) => (
+                    <div key={key}>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Part {parseInt(key) + 1}</span>
+                      <p className="text-sm text-slate-900 mt-1">{value || <span className="text-slate-400 italic">No answer provided</span>}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-900">{parsed.text || <span className="text-slate-400 italic">No text response provided</span>}</p>
+              )}
+            </div>
+          );
+        }
+      }
+    } catch (e) {
+      // Not a JSON or not our structured format, fall back to plain text
+    }
+
+    return <span>{answer}</span>;
+  };
+
   const handleDownloadPdf = async () => {
     if (!answerSheetRef.current) return;
     setDownloading(true);
@@ -801,6 +837,16 @@ const ExamResults: React.FC = () => {
                                 >
                                   {detail.is_correct ? 'Correct' : 'Incorrect'}
                                 </span>
+                                {(detail as any).evaluation_status === 'ai_evaluated' && (
+                                  <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] font-bold uppercase">
+                                    AI Evaluated
+                                  </span>
+                                )}
+                                {(detail as any).evaluation_status === 'auto_evaluated' && (
+                                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold uppercase">
+                                    Auto Graded
+                                  </span>
+                                )}
                               </div>
                             </div>
                             <div className="bg-slate-50 rounded-xl p-4">
@@ -809,7 +855,9 @@ const ExamResults: React.FC = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
                                 <p className="text-xs font-semibold text-emerald-700 uppercase mb-1">Student Answer</p>
-                                <p className="text-sm text-emerald-900">{detail.user_answer || 'Not attempted'}</p>
+                                <div className="text-sm text-emerald-900">
+                                  <RenderStudentAnswer answer={detail.user_answer} />
+                                </div>
                               </div>
                               <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
                                 <p className="text-xs font-semibold text-blue-700 uppercase mb-1">Correct Answer</p>
@@ -817,9 +865,18 @@ const ExamResults: React.FC = () => {
                               </div>
                             </div>
                             {detail.explanation && (
-                              <div className="bg-slate-50 rounded-xl p-4 text-sm text-slate-700">
-                                <p className="text-xs uppercase text-slate-500 mb-2">Explanation</p>
-                                <LaTeXRenderer content={detail.explanation} />
+                              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-sm text-slate-700">
+                                <p className="text-[10px] uppercase font-bold text-slate-500 mb-2 flex items-center gap-1">
+                                  {(detail as any).evaluation_status === 'ai_evaluated' ? (
+                                    <>
+                                      <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                                      AI Evaluation Feedback
+                                    </>
+                                  ) : 'Explanation / Feedback'}
+                                </p>
+                                <div className="prose prose-sm max-w-none">
+                                  <LaTeXRenderer content={detail.explanation} />
+                                </div>
                               </div>
                             )}
                           </div>

@@ -19,8 +19,15 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
-  X
+  X,
+  Target,
+  Layers,
+  Layout,
+  Settings,
+  Split,
+  List
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api, useApi } from '../hooks/useApi';
 import { MarkingScheme } from '../../shared/types';
@@ -44,6 +51,20 @@ interface PatternSection {
   is_compulsory: boolean;
   order: number;
   marking_scheme: MarkingScheme;
+  question_configurations?: Record<string, QuestionConfiguration>;
+}
+
+interface QuestionConfiguration {
+  is_nested: boolean;
+  nested_type?: 'internal_choice' | 'multipart';
+  description?: string;
+  options?: Array<{
+    label: string;
+    description?: string;
+    marks?: number;
+    parts?: Array<{ label: string; marks: number; description?: string }>;
+  }>;
+  sub_questions?: Array<{ label: string; marks: number; description?: string }>;
 }
 
 interface SubjectWithSections {
@@ -62,6 +83,16 @@ interface ExamPattern {
   sections: PatternSection[];
 }
 
+const SUBJECT_COLORS = [
+  { bg: 'bg-blue-50/50', border: 'border-blue-200', text: 'text-blue-800', accent: 'bg-blue-600', dot: 'bg-blue-500', shadow: 'shadow-blue-500/10' },
+  { bg: 'bg-indigo-50/50', border: 'border-indigo-200', text: 'text-indigo-800', accent: 'bg-indigo-600', dot: 'bg-indigo-500', shadow: 'shadow-indigo-500/10' },
+  { bg: 'bg-purple-50/50', border: 'border-purple-200', text: 'text-purple-800', accent: 'bg-purple-600', dot: 'bg-purple-500', shadow: 'shadow-purple-500/10' },
+  { bg: 'bg-rose-50/50', border: 'border-rose-200', text: 'text-rose-800', accent: 'bg-rose-600', dot: 'bg-rose-500', shadow: 'shadow-rose-500/10' },
+  { bg: 'bg-amber-50/50', border: 'border-amber-200', text: 'text-amber-800', accent: 'bg-amber-600', dot: 'bg-amber-500', shadow: 'shadow-amber-500/10' },
+  { bg: 'bg-emerald-50/50', border: 'border-emerald-200', text: 'text-emerald-800', accent: 'bg-emerald-600', dot: 'bg-emerald-500', shadow: 'shadow-emerald-500/10' },
+  { bg: 'bg-cyan-50/50', border: 'border-cyan-200', text: 'text-cyan-800', accent: 'bg-cyan-600', dot: 'bg-cyan-500', shadow: 'shadow-cyan-500/10' },
+];
+
 export default function PatternCreation() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,6 +106,13 @@ export default function PatternCreation() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sectionErrors, setSectionErrors] = useState<Record<number, Record<string, string>>>({});
   const [marksValidationError, setMarksValidationError] = useState('');
+
+  // Configuration Modal State
+  const [activeConfig, setActiveConfig] = useState<{
+    sectionIndex: number;
+    questionNumber: number;
+    config: QuestionConfiguration;
+  } | null>(null);
 
   const [pattern, setPattern] = useState<ExamPattern>({
     name: '',
@@ -117,6 +155,7 @@ export default function PatternCreation() {
       return {
         ...section,
         min_questions_to_attempt: Math.max(total, 1),
+        question_configurations: section.question_configurations || {},
       };
     });
 
@@ -147,6 +186,31 @@ export default function PatternCreation() {
       setMarksValidationError('');
     }
   };
+
+  // Auto-calculate totals from sections
+  useEffect(() => {
+    const totalQs = pattern.sections.reduce((total, section) => {
+      const startQ = typeof section.start_question === 'string' ? parseInt(section.start_question) || 0 : section.start_question;
+      const endQ = typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question;
+      return total + Math.max(0, endQ - startQ + 1);
+    }, 0);
+
+    const calculatedMarks = pattern.sections.reduce((total, section) => {
+      const startQ = typeof section.start_question === 'string' ? parseInt(section.start_question) || 0 : section.start_question;
+      const endQ = typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question;
+      const questionsInSection = Math.max(0, endQ - startQ + 1);
+      return total + (questionsInSection * (section.marking_scheme?.max_marks || 0));
+    }, 0);
+
+    // Only update if values actually changed to avoid unnecessary re-renders
+    if (Number(pattern.total_questions) !== totalQs || Number(pattern.total_marks) !== calculatedMarks) {
+      setPattern(prev => ({
+        ...prev,
+        total_questions: totalQs,
+        total_marks: calculatedMarks
+      }));
+    }
+  }, [pattern.sections]);
 
   // Handle subject input change with autocomplete
   const handleSubjectInputChange = (value: string) => {
@@ -186,23 +250,6 @@ export default function PatternCreation() {
       const sectionMarks = questionsInSection * section.marking_scheme.max_marks;
       return total + sectionMarks;
     }, 0);
-  };
-
-  // Validate marks consistency
-  const validateMarks = () => {
-    const calculatedMarks = calculateTotalSectionMarks();
-    const totalMarks = typeof pattern.total_marks === 'string' ? parseInt(pattern.total_marks) || 0 : pattern.total_marks;
-
-    // Only validate if total_marks is not empty
-    if (pattern.total_marks && pattern.total_marks !== '' && calculatedMarks !== totalMarks) {
-      setMarksValidationError(
-        `Marks mismatch! Total marks: ${totalMarks}, Calculated from sections: ${calculatedMarks}`
-      );
-      return false;
-    } else {
-      setMarksValidationError('');
-      return true;
-    }
   };
 
   // Calculate next available question number WITHIN A SPECIFIC SUBJECT
@@ -249,6 +296,46 @@ export default function PatternCreation() {
       console.error('Failed to remove subject:', error);
       alert(error.response?.data?.error || 'Failed to remove subject. Please try again.');
     }
+  };
+
+  const openConfigurationDrawer = (sectionIndex: number, questionNumber: number) => {
+    const section = pattern.sections[sectionIndex];
+    const existingConfig = section.question_configurations?.[questionNumber] || {
+      is_nested: false,
+      nested_type: 'internal_choice',
+      options: [
+        { label: 'Option A', parts: [{ label: 'a', marks: 1 }] },
+        { label: 'Option B', marks: 1 }
+      ],
+      sub_questions: [{ label: 'i', marks: 1 }]
+    };
+
+    setActiveConfig({
+      sectionIndex,
+      questionNumber,
+      config: existingConfig
+    });
+  };
+
+  const saveConfiguration = () => {
+    if (!activeConfig) return;
+
+    setPattern(prev => {
+      const updatedSections = [...prev.sections];
+      const section = updatedSections[activeConfig.sectionIndex];
+
+      updatedSections[activeConfig.sectionIndex] = {
+        ...section,
+        question_configurations: {
+          ...section.question_configurations,
+          [activeConfig.questionNumber]: activeConfig.config
+        }
+      };
+
+      return { ...prev, sections: updatedSections };
+    });
+
+    setActiveConfig(null);
   };
 
   // Handle adding a new subject
@@ -363,21 +450,22 @@ export default function PatternCreation() {
     }));
     setNextSectionOrder(prev => prev + 1);
 
-    // Scroll to the newly created section after a short delay
+    // Scroll to the subject group and highlight it
     setTimeout(() => {
-      const sectionElement = document.querySelector(`[data-section-id="${newSection.id}"]`);
-      if (sectionElement) {
-        sectionElement.scrollIntoView({
+      const subjectGroupElement = document.querySelector(`[data-subject-name="${subjectName}"]`);
+      if (subjectGroupElement) {
+        subjectGroupElement.scrollIntoView({
           behavior: 'smooth',
           block: 'center'
         });
-        // Add a subtle highlight effect
-        sectionElement.classList.add('ring-2', 'ring-blue-300', 'ring-opacity-50');
+
+        // Add a subtle highlight effect to the whole subject group
+        subjectGroupElement.classList.add('ring-2', 'ring-blue-400', 'ring-offset-2', 'transition-all', 'duration-500');
         setTimeout(() => {
-          sectionElement.classList.remove('ring-2', 'ring-blue-300', 'ring-opacity-50');
-        }, 2000);
+          subjectGroupElement.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-2');
+        }, 3000);
       }
-    }, 200);
+    }, 400); // Slightly longer delay to allow DOM to update with the new section
   };
 
   // Real-time validation for individual section fields
@@ -502,9 +590,7 @@ export default function PatternCreation() {
 
     // Trigger marks validation when relevant fields change
     if (field === 'start_question' || field === 'end_question' || field === 'marking_scheme') {
-      setTimeout(() => {
-        validateMarks();
-      }, 100);
+      // Logic for auto-calc is now handled via useEffect
     }
   };
 
@@ -656,19 +742,12 @@ export default function PatternCreation() {
   const handleSave = async () => {
     console.log('🔍 Starting validation...');
     const isValid = validateForm();
-    const marksValid = validateMarks();
     console.log('✅ Validation result:', isValid);
-    console.log('✅ Marks validation result:', marksValid);
     console.log('📋 Current errors:', errors);
     console.log('📋 Section errors:', sectionErrors);
 
     if (!isValid) {
       alert('Please fix all validation errors before saving.');
-      return;
-    }
-
-    if (!marksValid) {
-      alert('Please fix the marks mismatch before saving.');
       return;
     }
 
@@ -874,18 +953,23 @@ export default function PatternCreation() {
 
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Total Questions *
+                    Total Questions
                   </label>
-                  <input
-                    type="number"
-                    value={pattern.total_questions}
-                    onChange={(e) => handleInputChange('total_questions', e.target.value)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${errors.total_questions ? 'border-red-300' : 'border-slate-300'
-                      }`}
-                    min="1"
-                    max="500"
-                    placeholder="Enter total questions"
-                  />
+                  <div className="relative group">
+                    <input
+                      type="number"
+                      value={pattern.total_questions}
+                      readOnly
+                      disabled
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50 text-slate-500 font-bold cursor-not-allowed transition-all"
+                      placeholder="Calculated from sections"
+                    />
+                    <div className="absolute top-full left-0 mt-1 hidden group-hover:block z-10">
+                      <div className="bg-slate-800 text-white text-[10px] px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                        Auto-calculated from sections below
+                      </div>
+                    </div>
+                  </div>
                   {errors.total_questions && (
                     <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
@@ -896,17 +980,23 @@ export default function PatternCreation() {
 
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Total Marks *
+                    Total Marks
                   </label>
-                  <input
-                    type="number"
-                    value={pattern.total_marks}
-                    onChange={(e) => handleInputChange('total_marks', e.target.value)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${errors.total_marks ? 'border-red-300' : 'border-slate-300'
-                      }`}
-                    min="1"
-                    placeholder="Enter total marks"
-                  />
+                  <div className="relative group">
+                    <input
+                      type="number"
+                      value={pattern.total_marks}
+                      readOnly
+                      disabled
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50 text-slate-500 font-bold cursor-not-allowed transition-all"
+                      placeholder="Calculated from sections"
+                    />
+                    <div className="absolute top-full left-0 mt-1 hidden group-hover:block z-10">
+                      <div className="bg-slate-800 text-white text-[10px] px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                        Auto-calculated from sections below
+                      </div>
+                    </div>
+                  </div>
                   {errors.total_marks && (
                     <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
@@ -1145,40 +1235,48 @@ export default function PatternCreation() {
               <div className="space-y-4">
                 {getSubjectsWithSections().map((subjectGroup, subjectIndex) => {
                   const isNewlyAdded = recentlyAddedSubjects.has(subjectGroup.name);
+                  const colorScheme = SUBJECT_COLORS[subjectIndex % SUBJECT_COLORS.length];
 
                   return (
                     <div
                       key={subjectIndex}
                       data-subject-group
-                      className={`border rounded-lg p-4 transition-all ${isNewlyAdded
-                        ? 'border-green-300 bg-green-50 shadow-md'
-                        : 'border-slate-200'
+                      data-subject-name={subjectGroup.name}
+                      className={`border rounded-2xl p-6 transition-all duration-500 relative overflow-hidden ${colorScheme.bg} ${colorScheme.border} ${colorScheme.shadow} ${isNewlyAdded ? 'ring-2 ring-green-400 ring-offset-2 scale-[1.01]' : 'shadow-lg'
                         }`}
                     >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${isNewlyAdded ? 'bg-green-500' : 'bg-blue-500'
-                            }`}></div>
-                          <h4 className={`font-semibold text-sm ${isNewlyAdded ? 'text-green-800' : 'text-slate-800'
-                            }`}>
-                            {subjectGroup.name}
-                          </h4>
-                          {isNewlyAdded && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white rounded-full text-xs font-medium">
-                              <Zap className="w-3 h-3" />
-                              New
-                            </span>
-                          )}
-                          <span className="text-xs text-slate-500">
-                            ({subjectGroup.sections.length} sections)
-                          </span>
-                          {subjectGroup.sections.length > 0 && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                              <Hash className="w-3 h-3" />
-                              Q{Math.min(...subjectGroup.sections.map(s => typeof s.start_question === 'string' ? parseInt(s.start_question) || 1 : s.start_question))}-
-                              {Math.max(...subjectGroup.sections.map(s => typeof s.end_question === 'string' ? parseInt(s.end_question) || 1 : s.end_question))}
-                            </span>
-                          )}
+                      {/* Decorative Background Element */}
+                      <div className={`absolute top-0 right-0 w-32 h-32 ${colorScheme.accent} opacity-[0.03] rounded-bl-full -mr-8 -mt-8`}></div>
+
+                      <div className="flex items-center justify-between mb-6 relative z-10">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${colorScheme.dot} animate-pulse`}></div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className={`font-bold text-lg uppercase tracking-tight ${colorScheme.text}`}>
+                                {subjectGroup.name}
+                              </h4>
+                              {isNewlyAdded && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest animate-bounce">
+                                  <Zap className="w-2 h-2" />
+                                  New
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                {subjectGroup.sections.length} Sections
+                              </span>
+                              <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                Total Qs: {subjectGroup.sections.reduce((t, s) => {
+                                  const startQ = typeof s.start_question === 'string' ? parseInt(s.start_question) || 0 : s.start_question;
+                                  const endQ = typeof s.end_question === 'string' ? parseInt(s.end_question) || 0 : s.end_question;
+                                  return t + (endQ - startQ + 1);
+                                }, 0)}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                         <button
                           onClick={() => addSectionToSubject(subjectGroup.name)}
@@ -1328,6 +1426,38 @@ export default function PatternCreation() {
                                 />
                               </div>
 
+                              {/* Question Configuration Tiles for Subjective Questions */}
+                              {section.question_type === 'Subjective' && (
+                                <div className="mt-4 pt-4 border-t border-slate-200">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <Settings className="w-3 h-3 text-slate-400" />
+                                      <p className="text-xs font-medium text-slate-700">Configure Structure</p>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400">Click a number to configure</span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {Array.from({ length: (typeof section.end_question === 'string' ? parseInt(section.end_question) : section.end_question) - (typeof section.start_question === 'string' ? parseInt(section.start_question) : section.start_question) + 1 }, (_, i) => (typeof section.start_question === 'string' ? parseInt(section.start_question) : section.start_question) + i).map(qNum => {
+                                      const hasConfig = section.question_configurations?.[qNum]?.is_nested;
+                                      return (
+                                        <button
+                                          key={qNum}
+                                          onClick={() => openConfigurationDrawer(globalIndex, qNum)}
+                                          className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-medium transition-colors border relative ${hasConfig
+                                            ? 'bg-purple-600 text-white border-purple-700 shadow-sm'
+                                            : 'bg-white text-slate-600 border-slate-200 hover:bg-purple-50 hover:border-purple-200'
+                                            }`}
+                                          title={hasConfig ? "Question has custom structure" : "Standard subjective question"}
+                                        >
+                                          {qNum}
+                                          {hasConfig && <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full border-2 border-white"></div>}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
                               <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
                                 <div className="flex items-center gap-2">
                                   <span className="flex items-center gap-1">
@@ -1410,56 +1540,540 @@ export default function PatternCreation() {
               </div>
             </div>
 
-            {/* Marks Summary */}
-            {pattern.sections.length > 0 && (
-              <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4">
-                <h3 className="text-sm font-semibold text-slate-900 mb-3">Marks Summary</h3>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-600">Total:</span>
-                    <span className="text-xs font-medium text-slate-900">{pattern.total_marks || 'Not set'} marks</span>
+            {/* Live Skeleton Preview */}
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                  <Layout className="w-4 h-4 text-blue-600" />
+                  Live Skeleton
+                </h3>
+                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-full uppercase tracking-tighter">
+                  Real-time
+                </span>
+              </div>
+
+              {pattern.sections.length === 0 ? (
+                <div className="py-8 flex flex-col items-center justify-center text-center opacity-40">
+                  <div className="w-12 h-12 border-2 border-dashed border-slate-300 rounded-xl mb-2 flex items-center justify-center">
+                    <Layers className="w-5 h-5 text-slate-400" />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-600">Calculated:</span>
-                    <span className="text-xs font-medium text-slate-900">{calculateTotalSectionMarks()} marks</span>
-                  </div>
-                  {marksValidationError && (
-                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
-                      <p className="text-red-600 text-xs flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        {marksValidationError}
-                      </p>
-                    </div>
-                  )}
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">No sections yet</p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                  {getSubjectsWithSections().map((subject, sIdx) => {
+                    const colorScheme = SUBJECT_COLORS[sIdx % SUBJECT_COLORS.length];
+                    const totalQs = subject.sections.reduce((t, s) => {
+                      const startQ = typeof s.start_question === 'string' ? parseInt(s.start_question) || 0 : s.start_question;
+                      const endQ = typeof s.end_question === 'string' ? parseInt(s.end_question) || 0 : s.end_question;
+                      return t + (endQ - startQ + 1);
+                    }, 0);
+
+                    return (
+                      <div key={sIdx} className="relative pl-4">
+                        {/* Connecting Line */}
+                        <div className="absolute left-0 top-0 bottom-0 w-px bg-slate-100"></div>
+
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`w-2 h-2 rounded-full ${colorScheme.dot}`}></div>
+                          <span className="text-[11px] font-black uppercase text-slate-800 tracking-tight truncate max-w-[120px]">
+                            {subject.name}
+                          </span>
+                          <span className="ml-auto text-[10px] font-bold text-slate-400">
+                            {totalQs} Qs
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-1.5 ml-1">
+                          {subject.sections.map((section, secIdx) => (
+                            <div
+                              key={secIdx}
+                              onClick={() => {
+                                const el = document.querySelector(`[data-section-id="${section.id}"]`);
+                                el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              }}
+                              className="group cursor-pointer flex items-center justify-between p-2 bg-slate-50 border border-slate-100 rounded-lg hover:border-blue-300 hover:bg-white transition-all duration-300"
+                            >
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-slate-700 truncate max-w-[100px]">
+                                  {section.name || `Section ${secIdx + 1}`}
+                                </span>
+                                <span className="text-[9px] text-slate-400 font-medium">
+                                  {section.question_type}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[9px] font-black text-slate-500 tracking-tighter">
+                                  Q{section.start_question}-{section.end_question}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <span>Questions Distribution</span>
+                  <span className="text-slate-800">{pattern.total_questions || 0} Total</span>
+                </div>
+                <div className="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+                  {getSubjectsWithSections().map((subject, sIdx) => {
+                    const colorScheme = SUBJECT_COLORS[sIdx % SUBJECT_COLORS.length];
+                    const totalQs = subject.sections.reduce((t, s) => {
+                      const startQ = typeof s.start_question === 'string' ? parseInt(s.start_question) || 0 : s.start_question;
+                      const endQ = typeof s.end_question === 'string' ? parseInt(s.end_question) || 0 : s.end_question;
+                      return t + (endQ - startQ + 1);
+                    }, 0);
+                    const totalPatternQs = typeof pattern.total_questions === 'string' ? parseInt(pattern.total_questions) || 0 : pattern.total_questions;
+                    const width = (totalQs / (totalPatternQs || 1)) * 100;
+                    if (width === 0) return null;
+                    return (
+                      <div
+                        key={sIdx}
+                        className={`${colorScheme.accent} h-full transition-all duration-500`}
+                        style={{ width: `${width}%` }}
+                        title={`${subject.name}: ${totalQs} Questions`}
+                      ></div>
+                    );
+                  })}
                 </div>
               </div>
-            )}
-
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Actions - Fixed at bottom right */}
-      <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center justify-center gap-2 px-6 py-3 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg min-w-[140px] sm:min-w-[160px]"
-          >
-            <Save className="w-4 h-4" />
-            <span className="whitespace-nowrap">{saving ? 'Saving...' : 'Save Pattern'}</span>
-          </button>
-          <button
-            onClick={handlePublish}
-            disabled={saving}
-            className="flex items-center justify-center gap-2 px-6 py-3 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg min-w-[140px] sm:min-w-[180px]"
-          >
-            <CheckCircle className="w-4 h-4" />
-            <span className="whitespace-nowrap">{saving ? 'Publishing...' : 'Save & Publish'}</span>
-          </button>
+      {/* Actions - Fixed at bottom */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 p-4 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] z-50">
+        <div className="w-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+          <div className="hidden lg:flex items-center gap-8">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-none mb-1.5">Pattern Summary</span>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <BookOpen className="w-3 h-3 text-blue-500" />
+                  <span className="text-sm font-bold text-slate-800">{pattern.total_questions || 0} Qs</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Zap className="w-3 h-3 text-purple-500" />
+                  <span className="text-sm font-bold text-slate-800">{pattern.sections.length} Sections</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <button
+              onClick={() => navigate(`${basePath}/patterns`)}
+              className="hidden sm:flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors"
+            >
+              Cancel
+            </button>
+            <div className="flex-grow md:flex-grow-0 flex items-center gap-3">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center justify-center gap-2 px-6 py-3 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg min-w-[140px] sm:min-w-[160px]"
+              >
+                <Save className="w-4 h-4" />
+                <span className="whitespace-nowrap">{saving ? 'Saving...' : 'Save Pattern'}</span>
+              </button>
+              <button
+                onClick={handlePublish}
+                disabled={saving}
+                className="flex items-center justify-center gap-2 px-6 py-3 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg min-w-[140px] sm:min-w-[180px]"
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span className="whitespace-nowrap">{saving ? 'Publishing...' : 'Save & Publish'}</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Configuration Drawer/Modal */}
+      <AnimatePresence>
+        {activeConfig && (
+          <div className="fixed inset-0 z-[60] flex justify-end">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/20 backdrop-blur-sm"
+              onClick={() => setActiveConfig(null)}
+            />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              className="relative w-full max-w-lg bg-white shadow-2xl h-full flex flex-col"
+            >
+              <div className="flex items-center justify-between p-4 border-b border-slate-200">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Configure Question {activeConfig.questionNumber}</h3>
+                  <p className="text-sm text-slate-500">Subjective question structure</p>
+                </div>
+                <button onClick={() => setActiveConfig(null)} className="p-2 hover:bg-slate-100 rounded-lg">
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                {/* Structural Toggle */}
+                <div className="bg-purple-50 border border-purple-100 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-5 h-5 text-purple-600" />
+                      <span className="font-medium text-purple-900">Nested Structure</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={activeConfig.config.is_nested}
+                        onChange={(e) => setActiveConfig(prev => prev ? {
+                          ...prev,
+                          config: { ...prev.config, is_nested: e.target.checked }
+                        } : null)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                    </label>
+                  </div>
+
+                  {!activeConfig.config.is_nested && (
+                    <p className="text-sm text-purple-700">Enable this to add internal choices (OR) or multiple sub-parts (a, b, c).</p>
+                  )}
+                </div>
+
+                {activeConfig.config.is_nested && (
+                  <div className="space-y-6">
+                    {/* Structure Type */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Structure Type</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={() => setActiveConfig(prev => prev ? {
+                            ...prev,
+                            config: { ...prev.config, nested_type: 'internal_choice' }
+                          } : null)}
+                          className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeConfig.config.nested_type === 'internal_choice'
+                            ? 'bg-blue-50 border-blue-500 text-blue-700'
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                            }`}
+                        >
+                          <Split className="w-5 h-5" />
+                          <span className="text-sm font-medium">Internal Choice (OR)</span>
+                        </button>
+                        <button
+                          onClick={() => setActiveConfig(prev => prev ? {
+                            ...prev,
+                            config: { ...prev.config, nested_type: 'multipart' }
+                          } : null)}
+                          className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeConfig.config.nested_type === 'multipart'
+                            ? 'bg-blue-50 border-blue-500 text-blue-700'
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                            }`}
+                        >
+                          <List className="w-5 h-5" />
+                          <span className="text-sm font-medium">Multi-Part (a, b, c)</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Internal Choice Config */}
+                    {activeConfig.config.nested_type === 'internal_choice' && (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium text-slate-900">Options</h4>
+                          <button
+                            onClick={() => setActiveConfig(prev => {
+                              if (!prev) return null;
+                              const currentOptions = prev.config.options || [];
+                              return {
+                                ...prev,
+                                config: {
+                                  ...prev.config,
+                                  options: [...currentOptions, { label: `Option ${String.fromCharCode(65 + currentOptions.length)}`, marks: 5 }]
+                                }
+                              };
+                            })}
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            + Add Option
+                          </button>
+                        </div>
+
+                        <div className="space-y-4">
+                          {activeConfig.config.options?.map((option, idx) => (
+                            <div key={idx} className="p-4 border border-slate-200 rounded-xl bg-slate-50 relative group">
+                              <div className="flex items-center gap-3 mb-3">
+                                <input
+                                  type="text"
+                                  className="w-24 px-2 py-1 text-sm font-bold border rounded bg-white"
+                                  value={option.label}
+                                  onChange={(e) => {
+                                    setActiveConfig(prev => {
+                                      if (!prev) return null;
+                                      const newOptions = [...(prev.config.options || [])];
+                                      newOptions[idx] = { ...newOptions[idx], label: e.target.value };
+                                      return { ...prev, config: { ...prev.config, options: newOptions } };
+                                    });
+                                  }}
+                                />
+                                <div className="flex-1">
+                                  <input
+                                    type="text"
+                                    placeholder="Internal Note (e.g. 'Theory based')"
+                                    className="w-full px-2 py-1 text-xs border rounded bg-transparent border-dashed border-slate-300 focus:border-blue-400 focus:bg-white outline-none"
+                                    value={option.description || ''}
+                                    onChange={(e) => {
+                                      setActiveConfig(prev => {
+                                        if (!prev) return null;
+                                        const newOptions = [...(prev.config.options || [])];
+                                        newOptions[idx] = { ...newOptions[idx], description: e.target.value };
+                                        return { ...prev, config: { ...prev.config, options: newOptions } };
+                                      });
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-slate-400 font-medium">Marks:</span>
+                                  <input
+                                    type="number"
+                                    className="w-16 px-2 py-1 text-sm font-bold border rounded bg-white text-center"
+                                    value={option.marks}
+                                    onChange={(e) => {
+                                      const newMarks = parseInt(e.target.value) || 0;
+                                      setActiveConfig(prev => {
+                                        if (!prev) return null;
+                                        const newOptions = [...(prev.config.options || [])];
+                                        newOptions[idx] = { ...newOptions[idx], marks: newMarks };
+                                        return { ...prev, config: { ...prev.config, options: newOptions } };
+                                      });
+                                    }}
+                                  />
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setActiveConfig(prev => {
+                                      if (!prev) return null;
+                                      const newOptions = [...(prev.config.options || [])].filter((_, i) => i !== idx);
+                                      return { ...prev, config: { ...prev.config, options: newOptions } };
+                                    });
+                                  }}
+                                  className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+
+                              <div className="pl-2 border-l-2 border-slate-300 ml-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-xs text-slate-500">Sub-parts?</span>
+                                  <button
+                                    className="text-xs text-blue-600"
+                                    onClick={() => {
+                                      setActiveConfig(prev => {
+                                        if (!prev) return null;
+                                        const newOptions = [...(prev.config.options || [])];
+                                        const currentParts = newOptions[idx].parts || [];
+                                        newOptions[idx] = {
+                                          ...newOptions[idx],
+                                          parts: [...currentParts, { label: String.fromCharCode(97 + currentParts.length), marks: 1 }]
+                                        };
+                                        return { ...prev, config: { ...prev.config, options: newOptions } };
+                                      });
+                                    }}
+                                  >
+                                    + Add Part
+                                  </button>
+                                </div>
+
+                                {option.parts?.map((part, pIdx) => (
+                                  <div key={pIdx} className="flex items-center gap-2 mb-2">
+                                    <input
+                                      type="text"
+                                      className="w-10 px-1 py-0.5 text-xs font-mono border rounded bg-white text-center"
+                                      value={part.label}
+                                      onChange={(e) => {
+                                        setActiveConfig(prev => {
+                                          if (!prev) return null;
+                                          const newOptions = [...(prev.config.options || [])];
+                                          const newParts = [...(newOptions[idx].parts || [])];
+                                          newParts[pIdx] = { ...newParts[pIdx], label: e.target.value };
+                                          newOptions[idx] = { ...newOptions[idx], parts: newParts };
+                                          return { ...prev, config: { ...prev.config, options: newOptions } };
+                                        });
+                                      }}
+                                    />
+                                    <input
+                                      type="text"
+                                      className="flex-1 px-2 py-1 text-[11px] border rounded bg-white"
+                                      placeholder="Part Label (e.g. 'State...') "
+                                      value={part.description || ''}
+                                      onChange={(e) => {
+                                        setActiveConfig(prev => {
+                                          if (!prev) return null;
+                                          const newOptions = [...(prev.config.options || [])];
+                                          const newParts = [...(newOptions[idx].parts || [])];
+                                          newParts[pIdx] = { ...newParts[pIdx], description: e.target.value };
+                                          newOptions[idx] = { ...newOptions[idx], parts: newParts };
+                                          return { ...prev, config: { ...prev.config, options: newOptions } };
+                                        });
+                                      }}
+                                    />
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="number"
+                                        className="w-10 px-1 py-1 text-xs border rounded bg-white text-center"
+                                        value={part.marks}
+                                        onChange={(e) => {
+                                          setActiveConfig(prev => {
+                                            if (!prev) return null;
+                                            const newOptions = [...(prev.config.options || [])];
+                                            const newParts = [...(newOptions[idx].parts || [])];
+                                            newParts[pIdx] = { ...newParts[pIdx], marks: parseInt(e.target.value) || 0 };
+                                            newOptions[idx] = { ...newOptions[idx], parts: newParts };
+                                            return { ...prev, config: { ...prev.config, options: newOptions } };
+                                          });
+                                        }}
+                                      />
+                                      <span className="text-[10px] text-slate-400">m</span>
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        setActiveConfig(prev => {
+                                          if (!prev) return null;
+                                          const newOptions = [...(prev.config.options || [])];
+                                          const newParts = [...(newOptions[idx].parts || [])].filter((_, i) => i !== pIdx);
+                                          newOptions[idx] = { ...newOptions[idx], parts: newParts };
+                                          return { ...prev, config: { ...prev.config, options: newOptions } };
+                                        });
+                                      }}
+                                      className="p-1 text-slate-300 hover:text-red-400 transition-colors"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Multipart Config */}
+                    {activeConfig.config.nested_type === 'multipart' && (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium text-slate-900">Sub-questions</h4>
+                          <button
+                            onClick={() => setActiveConfig(prev => {
+                              if (!prev) return null;
+                              const currentSubs = prev.config.sub_questions || [];
+                              const labels = ['i', 'ii', 'iii', 'iv', 'v'];
+                              return {
+                                ...prev,
+                                config: {
+                                  ...prev.config,
+                                  sub_questions: [...currentSubs, { label: labels[currentSubs.length] || '?', marks: 2 }]
+                                }
+                              };
+                            })}
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            + Add Sub-question
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          {activeConfig.config.sub_questions?.map((sub, idx) => (
+                            <div key={idx} className="flex items-center gap-3 p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                              <input
+                                type="text"
+                                className="w-12 px-2 py-1 text-sm font-mono border rounded bg-white text-center"
+                                value={sub.label}
+                                onChange={(e) => {
+                                  setActiveConfig(prev => {
+                                    if (!prev) return null;
+                                    const newSubs = [...(prev.config.sub_questions || [])];
+                                    newSubs[idx] = { ...newSubs[idx], label: e.target.value };
+                                    return { ...prev, config: { ...prev.config, sub_questions: newSubs } };
+                                  });
+                                }}
+                              />
+                              <div className="flex-1">
+                                <input
+                                  type="text"
+                                  placeholder="Sub-part Note (e.g. 'Conceptual')"
+                                  className="w-full px-2 py-1 text-[11px] border border-dashed border-slate-300 rounded bg-transparent focus:bg-white outline-none"
+                                  value={sub.description || ''}
+                                  onChange={(e) => {
+                                    setActiveConfig(prev => {
+                                      if (!prev) return null;
+                                      const newSubs = [...(prev.config.sub_questions || [])];
+                                      (newSubs[idx] as any).description = e.target.value;
+                                      return { ...prev, config: { ...prev.config, sub_questions: newSubs } };
+                                    });
+                                  }}
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  className="w-16 px-2 py-1 text-sm border rounded bg-white text-center"
+                                  value={sub.marks}
+                                  onChange={(e) => {
+                                    setActiveConfig(prev => {
+                                      if (!prev) return null;
+                                      const newSubs = [...(prev.config.sub_questions || [])];
+                                      newSubs[idx] = { ...newSubs[idx], marks: parseInt(e.target.value) || 0 };
+                                      return { ...prev, config: { ...prev.config, sub_questions: newSubs } };
+                                    });
+                                  }}
+                                  placeholder="Marks"
+                                />
+                                <span className="text-sm text-slate-500">marks</span>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setActiveConfig(prev => {
+                                    if (!prev) return null;
+                                    const newSubs = [...(prev.config.sub_questions || [])].filter((_, i) => i !== idx);
+                                    return { ...prev, config: { ...prev.config, sub_questions: newSubs } };
+                                  });
+                                }}
+                                className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 border-t border-slate-200 bg-slate-50">
+                <button
+                  onClick={saveConfiguration}
+                  className="w-full py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 transition-colors"
+                >
+                  Save Configuration
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

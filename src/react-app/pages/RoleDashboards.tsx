@@ -153,83 +153,10 @@ export function AdminRoleDashboard() {
   );
 }
 
+import TeacherHomeContent from "../components/teacher/TeacherHomeContent";
+
 export function TeacherRoleDashboard() {
-  return (
-    <div className="min-h-screen bg-slate-50 dark:bg-gray-900">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <Header
-          title="Teacher Dashboard"
-          subtitle="See programs, batches and exams assigned to you."
-        />
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard icon={GraduationCap} label="My Programs" value="2" pill="Super 30, OnlyBoard" />
-          <StatCard icon={ClipboardList} label="Batches Assigned" value="4" pill="Active batches" />
-          <StatCard icon={CalendarDays} label="Upcoming Exams" value="3" pill="This week" />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 space-y-4">
-            <SectionTitle
-              title="My Batches (Static Table)"
-              subtitle="Preview of how batch listing can look for teachers."
-            />
-            <div className="rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden text-xs">
-              <table className="w-full border-collapse text-[11px]">
-                <thead className="bg-slate-50 dark:bg-gray-900/80 text-slate-500">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium">Batch</th>
-                    <th className="px-3 py-2 text-left font-medium">Program</th>
-                    <th className="px-3 py-2 text-left font-medium">Center</th>
-                    <th className="px-3 py-2 text-left font-medium">Students</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-t border-slate-100 dark:border-gray-800">
-                    <td className="px-3 py-2">Super 30 – 2026 Elite</td>
-                    <td className="px-3 py-2">Super 30 – JEE Advanced</td>
-                    <td className="px-3 py-2">Kota Residential</td>
-                    <td className="px-3 py-2">30</td>
-                  </tr>
-                  <tr className="border-t border-slate-100 dark:border-gray-800">
-                    <td className="px-3 py-2">OnlyBoard XII – Morning</td>
-                    <td className="px-3 py-2">OnlyBoard – CBSE 12th</td>
-                    <td className="px-3 py-2">Delhi Main Center</td>
-                    <td className="px-3 py-2">45</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <SectionTitle
-              title="Upcoming Exams (Static)"
-              subtitle="Teacher view of exam schedule."
-            />
-            <div className="rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 space-y-3 text-xs">
-              <Row label="Super 30 – Monthly Mock" value="12 Jan 2026, 10:00 AM" />
-              <Row label="OnlyBoard Preboard" value="18 Jan 2026, 09:00 AM" />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <SectionTitle
-              title="Static Planner"
-              subtitle="Later this can become a real planner / calendar for lesson plans."
-            />
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 dark:bg-gray-900/60 p-4 text-xs space-y-2">
-              <p className="font-semibold text-slate-800 dark:text-gray-100">
-                Lesson Plan Ideas (Static)
-              </p>
-              <p className="text-slate-600 dark:text-gray-400">
-                Reserve this area for lesson planning, topic coverage tracking and per-batch notes
-                once backend APIs are ready.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <TeacherHomeContent />;
 }
 
 export function StaffDashboard() {

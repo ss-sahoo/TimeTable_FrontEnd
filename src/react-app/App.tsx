@@ -70,7 +70,9 @@ import Batches from "@/react-app/pages/Batches";
 import ExamHub from "@/react-app/pages/ExamHub";
 import SuperAdminLayout from "@/react-app/components/superadmin/SuperAdminLayout";
 import CenterAdminLayout from "@/react-app/components/admin/CenterAdminLayout";
+import TeacherLayout from "@/react-app/components/teacher/TeacherLayout";
 import StudentLayout from "@/react-app/components/student/StudentLayout";
+import TeacherHomeContent from "@/react-app/components/teacher/TeacherHomeContent";
 import InstituteContent from "@/react-app/components/superadmin/InstituteContent";
 import CentersContent from "@/react-app/components/superadmin/CentersContent";
 import UsersContent from "@/react-app/components/superadmin/UsersContent";
@@ -488,7 +490,28 @@ function AppRoutes() {
       } />
 
       <Route path="/admin" element={<AdminRoleDashboard />} />
-      <Route path="/teacher" element={<TeacherRoleDashboard />} />
+
+      <Route path="/teacher/*" element={
+        <FullscreenProtectedRoute>
+          <TeacherLayout>
+            <Routes>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<TeacherHomeContent />} />
+              <Route path="exams" element={<ExamHub />} />
+              <Route path="exams/create" element={<ExamCreation />} />
+              <Route path="exams/:examId/edit" element={<ExamCreation />} />
+              <Route path="exams/:examId" element={<ExamView />} />
+              <Route path="evaluation" element={<TeacherAnalytics />} /> {/* Placeholder to match nav */}
+              <Route path="batches" element={<AdminBatchesContent />} />
+              <Route path="attendance" element={<AdminPeopleContent />} /> {/* Placeholder to match nav */}
+              <Route path="analytics" element={<ExamResultsAnalyticsEnhanced />} /> {/* Placeholder to match nav */}
+              <Route path="settings" element={<Settings />} />
+              <Route path="*" element={<Navigate to="dashboard" replace />} />
+            </Routes>
+          </TeacherLayout>
+        </FullscreenProtectedRoute>
+      } />
+
       <Route path="/staff" element={<StaffDashboard />} />
       <Route path="/exams" element={
         <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>

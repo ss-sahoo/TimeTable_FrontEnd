@@ -39,6 +39,22 @@ interface PatternSection {
   marks_per_question: number;
   negative_marking: number;
   min_questions_to_attempt: number;
+  question_configurations?: Record<number, {
+    is_nested: boolean;
+    nested_type?: 'internal_choice' | 'multipart';
+    description?: string;
+    options?: Array<{
+      label: string;
+      description?: string;
+      marks?: number;
+      parts?: Array<{ label: string; marks: number; description?: string }>;
+    }>;
+    sub_questions?: Array<{
+      label: string;
+      marks: number;
+      description?: string;
+    }>;
+  }>;
 }
 
 interface Pattern {
@@ -62,6 +78,7 @@ interface QuestionFormData {
   subject: string;
   topic: string;
   pattern_section: number | null;
+  structure?: any;
 }
 
 interface QuestionData {
@@ -81,6 +98,7 @@ interface QuestionData {
   pattern_section_id?: number | null;
   question_number?: number | null;
   question_number_in_pattern?: number | null;
+  structure?: any;
 }
 
 interface SectionStats {
@@ -205,6 +223,7 @@ export default function EnhancedQuestionEditor() {
     subject: '',
     topic: '',
     pattern_section: null,
+    structure: {},
   });
   const [fixingNumbers, setFixingNumbers] = useState(false);
   // Track which question numbers already exist in current section
@@ -687,6 +706,7 @@ export default function EnhancedQuestionEditor() {
         subject: mappedExisting.subject || '',
         topic: mappedExisting.topic || '',
         pattern_section: mappedExisting.pattern_section,
+        structure: mappedExisting.structure || {},
       });
       return;
     }
@@ -720,6 +740,7 @@ export default function EnhancedQuestionEditor() {
         subject: question.subject || '',
         topic: question.topic || '',
         pattern_section: question.pattern_section,
+        structure: question.structure || {},
       });
     } else if (existingQuestion && Array.isArray(existingQuestion) && existingQuestion.length > 0) {
       const question = existingQuestion[0] as QuestionData;
@@ -750,6 +771,7 @@ export default function EnhancedQuestionEditor() {
         subject: question.subject || '',
         topic: question.topic || '',
         pattern_section: question.pattern_section,
+        structure: question.structure || {},
       });
     } else {
       // If we've reached here and questionLoading is false (API finished)
@@ -757,6 +779,15 @@ export default function EnhancedQuestionEditor() {
       // Reset the form for a NEW question
       if (!questionLoading && !mappedExisting) {
         console.log('Resetting form for new question slot...');
+        const config = currentSection?.question_configurations?.[currentQuestionNumber];
+        const initialStructure = config?.is_nested ? {
+          is_nested: true,
+          nested_type: config.nested_type,
+          parts: config.nested_type === 'internal_choice'
+            ? config.options?.map(opt => ({ ...opt, question_text: '' }))
+            : config.sub_questions?.map(sub => ({ ...sub, question_text: '' }))
+        } : {};
+
         setFormData({
           question_text: '',
           question_type: currentSection?.question_type || 'mcq',
@@ -770,6 +801,7 @@ export default function EnhancedQuestionEditor() {
           subject: currentSection?.subject || '',
           topic: '',
           pattern_section: currentSection?.id ?? null,
+          structure: initialStructure
         });
       }
     }
@@ -936,6 +968,120 @@ export default function EnhancedQuestionEditor() {
     }
 
     if (questionType === 'subjective') {
+      const config = currentSection?.question_configurations?.[currentQuestionNumber];
+      const isNested = config?.is_nested || formData.structure?.is_nested;
+      const nestedType = config?.nested_type || formData.structure?.nested_type;
+
+      if (isNested) {
+        return (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-4 rounded-xl border border-indigo-100 mb-4">
+              <div className="flex items-center gap-2 text-indigo-900 font-bold mb-1">
+                <FileText className="w-5 h-5" />
+                Structured Question: {nestedType === 'internal_choice' ? 'Internal Choice (OR)' : 'Multi-Part (a, b, c)'}
+              </div>
+              <p className="text-sm text-indigo-700">
+                This question has been configured as a structured question in the pattern. Please provide content for each part below.
+              </p>
+            </div>
+
+            {nestedType === 'internal_choice' ? (
+              <div className="space-y-8">
+                {(formData.structure?.parts || config?.options || []).map((option: any, optIdx: number) => (
+                  <div key={optIdx} className="bg-white rounded-2xl border-2 border-slate-100 shadow-sm overflow-hidden">
+                    <div className="bg-slate-50 px-6 py-3 border-b border-slate-100 flex items-center justify-between">
+                      <span className="font-bold text-slate-700">Choice {option.label || String.fromCharCode(65 + optIdx)}</span>
+                      {option.marks && <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg">+{option.marks} Marks</span>}
+                    </div>
+                    <div className="p-6 space-y-4">
+                      {option.description && (
+                        <div className="text-xs text-slate-500 italic mb-2">Note: {option.description}</div>
+                      )}
+
+                      {/* Internal Choice Part content */}
+                      {(option.parts || []).map((part: any, partIdx: number) => (
+                        <div key={partIdx} className="space-y-2 mt-4 first:mt-0">
+                          <label className="text-sm font-semibold text-slate-600 flex items-center gap-2">
+                            Part {part.label || String.fromCharCode(97 + partIdx)}
+                            <span className="text-xs font-normal text-slate-400">({part.marks} marks)</span>
+                          </label>
+                          <RichTextEditor
+                            value={formData.structure?.parts?.[optIdx]?.parts?.[partIdx]?.question_text || ''}
+                            onChange={(val) => {
+                              const newStructure = { ...formData.structure };
+                              if (!newStructure.parts) newStructure.parts = [];
+                              if (!newStructure.parts[optIdx]) newStructure.parts[optIdx] = { ...option };
+                              if (!newStructure.parts[optIdx].parts) newStructure.parts[optIdx].parts = [...(option.parts || [])];
+                              newStructure.parts[optIdx].parts[partIdx] = {
+                                ...newStructure.parts[optIdx].parts[partIdx],
+                                question_text: val
+                              };
+                              handleInputChange('structure', newStructure);
+                            }}
+                            placeholder={`Enter text for part ${part.label}...`}
+                          />
+                        </div>
+                      ))}
+
+                      {(!option.parts || option.parts.length === 0) && (
+                        <div className="space-y-2">
+                          <RichTextEditor
+                            value={formData.structure?.parts?.[optIdx]?.question_text || ''}
+                            onChange={(val) => {
+                              const newStructure = { ...formData.structure };
+                              if (!newStructure.parts) newStructure.parts = [];
+                              newStructure.parts[optIdx] = {
+                                ...option,
+                                ...newStructure.parts[optIdx],
+                                question_text: val
+                              };
+                              handleInputChange('structure', newStructure);
+                            }}
+                            placeholder={`Enter question text for Choice ${option.label}...`}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {(formData.structure?.parts || config?.sub_questions || []).map((sub: any, idx: number) => (
+                  <div key={idx} className="bg-white p-6 rounded-2xl border-2 border-slate-100 shadow-sm space-y-3">
+                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                      <span className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600">{sub.label || String.fromCharCode(97 + idx)}</span>
+                      Part {sub.label || String.fromCharCode(97 + idx)}
+                      <span className="text-xs font-normal text-slate-400">({sub.marks} marks)</span>
+                    </label>
+                    <RichTextEditor
+                      value={formData.structure?.parts?.[idx]?.question_text || ''}
+                      onChange={(val) => {
+                        const newStructure = { ...formData.structure };
+                        if (!newStructure.parts) newStructure.parts = [];
+                        newStructure.parts[idx] = {
+                          ...sub,
+                          ...newStructure.parts[idx],
+                          question_text: val
+                        };
+                        handleInputChange('structure', newStructure);
+                      }}
+                      placeholder={`Enter text for part ${sub.label || String.fromCharCode(97 + idx)}...`}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl">
+              <p className="text-sm text-amber-800">
+                <strong>Important:</strong> The above structured content is what students will see. The main "Question Text" field at the top can be used for common instructions or context if needed.
+              </p>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border-2 border-purple-200">
           <div className="flex items-center gap-2 mb-4">

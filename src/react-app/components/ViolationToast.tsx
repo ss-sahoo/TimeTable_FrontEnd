@@ -54,6 +54,17 @@ const ViolationToast: React.FC<ViolationToastProps> = ({ violation, onClose }) =
         return { title: 'Proctoring Alert', message: 'Face not detected. Please stay in view.', icon: <AlertTriangle className="w-5 h-5" /> };
       case 'mobile_detected':
         return { title: 'Device Alert', message: 'Mobile device detected in frame.', icon: <ShieldAlert className="w-5 h-5" /> };
+      case 'gaze_left':
+      case 'gaze_right':
+      case 'gaze_up':
+      case 'gaze_down':
+      case 'head_turned_left':
+      case 'head_turned_right':
+      case 'head_looking_up':
+      case 'head_looking_down':
+        return { title: 'Attention Warning', message: 'Please maintain focus on the exam screen.', icon: <AlertTriangle className="w-5 h-5" /> };
+      case 'eyes_closed':
+        return { title: 'Attention Warning', message: 'Eyes appear to be closed or not visible.', icon: <AlertTriangle className="w-5 h-5" /> };
       default:
         return { title: 'Security Alert', message: 'A security violation has been recorded.', icon: <AlertTriangle className="w-5 h-5" /> };
     }
@@ -85,7 +96,10 @@ const ViolationToast: React.FC<ViolationToastProps> = ({ violation, onClose }) =
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                 </h4>
                 <button
-                  onClick={() => setIsVisible(false)}
+                  onClick={() => {
+                    setIsVisible(false);
+                    setTimeout(onClose, 300);
+                  }}
                   className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 transition-colors"
                 >
                   <X className="w-4 h-4" />

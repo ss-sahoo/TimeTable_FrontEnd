@@ -12,22 +12,26 @@ import {
     Users as UsersIcon,
     Settings as SettingsIcon,
     Layers,
+    Award,
+    ClipboardCheck,
+    BarChart3,
 } from "lucide-react";
 import { useAuthContext } from "../../contexts/AuthContext";
 
-interface CenterAdminLayoutProps {
+interface TeacherLayoutProps {
     children: React.ReactNode;
 }
 
 const navItems = [
-    { id: "home", label: "Home", icon: Home, href: "/center-admin/dashboard" },
-    { id: "exams", label: "Exams", icon: FileText, href: "/center-admin/exams" },
-    { id: "people", label: "People", icon: UsersIcon, href: "/center-admin/people" },
-    { id: "batches", label: "Batches", icon: Layers, href: "/center-admin/batches" },
-    { id: "settings", label: "Settings", icon: SettingsIcon, href: "/center-admin/settings" },
+    { id: "home", label: "Dashboard", icon: Home, href: "/teacher/dashboard" },
+    { id: "exams", label: "Exams", icon: FileText, href: "/teacher/exams" },
+    { id: "evaluation", label: "Evaluation", icon: Award, href: "/teacher/evaluation" },
+    { id: "batches", label: "My Batches", icon: Layers, href: "/teacher/batches" },
+    { id: "attendance", label: "Attendance", icon: ClipboardCheck, href: "/teacher/attendance" },
+    { id: "analytics", label: "Insights", icon: BarChart3, href: "/teacher/analytics" },
 ];
 
-export default function CenterAdminLayout({ children }: CenterAdminLayoutProps) {
+export default function TeacherLayout({ children }: TeacherLayoutProps) {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const { user, logout } = useAuthContext();
@@ -40,24 +44,25 @@ export default function CenterAdminLayout({ children }: CenterAdminLayoutProps) 
     };
 
     const isActive = (href: string) => {
-        if (href === "/center-admin/dashboard") {
+        if (href === "/teacher/dashboard") {
             return location.pathname === href;
         }
         return location.pathname.startsWith(href);
     };
 
     const getPageTitle = () => {
-        if (location.pathname === "/center-admin/dashboard") return "Dashboard";
-        if (location.pathname.startsWith("/center-admin/exams") || location.pathname.startsWith("/center-admin/patterns")) return "Exam Hub";
-        if (location.pathname.startsWith("/center-admin/people")) return "People Management";
-        if (location.pathname.startsWith("/center-admin/batches")) return "Batches & Programs";
-        if (location.pathname.startsWith("/center-admin/settings")) return "Settings";
-        return "Center Admin";
+        if (location.pathname === "/teacher/dashboard") return "Dashboard";
+        if (location.pathname.startsWith("/teacher/exams")) return "Exam Management";
+        if (location.pathname.startsWith("/teacher/evaluation")) return "Grading & Evaluation";
+        if (location.pathname.startsWith("/teacher/batches")) return "My Batches";
+        if (location.pathname.startsWith("/teacher/attendance")) return "Attendance Tracking";
+        if (location.pathname.startsWith("/teacher/analytics")) return "Performance Insights";
+        if (location.pathname.startsWith("/teacher/settings")) return "Settings";
+        return "Teacher Portal";
     };
 
     const isStandalonePage = location.pathname.includes('/exams/create') ||
-        location.pathname.includes('/edit') ||
-        location.pathname.includes('/patterns/create');
+        location.pathname.includes('/edit');
 
     return (
         <div className="bg-slate-50 text-slate-600 font-sans antialiased h-screen flex overflow-hidden">
@@ -70,7 +75,7 @@ export default function CenterAdminLayout({ children }: CenterAdminLayoutProps) 
                     {/* Logo / Context Switcher */}
                     <div className="h-16 flex items-center px-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
                         <div className="flex items-center gap-3 w-full">
-                            <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-violet-700 rounded-lg flex items-center justify-center text-white shadow-sm flex-shrink-0">
+                            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg flex items-center justify-center text-white shadow-sm flex-shrink-0">
                                 <Zap className="w-4 h-4" />
                             </div>
                             {!sidebarCollapsed && (
@@ -79,7 +84,7 @@ export default function CenterAdminLayout({ children }: CenterAdminLayoutProps) 
                                         <h1 className="font-bold text-sm text-slate-900 leading-tight truncate">
                                             {user?.institute?.name || user?.institute_name || "DashoExams"}
                                         </h1>
-                                        <p className="text-[10px] text-slate-500 font-medium tracking-wide whitespace-nowrap">CENTER ADMIN</p>
+                                        <p className="text-[10px] text-slate-500 font-medium tracking-wide whitespace-nowrap uppercase">Teacher Portal</p>
                                     </div>
                                     <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
                                 </>
@@ -91,7 +96,7 @@ export default function CenterAdminLayout({ children }: CenterAdminLayoutProps) 
                     <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
                         {!sidebarCollapsed && (
                             <div className="flex items-center gap-2 px-3 mb-2">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Menu</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Main Menu</span>
                             </div>
                         )}
                         {navItems.map((item) => {
@@ -103,15 +108,15 @@ export default function CenterAdminLayout({ children }: CenterAdminLayoutProps) 
                                     to={item.href}
                                     className={`nav-item w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all group relative ${sidebarCollapsed ? "justify-center" : ""
                                         } ${active
-                                            ? "bg-violet-50 text-violet-700"
+                                            ? "bg-blue-50 text-blue-700"
                                             : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                                         }`}
                                     title={sidebarCollapsed ? item.label : undefined}
                                 >
                                     {active && (
-                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[70%] bg-violet-600 rounded-r" />
+                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[70%] bg-blue-600 rounded-r" />
                                     )}
-                                    <Icon className={`w-[18px] h-[18px] ${active ? "text-violet-600" : "text-slate-400 group-hover:text-slate-600"}`} />
+                                    <Icon className={`w-[18px] h-[18px] ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} />
                                     {!sidebarCollapsed && <span className="flex-1 text-left">{item.label}</span>}
                                 </Link>
                             );
@@ -123,14 +128,14 @@ export default function CenterAdminLayout({ children }: CenterAdminLayoutProps) 
                         {!sidebarCollapsed ? (
                             <>
                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white shadow-sm">
-                                        {user?.first_name?.[0] || user?.full_name?.[0] || "C"}
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white shadow-sm">
+                                        {user?.first_name?.[0] || user?.full_name?.[0] || "T"}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs font-bold text-slate-900 truncate">
                                             {user?.full_name || user?.get_full_name || user?.email}
                                         </p>
-                                        <p className="text-[10px] text-slate-500 truncate">Center Admin</p>
+                                        <p className="text-[10px] text-slate-500 truncate">Teacher</p>
                                     </div>
                                     <button
                                         onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -188,10 +193,10 @@ export default function CenterAdminLayout({ children }: CenterAdminLayoutProps) 
                         <div className="flex items-center gap-3">
                             <div className="text-right hidden sm:block">
                                 <p className="text-sm font-medium text-slate-900">{user?.full_name || user?.get_full_name || user?.email}</p>
-                                <p className="text-xs text-slate-500">Center Admin</p>
+                                <p className="text-xs text-slate-500">Teacher Account</p>
                             </div>
-                            <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold ring-2 ring-white shadow-sm">
-                                {user?.first_name?.[0] || user?.full_name?.[0] || "C"}
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-sm font-bold ring-2 ring-white shadow-sm">
+                                {user?.first_name?.[0] || user?.full_name?.[0] || "T"}
                             </div>
                         </div>
                     </header>
@@ -213,7 +218,7 @@ export default function CenterAdminLayout({ children }: CenterAdminLayoutProps) 
                         <div className="flex flex-col h-full">
                             <div className="flex items-center justify-between p-5 border-b border-slate-200">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-violet-700 rounded-lg flex items-center justify-center text-white shadow-sm">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg flex items-center justify-center text-white shadow-sm">
                                         <Zap className="w-4 h-4" />
                                     </div>
                                     <span className="font-bold text-slate-900 text-sm">DashoExams</span>
@@ -232,14 +237,14 @@ export default function CenterAdminLayout({ children }: CenterAdminLayoutProps) 
                                             to={item.href}
                                             onClick={() => setMobileMenuOpen(false)}
                                             className={`nav-item w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all group relative ${active
-                                                ? "bg-violet-50 text-violet-700"
+                                                ? "bg-blue-50 text-blue-700"
                                                 : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                                                 }`}
                                         >
                                             {active && (
-                                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[70%] bg-violet-600 rounded-r" />
+                                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[70%] bg-blue-600 rounded-r" />
                                             )}
-                                            <Icon className={`w-[18px] h-[18px] ${active ? "text-violet-600" : "text-slate-400 group-hover:text-slate-600"}`} />
+                                            <Icon className={`w-[18px] h-[18px] ${active ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} />
                                             <span className="flex-1 text-left">{item.label}</span>
                                         </Link>
                                     );
@@ -248,14 +253,14 @@ export default function CenterAdminLayout({ children }: CenterAdminLayoutProps) 
                             {/* Mobile Logout Button */}
                             <div className="p-4 border-t border-slate-100 bg-slate-50/50">
                                 <div className="flex items-center gap-3 mb-3">
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white shadow-sm">
-                                        {user?.first_name?.[0] || user?.full_name?.[0] || "C"}
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white shadow-sm">
+                                        {user?.first_name?.[0] || user?.full_name?.[0] || "T"}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs font-bold text-slate-900 truncate">
                                             {user?.full_name || user?.get_full_name || user?.email}
                                         </p>
-                                        <p className="text-[10px] text-slate-500 truncate">Center Admin</p>
+                                        <p className="text-[10px] text-slate-500 truncate">Teacher</p>
                                     </div>
                                 </div>
                                 <button

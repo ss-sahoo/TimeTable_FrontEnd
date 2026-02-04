@@ -29,6 +29,7 @@ interface User {
   get_full_name?: string;
   username?: string;
   center_id?: string;
+  center_name?: string;
   phone?: string;
   // Add other user-related fields as needed
 }

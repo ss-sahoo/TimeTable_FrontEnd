@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { 
-  Clock, 
-  Flag, 
-  CheckCircle, 
-  AlertTriangle, 
+import {
+  Clock,
+  Flag,
+  CheckCircle,
+  AlertTriangle,
   Save,
   Send,
   Eye,
@@ -54,6 +54,7 @@ interface ExamAttempt {
     disable_right_click: boolean;
     enable_webcam_proctoring: boolean;
     allow_tab_switching: boolean;
+    end_date: string;
     pattern: {
       sections: Array<{
         id: number;
@@ -68,6 +69,7 @@ interface ExamAttempt {
   started_at: string;
   time_spent: number;
   max_violations_allowed: number;
+  violations_count: number;
 }
 
 interface Answer {
@@ -80,7 +82,7 @@ interface Answer {
 const SecureExamView: React.FC = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
   const navigate = useNavigate();
-  
+
   const [examAttempt, setExamAttempt] = useState<ExamAttempt | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -98,18 +100,18 @@ const SecureExamView: React.FC = () => {
   const [cameraStatusInfo, setCameraStatusInfo] = useState<CameraStatusPayload>({ status: 'idle' });
   const [cameraIncidents, setCameraIncidents] = useState<ProctoringIncidentPayload[]>([]);
   const webcamRequired = examAttempt?.exam.enable_webcam_proctoring ?? false;
-  
+
   // Exam started state - auto-start when component loads
   const [examStarted, setExamStarted] = useState(false);
 
   // Security hook - configured based on exam settings
   const {
+    logViolation,
     violations,
     violationCount,
     isDisqualified,
     isFullscreen,
-    requestFullscreen,
-    logViolation
+    requestFullscreen
   } = useExamSecurity(parseInt(attemptId!), {
     maxViolations: examAttempt?.max_violations_allowed || 5,
     enableTabMonitoring: examAttempt ? !examAttempt.exam.allow_tab_switching : true,
@@ -117,6 +119,7 @@ const SecureExamView: React.FC = () => {
     enableCopyPasteBlocking: examAttempt?.exam.disable_copy_paste || false,
     enableRightClickBlocking: examAttempt?.exam.disable_right_click || false,
     enableContextMenuBlocking: examAttempt?.exam.disable_right_click || false,
+    initialViolationCount: examAttempt?.violations_count || 0
   });
 
   // Load exam data and auto-start exam
@@ -139,16 +142,37 @@ const SecureExamView: React.FC = () => {
   useEffect(() => {
     if (!examAttempt) return;
 
-    const interval = setInterval(() => {
+    const calculateTime = () => {
       const now = new Date();
       const startTime = new Date(examAttempt.started_at);
+      const endTime = new Date(examAttempt.exam.end_date);
+
+      // Calculate remaining time based on attempt duration
       const elapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-      const remaining = (examAttempt.exam.duration_minutes * 60) - elapsed;
-      
-      setTimeRemaining(Math.max(0, remaining));
-      
+      const remainingByDuration = (examAttempt.exam.duration_minutes * 60) - elapsed;
+
+      // Calculate remaining time based on absolute exam end date
+      const remainingByEndDate = Math.floor((endTime.getTime() - now.getTime()) / 1000);
+
+      // Use the stricter (smaller) remaining time
+      const remaining = Math.min(remainingByDuration, remainingByEndDate);
+
       if (remaining <= 0) {
+        setTimeRemaining(0);
         handleAutoSubmit();
+        return false; // Should stop the interval
+      }
+
+      setTimeRemaining(remaining);
+      return true;
+    };
+
+    // Run once immediately
+    if (!calculateTime()) return;
+
+    const interval = setInterval(() => {
+      if (!calculateTime()) {
+        clearInterval(interval);
       }
     }, 1000);
 
@@ -166,18 +190,23 @@ const SecureExamView: React.FC = () => {
 
 
   // Listen for new violations and show toast
+  const lastViolationTimeShown = useRef<number>(0);
   useEffect(() => {
     if (violations.length > 0) {
       const latestViolation = violations[violations.length - 1];
-      console.log('🚨 VIOLATION DETECTED:', {
-        type: latestViolation.type,
-        timestamp: latestViolation.timestamp,
-        metadata: latestViolation.metadata,
-        totalViolations: violations.length
-      });
-      setCurrentToastViolation(latestViolation);
+      const timestamp = latestViolation.timestamp.getTime();
+
+      if (timestamp > lastViolationTimeShown.current) {
+        lastViolationTimeShown.current = timestamp;
+        console.log('🚨 SHOWING NEW VIOLATION:', latestViolation.type);
+        setCurrentToastViolation(latestViolation);
+      }
     }
   }, [violations]);
+
+  const handleCloseToast = useCallback(() => {
+    setCurrentToastViolation(null);
+  }, []);
 
   const loadExamData = async () => {
     try {
@@ -204,7 +233,7 @@ const SecureExamView: React.FC = () => {
         console.log('🔵 API CALL #2: GET', questionsEndpoint);
         const questionsResponse = await api.get(questionsEndpoint);
         console.log('✅ API RESPONSE #2 (RAW):', JSON.stringify(questionsResponse.data, null, 2));
-        
+
         const examQuestions = Array.isArray(questionsResponse.data)
           ? questionsResponse.data
           : (questionsResponse.data?.results ?? []);
@@ -249,7 +278,7 @@ const SecureExamView: React.FC = () => {
           console.log('🔵 API CALL #3 (FALLBACK): GET', fallbackEndpoint, 'with params:', params);
           const questionsResponse = await api.get(fallbackEndpoint, { params });
           console.log('✅ API RESPONSE #3 (RAW):', JSON.stringify(questionsResponse.data, null, 2));
-          
+
           const rawQuestions = Array.isArray(questionsResponse.data)
             ? questionsResponse.data
             : (questionsResponse.data?.results ?? questionsResponse.data ?? []);
@@ -293,7 +322,7 @@ const SecureExamView: React.FC = () => {
           console.log('🔵 API CALL #4 (PATTERN FALLBACK): GET', patternEndpoint);
           const questionsResponse = await api.get(patternEndpoint);
           console.log('✅ API RESPONSE #4 (RAW):', JSON.stringify(questionsResponse.data, null, 2));
-          
+
           const sections = questionsResponse.data?.sections_with_questions ?? [];
           console.log('📊 Pattern Sections Count:', sections.length);
 
@@ -363,7 +392,7 @@ const SecureExamView: React.FC = () => {
     try {
       const answersObject = Object.fromEntries(answers);
       const autoSaveEndpoint = `/exams/attempts/${attemptId}/auto-save/`;
-      
+
       console.log('🔵 API CALL (AUTO-SAVE): POST', autoSaveEndpoint);
       console.log('💾 Auto-save payload:', {
         totalAnswers: answers.size,
@@ -423,10 +452,13 @@ const SecureExamView: React.FC = () => {
     setCurrentQuestionIndex(index);
   };
 
-
   const handleViolationDetected = (violation: any) => {
-    setCurrentViolation(violation);
-    setShowViolationWarning(true);
+    // We log it via the security hook which handles cooldowns and state
+    logViolation(violation.type, {
+      message: violation.message,
+      confidence: violation.confidence,
+      ...violation.analysis
+    }, true);
   };
 
   const handleCameraStatusChange = useCallback((payload: CameraStatusPayload) => {
@@ -467,7 +499,7 @@ const SecureExamView: React.FC = () => {
         attempt_id: parseInt(attemptId!),
         answers: Object.fromEntries(answers)
       };
-      
+
       const submitEndpoint = '/exams/submit-exam/';
       console.log('🔵 API CALL (SUBMIT): POST', submitEndpoint);
       console.log('📤 Submission payload:', {
@@ -475,9 +507,9 @@ const SecureExamView: React.FC = () => {
         totalAnswers: answers.size,
         submissionData: submissionData
       });
-      
+
       const response = await api.post(submitEndpoint, submissionData);
-      
+
       console.log('✅ Submission successful!');
       console.log('📥 Submission response:', JSON.stringify(response.data, null, 2));
 
@@ -499,7 +531,7 @@ const SecureExamView: React.FC = () => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     if (hours > 0) {
       return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     } else {
@@ -516,7 +548,7 @@ const SecureExamView: React.FC = () => {
   const getQuestionStatus = (questionIndex: number) => {
     const question = questions[questionIndex];
     if (!question) return 'not-visited';
-    
+
     const answer = answers.get(question.id);
     if (!answer || !answer.answer) return 'not-visited';
     if (answer.is_flagged) return 'flagged';
@@ -549,8 +581,8 @@ const SecureExamView: React.FC = () => {
         <div className="text-center">
           <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <p className="text-red-600 dark:text-red-400 mb-4">{error || 'Exam not found'}</p>
-          <button 
-            onClick={() => navigate('/student-dashboard')} 
+          <button
+            onClick={() => navigate('/student-dashboard')}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             Back to Dashboard
@@ -560,6 +592,8 @@ const SecureExamView: React.FC = () => {
     );
   }
 
+  // Frontend disqualification screen removed per user request:
+  /*
   if (isDisqualified) {
     return (
       <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
@@ -579,6 +613,7 @@ const SecureExamView: React.FC = () => {
       </div>
     );
   }
+  */
 
   if (questions.length === 0) {
     return (
@@ -589,8 +624,8 @@ const SecureExamView: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             This exam doesn't have any questions assigned yet.
           </p>
-          <button 
-            onClick={() => navigate('/student-dashboard')} 
+          <button
+            onClick={() => navigate('/student-dashboard')}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             Back to Dashboard
@@ -624,7 +659,7 @@ const SecureExamView: React.FC = () => {
   const cameraStatusMessage = cameraHealthy
     ? 'Webcam monitoring is active.'
     : cameraStatusInfo.error ||
-      'Please allow and keep your webcam active throughout the exam.';
+    'Please allow and keep your webcam active throughout the exam.';
   const formatIncidentTime = (timestamp?: string) => {
     if (!timestamp) return 'just now';
     const parsed = new Date(timestamp);
@@ -645,7 +680,7 @@ const SecureExamView: React.FC = () => {
               </span>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-4">
             {/* Auto-save status */}
             <div className="flex items-center gap-2">
@@ -653,25 +688,29 @@ const SecureExamView: React.FC = () => {
               {autoSaveStatus === 'saved' && <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-500" />}
               {autoSaveStatus === 'error' && <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-500" />}
               <span className="text-sm text-gray-600 dark:text-gray-400">
-                {autoSaveStatus === 'saving' ? 'Saving...' : 
-                 autoSaveStatus === 'saved' ? 'Saved' : 'Save Error'}
+                {autoSaveStatus === 'saving' ? 'Saving...' :
+                  autoSaveStatus === 'saved' ? 'Saved' : 'Save Error'}
               </span>
             </div>
 
-            {/* Violation count */}
-            {violationCount > 0 && (
-              <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
-                <AlertTriangle className="w-4 h-4" />
-                <span className="text-sm">{violationCount} violations</span>
-                <button
-                  onClick={() => setShowViolationsPanel(true)}
-                  className="ml-2 px-2 py-1 bg-orange-600 text-white text-xs rounded hover:bg-orange-700 transition-colors"
-                  title="View violation details"
-                >
-                  View Details
-                </button>
-              </div>
-            )}
+            {/* Violation count - Always visible */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowViolationsPanel(true)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all hover:shadow-md active:scale-95 ${violationCount > 3
+                  ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
+                  : violationCount > 0
+                    ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                    : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                  }`}
+                title="View security logs"
+              >
+                <div className={`w-1.5 h-1.5 rounded-full ${violationCount > 3 ? 'bg-red-500 animate-pulse' : violationCount > 0 ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                <span className="text-xs font-bold uppercase">
+                  {violationCount} Security Records
+                </span>
+              </button>
+            </div>
 
             {/* Fullscreen toggle */}
             <button
@@ -701,11 +740,10 @@ const SecureExamView: React.FC = () => {
 
       {isCameraRequired && (
         <div
-          className={`mx-4 mt-4 mb-2 rounded-lg border p-4 ${
-            cameraHealthy
-              ? 'bg-green-50 border-green-200 text-green-800'
-              : 'bg-yellow-50 border-yellow-200 text-yellow-800'
-          }`}
+          className={`mx-4 mt-4 mb-2 rounded-lg border p-4 ${cameraHealthy
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-yellow-50 border-yellow-200 text-yellow-800'
+            }`}
         >
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
@@ -744,14 +782,13 @@ const SecureExamView: React.FC = () => {
                       {currentQuestion.marks} mark{currentQuestion.marks !== 1 ? 's' : ''}
                     </span>
                   </div>
-                  
+
                   <button
                     onClick={() => handleFlagToggle(currentQuestion.id)}
-                    className={`p-2 rounded-lg transition-colors ${
-                      currentAnswer?.is_flagged 
-                        ? 'bg-yellow-500 text-white shadow-lg' 
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                    }`}
+                    className={`p-2 rounded-lg transition-colors ${currentAnswer?.is_flagged
+                      ? 'bg-yellow-500 text-white shadow-lg'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                      }`}
                     title="Flag for review"
                   >
                     <Flag className="w-4 h-4" />
@@ -773,15 +810,14 @@ const SecureExamView: React.FC = () => {
                     // Handle both string and object options
                     const optionText = typeof option === 'string' ? option : option.text;
                     const optionId = typeof option === 'object' && option.id ? option.id : index;
-                    
+
                     return (
                       <label
                         key={optionId}
-                        className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                          currentAnswer?.answer === optionText
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
-                            : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-300 dark:hover:border-gray-500'
-                        }`}
+                        className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${currentAnswer?.answer === optionText
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
+                          : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-300 dark:hover:border-gray-500'
+                          }`}
                       >
                         <input
                           type="radio"
@@ -792,11 +828,10 @@ const SecureExamView: React.FC = () => {
                           className="sr-only"
                         />
                         <div className="flex items-center gap-3">
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                            currentAnswer?.answer === optionText
-                              ? 'border-blue-500 bg-blue-500'
-                              : 'border-gray-400 dark:border-gray-500'
-                          }`}>
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${currentAnswer?.answer === optionText
+                            ? 'border-blue-500 bg-blue-500'
+                            : 'border-gray-400 dark:border-gray-500'
+                            }`}>
                             {currentAnswer?.answer === optionText && (
                               <div className="w-2 h-2 bg-white rounded-full"></div>
                             )}
@@ -815,69 +850,67 @@ const SecureExamView: React.FC = () => {
               {currentQuestion.question_type === 'multiple_mcq' && (() => {
                 // For multiple MCQ, answer is stored as "option1|option2|option3"
                 const selectedAnswers = currentAnswer?.answer ? String(currentAnswer.answer).split('|').filter(a => a) : [];
-                
+
                 return (
-                <div className="space-y-3">
-                  <p className="text-sm text-purple-600 dark:text-purple-400 font-medium mb-3">
-                    ✓ Select all correct options (multiple answers allowed)
-                  </p>
-                  {currentQuestion.options.map((option, index) => {
-                    // Handle both string and object options
-                    const optionText = typeof option === 'string' ? option : option.text;
-                    const optionId = typeof option === 'object' && option.id ? option.id : index;
-                    
-                    const isSelected = selectedAnswers.includes(optionText);
-                    
-                    return (
-                      <label
-                        key={optionId}
-                        className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                          isSelected
+                  <div className="space-y-3">
+                    <p className="text-sm text-purple-600 dark:text-purple-400 font-medium mb-3">
+                      ✓ Select all correct options (multiple answers allowed)
+                    </p>
+                    {currentQuestion.options.map((option, index) => {
+                      // Handle both string and object options
+                      const optionText = typeof option === 'string' ? option : option.text;
+                      const optionId = typeof option === 'object' && option.id ? option.id : index;
+
+                      const isSelected = selectedAnswers.includes(optionText);
+
+                      return (
+                        <label
+                          key={optionId}
+                          className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${isSelected
                             ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 shadow-md'
                             : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-purple-300 dark:hover:border-gray-500'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          name={`question-${currentQuestion.id}-${index}`}
-                          value={optionText}
-                          checked={isSelected}
-                          onChange={(e) => {
-                            const currentAnswers = currentAnswer?.answer ? String(currentAnswer.answer).split('|') : [];
-                            let newAnswers;
-                            if (e.target.checked) {
-                              // Add to selected answers
-                              newAnswers = [...currentAnswers, optionText];
-                            } else {
-                              // Remove from selected answers
-                              newAnswers = currentAnswers.filter(a => a !== optionText);
-                            }
-                            // Join with | separator
-                            handleAnswerChange(currentQuestion.id, newAnswers.join('|'));
-                          }}
-                          className="sr-only"
-                        />
-                        <div className="flex items-center gap-3">
-                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                            isSelected
+                            }`}
+                        >
+                          <input
+                            type="checkbox"
+                            name={`question-${currentQuestion.id}-${index}`}
+                            value={optionText}
+                            checked={isSelected}
+                            onChange={(e) => {
+                              const currentAnswers = currentAnswer?.answer ? String(currentAnswer.answer).split('|') : [];
+                              let newAnswers;
+                              if (e.target.checked) {
+                                // Add to selected answers
+                                newAnswers = [...currentAnswers, optionText];
+                              } else {
+                                // Remove from selected answers
+                                newAnswers = currentAnswers.filter(a => a !== optionText);
+                              }
+                              // Join with | separator
+                              handleAnswerChange(currentQuestion.id, newAnswers.join('|'));
+                            }}
+                            className="sr-only"
+                          />
+                          <div className="flex items-center gap-3">
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected
                               ? 'border-purple-500 bg-purple-500'
                               : 'border-gray-400 dark:border-gray-500'
-                          }`}>
-                            {isSelected && (
-                              <CheckCircle className="w-4 h-4 text-white" />
-                            )}
+                              }`}>
+                              {isSelected && (
+                                <CheckCircle className="w-4 h-4 text-white" />
+                              )}
+                            </div>
+                            <span className="text-sm text-gray-900 dark:text-white">
+                              <LaTeXRenderer content={optionText} />
+                            </span>
                           </div>
-                          <span className="text-sm text-gray-900 dark:text-white">
-                            <LaTeXRenderer content={optionText} />
-                          </span>
-                        </div>
-                      </label>
-                    );
-                  })}
-                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
-                    Selected: {selectedAnswers.length > 0 ? selectedAnswers.join(', ') : 'None'}
-                  </p>
-                </div>
+                        </label>
+                      );
+                    })}
+                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+                      Selected: {selectedAnswers.length > 0 ? selectedAnswers.join(', ') : 'None'}
+                    </p>
+                  </div>
                 );
               })()}
 
@@ -910,11 +943,10 @@ const SecureExamView: React.FC = () => {
                   {['True', 'False'].map((option) => (
                     <label
                       key={option}
-                      className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                        currentAnswer?.answer === option
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
-                          : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-300 dark:hover:border-gray-500'
-                      }`}
+                      className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${currentAnswer?.answer === option
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
+                        : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-300 dark:hover:border-gray-500'
+                        }`}
                     >
                       <input
                         type="radio"
@@ -925,11 +957,10 @@ const SecureExamView: React.FC = () => {
                         className="sr-only"
                       />
                       <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          currentAnswer?.answer === option
-                            ? 'border-blue-500 bg-blue-500'
-                            : 'border-gray-400 dark:border-gray-500'
-                        }`}>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${currentAnswer?.answer === option
+                          ? 'border-blue-500 bg-blue-500'
+                          : 'border-gray-400 dark:border-gray-500'
+                          }`}>
                           {currentAnswer?.answer === option && (
                             <div className="w-2 h-2 bg-white rounded-full"></div>
                           )}
@@ -979,11 +1010,10 @@ const SecureExamView: React.FC = () => {
                   <button
                     key={question.id}
                     onClick={() => handleQuestionNavigation(index)}
-                    className={`w-full p-3 text-left rounded-lg border-2 transition-all ${
-                      index === currentQuestionIndex
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-md'
-                        : getStatusColor(status)
-                    }`}
+                    className={`w-full p-3 text-left rounded-lg border-2 transition-all ${index === currentQuestionIndex
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-md'
+                      : getStatusColor(status)
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-gray-900 dark:text-white">Q{index + 1}</span>
@@ -1037,21 +1067,12 @@ const SecureExamView: React.FC = () => {
           attemptId={parseInt(attemptId!)}
           onViolationDetected={handleViolationDetected}
           captureInterval={30}
-          showPreview={true}
+          showPreview={false}
           autoStart={webcamRequired}
           onStatusChange={handleCameraStatusChange}
+          className="hidden"
         />
       )}
-
-      {/* Violation Warning Modal */}
-      <ViolationWarning
-        isOpen={showViolationWarning}
-        violation={currentViolation}
-        violationCount={violationCount}
-        maxViolations={examAttempt.max_violations_allowed}
-        onAcknowledge={handleViolationAcknowledged}
-        onClose={handleViolationAcknowledged}
-      />
 
       <ViolationsPanel
         attemptId={parseInt(attemptId || '0')}
@@ -1062,7 +1083,7 @@ const SecureExamView: React.FC = () => {
       {/* Violation Toast Notification */}
       <ViolationToast
         violation={currentToastViolation}
-        onClose={() => setCurrentToastViolation(null)}
+        onClose={handleCloseToast}
       />
     </div>
   );

@@ -47,6 +47,7 @@ interface Question {
   question_number_in_pattern?: number | null;
   section_name?: string;
   negative_marks?: number | null;
+  structure?: any;
 }
 
 interface ExamAttempt {
@@ -63,6 +64,7 @@ interface ExamAttempt {
     disable_right_click: boolean;
     enable_webcam_proctoring: boolean;
     allow_tab_switching: boolean;
+    end_date: string;
     pattern: {
       sections: Array<{
         id: number;
@@ -77,6 +79,7 @@ interface ExamAttempt {
   started_at: string;
   time_spent: number;
   max_violations_allowed: number;
+  violations_count: number;
 }
 
 interface Answer {
@@ -109,9 +112,12 @@ const SecureExamExperience: React.FC = () => {
 
   // Pre-exam flow states
   const [examStarted, setExamStarted] = useState(false);
+  const [isExpired, setIsExpired] = useState(false);
+  const timerBaselineRef = useRef<{ serverTime: number, localTime: number } | null>(null);
 
   // Security hook
   const {
+    logViolation,
     violations,
     violationCount,
     isDisqualified,
@@ -124,6 +130,7 @@ const SecureExamExperience: React.FC = () => {
     enableCopyPasteBlocking: examAttempt?.exam.disable_copy_paste || false,
     enableRightClickBlocking: examAttempt?.exam.disable_right_click || false,
     enableContextMenuBlocking: examAttempt?.exam.disable_right_click || false,
+    initialViolationCount: examAttempt?.violations_count || 0
   });
 
   // Load exam data
@@ -143,18 +150,18 @@ const SecureExamExperience: React.FC = () => {
 
   // Timer effect
   useEffect(() => {
-    if (!examAttempt || isPaused) return;
+    if (!examAttempt || isPaused || !timerBaselineRef.current) return;
 
     const interval = setInterval(() => {
-      const now = new Date();
-      const startTime = new Date(examAttempt.started_at);
-      const elapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-      const remaining = (examAttempt.exam.duration_minutes * 60) - elapsed;
+      const elapsedLocal = (Date.now() - timerBaselineRef.current!.localTime) / 1000;
+      const currentRemaining = Math.max(0, timerBaselineRef.current!.serverTime - elapsedLocal);
 
-      setTimeRemaining(Math.max(0, remaining));
-
-      if (remaining <= 0) {
+      if (currentRemaining <= 0) {
+        setTimeRemaining(0);
         handleAutoSubmit();
+        clearInterval(interval);
+      } else {
+        setTimeRemaining(currentRemaining);
       }
     }, 1000);
 
@@ -171,12 +178,22 @@ const SecureExamExperience: React.FC = () => {
   }, [answers]);
 
   // Listen for new violations and show toast
+  const lastViolationTimeShown = useRef<number>(0);
   useEffect(() => {
     if (violations.length > 0) {
       const latestViolation = violations[violations.length - 1];
-      setCurrentToastViolation(latestViolation);
+      const timestamp = latestViolation.timestamp.getTime();
+
+      if (timestamp > lastViolationTimeShown.current) {
+        lastViolationTimeShown.current = timestamp;
+        setCurrentToastViolation(latestViolation);
+      }
     }
   }, [violations]);
+
+  const handleCloseToast = useCallback(() => {
+    setCurrentToastViolation(null);
+  }, []);
 
   const loadExamData = async () => {
     try {
@@ -217,6 +234,7 @@ const SecureExamExperience: React.FC = () => {
                 question_number_in_pattern: q.question_number_in_pattern ?? item.order ?? null,
                 section_name: item.section_name ?? '',
                 negative_marks: item.negative_marks ?? q.negative_marks ?? null,
+                structure: q.structure ?? {},
               };
             })
             .filter((question: Question) => Boolean(question.question_text));
@@ -247,6 +265,7 @@ const SecureExamExperience: React.FC = () => {
           question_number_in_pattern: item.question_number_in_pattern ?? null,
           section_name: item.pattern_section_name ?? '',
           negative_marks: item.negative_marks ?? null,
+          structure: item.structure ?? {},
         })).filter((q: Question) => Boolean(q.question_text));
       }
 
@@ -264,6 +283,19 @@ const SecureExamExperience: React.FC = () => {
           existingAnswers.set(parseInt(questionId, 10), answer);
         });
         setAnswers(existingAnswers);
+      }
+
+      // Initialize stable timer baseline
+      if (attemptData.time_remaining !== undefined) {
+        if (attemptData.time_remaining <= 0) {
+          setIsExpired(true);
+        } else {
+          timerBaselineRef.current = {
+            serverTime: attemptData.time_remaining,
+            localTime: Date.now()
+          };
+          setTimeRemaining(attemptData.time_remaining);
+        }
       }
 
       setLoading(false);
@@ -318,8 +350,12 @@ const SecureExamExperience: React.FC = () => {
   };
 
   const handleViolationDetected = (violation: any) => {
-    setCurrentViolation(violation);
-    setShowViolationWarning(true);
+    // We log it via the security hook which handles cooldowns and state
+    logViolation(violation.type, {
+      message: violation.message,
+      confidence: violation.confidence,
+      ...violation.analysis
+    }, true);
   };
 
   const handleViolationAcknowledged = () => {
@@ -398,7 +434,28 @@ const SecureExamExperience: React.FC = () => {
     );
   }
 
-  if (isDisqualified) return <ViolationWarning isOpen={true} violation={{ type: 'disqualified', message: 'Maximum violations reached.', timestamp: new Date(), confidence: 1 }} violationCount={violationCount} maxViolations={examAttempt?.max_violations_allowed || 10} onAcknowledge={() => navigate('/student-dashboard')} onClose={() => { }} />;
+  // Frontend disqualification screen removed per user request
+  if (isExpired) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
+          <Clock className="w-10 h-10 text-red-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Assessment Expired</h2>
+        <p className="text-slate-600 dark:text-slate-400 max-w-md mb-8">
+          This assessment session has reached its time limit or the scheduled end date has passed. You can no longer make any changes.
+        </p>
+        <button
+          onClick={() => navigate(`/exam-results/${attemptId}`)}
+          className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all"
+        >
+          View Results
+        </button>
+      </div>
+    );
+  }
+
+  // if (isDisqualified) return <ViolationWarning isOpen={true} violation={{ type: 'disqualified', ... }} ... />;
 
   return (
     <div className="h-screen flex flex-col bg-slate-100 dark:bg-slate-950 select-none">
@@ -429,6 +486,19 @@ const SecureExamExperience: React.FC = () => {
             <div className="text-right">
               <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">Attempted</p>
               <p className="text-xs font-bold text-slate-900 dark:text-white">{questionStats.answered} / {questions.length}</p>
+            </div>
+            <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-800" />
+            <div className="text-right">
+              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">Violations</p>
+              <button
+                onClick={() => setShowViolationsPanel(true)}
+                className="flex items-center gap-2 justify-end group transition-all"
+              >
+                <div className={`w-1.5 h-1.5 rounded-full ${violationCount > 3 ? 'bg-red-500 animate-pulse' : violationCount > 0 ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                <span className={`text-xs font-bold uppercase transition-colors ${violationCount > 3 ? 'text-red-600' : violationCount > 0 ? 'text-amber-600' : 'text-emerald-600'} group-hover:underline`}>
+                  {violationCount} Records
+                </span>
+              </button>
             </div>
           </div>
 
@@ -501,6 +571,99 @@ const SecureExamExperience: React.FC = () => {
               <div className="flex-1 overflow-y-auto px-10 py-8 space-y-8 question-scroll">
                 <div className="text-lg md:text-xl font-medium text-slate-800 dark:text-slate-100 leading-relaxed bg-slate-50/50 dark:bg-slate-800/30 p-8 rounded-[24px] border border-slate-100 dark:border-slate-800">
                   <LaTeXRenderer content={currentQuestion?.question_text || ''} />
+
+                  {/* Structured Question Content (Internal Choice or Multi-part) */}
+                  {currentQuestion?.structure?.is_nested && (
+                    <div className="mt-8 space-y-6">
+                      <div className="h-[1px] bg-slate-200 dark:bg-slate-700 w-full" />
+
+                      {currentQuestion.structure.nested_type === 'internal_choice' ? (
+                        <div className="space-y-8">
+                          {(currentQuestion.structure.parts || []).map((part: any, idx: number) => (
+                            <div key={idx} className="bg-white dark:bg-slate-900/50 rounded-2xl border-2 border-slate-100 dark:border-slate-800 overflow-hidden">
+                              <div className="bg-slate-50 dark:bg-slate-800 px-6 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                <span className="font-bold text-slate-700 dark:text-slate-300">Choice {part.label || String.fromCharCode(65 + idx)}</span>
+                                {part.marks && <span className="text-[10px] font-bold bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-lg">+{part.marks} Marks</span>}
+                              </div>
+                              <div className="p-6 space-y-4">
+                                {part.description && <p className="text-xs text-slate-400 italic mb-2">Note: {part.description}</p>}
+                                <div className="text-base text-slate-700 dark:text-slate-300">
+                                  <LaTeXRenderer content={part.question_text || ''} />
+                                </div>
+
+                                {/* Sub-parts within a choice */}
+                                {(part.parts || []).map((subPart: any, spIdx: number) => (
+                                  <div key={spIdx} className="mt-4 pl-4 border-l-2 border-slate-100 dark:border-slate-700">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-xs font-bold text-slate-500">{subPart.label || String.fromCharCode(97 + spIdx)})</span>
+                                      <span className="text-[10px] text-slate-400">({subPart.marks} marks)</span>
+                                    </div>
+                                    <div className="text-sm text-slate-600 dark:text-slate-400">
+                                      <LaTeXRenderer content={subPart.question_text || ''} />
+                                    </div>
+                                  </div>
+                                ))}
+
+                                {/* Choice Selection UI */}
+                                <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                  <p className="text-xs text-slate-500 font-medium">Answer this choice?</p>
+                                  <button
+                                    onClick={() => {
+                                      let currentAns: any = {};
+                                      try {
+                                        currentAns = JSON.parse(currentAnswer?.answer as string || '{}');
+                                      } catch (e) {
+                                        currentAns = { text: currentAnswer?.answer };
+                                      }
+                                      currentAns.selected_choice = part.label || `Choice ${String.fromCharCode(65 + idx)}`;
+                                      handleAnswerChange(currentQuestion.id, JSON.stringify(currentAns));
+                                    }}
+                                    className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${(function () {
+                                        let sel = '';
+                                        try {
+                                          sel = JSON.parse(currentAnswer?.answer as string || '{}').selected_choice;
+                                        } catch (e) { }
+                                        return sel === (part.label || `Choice ${String.fromCharCode(65 + idx)}`);
+                                      })()
+                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                      }`}
+                                  >
+                                    {(function () {
+                                      let sel = '';
+                                      try {
+                                        sel = JSON.parse(currentAnswer?.answer as string || '{}').selected_choice;
+                                      } catch (e) { }
+                                      return sel === (part.label || `Choice ${String.fromCharCode(65 + idx)}`);
+                                    })() ? 'Selected' : 'Select Choice'}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          {(currentQuestion.structure.parts || []).map((part: any, idx: number) => (
+                            <div key={idx} className="flex gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700">
+                              <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 font-bold shrink-0">
+                                {part.label || String.fromCharCode(97 + idx)}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="font-bold text-slate-700 dark:text-slate-300 text-sm">Part {part.label || String.fromCharCode(97 + idx)}</span>
+                                  <span className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-500 px-2 py-0.5 rounded-full">{part.marks} Marks</span>
+                                </div>
+                                <div className="text-base text-slate-700 dark:text-slate-300">
+                                  <LaTeXRenderer content={part.question_text || ''} />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -548,12 +711,114 @@ const SecureExamExperience: React.FC = () => {
                   )}
 
                   {currentQuestion?.question_type === 'subjective' && (
-                    <textarea
-                      placeholder="Input your response here..."
-                      value={currentAnswer?.answer || ''}
-                      onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                      className="w-full h-64 px-8 py-6 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-transparent rounded-[32px] focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all text-lg leading-relaxed resize-none"
-                    />
+                    <div className="space-y-6">
+                      {currentQuestion?.structure?.is_nested ? (
+                        <div className="space-y-6">
+                          {(function () {
+                            let selected = '';
+                            try {
+                              selected = JSON.parse(currentAnswer?.answer as string || '{}').selected_choice;
+                            } catch (e) { }
+
+                            if (!selected) {
+                              return (
+                                <div className="p-12 text-center rounded-[32px] border-2 border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                                  <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-4" />
+                                  <h4 className="text-lg font-bold text-slate-800 dark:text-slate-100">Choice Selection Required</h4>
+                                  <p className="text-slate-500 text-sm mt-2">Please select an option from the choices above to provide your answer.</p>
+                                </div>
+                              );
+                            }
+
+                            // Find the selected part
+                            const parts = currentQuestion.structure.parts || [];
+                            const nestedType = currentQuestion.structure.nested_type;
+
+                            if (nestedType === 'internal_choice') {
+                              const selectedPart = parts.find((p: any, idx: number) => (p.label || `Choice ${String.fromCharCode(65 + idx)}`) === selected);
+
+                              if (selectedPart) {
+                                return (
+                                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="text-sm font-bold text-blue-600 uppercase tracking-widest">Your Response for {selected}</h4>
+                                      <button
+                                        onClick={() => {
+                                          let currentAns: any = {};
+                                          try { currentAns = JSON.parse(currentAnswer?.answer as string || '{}'); } catch (e) { }
+                                          delete currentAns.selected_choice;
+                                          handleAnswerChange(currentQuestion.id, JSON.stringify(currentAns));
+                                        }}
+                                        className="text-xs font-bold text-slate-400 hover:text-red-500 transition-colors"
+                                      >
+                                        Change Selection
+                                      </button>
+                                    </div>
+
+                                    {(selectedPart.parts || []).length > 0 ? (
+                                      <div className="space-y-6">
+                                        {(selectedPart.parts).map((subPart: any, spIdx: number) => (
+                                          <div key={spIdx} className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase ml-2">Part {subPart.label || String.fromCharCode(97 + spIdx)}</label>
+                                            <textarea
+                                              placeholder={`Write answer for part ${subPart.label || String.fromCharCode(97 + spIdx)}...`}
+                                              value={(function () {
+                                                try {
+                                                  const data = JSON.parse(currentAnswer?.answer as string || '{}');
+                                                  return data.parts?.[selected]?.[spIdx] || '';
+                                                } catch (e) { return ''; }
+                                              })()}
+                                              onChange={(e) => {
+                                                let data: any = {};
+                                                try { data = JSON.parse(currentAnswer?.answer as string || '{}'); } catch (e) { }
+                                                if (!data.parts) data.parts = {};
+                                                if (!data.parts[selected]) data.parts[selected] = {};
+                                                data.parts[selected][spIdx] = e.target.value;
+                                                handleAnswerChange(currentQuestion.id, JSON.stringify(data));
+                                              }}
+                                              className="w-full h-32 px-6 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-transparent rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all text-lg resize-none"
+                                            />
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <textarea
+                                        placeholder={`Write your response for ${selected} here...`}
+                                        value={(function () {
+                                          try {
+                                            const data = JSON.parse(currentAnswer?.answer as string || '{}');
+                                            return data.text || '';
+                                          } catch (e) { return currentAnswer?.answer; }
+                                        })()}
+                                        onChange={(e) => {
+                                          let data: any = {};
+                                          try {
+                                            data = JSON.parse(currentAnswer?.answer as string || '{}');
+                                            data.text = e.target.value;
+                                          } catch (e) {
+                                            data = { selected_choice: selected, text: e.target.value };
+                                          }
+                                          handleAnswerChange(currentQuestion.id, JSON.stringify(data));
+                                        }}
+                                        className="w-full h-64 px-8 py-6 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-transparent rounded-[32px] focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all text-lg leading-relaxed resize-none"
+                                      />
+                                    )}
+                                  </div>
+                                );
+                              }
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      ) : (
+                        <textarea
+                          placeholder="Input your response here..."
+                          value={currentAnswer?.answer || ''}
+                          onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                          className="w-full h-64 px-8 py-6 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-transparent rounded-[32px] focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all text-lg leading-relaxed resize-none"
+                        />
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -640,9 +905,9 @@ const SecureExamExperience: React.FC = () => {
                       key={q.id}
                       onClick={() => handleQuestionNavigation(idx)}
                       className={`h-11 rounded-xl text-xs font-bold transition-all border-2 flex items-center justify-center relative ${isCurrent ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-inner' :
-                          isFlagged ? 'border-amber-400 bg-amber-50 text-amber-700' :
-                            isAnswered ? 'border-emerald-500 bg-emerald-50 text-emerald-700' :
-                              'border-slate-100 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-800/50'
+                        isFlagged ? 'border-amber-400 bg-amber-50 text-amber-700' :
+                          isAnswered ? 'border-emerald-500 bg-emerald-50 text-emerald-700' :
+                            'border-slate-100 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-800/50'
                         }`}
                     >
                       {idx + 1}
@@ -683,25 +948,38 @@ const SecureExamExperience: React.FC = () => {
       </main>
 
       {/* Proctoring & Violation UI */}
-      <WebcamMonitor
-        attemptId={parseInt(attemptId!)}
-        onViolationDetected={handleViolationDetected}
-        captureInterval={5}
-        showPreview={true}
-      />
+      {examAttempt?.exam.enable_webcam_proctoring && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <WebcamMonitor
+            attemptId={parseInt(attemptId!)}
+            onViolationDetected={handleViolationDetected}
+            captureInterval={20}
+            showPreview={true}
+            autoStart={true}
+            className="w-48 shadow-2xl rounded-xl border-2 border-white dark:border-slate-800 overflow-hidden"
+          />
+        </div>
+      )}
 
-      <ViolationWarning
+      {/* Modal disabled as per user request */}
+      {/* <ViolationWarning
         isOpen={showViolationWarning}
         violation={currentViolation}
         violationCount={violationCount}
         maxViolations={examAttempt?.max_violations_allowed || 10}
         onAcknowledge={handleViolationAcknowledged}
         onClose={handleViolationAcknowledged}
-      />
+      /> */}
 
       <ViolationToast
         violation={currentToastViolation}
-        onClose={() => setCurrentToastViolation(null)}
+        onClose={handleCloseToast}
+      />
+
+      <ViolationsPanel
+        attemptId={parseInt(attemptId!)}
+        isOpen={showViolationsPanel}
+        onClose={() => setShowViolationsPanel(false)}
       />
 
       <style>{`

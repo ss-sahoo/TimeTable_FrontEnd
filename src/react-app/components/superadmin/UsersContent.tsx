@@ -56,12 +56,14 @@ const UsersContent = () => {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAssignCenterModal, setShowAssignCenterModal] = useState(false);
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [userCredentials, setUserCredentials] = useState<{ username: string; password: string } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
+  const [editingUser, setEditingUser] = useState<UserData | null>(null);
   const [centers, setCenters] = useState<any[]>([]);
   const [selectedCenterId, setSelectedCenterId] = useState<string>("");
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -149,6 +151,43 @@ const UsersContent = () => {
     setSelectedUser(user);
     setShowAssignCenterModal(true);
     fetchCenters();
+  };
+
+  const openEditModal = (user: UserData) => {
+    setEditingUser({ ...user });
+    setSelectedCenterId(user.center?.id || "");
+    setShowEditUserModal(true);
+    fetchCenters();
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+
+    try {
+      setError("");
+      setLoading(true);
+
+      const payload: any = {
+        first_name: editingUser.first_name,
+        last_name: editingUser.last_name,
+        role: editingUser.role,
+        center_id: selectedCenterId || null
+      };
+
+      await api.patch(`/auth/users/${editingUser.id}/`, payload);
+
+      setShowEditUserModal(false);
+      setEditingUser(null);
+      setSelectedCenterId("");
+
+      alert(`User ${editingUser.email} updated successfully`);
+      fetchUsers();
+    } catch (error: any) {
+      console.error("Error updating user:", error);
+      setError(error.response?.data?.detail || error.response?.data?.error || "Failed to update user");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddUser = async () => {
@@ -279,16 +318,35 @@ const UsersContent = () => {
           const autoUsername = newUser.username || `STU-${newUser.email.split('@')[0]}`;
           const autoPassword = newUser.password || `Student@${new Date().getFullYear()}`;
 
-          response = await api.post('/auth/register/', {
+          // Build payload with center_id if selected
+          const studentPayload: any = {
             username: autoUsername,
             email: newUser.email,
             password: autoPassword,
             password_confirm: autoPassword,
             first_name: newUser.first_name,
             last_name: newUser.last_name,
-            role: 'student',  // Changed to lowercase
+            role: 'student',
             institute_id: instituteId
-          });
+          };
+
+          // Include center_id directly in registration if selected
+          if (selectedCenterId) {
+            studentPayload.center_id = selectedCenterId;
+          }
+
+          response = await api.post('/auth/register/', studentPayload);
+
+          // Additional safety check to ensure center assignment (similar to admin case)
+          if (selectedCenterId && response.data.id && !response.data.center_id) {
+            try {
+              await api.patch(`/auth/users/${response.data.id}/`, {
+                center_id: selectedCenterId
+              });
+            } catch (centerError) {
+              console.error('Failed to assign center to student via update:', centerError);
+            }
+          }
 
           // Set credentials for display
           response.data = {
@@ -649,7 +707,10 @@ const UsersContent = () => {
           </button>
           <button
             type="button"
-            onClick={() => setShowAddUserModal(true)}
+            onClick={() => {
+              setShowAddUserModal(true);
+              fetchCenters();
+            }}
             className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
           >
             <UserPlus className="-ml-0.5 mr-1.5 h-5 w-5" />
@@ -668,8 +729,8 @@ const UsersContent = () => {
                 <button
                   onClick={() => setActiveTab("all")}
                   className={`${activeTab === "all"
-                      ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                     } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                 >
                   All Users
@@ -681,8 +742,8 @@ const UsersContent = () => {
                 <button
                   onClick={() => setActiveTab("super_admin")}
                   className={`${activeTab === "super_admin"
-                      ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                     } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                 >
                   Super Admins
@@ -694,8 +755,8 @@ const UsersContent = () => {
                 <button
                   onClick={() => setActiveTab("admin")}
                   className={`${activeTab === "admin"
-                      ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                     } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                 >
                   Admins
@@ -707,8 +768,8 @@ const UsersContent = () => {
                 <button
                   onClick={() => setActiveTab("teacher")}
                   className={`${activeTab === "teacher"
-                      ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                     } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                 >
                   Teachers
@@ -720,8 +781,8 @@ const UsersContent = () => {
                 <button
                   onClick={() => setActiveTab("student")}
                   className={`${activeTab === "student"
-                      ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                     } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                 >
                   Students
@@ -733,8 +794,8 @@ const UsersContent = () => {
                 <button
                   onClick={() => setActiveTab("staff")}
                   className={`${activeTab === "staff"
-                      ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                     } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
                 >
                   Staff
@@ -870,7 +931,7 @@ const UsersContent = () => {
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                       <button
-                        onClick={() => {/* TODO: Implement edit */ }}
+                        onClick={() => openEditModal(user)}
                         className="text-gray-400 hover:text-blue-600 mr-3"
                       >
                         <Edit2 className="w-5 h-5" />
@@ -915,8 +976,8 @@ const UsersContent = () => {
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
                       className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${currentPage === pageNum
-                          ? 'z-10 bg-blue-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600'
-                          : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20'
+                        ? 'z-10 bg-blue-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600'
+                        : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20'
                         }`}
                     >
                       {pageNum}
@@ -1203,6 +1264,123 @@ const UsersContent = () => {
         </div>
       )}
 
+      {/* Edit User Modal */}
+      {showEditUserModal && editingUser && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowEditUserModal(false)}></div>
+
+            <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+              <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold leading-6 text-gray-900">Edit User</h3>
+                  <button onClick={() => setShowEditUserModal(false)} className="text-gray-400 hover:text-gray-500">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+
+                {error && (
+                  <div className="mb-4 rounded-md bg-red-50 p-4">
+                    <div className="flex">
+                      <AlertCircle className="h-5 w-5 text-red-400" />
+                      <div className="ml-3">
+                        <p className="text-sm text-red-800">{error}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">First Name</label>
+                      <input
+                        type="text"
+                        value={editingUser.first_name || ""}
+                        onChange={(e) => setEditingUser({ ...editingUser, first_name: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Last Name</label>
+                      <input
+                        type="text"
+                        value={editingUser.last_name || ""}
+                        onChange={(e) => setEditingUser({ ...editingUser, last_name: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Email</label>
+                    <input
+                      type="email"
+                      value={editingUser.email}
+                      disabled
+                      className="mt-1 block w-full rounded-md border-gray-100 bg-gray-50 shadow-sm sm:text-sm px-3 py-2 border cursor-not-allowed"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Email cannot be changed.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Role</label>
+                    <select
+                      value={editingUser.role}
+                      onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                    >
+                      <option value="student">Student</option>
+                      <option value="teacher">Teacher</option>
+                      <option value="admin">Admin</option>
+                      <option value="staff">Staff</option>
+                      <option value="super_admin">Super Admin</option>
+                    </select>
+                  </div>
+
+                  {/* Center Selection */}
+                  {(editingUser.role === 'admin' || editingUser.role === 'teacher' || editingUser.role === 'student' || editingUser.role === 'staff') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Center</label>
+                      <select
+                        value={selectedCenterId}
+                        onChange={(e) => setSelectedCenterId(e.target.value)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                      >
+                        <option value="">-- No Center / Unassigned --</option>
+                        {centers.map((center) => (
+                          <option key={center.id} value={center.id}>
+                            {center.name} - {center.city}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                <button
+                  type="button"
+                  onClick={handleUpdateUser}
+                  disabled={loading}
+                  className="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:ml-3 sm:w-auto"
+                >
+                  {loading ? "Updating..." : "Save Changes"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowEditUserModal(false)}
+                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add User Modal */}
       {showAddUserModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto" onLoad={() => fetchCenters()}>
@@ -1308,7 +1486,7 @@ const UsersContent = () => {
                       onChange={(e) => {
                         setNewUser({ ...newUser, role: e.target.value });
                         // Fetch centers when admin or teacher is selected
-                        if (e.target.value === 'admin' || e.target.value === 'teacher') {
+                        if (e.target.value === 'admin' || e.target.value === 'teacher' || e.target.value === 'student') {
                           fetchCenters();
                         }
                       }}
@@ -1322,8 +1500,8 @@ const UsersContent = () => {
                     </select>
                   </div>
 
-                  {/* Center Selection - Only for Admin and Teacher */}
-                  {(newUser.role === 'admin' || newUser.role === 'teacher') && (
+                  {/* Center Selection - Only for Student, Admin and Teacher */}
+                  {(newUser.role === 'admin' || newUser.role === 'teacher' || newUser.role === 'student') && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
                         Center <span className="text-xs text-gray-500">(Optional - can be assigned later)</span>

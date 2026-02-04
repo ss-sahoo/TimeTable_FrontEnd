@@ -8,6 +8,7 @@ interface Snapshot {
   stored_reason: string;
   has_image: boolean;
   image_data?: string;
+  image_url?: string;
   metadata: Record<string, any>;
   analysis: {
     success: boolean;
@@ -242,10 +243,10 @@ const ProctoringSnapshotsView: React.FC = () => {
                 onClick={() => setSelectedSnapshot(snapshot)}
               >
                 {/* Image */}
-                {snapshot.has_image && snapshot.image_data ? (
+                {snapshot.has_image && (snapshot.image_url || snapshot.image_data) ? (
                   <div className="relative w-full h-48 bg-gray-100">
                     <img
-                      src={`data:image/jpeg;base64,${snapshot.image_data}`}
+                      src={snapshot.image_url || `data:image/jpeg;base64,${snapshot.image_data}`}
                       alt={`Snapshot ${index + 1}`}
                       className="w-full h-full object-cover"
                     />
@@ -331,10 +332,10 @@ const ProctoringSnapshotsView: React.FC = () => {
                 </div>
 
                 {/* Large Image */}
-                {selectedSnapshot.has_image && selectedSnapshot.image_data && (
+                {selectedSnapshot.has_image && (selectedSnapshot.image_url || selectedSnapshot.image_data) && (
                   <div className="mb-6">
                     <img
-                      src={`data:image/jpeg;base64,${selectedSnapshot.image_data}`}
+                      src={selectedSnapshot.image_url || `data:image/jpeg;base64,${selectedSnapshot.image_data}`}
                       alt="Snapshot"
                       className="w-full rounded-lg border border-gray-200"
                     />

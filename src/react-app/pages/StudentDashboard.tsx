@@ -24,7 +24,11 @@ import {
   Timer,
   Percent,
   History,
-  Info
+  Info,
+  Mail,
+  Phone,
+  Building2,
+  MapPin
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useApi } from '../hooks/useApi';
@@ -208,6 +212,73 @@ export default function StudentDashboard() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-900">
       <div className="w-full py-4 sm:py-6">
+        {/* Profile & Institute Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 p-6 shadow-sm flex flex-col sm:flex-row items-center gap-6 relative overflow-hidden">
+            {/* Decorative background */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 dark:bg-blue-900/10 rounded-bl-full -mr-8 -mt-8"></div>
+
+            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white text-3xl font-bold shadow-lg flex-shrink-0 z-10">
+              {user?.first_name?.charAt(0) || user?.full_name?.charAt(0) || 'S'}
+            </div>
+
+            <div className="flex-1 text-center sm:text-left z-10">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {user?.full_name || `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Student'}
+                </h1>
+                <span className="inline-flex px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest rounded-full w-fit mx-auto sm:mx-0">
+                  Student
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-2 gap-x-6">
+                <div className="flex items-center justify-center sm:justify-start gap-2 text-slate-600 dark:text-gray-400 text-sm">
+                  <Mail className="w-4 h-4 text-blue-500" />
+                  <span className="truncate">{user?.email}</span>
+                </div>
+                {user?.phone && (
+                  <div className="flex items-center justify-center sm:justify-start gap-2 text-slate-600 dark:text-gray-400 text-sm">
+                    <Phone className="w-4 h-4 text-blue-500" />
+                    <span>{user.phone}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-center sm:justify-start gap-2 text-slate-600 dark:text-gray-400 text-sm">
+                  <UserCheck className="w-4 h-4 text-blue-500" />
+                  <span>Username: {user?.username || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 p-6 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 dark:bg-emerald-900/10 rounded-bl-full -mr-6 -mt-6"></div>
+
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-emerald-600" />
+              Campus Information
+            </h3>
+
+            <div className="space-y-4 relative z-10">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Institute</p>
+                <p className="text-sm font-bold text-slate-800 dark:text-white truncate">
+                  {user?.institute?.name || user?.institute_name || 'Generic Institute'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Center</p>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-red-500" />
+                  <p className="text-sm font-bold text-slate-800 dark:text-white">
+                    {user?.center_name || 'Main Center'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-slate-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all">
@@ -520,8 +591,8 @@ export default function StudentDashboard() {
                           const isDisqualified = exam.status === 'disqualified';
                           return (
                             <div key={exam.id} className={`rounded-lg border p-4 hover:shadow-md transition-all ${isDisqualified
-                                ? 'bg-red-50 border-red-200'
-                                : 'bg-white border-slate-200 dark:border-gray-700'
+                              ? 'bg-red-50 border-red-200'
+                              : 'bg-white border-slate-200 dark:border-gray-700'
                               }`}>
                               <div className="flex items-start justify-between">
                                 <div className="flex-1">
@@ -689,8 +760,8 @@ export default function StudentDashboard() {
                                   <div className="flex items-center gap-3">
                                     <div
                                       className={`w-10 h-10 rounded-lg flex items-center justify-center ${isDisqualified
-                                          ? 'bg-red-100'
-                                          : 'bg-blue-100'
+                                        ? 'bg-red-100'
+                                        : 'bg-blue-100'
                                         }`}>
                                       {isDisqualified ? (
                                         <AlertCircle className="w-5 h-5 text-red-600" />

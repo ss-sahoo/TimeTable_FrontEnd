@@ -21,13 +21,15 @@ interface SecurityConfig {
   enableCopyPasteBlocking: boolean;
   enableRightClickBlocking: boolean;
   enableContextMenuBlocking: boolean;
+  initialViolationCount?: number;
 }
 
 interface UseExamSecurityReturn {
   violations: ViolationData[];
   violationCount: number;
   isDisqualified: boolean;
-  logViolation: (type: string, metadata?: ViolationMetadata) => void;
+  logViolation: (type: string, metadata?: ViolationMetadata, skipBackend?: boolean) => void;
+  syncViolationCount: (count: number) => void;
   clearViolations: () => void;
   isFullscreen: boolean;
   requestFullscreen: () => Promise<void>;
@@ -43,12 +45,20 @@ const useExamSecurity = (
     enableCopyPasteBlocking: true,
     enableRightClickBlocking: true,
     enableContextMenuBlocking: true,
+    initialViolationCount: 0,
   }
 ): UseExamSecurityReturn => {
   const [violations, setViolations] = useState<ViolationData[]>([]);
-  const [violationCount, setViolationCount] = useState(0);
+  const [violationCount, setViolationCount] = useState(config.initialViolationCount || 0);
   const [isDisqualified, setIsDisqualified] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Sync with initial count from backend when it becomes available
+  useEffect(() => {
+    if (config.initialViolationCount !== undefined && config.initialViolationCount > violationCount) {
+      setViolationCount(config.initialViolationCount);
+    }
+  }, [config.initialViolationCount]);
 
   const violationCooldowns = useRef<Record<string, number>>({});
   const lastViolationTimeRef = useRef<number>(0);
@@ -56,7 +66,7 @@ const useExamSecurity = (
   // Log security configuration on initialization
   useEffect(() => {
     // Only log once on mount
-    console.log('🔒 EXAM SECURITY ACTIVE', { attemptId, max: config.maxViolations });
+    console.log('🔒 EXAM SECURITY ACTIVE', { attemptId, max: config.maxViolations, initialCount: config.initialViolationCount });
   }, []);
 
   // Log violation to backend
@@ -68,9 +78,6 @@ const useExamSecurity = (
       });
 
       const data = response.data;
-      if (data.auto_disqualified) {
-        setIsDisqualified(true);
-      }
       return data;
     } catch (error) {
       // Quiet error logging
@@ -78,18 +85,22 @@ const useExamSecurity = (
   }, [attemptId]);
 
   // Log violation
-  const logViolation = useCallback((type: string, metadata?: ViolationMetadata) => {
+  const logViolation = useCallback((type: string, metadata?: ViolationMetadata, skipBackend: boolean = false) => {
     const now = Date.now();
     const lastTime = violationCooldowns.current[type] || 0;
 
-    // Per-type cooldown: 10 seconds for the same type to avoid spamming the student
-    // Global cooldown: 2 seconds between any different violations
+    // Strict cooldown to avoid spamming the student
+    // 10s for same type (prevents accidental double trigger)
+    // 2s across any type (global breathing room)
     if (now - lastTime < 10000 || now - lastViolationTimeRef.current < 2000) {
+      console.log(`🛡️ Violation suppressed (cooldown): ${type}`);
       return;
     }
 
     violationCooldowns.current[type] = now;
     lastViolationTimeRef.current = now;
+
+    console.log(`🚫 Security Violation: ${type}${skipBackend ? ' (Backend sync skipped)' : ''}`, metadata);
 
     const violation: ViolationData = {
       type,
@@ -105,15 +116,11 @@ const useExamSecurity = (
 
     setViolationCount(prev => prev + 1);
 
-    // Log to backend
-    logViolationToBackend(type, metadata);
-
-    // Check if disqualified (only for serious violations)
-    const seriousViolations = ['tab_switch', 'window_blur', 'copy_paste', 'right_click', 'keyboard_shortcut', 'multiple_faces', 'mobile_detected'];
-    if (seriousViolations.includes(type) && violationCount + 1 >= config.maxViolations) {
-      setIsDisqualified(true);
+    // Log to backend if not already logged (e.g. by webcam analyzer)
+    if (!skipBackend) {
+      logViolationToBackend(type, metadata);
     }
-  }, [violationCount, config.maxViolations, logViolationToBackend]);
+  }, [config.maxViolations, logViolationToBackend]);
 
   // Clear violations
   const clearViolations = useCallback(() => {
@@ -402,6 +409,7 @@ const useExamSecurity = (
     violationCount,
     isDisqualified,
     logViolation,
+    syncViolationCount: setViolationCount,
     clearViolations,
     isFullscreen,
     requestFullscreen,

@@ -19,6 +19,7 @@ import {
   Zap,
   ChevronDown
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
 import { getPublicExamLink, normalizeShareUrl } from '../utils/urlUtils';
@@ -178,6 +179,7 @@ interface ExamFormData {
   visibility_scope: 'institute' | 'centers' | 'batches';
   center_ids: string[];
   batch_ids: string[];
+  copy_from_exam_id: number | null;
 }
 
 const getDefaultFormData = (): ExamFormData => ({
@@ -227,6 +229,7 @@ const getDefaultFormData = (): ExamFormData => ({
   visibility_scope: 'institute',
   center_ids: [],
   batch_ids: [],
+  copy_from_exam_id: null,
 });
 
 export default function ExamCreation() {
@@ -256,12 +259,13 @@ export default function ExamCreation() {
   const [batches, setBatches] = useState<any[]>([]);
 
   const [creationSuccess, setCreationSuccess] = useState<{
-
     examId: number;
     shareUrl?: string | null;
     token?: string | null;
   } | null>(null);
   const [creationCopyMessage, setCreationCopyMessage] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   const [formData, setFormData] = useState<ExamFormData>(getDefaultFormData());
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
@@ -270,6 +274,7 @@ export default function ExamCreation() {
   useEffect(() => {
     const loadData = async () => {
       const fetchedPatterns = await fetchPatterns();
+      fetchExamsForCopy();
       fetchCenters();
       fetchBatches();
       if (isEditMode && examId) {
@@ -278,6 +283,17 @@ export default function ExamCreation() {
     };
     loadData();
   }, [examId, isEditMode]);
+
+  const [existingExams, setExistingExams] = useState<any[]>([]);
+
+  const fetchExamsForCopy = async () => {
+    try {
+      const response = await api.get('/exams/exams/?page_size=1000');
+      setExistingExams(response.data.results || response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch exams for copy:', error);
+    }
+  };
 
   const fetchCenters = async () => {
     try {
@@ -394,6 +410,7 @@ export default function ExamCreation() {
         visibility_scope: exam.visibility_scope || 'institute',
         center_ids: exam.allowed_centers_data ? exam.allowed_centers_data.map((c: any) => String(c.id)) : [],
         batch_ids: exam.allowed_batches_data ? exam.allowed_batches_data.map((b: any) => String(b.id)) : [],
+        copy_from_exam_id: null,
       });
 
 
@@ -602,6 +619,7 @@ export default function ExamCreation() {
       const examData = {
         ...rest,
         pattern_id: pattern,  // Backend expects pattern_id, not pattern
+        copy_from_exam_id: formData.copy_from_exam_id,
         start_date: convertToISOStringWithTimezone(rest.start_date, rest.timezone),
         end_date: convertToISOStringWithTimezone(rest.end_date, rest.timezone),
         public_token_expires_at: publicExpiryISO,
@@ -621,31 +639,24 @@ export default function ExamCreation() {
 
       if (isEditMode && examId) {
         await api.put(`/exams/exams/${examId}/`, examData);
-        navigate(`${basePath}/exams`);
+        setToastMessage('Exam Updated Successfully!');
+        setShowToast(true);
+        setTimeout(() => {
+          setShowToast(false);
+          navigate(`${basePath}/exams`);
+        }, 1500);
       } else {
         // Create new exam
         const response = await api.post('/exams/exams/', examData);
         const newExam = response.data;
 
-        const shareUrl = normalizeShareUrl(
-          newExam?.share_url ||
-          (newExam?.public_access_token
-            ? getPublicExamLink(newExam.public_access_token)
-            : undefined)
-        );
-
         if (newExam?.id) {
-          setCreationSuccess({
-            examId: newExam.id,
-            shareUrl,
-            token: newExam?.public_access_token ?? null,
-          });
-          setFormData(getDefaultFormData());
-          setAdvancedExpanded(false);
-          setErrors({});
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-          navigate(`${basePath}/exams`);
+          setToastMessage(saveAsDraft ? 'Exam Saved as Draft!' : 'Exam Published Successfully!');
+          setShowToast(true);
+          setTimeout(() => {
+            setShowToast(false);
+            navigate(`${basePath}/exams`);
+          }, 1500);
         }
       }
     } catch (error: any) {
@@ -779,7 +790,7 @@ export default function ExamCreation() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 pb-32">
       <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
@@ -795,54 +806,11 @@ export default function ExamCreation() {
           </div>
         </div>
 
-        {creationSuccess && (
-          <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-blue-900">Exam created successfully.</p>
-                <p className="text-xs text-blue-700">
-                  Share this link with students to let them access the exam without logging in.
-                </p>
-                {creationSuccess.shareUrl && (
-                  <p className="mt-2 text-xs font-mono text-blue-900 break-all bg-white/60 px-3 py-2 rounded-lg border border-blue-200">
-                    {normalizeShareUrl(creationSuccess.shareUrl)}
-                  </p>
-                )}
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                <button
-                  type="button"
-                  onClick={handleCopyCreatedLink}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  {creationCopyMessage ? creationCopyMessage : 'Copy Public Link'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate(`${basePath}/exams/${creationSuccess.examId}/edit`)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-blue-700 bg-white border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                >
-                  <Settings className="w-3.5 h-3.5" />
-                  Configure Exam
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate(`${basePath}/exams`)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  View Exams
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Removed creationSuccess block as requested to show toast instead */}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Main Form - Takes 3 columns */}
           <div className="lg:col-span-3 space-y-4">
-            {/* Basic Information */}
             <div className="bg-white rounded-xl border border-slate-200 p-4">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -898,6 +866,179 @@ export default function ExamCreation() {
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none"
                     placeholder="Enter exam instructions for students..."
                   />
+                </div>
+
+                {/* Exam Pattern & Content - Moved Up & Redesigned */}
+                <div className="col-span-2 mt-4 pt-6 border-t border-slate-100">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <Zap className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900">Exam Pattern & Content</h2>
+                      <p className="text-xs text-slate-600">Select how to populate questions for this exam</p>
+                    </div>
+                  </div>
+
+                  {!isEditMode && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('copy_from_exam_id', null)}
+                        className={`group relative flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${!formData.copy_from_exam_id
+                          ? 'border-blue-600 bg-blue-50/50 ring-4 ring-blue-50'
+                          : 'border-slate-100 bg-slate-50/50 hover:border-slate-200 hover:bg-white'}`}
+                      >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${!formData.copy_from_exam_id ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white text-slate-400 border border-slate-200 group-hover:bg-slate-50'}`}>
+                          <Plus className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1">
+                          <p className={`text-sm font-bold ${!formData.copy_from_exam_id ? 'text-blue-900' : 'text-slate-900'}`}>Use Pattern Template</p>
+                          <p className="text-xs text-slate-500">Pick a structure and add questions manually</p>
+                        </div>
+                        {!formData.copy_from_exam_id && (
+                          <CheckCircle className="w-5 h-5 text-blue-600 absolute top-4 right-4" />
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (existingExams.length > 0 && !formData.copy_from_exam_id) {
+                            const sourceExam = existingExams[0];
+                            handleInputChange('copy_from_exam_id', sourceExam.id);
+                            if (!formData.title.trim()) {
+                              handleInputChange('title', `${sourceExam.title} (Copy)`);
+                            }
+                            if (sourceExam.pattern) {
+                              handlePatternSelect(sourceExam.pattern.id);
+                            }
+                          }
+                        }}
+                        className={`group relative flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${formData.copy_from_exam_id
+                          ? 'border-blue-600 bg-blue-50/50 ring-4 ring-blue-50'
+                          : 'border-slate-100 bg-slate-50/50 hover:border-slate-200 hover:bg-white'}`}
+                      >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${formData.copy_from_exam_id ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white text-slate-400 border border-slate-200 group-hover:bg-slate-50'}`}>
+                          <Copy className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1">
+                          <p className={`text-sm font-bold ${formData.copy_from_exam_id ? 'text-blue-900' : 'text-slate-900'}`}>Copy from Existing</p>
+                          <p className="text-xs text-slate-500">Duplicate questions from a past exam</p>
+                        </div>
+                        {formData.copy_from_exam_id && (
+                          <CheckCircle className="w-5 h-5 text-blue-600 absolute top-4 right-4" />
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {formData.copy_from_exam_id && !isEditMode && (
+                    <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <label className="block text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-2">Select Source Exam</label>
+                      <select
+                        value={formData.copy_from_exam_id || ''}
+                        onChange={(e) => {
+                          const val = e.target.value ? parseInt(e.target.value) : null;
+                          handleInputChange('copy_from_exam_id', val);
+                          const sourceExam = existingExams.find(ex => ex.id === val);
+                          if (sourceExam) {
+                            if (!formData.title.trim() || formData.title.includes('(Copy)')) {
+                              handleInputChange('title', `${sourceExam.title} (Copy)`);
+                            }
+                            if (sourceExam.pattern) {
+                              handlePatternSelect(sourceExam.pattern.id);
+                            }
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 text-sm border-2 border-blue-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 bg-white shadow-sm transition-all"
+                      >
+                        <option value="">Select an exam...</option>
+                        {existingExams.map((ex) => (
+                          <option key={ex.id} value={ex.id}>{ex.title} ({ex.pattern?.name || 'No Pattern'})</option>
+                        ))}
+                      </select>
+
+                      <div className="mt-4 flex flex-wrap gap-4">
+                        {formData.copy_from_exam_id && (() => {
+                          const ex = existingExams.find(e => e.id === formData.copy_from_exam_id);
+                          if (!ex) return null;
+                          return (
+                            <>
+                              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm">
+                                <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+                                <span className="text-[11px] font-medium text-slate-600">Q: <span className="font-bold text-slate-900">{ex.questions_added || 0}</span></span>
+                              </div>
+                              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm">
+                                <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                                <span className="text-[11px] font-medium text-slate-600">Marks: <span className="font-bold text-slate-900">{ex.total_marks || 0}</span></span>
+                              </div>
+                              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm">
+                                <Clock className="w-3.5 h-3.5 text-purple-500" />
+                                <span className="text-[11px] font-medium text-slate-600 font-bold text-slate-900">{ex.duration_minutes || 0}m</span>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mb-4">
+                    <label className="block text-xs font-medium text-slate-700 mb-2">Available Patterns *</label>
+                    <div className="relative">
+                      <select
+                        value={formData.pattern || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          handlePatternSelect(value ? parseInt(value) : 0);
+                        }}
+                        disabled={!!formData.copy_from_exam_id}
+                        className={`w-full px-4 py-2.5 text-sm border-2 rounded-xl appearance-none bg-white focus:ring-4 transition-all ${errors.pattern ? 'border-red-300 focus:ring-red-50' : 'border-slate-200 focus:ring-blue-50 focus:border-blue-500'}`}
+                      >
+                        <option value="">Select a pattern structure...</option>
+                        {patterns.map((pattern) => (
+                          <option key={pattern.id} value={pattern.id}>
+                            {pattern.name} ({pattern.total_questions} Q, {pattern.total_duration}m)
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400">
+                        <ChevronDown className="w-4 h-4" />
+                      </div>
+                    </div>
+                    {errors.pattern && (
+                      <p className="text-red-600 text-xs mt-2 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> {errors.pattern}
+                      </p>
+                    )}
+
+                    {selectedPattern && (
+                      <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                        <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200/60">
+                          <div>
+                            <h3 className="text-sm font-bold text-slate-900">{selectedPattern.name}</h3>
+                            <p className="text-[10px] text-slate-500 mt-0.5">{selectedPattern.description}</p>
+                          </div>
+                          <span className="bg-white px-3 py-1 rounded-full border border-slate-200 text-[10px] font-bold text-blue-600 shadow-sm">Pattern Loaded</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Questions</span>
+                            <span className="text-sm font-bold text-slate-900">{selectedPattern.total_questions}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Duration</span>
+                            <span className="text-sm font-bold text-slate-900">{selectedPattern.total_duration}m</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Total Marks</span>
+                            <span className="text-sm font-bold text-slate-900">{selectedPattern.total_marks}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -1168,102 +1309,7 @@ export default function ExamCreation() {
             </div>
 
 
-            {/* Pattern Selection */}
-            <div className="bg-white rounded-xl border border-slate-200 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <Zap className="w-4 h-4 text-purple-600" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Exam Pattern</h2>
-                  <p className="text-xs text-slate-600">Select the pattern for this exam</p>
-                </div>
-              </div>
 
-              <div className="mb-4">
-                <label className="block text-xs font-medium text-slate-700 mb-2">Available Patterns *</label>
-                <select
-                  value={formData.pattern || ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    handlePatternSelect(value ? parseInt(value) : 0);
-                  }}
-                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.pattern ? 'border-red-300' : 'border-slate-300'
-                    }`}
-                >
-                  <option value="">Select a pattern...</option>
-                  {patterns.map((pattern) => (
-                    <option key={pattern.id} value={pattern.id}>
-                      {pattern.name} ({pattern.total_questions} Q, {pattern.total_duration} min, {pattern.total_marks} marks)
-                    </option>
-                  ))}
-                </select>
-                {errors.pattern && (
-                  <p className="text-red-600 text-xs mt-2 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> {errors.pattern}
-                  </p>
-                )}
-
-                {/* Pattern Details Display */}
-                {selectedPattern && (
-                  <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-semibold text-slate-900">{selectedPattern.name}</h3>
-                    </div>
-                    <p className="text-xs text-slate-600 mb-2">{selectedPattern.description}</p>
-                    <div className="flex items-center gap-4 text-xs text-slate-500">
-                      <div className="flex items-center gap-1">
-                        <BookOpen className="w-3 h-3" />
-                        <span>{selectedPattern.total_questions} Questions</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        <span>{selectedPattern.total_duration} min</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" />
-                        <span>{selectedPattern.total_marks} marks</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Removed: Pattern option selection - always using template mode by default */}
-
-              {/* Pattern Structure Preview */}
-              {selectedPattern && (
-                <div className="border-t border-slate-200 pt-4">
-                  <h3 className="text-sm font-medium text-slate-900 mb-3">Pattern Structure</h3>
-                  <div className="space-y-2">
-                    {(() => {
-                      const groupedSections = selectedPattern.sections.reduce((acc: any, section: any) => {
-                        if (!acc[section.subject]) {
-                          acc[section.subject] = [];
-                        }
-                        acc[section.subject].push(section);
-                        return acc;
-                      }, {});
-
-                      return Object.entries(groupedSections).slice(0, 3).map(([subject, sections]: [string, any]) => (
-                        <div key={subject} className="flex items-center gap-2 text-xs">
-                          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
-                          <span className="text-slate-600 font-medium">{subject}</span>
-                          <span className="text-slate-400">
-                            (Q{sections[0].start_question}-{sections[sections.length - 1].end_question})
-                          </span>
-                        </div>
-                      ));
-                    })()}
-                    {selectedPattern.sections.length > 3 && (
-                      <div className="text-xs text-slate-400">
-                        +{selectedPattern.sections.length - 3} more sections
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
 
             {/* Exam Settings */}
             <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -1889,51 +1935,7 @@ export default function ExamCreation() {
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="bg-white rounded-xl border border-slate-200 p-4">
-              <h3 className="text-sm font-semibold text-slate-900 mb-3">Actions</h3>
-              <div className="space-y-2">
-                {!isEditMode && (
-                  <>
-                    <button
-                      onClick={() => handleSubmit(false)}
-                      disabled={saving}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <CheckCircle className="w-3 h-3" />
-                      {saving ? 'Publishing...' : 'Publish Exam'}
-                    </button>
 
-                    <button
-                      onClick={() => handleSubmit(true)}
-                      disabled={saving}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <Save className="w-3 h-3" />
-                      {saving ? 'Saving...' : 'Save as Draft'}
-                    </button>
-                  </>
-                )}
-
-                {isEditMode && (
-                  <button
-                    onClick={() => handleSubmit(formData.status === 'draft')}
-                    disabled={saving}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <Save className="w-3 h-3" />
-                    {saving ? 'Updating...' : 'Update Exam'}
-                  </button>
-                )}
-
-                <button
-                  onClick={() => navigate(`${basePath}/exams`)}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
 
             {/* Help */}
             <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
@@ -1952,7 +1954,84 @@ export default function ExamCreation() {
             </div>
           </div>
         </div>
+
+        {/* Sticky Action Footer */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 p-4 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] z-50 transition-all">
+          <div className="w-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+            <div className="hidden lg:flex items-center gap-8">
+              <div className="flex flex-col">
+                <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-none mb-1.5">Exam Setting</span>
+                <span className="text-sm font-bold text-slate-800 truncate max-w-[200px]">{formData.title || 'Untitled Exam'}</span>
+              </div>
+              <div className="h-8 w-px bg-slate-200"></div>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-none mb-1.5">Pattern Selection</span>
+                <div className="flex items-center gap-2">
+                  <Zap className={`w-3 h-3 ${selectedPattern ? 'text-purple-500' : 'text-slate-300'}`} />
+                  <span className="text-sm font-bold text-slate-800">{selectedPattern?.name || 'Incomplete'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              <button
+                onClick={() => navigate(`${basePath}/exams`)}
+                className="hidden sm:flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors"
+              >
+                Cancel
+              </button>
+
+              <div className="flex-grow md:flex-grow-0 flex items-center gap-3">
+                {!isEditMode ? (
+                  <>
+                    <button
+                      onClick={() => handleSubmit(true)}
+                      disabled={saving}
+                      className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 disabled:opacity-50 transition-all border border-slate-200"
+                    >
+                      <Save className="w-4 h-4" />
+                      {saving ? 'Saving...' : 'Save Draft'}
+                    </button>
+                    <button
+                      onClick={() => handleSubmit(false)}
+                      disabled={saving}
+                      className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-2.5 text-sm font-bold bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 shadow-lg shadow-green-100 transition-all active:scale-95"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      {saving ? 'Publishing...' : 'Publish Exam'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => handleSubmit(formData.status === 'draft')}
+                    disabled={saving}
+                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-10 py-2.5 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 shadow-lg shadow-blue-100 transition-all active:scale-95"
+                  >
+                    <Save className="w-4 h-4" />
+                    {saving ? 'Updating...' : 'Update Exam'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+
+      <AnimatePresence>
+        {showToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, x: 20 }}
+            animate={{ opacity: 1, y: 0, x: 0 }}
+            exit={{ opacity: 0, y: -20, x: 20 }}
+            className="fixed top-6 right-6 z-[100] bg-green-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-green-500/50 backdrop-blur-sm"
+          >
+            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-5 h-5" />
+            </div>
+            <span className="font-bold text-sm tracking-tight">{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div >
   );
 }

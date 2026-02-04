@@ -1,9 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router';
 import { useAuthContext } from '../contexts/AuthContext';
-import Dashboard from '../pages/Dashboard';
-import StudentDashboard from '../pages/StudentDashboard';
-import TeacherDashboard from '../pages/TeacherDashboard';
 
 export default function SmartDashboard() {
   const { user } = useAuthContext();
@@ -14,11 +11,11 @@ export default function SmartDashboard() {
   if (normalizedRole === 'super_admin' || normalizedRole === 'superadmin') {
     return <Navigate to="/superadmin/dashboard" replace />;
   } else if (normalizedRole === 'student') {
-    return <StudentDashboard />;
-  } else if (normalizedRole === 'teacher' || normalizedRole === 'exam_admin') {
-    return <TeacherDashboard />;
+    return <Navigate to="/student-dashboard" replace />;
+  } else if (normalizedRole === 'teacher' || normalizedRole === 'exam_admin' || normalizedRole === 'TEACHER') {
+    return <Navigate to="/teacher/dashboard" replace />;
+  } else {
+    // Default to admin dashboard (for institute_admin, ADMIN, etc.)
+    return <Navigate to="/center-admin/dashboard" replace />;
   }
-
-  // Default to admin dashboard (for institute_admin, ADMIN, etc.)
-  return <Dashboard />;
 }
