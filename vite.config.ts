@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => ({
     host: true, // Allow external connections
     proxy: {
       '/api': {
-        target: 'http://localhost:8001',
+        target: 'http://0.0.0.0:8000',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, '/api'),

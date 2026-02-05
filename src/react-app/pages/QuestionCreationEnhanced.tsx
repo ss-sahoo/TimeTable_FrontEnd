@@ -41,13 +41,21 @@ interface PatternSection {
   min_questions_to_attempt: number;
   question_configurations?: Record<number, {
     is_nested: boolean;
-    nested_type?: 'internal_choice' | 'multipart';
+    nested_type?: 'internal_choice' | 'multipart' | 'mixed';
     description?: string;
     options?: Array<{
+      type?: 'compulsory' | 'choice_group';
       label: string;
       description?: string;
       marks?: number;
-      parts?: Array<{ label: string; marks: number; description?: string }>;
+      options?: Array<{
+        label: string;
+        marks: number;
+        description?: string;
+        sub_parts?: Array<{ label: string; marks: number; description?: string }>;
+      }>;
+      parts?: Array<{ label: string; marks: number; description?: string }>; // legacy/alternate
+      sub_parts?: Array<{ label: string; marks: number; description?: string }>;
     }>;
     sub_questions?: Array<{
       label: string;
@@ -133,6 +141,25 @@ interface AIQuestionPayload {
   explanation?: string;
   difficulty?: string;
   topic?: string;
+  // For nested questions
+  structure?: {
+    nested_parts?: Array<{
+      label?: string;
+      text?: string;
+      sub_parts?: Array<{
+        label?: string;
+        text?: string;
+      }>;
+      options?: Array<{
+        label?: string;
+        text?: string;
+        sub_parts?: Array<{
+          label?: string;
+          text?: string;
+        }>;
+      }>;
+    }>;
+  };
 }
 
 const stripOptionContent = (value?: string | null) =>
@@ -783,7 +810,7 @@ export default function EnhancedQuestionEditor() {
         const initialStructure = config?.is_nested ? {
           is_nested: true,
           nested_type: config.nested_type,
-          parts: config.nested_type === 'internal_choice'
+          parts: (config.nested_type === 'internal_choice' || config.nested_type === 'mixed')
             ? config.options?.map(opt => ({ ...opt, question_text: '' }))
             : config.sub_questions?.map(sub => ({ ...sub, question_text: '' }))
         } : {};
@@ -978,100 +1005,241 @@ export default function EnhancedQuestionEditor() {
             <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-4 rounded-xl border border-indigo-100 mb-4">
               <div className="flex items-center gap-2 text-indigo-900 font-bold mb-1">
                 <FileText className="w-5 h-5" />
-                Structured Question: {nestedType === 'internal_choice' ? 'Internal Choice (OR)' : 'Multi-Part (a, b, c)'}
+                Structured Question: {
+                  nestedType === 'internal_choice' ? 'Internal Choice (OR)' :
+                    nestedType === 'mixed' ? 'Mixed Mode (Parts + OR)' :
+                      'Multi-Part (a, b, c)'
+                }
               </div>
               <p className="text-sm text-indigo-700">
                 This question has been configured as a structured question in the pattern. Please provide content for each part below.
               </p>
             </div>
 
-            {nestedType === 'internal_choice' ? (
-              <div className="space-y-8">
-                {(formData.structure?.parts || config?.options || []).map((option: any, optIdx: number) => (
-                  <div key={optIdx} className="bg-white rounded-2xl border-2 border-slate-100 shadow-sm overflow-hidden">
-                    <div className="bg-slate-50 px-6 py-3 border-b border-slate-100 flex items-center justify-between">
-                      <span className="font-bold text-slate-700">Choice {option.label || String.fromCharCode(65 + optIdx)}</span>
-                      {option.marks && <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg">+{option.marks} Marks</span>}
-                    </div>
-                    <div className="p-6 space-y-4">
-                      {option.description && (
-                        <div className="text-xs text-slate-500 italic mb-2">Note: {option.description}</div>
-                      )}
+            <div className="space-y-8">
+              {(() => {
+                // Determine the correct data source for parts
+                let partsData = formData.structure?.parts || formData.structure?.nested_parts;
+                if (!partsData || partsData.length === 0) {
+                  if (nestedType === 'internal_choice') {
+                    partsData = config?.options || [];
+                  } else if (nestedType === 'mixed') {
+                    partsData = config?.options || [];
+                  } else if (nestedType === 'multipart') {
+                    // For multipart, prefer options over sub_questions if options has data
+                    partsData = (config?.options && config.options.length > 0) ? config.options : (config?.sub_questions || []);
+                  } else {
+                    partsData = config?.sub_questions || config?.options || [];
+                  }
+                }
+                return partsData;
+              })().map((item: any, idx: number) => {
+                const isChoiceGroup = item.type === 'choice_group' || nestedType === 'internal_choice';
 
-                      {/* Internal Choice Part content */}
-                      {(option.parts || []).map((part: any, partIdx: number) => (
-                        <div key={partIdx} className="space-y-2 mt-4 first:mt-0">
-                          <label className="text-sm font-semibold text-slate-600 flex items-center gap-2">
-                            Part {part.label || String.fromCharCode(97 + partIdx)}
-                            <span className="text-xs font-normal text-slate-400">({part.marks} marks)</span>
-                          </label>
-                          <RichTextEditor
-                            value={formData.structure?.parts?.[optIdx]?.parts?.[partIdx]?.question_text || ''}
-                            onChange={(val) => {
-                              const newStructure = { ...formData.structure };
-                              if (!newStructure.parts) newStructure.parts = [];
-                              if (!newStructure.parts[optIdx]) newStructure.parts[optIdx] = { ...option };
-                              if (!newStructure.parts[optIdx].parts) newStructure.parts[optIdx].parts = [...(option.parts || [])];
-                              newStructure.parts[optIdx].parts[partIdx] = {
-                                ...newStructure.parts[optIdx].parts[partIdx],
-                                question_text: val
-                              };
-                              handleInputChange('structure', newStructure);
-                            }}
-                            placeholder={`Enter text for part ${part.label}...`}
-                          />
-                        </div>
-                      ))}
-
-                      {(!option.parts || option.parts.length === 0) && (
-                        <div className="space-y-2">
-                          <RichTextEditor
-                            value={formData.structure?.parts?.[optIdx]?.question_text || ''}
-                            onChange={(val) => {
-                              const newStructure = { ...formData.structure };
-                              if (!newStructure.parts) newStructure.parts = [];
-                              newStructure.parts[optIdx] = {
-                                ...option,
-                                ...newStructure.parts[optIdx],
-                                question_text: val
-                              };
-                              handleInputChange('structure', newStructure);
-                            }}
-                            placeholder={`Enter question text for Choice ${option.label}...`}
-                          />
-                        </div>
+                if (isChoiceGroup) {
+                  const choices = item.options || [item];
+                  return (
+                    <div key={idx} className="space-y-4">
+                      {item.type === 'choice_group' && (
+                        <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest ml-1 mb-2">Internal Choice Group</div>
                       )}
+                      <div className="space-y-4">
+                        {choices.map((choice: any, cIdx: number) => (
+                          <div key={cIdx}>
+                            <div className="bg-white rounded-2xl border-2 border-indigo-50 shadow-sm overflow-hidden">
+                              <div className="bg-indigo-50/30 px-6 py-3 border-b border-indigo-50 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <span className="font-bold text-indigo-700">
+                                    {item.type === 'choice_group' ? `Choice ${String.fromCharCode(cIdx + 65)}` : choice.label || `Choice ${String.fromCharCode(65 + cIdx)}`}
+                                  </span>
+                                  {choice.description && <span className="text-[10px] font-medium text-slate-400">({choice.description})</span>}
+                                </div>
+                                {choice.marks && <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg">+{choice.marks} Marks</span>}
+                              </div>
+                              <div className="p-6 space-y-4">
+                                <RichTextEditor
+                                  value={
+                                    (item.type === 'choice_group'
+                                      ? (formData.structure?.parts?.[idx]?.options?.[cIdx]?.question_text || formData.structure?.nested_parts?.[idx]?.options?.[cIdx]?.question_text)
+                                      : (formData.structure?.parts?.[idx]?.question_text || formData.structure?.nested_parts?.[idx]?.question_text)) || ''
+                                  }
+                                  onChange={(val) => {
+                                    const newStructure = { ...formData.structure };
+                                    if (!newStructure.nested_parts) {
+                                      let sourceData;
+                                      if (nestedType === 'multipart' && config?.options?.length > 0) {
+                                        sourceData = config.options;
+                                      } else if (nestedType === 'internal_choice' || nestedType === 'mixed') {
+                                        sourceData = config?.options || [];
+                                      } else {
+                                        sourceData = config?.sub_questions || config?.options || [];
+                                      }
+                                      newStructure.nested_parts = (formData.structure?.parts || sourceData).map((o: any) => ({ ...o }));
+                                    }
+
+                                    if (!newStructure.nested_parts[idx]) newStructure.nested_parts[idx] = { ...item };
+
+                                    const targetPart = newStructure.nested_parts[idx];
+                                    if (item.type === 'choice_group') {
+                                      if (!targetPart.options) targetPart.options = [...(item.options || [])];
+                                      targetPart.options[cIdx] = { ...targetPart.options[cIdx], question_text: val };
+                                    } else {
+                                      targetPart.question_text = val;
+                                    }
+
+                                    newStructure.parts = newStructure.nested_parts;
+                                    handleInputChange('structure', newStructure);
+                                  }}
+                                  placeholder="Enter choice content..."
+                                />
+
+                                {/* Sub-parts for this Choice */}
+                                {(choice.sub_parts || choice.parts || []).map((sp: any, spIdx: number) => (
+                                  <div key={spIdx} className="ml-8 space-y-2 mt-4">
+                                    <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div>
+                                      Part {sp.label || (spIdx + 1)} ({sp.marks} marks)
+                                    </label>
+                                    <RichTextEditor
+                                      value={
+                                        (item.type === 'choice_group'
+                                          ? (formData.structure?.parts?.[idx]?.options?.[cIdx]?.sub_parts?.[spIdx]?.question_text || formData.structure?.nested_parts?.[idx]?.options?.[cIdx]?.sub_parts?.[spIdx]?.question_text || formData.structure?.parts?.[idx]?.options?.[cIdx]?.parts?.[spIdx]?.question_text || formData.structure?.nested_parts?.[idx]?.options?.[cIdx]?.parts?.[spIdx]?.question_text)
+                                          : (formData.structure?.parts?.[idx]?.sub_parts?.[spIdx]?.question_text || formData.structure?.nested_parts?.[idx]?.sub_parts?.[spIdx]?.question_text || formData.structure?.parts?.[idx]?.parts?.[spIdx]?.question_text || formData.structure?.nested_parts?.[idx]?.parts?.[spIdx]?.question_text)) || ''
+                                      }
+                                      onChange={(val) => {
+                                        const newStructure = { ...formData.structure };
+                                        if (!newStructure.nested_parts) {
+                                          let sourceData;
+                                          if (nestedType === 'multipart' && config?.options?.length > 0) {
+                                            sourceData = config.options;
+                                          } else if (nestedType === 'internal_choice' || nestedType === 'mixed') {
+                                            sourceData = config?.options || [];
+                                          } else {
+                                            sourceData = config?.sub_questions || config?.options || [];
+                                          }
+                                          newStructure.nested_parts = (formData.structure?.parts || sourceData).map((o: any) => ({ ...o }));
+                                        }
+
+                                        if (!newStructure.nested_parts[idx]) newStructure.nested_parts[idx] = { ...item };
+                                        const targetPart = newStructure.nested_parts[idx];
+
+                                        if (item.type === 'choice_group') {
+                                          if (!targetPart.options) targetPart.options = [...(item.options || [])];
+                                          const targetChoice = targetPart.options[cIdx];
+                                          if (!targetChoice.sub_parts) targetChoice.sub_parts = [...(choice.sub_parts || choice.parts || [])];
+                                          targetChoice.sub_parts[spIdx] = { ...targetChoice.sub_parts[spIdx], question_text: val };
+                                        } else {
+                                          if (!targetPart.sub_parts) targetPart.sub_parts = [...(item.sub_parts || item.parts || [])];
+                                          targetPart.sub_parts[spIdx] = { ...targetPart.sub_parts[spIdx], question_text: val };
+                                        }
+
+                                        newStructure.parts = newStructure.nested_parts;
+                                        handleInputChange('structure', newStructure);
+                                      }}
+                                      placeholder={`Enter text for part ${sp.label}...`}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            {cIdx < choices.length - 1 && (
+                              <div className="text-[10px] font-black text-indigo-300 text-center py-2 tracking-[0.2em]">— OR —</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {(formData.structure?.parts || config?.sub_questions || []).map((sub: any, idx: number) => (
-                  <div key={idx} className="bg-white p-6 rounded-2xl border-2 border-slate-100 shadow-sm space-y-3">
-                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                      <span className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600">{sub.label || String.fromCharCode(97 + idx)}</span>
-                      Part {sub.label || String.fromCharCode(97 + idx)}
-                      <span className="text-xs font-normal text-slate-400">({sub.marks} marks)</span>
-                    </label>
+                  );
+                }
+
+                // Compulsory Part
+                return (
+                  <div key={idx} className="bg-white p-6 rounded-2xl border-2 border-slate-100 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 font-bold">{item.label || String.fromCharCode(97 + idx)}</span>
+                        <div>
+                          <label className="text-sm font-bold text-slate-700">Part {item.label || String.fromCharCode(97 + idx)}</label>
+                          {item.description && <div className="text-[10px] text-slate-400 font-medium">{item.description}</div>}
+                        </div>
+                      </div>
+                      {item.marks && <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">+{item.marks} Marks</span>}
+                    </div>
+
                     <RichTextEditor
-                      value={formData.structure?.parts?.[idx]?.question_text || ''}
+                      value={(formData.structure?.parts?.[idx]?.question_text || formData.structure?.nested_parts?.[idx]?.question_text) || ''}
                       onChange={(val) => {
                         const newStructure = { ...formData.structure };
-                        if (!newStructure.parts) newStructure.parts = [];
-                        newStructure.parts[idx] = {
-                          ...sub,
-                          ...newStructure.parts[idx],
-                          question_text: val
-                        };
+                        if (!newStructure.nested_parts) {
+                          // Use the same logic as render to initialize nested_parts
+                          let sourceData;
+                          if (nestedType === 'multipart' && config?.options?.length > 0) {
+                            sourceData = config.options;
+                          } else if (nestedType === 'internal_choice' || nestedType === 'mixed') {
+                            sourceData = config?.options || [];
+                          } else {
+                            sourceData = config?.sub_questions || config?.options || [];
+                          }
+                          newStructure.nested_parts = (formData.structure?.parts || sourceData).map((o: any) => ({ ...o }));
+                        }
+
+                        if (!newStructure.nested_parts[idx]) newStructure.nested_parts[idx] = { ...item };
+                        newStructure.nested_parts[idx].question_text = val;
+
+                        newStructure.parts = newStructure.nested_parts;
                         handleInputChange('structure', newStructure);
                       }}
-                      placeholder={`Enter text for part ${sub.label || String.fromCharCode(97 + idx)}...`}
+                      placeholder={`Enter text for part ${item.label || String.fromCharCode(97 + idx)}...`}
                     />
+
+                    {/* Sub-parts for compulsory part */}
+                    {(item.sub_parts || item.parts || []).map((sp: any, spIdx: number) => (
+                      <div key={spIdx} className="ml-8 space-y-2 mt-4">
+                        <label className="text-[11px] font-bold text-slate-400 uppercase flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
+                          Sub-Part {sp.label || (spIdx + 1)} ({sp.marks} marks)
+                        </label>
+                        <RichTextEditor
+                          value={
+                            (formData.structure?.parts?.[idx]?.sub_parts?.[spIdx]?.question_text ||
+                              formData.structure?.nested_parts?.[idx]?.sub_parts?.[spIdx]?.question_text ||
+                              formData.structure?.parts?.[idx]?.parts?.[spIdx]?.question_text ||
+                              formData.structure?.nested_parts?.[idx]?.parts?.[spIdx]?.question_text) || ''
+                          }
+                          onChange={(val) => {
+                            const newStructure = { ...formData.structure };
+                            if (!newStructure.nested_parts) {
+                              let sourceData;
+                              if (nestedType === 'multipart' && config?.options?.length > 0) {
+                                sourceData = config.options;
+                              } else if (nestedType === 'internal_choice' || nestedType === 'mixed') {
+                                sourceData = config?.options || [];
+                              } else {
+                                sourceData = config?.sub_questions || config?.options || [];
+                              }
+                              newStructure.nested_parts = (formData.structure?.parts || sourceData).map((o: any) => ({ ...o }));
+                            }
+
+                            if (!newStructure.nested_parts[idx]) newStructure.nested_parts[idx] = { ...item };
+                            const targetPart = newStructure.nested_parts[idx];
+                            if (!targetPart.sub_parts) targetPart.sub_parts = [...(item.sub_parts || item.parts || [])];
+
+                            targetPart.sub_parts[spIdx] = {
+                              ...targetPart.sub_parts[spIdx],
+                              question_text: val
+                            };
+
+                            newStructure.parts = newStructure.nested_parts;
+                            handleInputChange('structure', newStructure);
+                          }}
+                          placeholder={`Enter text for sub-part ${sp.label}...`}
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
 
             <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl">
               <p className="text-sm text-amber-800">
@@ -1207,7 +1375,7 @@ export default function EnhancedQuestionEditor() {
     return null;
   };
 
-  const handleInputChange = (field: keyof QuestionFormData, value: string | number | string[]) => {
+  const handleInputChange = (field: keyof QuestionFormData, value: string | number | string[] | any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setSaveStatus('idle');
   };
@@ -1232,7 +1400,11 @@ export default function EnhancedQuestionEditor() {
   };
 
   const handleSave = async () => {
-    if (!formData.question_text.trim()) {
+    // For nested/subjective questions, question_text can be empty (content is in parts)
+    const isNestedQuestion = formData.structure?.is_nested ||
+      currentSection?.question_configurations?.[currentQuestionNumber]?.is_nested;
+
+    if (!isNestedQuestion && !formData.question_text.trim()) {
       setSaveStatus('error');
       return;
     }
@@ -1271,8 +1443,13 @@ export default function EnhancedQuestionEditor() {
       const patternSectionId = formData.pattern_section ?? currentSection?.id ?? null;
       const patternSectionName = currentSection?.name ?? '';
       const absoluteQuestionNumberForSave = computeAbsoluteQuestionNumber(currentSection ?? null, currentQuestionNumber);
+      // For nested questions, ensure question_text has a value (backend requires it)
+      const questionTextToSave = formData.question_text.trim() ||
+        (isNestedQuestion ? 'Answer the following:' : formData.question_text);
+
       const dataToSave = {
         ...formData,
+        question_text: questionTextToSave,
         options:
           formData.question_type === 'single_mcq' ||
             formData.question_type === 'multiple_mcq' ||
@@ -1406,6 +1583,10 @@ export default function EnhancedQuestionEditor() {
     setAiSuccess(null);
 
     try {
+      // Get the question configuration for nested questions
+      const questionConfig = activeSection?.question_configurations?.[currentQuestionNumber];
+      const isNestedQuestion = questionConfig?.is_nested || false;
+
       const response = await api.post('/questions/ai/generate-question/', {
         question_type: activeSection.question_type || formData.question_type,
         subject: activeSection.subject || formData.subject,
@@ -1416,6 +1597,10 @@ export default function EnhancedQuestionEditor() {
         pattern_section_name: activeSection.name,
         question_number: currentQuestionNumber,
         exam_id: examIdFromQuery,
+        // Send question configuration for nested questions
+        is_nested: isNestedQuestion,
+        nested_type: questionConfig?.nested_type,
+        question_configuration: isNestedQuestion ? questionConfig : null,
       });
 
       const aiQuestion = response.data?.question as AIQuestionPayload | undefined;
@@ -1503,16 +1688,90 @@ export default function EnhancedQuestionEditor() {
       const aiDifficultyRaw = String(aiQuestion.difficulty || '').toLowerCase();
       const mappedDifficulty = ['easy', 'medium', 'hard'].includes(aiDifficultyRaw) ? (aiDifficultyRaw as 'easy' | 'medium' | 'hard') : formData.difficulty;
 
-      setFormData((prev) => ({
-        ...prev,
-        question_text: aiQuestion.question_text || prev.question_text,
-        options: (isSingleChoice || isMultipleChoice || isTrueFalse) ? normalizedOptions : prev.options,
-        correct_answer: finalCorrectAnswer || prev.correct_answer,
-        solution: aiQuestion.solution || prev.solution,
-        explanation: aiQuestion.explanation || aiQuestion.solution || prev.explanation,
-        difficulty: mappedDifficulty,
-        topic: aiQuestion.topic || prev.topic,
-      }));
+      // Handle nested questions - populate structure with AI-generated parts
+      if (isNestedQuestion && aiQuestion.structure?.nested_parts) {
+        const aiParts = aiQuestion.structure.nested_parts;
+
+        // Get config parts to merge with
+        let configParts: any[] = [];
+        if (questionConfig?.options && questionConfig.options.length > 0) {
+          configParts = questionConfig.options;
+        } else if (questionConfig?.sub_questions && questionConfig.sub_questions.length > 0) {
+          configParts = questionConfig.sub_questions;
+        }
+
+        // Merge AI-generated text with config structure
+        const mergedParts = configParts.map((configPart: any, idx: number) => {
+          const aiPart = aiParts.find((ap: any) =>
+            ap.label?.toLowerCase() === configPart.label?.toLowerCase()
+          ) || aiParts[idx];
+
+          const merged: any = { ...configPart };
+
+          if (aiPart) {
+            if (configPart.type === 'choice_group' && configPart.options) {
+              // Handle choice groups
+              const aiOptions = aiPart.options || [];
+              merged.options = configPart.options.map((co: any, coIdx: number) => {
+                const aiOpt = aiOptions[coIdx];
+                const mergedOpt: any = { ...co, question_text: aiOpt?.text || '' };
+
+                // Handle sub_parts inside choice options
+                if (co.sub_parts && aiOpt?.sub_parts) {
+                  mergedOpt.sub_parts = co.sub_parts.map((csp: any, spIdx: number) => {
+                    const aiSp = aiOpt.sub_parts[spIdx];
+                    return { ...csp, question_text: aiSp?.text || '' };
+                  });
+                }
+                return mergedOpt;
+              });
+            } else {
+              // Regular part
+              merged.question_text = aiPart.text || '';
+
+              // Handle sub_parts
+              if (configPart.sub_parts || configPart.parts) {
+                const configSubParts = configPart.sub_parts || configPart.parts || [];
+                const aiSubParts = aiPart.sub_parts || [];
+
+                merged.sub_parts = configSubParts.map((csp: any, spIdx: number) => {
+                  const aiSp = aiSubParts.find((asp: any) =>
+                    asp.label?.toLowerCase() === csp.label?.toLowerCase()
+                  ) || aiSubParts[spIdx];
+                  return { ...csp, question_text: aiSp?.text || '' };
+                });
+              }
+            }
+          }
+          return merged;
+        });
+
+        // Update form with nested structure
+        setFormData((prev) => ({
+          ...prev,
+          question_text: aiQuestion.question_text || 'Answer the following:',
+          difficulty: mappedDifficulty,
+          topic: aiQuestion.topic || prev.topic,
+          structure: {
+            is_nested: true,
+            nested_type: questionConfig?.nested_type || 'multipart',
+            parts: mergedParts,
+            nested_parts: mergedParts
+          }
+        }));
+      } else {
+        // Non-nested question - original logic
+        setFormData((prev) => ({
+          ...prev,
+          question_text: aiQuestion.question_text || prev.question_text,
+          options: (isSingleChoice || isMultipleChoice || isTrueFalse) ? normalizedOptions : prev.options,
+          correct_answer: finalCorrectAnswer || prev.correct_answer,
+          solution: aiQuestion.solution || prev.solution,
+          explanation: aiQuestion.explanation || aiQuestion.solution || prev.explanation,
+          difficulty: mappedDifficulty,
+          topic: aiQuestion.topic || prev.topic,
+        }));
+      }
       setSaveStatus('idle');
 
       setAiSuccess(response.data?.message || 'AI generated a draft question. Review before saving.');
@@ -2409,9 +2668,20 @@ export default function EnhancedQuestionEditor() {
                     handleInputChange('question_text', text);
                   }}
                   onExtractedQuestion={(data) => {
+                    // DEBUG: Log what AI returned
+                    console.log('AI Extracted Data:', JSON.stringify(data, null, 2));
+                    console.log('is_nested:', data.is_nested);
+                    console.log('structure:', data.structure);
+
                     // Auto-fill the question form with extracted data
-                    if (data.question_text) {
+                    // For nested questions, set a default question_text
+                    // Only set question_text for non-nested questions (MCQ, simple subjective)
+                    if (!data.is_nested && data.question_text) {
                       handleInputChange('question_text', data.question_text);
+                    }
+                    // If nested, set default question_text (backend requires non-empty)
+                    if (data.is_nested) {
+                      handleInputChange('question_text', data.question_text || 'Answer the following:');
                     }
                     if (data.options && data.options.length > 0) {
                       // Pad options to 4 if needed
@@ -2438,6 +2708,108 @@ export default function EnhancedQuestionEditor() {
                     }
                     if (data.explanation) {
                       handleInputChange('explanation', data.explanation);
+                    }
+
+                    // Handle nested structure from AI extraction
+                    if (data.is_nested && data.structure?.nested_parts) {
+                      const config = currentSection?.question_configurations?.[currentQuestionNumber];
+                      const aiParts = data.structure.nested_parts;
+
+                      // Get the pattern configuration parts
+                      let configParts: any[] = [];
+                      if (config?.options && config.options.length > 0) {
+                        configParts = config.options;
+                      } else if (config?.sub_questions && config.sub_questions.length > 0) {
+                        configParts = config.sub_questions;
+                      }
+
+                      // Helper function to find AI part - handles both direct parts and choice_group
+                      const findAiPart = (configPart: any, idx: number) => {
+                        // Check if AI returned a choice_group that matches
+                        const aiChoiceGroup = aiParts.find((ap: any) => ap.type === 'choice_group');
+
+                        if (configPart.type === 'choice_group' && aiChoiceGroup) {
+                          return aiChoiceGroup;
+                        }
+
+                        // Try to find by label
+                        let match = aiParts.find((ap: any) =>
+                          ap.label?.toLowerCase() === configPart.label?.toLowerCase()
+                        );
+
+                        // If config is inside a choice_group options, look in AI choice_group options too
+                        if (!match && aiChoiceGroup?.options) {
+                          match = aiChoiceGroup.options.find((opt: any) =>
+                            opt.label?.toLowerCase() === configPart.label?.toLowerCase() ||
+                            opt.label?.toLowerCase() === configPart.description?.toLowerCase()
+                          );
+                        }
+
+                        return match || aiParts[idx];
+                      };
+
+                      // Merge AI-extracted text with pattern config structure
+                      const mergedParts = configParts.map((configPart: any, idx: number) => {
+                        const aiPart = findAiPart(configPart, idx);
+                        const merged: any = { ...configPart };
+
+                        if (aiPart) {
+                          // For choice_group, handle options inside
+                          if (configPart.type === 'choice_group' && configPart.options) {
+                            const aiOptions = aiPart.options || [];
+                            merged.options = configPart.options.map((co: any, coIdx: number) => {
+                              const aiOpt = aiOptions[coIdx] || aiOptions.find((ao: any) =>
+                                ao.label?.toLowerCase() === co.label?.toLowerCase() ||
+                                ao.label?.toLowerCase() === co.description?.toLowerCase()
+                              );
+
+                              const mergedOpt: any = { ...co, question_text: aiOpt?.text || '' };
+
+                              // Handle sub_parts inside choice options
+                              if (co.sub_parts && aiOpt?.sub_parts) {
+                                mergedOpt.sub_parts = co.sub_parts.map((csp: any, spIdx: number) => {
+                                  const aiSp = aiOpt.sub_parts[spIdx] || aiOpt.sub_parts.find((sp: any) =>
+                                    sp.label?.toLowerCase() === csp.label?.toLowerCase()
+                                  );
+                                  return { ...csp, question_text: aiSp?.text || '' };
+                                });
+                              }
+
+                              return mergedOpt;
+                            });
+                          } else {
+                            // Regular part - set question text
+                            merged.question_text = aiPart.text || '';
+
+                            // Handle sub_parts
+                            if (configPart.sub_parts || configPart.parts) {
+                              const configSubParts = configPart.sub_parts || configPart.parts || [];
+                              const aiSubParts = aiPart.sub_parts || [];
+
+                              merged.sub_parts = configSubParts.map((csp: any, spIdx: number) => {
+                                const aiSp = aiSubParts.find((asp: any) =>
+                                  asp.label?.toLowerCase() === csp.label?.toLowerCase()
+                                ) || aiSubParts[spIdx];
+
+                                return {
+                                  ...csp,
+                                  question_text: aiSp?.text || ''
+                                };
+                              });
+                            }
+                          }
+                        }
+
+                        return merged;
+                      });
+
+                      // Update the form structure
+                      handleInputChange('structure', {
+                        is_nested: true,
+                        nested_type: config?.nested_type || 'multipart',
+                        parts: mergedParts,
+                        nested_parts: mergedParts
+                      });
                     }
                   }}
                 />

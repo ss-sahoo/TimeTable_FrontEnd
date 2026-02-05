@@ -15,8 +15,10 @@ import {
   Calculator,
   Download,
   FileText,
+  Settings,
+  X,
 } from 'lucide-react';
-import LaTeXRenderer, { hasLaTeX } from '../LaTeXRenderer';
+import LaTeXRenderer from '../LaTeXRenderer';
 
 interface ExtractedQuestion {
   id: number;
@@ -33,6 +35,7 @@ interface ExtractedQuestion {
   suggested_section_id: number | null;
   assigned_subject: string;
   assigned_section_id: number | null;
+  structure?: any;
 }
 
 interface QuestionPreviewProps {
@@ -55,6 +58,8 @@ const QuestionPreview: React.FC<QuestionPreviewProps> = ({
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<Partial<ExtractedQuestion>>({});
+  const [structureEditingId, setStructureEditingId] = useState<number | null>(null);
+  const [structureForm, setStructureForm] = useState<any>(null);
 
   useEffect(() => {
     fetchQuestions();
@@ -67,7 +72,7 @@ const QuestionPreview: React.FC<QuestionPreviewProps> = ({
       const data = response.data.questions as ExtractedQuestion[];
       setQuestions(data);
       onQuestionsLoaded(data);
-      
+
       // Select all by default
       const allIds = new Set(data.map(q => q.id));
       setSelectedIds(allIds);
@@ -117,17 +122,42 @@ const QuestionPreview: React.FC<QuestionPreviewProps> = ({
 
     try {
       await api.patch(`/questions/extracted-questions/${editingId}/`, editForm);
-      
+
       // Update local state
-      setQuestions(questions.map(q => 
+      setQuestions(questions.map(q =>
         q.id === editingId ? { ...q, ...editForm } : q
       ));
-      
+
       setEditingId(null);
       setEditForm({});
     } catch (err) {
       console.error('Failed to update question:', err);
       alert('Failed to update question');
+    }
+  };
+
+  const startStructureEdit = (question: ExtractedQuestion) => {
+    setStructureEditingId(question.id);
+    setStructureForm(question.structure || { nested_parts: [] });
+  };
+
+  const saveStructure = async () => {
+    if (!structureEditingId) return;
+
+    try {
+      await api.patch(`/questions/extracted-questions/${structureEditingId}/`, {
+        structure: structureForm
+      });
+
+      setQuestions(questions.map(q =>
+        q.id === structureEditingId ? { ...q, structure: structureForm } : q
+      ));
+
+      setStructureEditingId(null);
+      setStructureForm(null);
+    } catch (err) {
+      console.error('Failed to update structure:', err);
+      alert('Failed to update structure');
     }
   };
 
@@ -137,7 +167,7 @@ const QuestionPreview: React.FC<QuestionPreviewProps> = ({
     try {
       await api.delete(`/questions/extracted-questions/${id}/`);
       setQuestions(questions.filter(q => q.id !== id));
-      
+
       const newSelected = new Set(selectedIds);
       newSelected.delete(id);
       setSelectedIds(newSelected);
@@ -148,93 +178,57 @@ const QuestionPreview: React.FC<QuestionPreviewProps> = ({
     }
   };
 
-  const getQuestionTypeLabel = (type: string): string => {
-    const labels: Record<string, string> = {
-      single_mcq: 'Single Correct MCQ',
-      multiple_mcq: 'Multiple Correct MCQ',
-      numerical: 'Numerical',
-      subjective: 'Subjective',
-      true_false: 'True/False',
-      fill_blank: 'Fill in the Blanks',
-    };
-    return labels[type] || type;
-  };
+  // Recursive helper to render nested parts
+  const renderNestedParts = (parts: any[], containerClass: string = '') => {
+    if (!parts || parts.length === 0) return null;
 
-  // Download questions for a specific subject
-  const handleDownloadSubject = (subject: string, subjectQuestions: ExtractedQuestion[]) => {
-    const content = generateSubjectContent(subject, subjectQuestions);
-    downloadTextFile(`${subject}_Questions.txt`, content);
-  };
-
-  // Download all questions grouped by subject
-  const handleDownloadAll = () => {
-    const groupedBySubject = questions.reduce((acc, q) => {
-      const subject = q.suggested_subject || q.assigned_subject || 'Uncategorized';
-      if (!acc[subject]) {
-        acc[subject] = [];
-      }
-      acc[subject].push(q);
-      return acc;
-    }, {} as Record<string, ExtractedQuestion[]>);
-
-    let content = '=' .repeat(60) + '\n';
-    content += 'EXTRACTED QUESTIONS - ALL SUBJECTS\n';
-    content += `Total Questions: ${questions.length}\n`;
-    content += '=' .repeat(60) + '\n\n';
-
-    for (const [subject, subjectQuestions] of Object.entries(groupedBySubject)) {
-      content += generateSubjectContent(subject, subjectQuestions);
-      content += '\n\n';
-    }
-
-    downloadTextFile('All_Questions_By_Subject.txt', content);
-  };
-
-  // Generate content for a subject
-  const generateSubjectContent = (subject: string, subjectQuestions: ExtractedQuestion[]): string => {
-    let content = '-'.repeat(60) + '\n';
-    content += `SUBJECT: ${subject.toUpperCase()}\n`;
-    content += `Total Questions: ${subjectQuestions.length}\n`;
-    content += '-'.repeat(60) + '\n\n';
-
-    subjectQuestions.forEach((q, index) => {
-      content += `Q.${index + 1} ${q.question_text}\n`;
-      
-      // Add options if present
-      if (q.options && q.options.length > 0) {
-        q.options.forEach((opt, i) => {
-          const optionLetter = String.fromCharCode(65 + i); // A, B, C, D...
-          content += `   ${optionLetter}) ${opt}\n`;
-        });
-      }
-      
-      // Add answer
-      if (q.correct_answer) {
-        content += `   Answer: ${q.correct_answer}\n`;
-      }
-      
-      // Add solution
-      if (q.solution) {
-        content += `   Solution: ${q.solution}\n`;
-      }
-      
-      content += '\n';
-    });
-
-    return content;
-  };
-
-  // Helper to download text file
-  const downloadTextFile = (filename: string, content: string) => {
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    return (
+      <div className={containerClass}>
+        <div className="space-y-3">
+          {parts.map((item: any, idx: number) => (
+            <div key={idx} className="relative">
+              {item.type === 'choice_group' ? (
+                <div className="border-l-4 border-amber-300 pl-4 py-1 space-y-3">
+                  <div className="flex items-center space-x-2 -ml-6 mb-1">
+                    <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-amber-200 uppercase tracking-wider">Choice (OR)</span>
+                  </div>
+                  {(item.options || []).map((option: any, oIdx: number) => (
+                    <React.Fragment key={oIdx}>
+                      <div className="bg-amber-50/50 p-2 rounded-lg border border-amber-50 shadow-sm">
+                        <div className="flex items-start space-x-2">
+                          {option.label && <span className="font-bold text-amber-800 text-xs min-w-[15px]">{option.label}.</span>}
+                          <div className="flex-1">
+                            <LaTeXRenderer content={option.question_text || option.text || ''} />
+                            {option.marks && <span className="text-[9px] font-bold text-amber-600 ml-2 uppercase">[{option.marks}m]</span>}
+                            {(option.sub_parts || option.parts) && renderNestedParts(option.sub_parts || option.parts, 'ml-4 mt-2')}
+                          </div>
+                        </div>
+                      </div>
+                      {oIdx < item.options.length - 1 && (
+                        <div className="flex items-center justify-center py-1">
+                          <span className="px-2 text-[9px] font-black text-amber-300 uppercase tracking-widest">OR</span>
+                        </div>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-start space-x-2">
+                  <span className="text-gray-700 font-bold text-xs min-w-[20px]">{item.label || (idx + 1)}.</span>
+                  <div className="flex-1">
+                    <div className="text-gray-700 text-sm leading-relaxed">
+                      <LaTeXRenderer content={item.question_text || item.text || ''} />
+                      {item.marks && <span className="text-[9px] font-bold text-blue-500 ml-1 uppercase">({item.marks}m)</span>}
+                    </div>
+                    {(item.sub_parts || item.parts) && renderNestedParts(item.sub_parts || item.parts, 'mt-2 ml-4')}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   const getConfidenceColor = (score: number): string => {
@@ -243,360 +237,415 @@ const QuestionPreview: React.FC<QuestionPreviewProps> = ({
     return 'text-red-600 bg-red-100';
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-      </div>
-    );
-  }
+  const handleDownloadAll = () => {
+    const groupedBySubject = questions.reduce((acc, q) => {
+      const subject = q.suggested_subject || q.assigned_subject || 'Uncategorized';
+      if (!acc[subject]) acc[subject] = [];
+      acc[subject].push(q);
+      return acc;
+    }, {} as Record<string, ExtractedQuestion[]>);
 
-  if (error) {
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <p className="text-red-700">{error}</p>
-      </div>
-    );
-  }
+    let content = '=== EXTRACTED QUESTIONS ===\n\n';
+    for (const [subject, subjectQuestions] of Object.entries(groupedBySubject)) {
+      content += `SUBJECT: ${subject}\n${'-'.repeat(subject.length + 9)}\n`;
+      subjectQuestions.forEach((q, i) => {
+        content += `${i + 1}. ${q.question_text}\n`;
+        if (q.options?.length) q.options.forEach((opt, j) => content += `   ${String.fromCharCode(65 + j)}) ${opt}\n`);
+        content += `   Ans: ${q.correct_answer}\n\n`;
+      });
+      content += '\n';
+    }
 
-  if (questions.length === 0) {
-    return (
-      <div className="text-center p-8 text-gray-500">
-        No questions were extracted from the file.
-      </div>
-    );
-  }
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'extracted_questions.txt';
+    a.click();
+  };
+
+  if (loading) return <div className="flex justify-center p-12"><div className="animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full" /></div>;
+  if (error) return <div className="p-4 bg-red-50 text-red-700 rounded-lg">{error}</div>;
 
   return (
-    <div className="space-y-4">
-      {/* Statistics Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg mb-4">
-        <div className="text-center">
-          <div className="text-2xl font-bold text-blue-600">{questions.length}</div>
-          <div className="text-xs text-gray-600">Total Questions</div>
+    <div className="space-y-6 max-w-6xl mx-auto p-4">
+      {/* Subject Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl border shadow-sm">
+          <div className="text-sm text-gray-500">Total Questions</div>
+          <div className="text-2xl font-bold text-indigo-600">{questions.length}</div>
         </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-green-600">
-            {questions.filter(q => q.confidence_score >= 0.8).length}
-          </div>
-          <div className="text-xs text-gray-600">High Confidence</div>
+        <div className="bg-white p-4 rounded-xl border shadow-sm">
+          <div className="text-sm text-gray-500">Selected</div>
+          <div className="text-2xl font-bold text-blue-600">{selectedIds.size}</div>
         </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-yellow-600">
-            {questions.filter(q => q.requires_review).length}
-          </div>
-          <div className="text-xs text-gray-600">Need Review</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-indigo-600">{selectedIds.size}</div>
-          <div className="text-xs text-gray-600">Selected</div>
-        </div>
-      </div>
-
-      {/* Subject Distribution with Download - MAIN FOCUS */}
-      <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg mb-4">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-semibold text-indigo-800">📚 Questions by Subject</h4>
-          <button
-            onClick={() => handleDownloadAll()}
-            className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm"
-          >
-            <Download size={16} />
-            <span>Download All</span>
-          </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Object.entries(
-            questions.reduce((acc, q) => {
-              const subject = q.suggested_subject || q.assigned_subject || 'Uncategorized';
-              if (!acc[subject]) {
-                acc[subject] = [];
-              }
-              acc[subject].push(q);
-              return acc;
-            }, {} as Record<string, ExtractedQuestion[]>)
-          ).map(([subject, subjectQuestions]) => (
-            <div
-              key={subject}
-              className="bg-white border border-indigo-200 rounded-lg shadow-sm overflow-hidden"
-            >
-              <div className="p-4 border-b border-indigo-100 bg-indigo-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <FileText className="w-5 h-5 text-indigo-600" />
-                    <span className="font-semibold text-indigo-900">{subject}</span>
-                  </div>
-                  <span className="text-2xl font-bold text-indigo-600">{subjectQuestions.length}</span>
-                </div>
-              </div>
-              <div className="p-4">
-                <p className="text-sm text-gray-600 mb-3">
-                  {subjectQuestions.length} questions categorized under {subject}
-                </p>
-                <button
-                  onClick={() => handleDownloadSubject(subject, subjectQuestions)}
-                  className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-white border border-indigo-300 text-indigo-700 rounded-lg hover:bg-indigo-50 transition-colors text-sm"
-                >
-                  <Download size={14} />
-                  <span>Download {subject} Questions</span>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-        <div className="flex items-center space-x-4">
-          <input
-            type="checkbox"
-            checked={selectedIds.size === questions.length}
-            onChange={toggleSelectAll}
-            className="w-5 h-5 text-blue-600 rounded"
-          />
-          <span className="text-sm font-medium text-gray-700">
-            {selectedIds.size} of {questions.length} questions selected
-          </span>
-        </div>
-        <div className="flex items-center space-x-4">
-          {onNext && (
-            <button
-              onClick={onNext}
-              disabled={selectedIds.size === 0}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-            >
-              Continue to Mapping →
+        <div className="bg-white p-4 rounded-xl border shadow-sm col-span-2">
+          <div className="flex justify-between items-center h-full">
+            <button onClick={handleDownloadAll} className="flex items-center space-x-2 text-indigo-600 hover:text-indigo-700 font-medium">
+              <Download size={18} />
+              <span>Export All Questions</span>
             </button>
-          )}
+            <button onClick={onNext} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md">
+              Proceed to Mapping →
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Questions List */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         {questions.map((question, index) => (
-          <div
-            key={question.id}
-            className={`border rounded-lg overflow-hidden transition-all ${
-              question.requires_review
-                ? 'border-yellow-300 bg-yellow-50'
-                : 'border-gray-200 bg-white'
-            }`}
-          >
-            {/* Question Header */}
-            <div className="p-4">
-              <div className="flex items-start space-x-3">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(question.id)}
-                  onChange={() => toggleSelection(question.id)}
-                  className="mt-1 w-5 h-5 text-blue-600 rounded"
-                />
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-semibold text-gray-500">
-                        Q{index + 1}
+          <div key={question.id} className="bg-white border rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+            <div className="p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center space-x-4">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(question.id)}
+                    onChange={() => toggleSelection(question.id)}
+                    className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Question {index + 1}</span>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold border border-indigo-100 uppercase uppercase">
+                        {question.suggested_subject || 'Uncategorized'}
                       </span>
-                      {/* Subject Badge - Primary Focus */}
-                      <span className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded font-medium">
-                        {question.suggested_subject || question.assigned_subject || 'Uncategorized'}
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getConfidenceColor(question.confidence_score)} uppercase`}>
+                        {(question.confidence_score * 100).toFixed(0)}% Confidence
                       </span>
-                      <span
-                        className={`text-xs px-2 py-1 rounded ${getConfidenceColor(
-                          question.confidence_score
-                        )}`}
-                      >
-                        {(question.confidence_score * 100).toFixed(0)}% confidence
-                      </span>
-                      {question.requires_review && (
-                        <span className="flex items-center text-xs text-yellow-700">
-                          <AlertTriangle size={14} className="mr-1" />
-                          Needs Review
-                        </span>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => startEdit(question)}
-                        className="text-gray-400 hover:text-blue-600"
-                        title="Edit"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        onClick={() => deleteQuestion(question.id)}
-                        className="text-gray-400 hover:text-red-600"
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                      <button
-                        onClick={() =>
-                          setExpandedId(expandedId === question.id ? null : question.id)
-                        }
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        {expandedId === question.id ? (
-                          <ChevronUp size={16} />
-                        ) : (
-                          <ChevronDown size={16} />
-                        )}
-                      </button>
                     </div>
                   </div>
+                </div>
 
-                  {editingId === question.id ? (
-                    /* Edit Mode */
-                    <div className="space-y-3">
-                      <textarea
-                        value={editForm.question_text || ''}
-                        onChange={(e) =>
-                          setEditForm({ ...editForm, question_text: e.target.value })
-                        }
-                        className="w-full p-2 border rounded text-sm"
-                        rows={3}
-                      />
-                      {question.question_type.includes('mcq') && (
-                        <div className="space-y-2">
-                          {(editForm.options || question.options).map((opt, i) => (
-                            <input
-                              key={i}
-                              value={opt}
-                              onChange={(e) => {
-                                const newOptions = [...(editForm.options || question.options)];
-                                newOptions[i] = e.target.value;
-                                setEditForm({ ...editForm, options: newOptions });
-                              }}
-                              className="w-full p-2 border rounded text-sm"
-                            />
-                          ))}
-                        </div>
-                      )}
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={saveEdit}
-                          className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={cancelEdit}
-                          className="px-4 py-2 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                <div className="flex items-center space-x-2">
+                  <button onClick={() => startStructureEdit(question)} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Edit Structure">
+                    <Settings size={18} />
+                  </button>
+                  <button onClick={() => startEdit(question)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                    <Edit2 size={18} />
+                  </button>
+                  <button onClick={() => deleteQuestion(question.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                    <Trash2 size={18} />
+                  </button>
+                  <button onClick={() => setExpandedId(expandedId === question.id ? null : question.id)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                    {expandedId === question.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pl-9">
+                {editingId === question.id ? (
+                  <div className="space-y-4">
+                    <textarea
+                      value={editForm.question_text || ''}
+                      onChange={e => setEditForm({ ...editForm, question_text: e.target.value })}
+                      className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 min-h-[100px]"
+                    />
+                    <div className="flex space-x-3">
+                      <button onClick={saveEdit} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Save Changes</button>
+                      <button onClick={cancelEdit} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Cancel</button>
                     </div>
-                  ) : (
-                    /* View Mode */
-                    <div>
-                      <div className="text-sm text-gray-900 mb-2">
-                        <LaTeXRenderer content={question.question_text} />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="text-gray-800 text-lg leading-relaxed">
+                      <LaTeXRenderer content={question.question_text} />
+                    </div>
+
+                    {/* Hierarchical Structure Rendering */}
+                    {question.structure?.nested_parts && question.structure.nested_parts.length > 0 ? (
+                      <div className="mt-4 border-l-2 border-gray-100">
+                        {renderNestedParts(question.structure.nested_parts, 'pl-6')}
                       </div>
-                      
-                      {question.question_type.includes('mcq') && (
-                        <div className="space-y-1 mt-2">
-                          {question.options.map((option, i) => (
-                            <div
-                              key={i}
-                              className={`text-sm p-2 rounded ${
-                                option === question.correct_answer
-                                  ? 'bg-green-100 text-green-900 font-medium'
-                                  : 'bg-gray-50 text-gray-700'
-                              }`}
-                            >
-                              {String.fromCharCode(65 + i)}. <LaTeXRenderer content={option} />
-                              {option === question.correct_answer && (
-                                <CheckCircle
-                                  size={14}
-                                  className="inline ml-2 text-green-600"
-                                />
-                              )}
+                    ) : (
+                      <button onClick={() => startStructureEdit(question)} className="mt-2 text-xs text-indigo-500 font-medium hover:underline flex items-center">
+                        + Configure Question Parts (Compulsory/OR)
+                      </button>
+                    )}
+
+                    {/* MCQ Options */}
+                    {question.options?.length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                        {question.options.map((opt, i) => (
+                          <div key={i} className={`p-3 rounded-xl border ${opt === question.correct_answer ? 'bg-green-50 border-green-200 ring-1 ring-green-200' : 'bg-gray-50 border-gray-100'}`}>
+                            <div className="flex items-center space-x-3">
+                              <span className="font-bold text-gray-400">{String.fromCharCode(65 + i)}</span>
+                              <div className="flex-1 text-sm"><LaTeXRenderer content={opt} /></div>
+                              {opt === question.correct_answer && <CheckCircle className="text-green-500" size={16} />}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {expandedId === question.id && (
+              <div className="bg-gray-50/50 border-t p-5 pl-14 space-y-4">
+                {question.solution && (
+                  <div>
+                    <div className="text-[10px] font-bold text-gray-400 uppercase mb-1">Solution</div>
+                    <div className="text-sm text-gray-700 bg-white p-3 rounded-lg border border-gray-100"><LaTeXRenderer content={question.solution} /></div>
+                  </div>
+                )}
+                <div className="flex gap-4">
+                  <div className="px-3 py-1.5 bg-white rounded-lg border text-xs"><span className="text-gray-400 mr-2">Difficulty:</span><span className="capitalize font-medium">{question.difficulty}</span></div>
+                  <div className="px-3 py-1.5 bg-white rounded-lg border text-xs"><span className="text-gray-400 mr-2">Type:</span><span className="capitalize font-medium">{question.question_type.replace('_', ' ')}</span></div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Structure Editor Modal */}
+      {structureEditingId && structureForm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-6 bg-indigo-600 text-white">
+              <div className="flex items-center space-x-3">
+                <Settings size={24} />
+                <div>
+                  <h3 className="text-xl font-bold">Edit Question Structure</h3>
+                  <p className="text-indigo-100 text-sm">Configure compulsory parts and internal choices (OR)</p>
+                </div>
+              </div>
+              <button onClick={() => setStructureEditingId(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={24} /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/50">
+              <div className="flex justify-between items-center">
+                <h4 className="font-bold text-gray-700">Question Parts</h4>
+                <button
+                  onClick={() => {
+                    const parts = [...(structureForm.nested_parts || [])];
+                    parts.push({ type: 'compulsory', label: '', text: '', marks: 1 });
+                    setStructureForm({ ...structureForm, nested_parts: parts });
+                  }}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700"
+                >
+                  + Add Root Part
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {(structureForm.nested_parts || []).map((part: any, idx: number) => (
+                  <div key={idx} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm relative group">
+                    <button
+                      onClick={() => {
+                        const parts = [...structureForm.nested_parts];
+                        parts.splice(idx, 1);
+                        setStructureForm({ ...structureForm, nested_parts: parts });
+                      }}
+                      className="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+
+                    <div className="grid grid-cols-12 gap-6">
+                      <div className="col-span-3">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase">Part Type</label>
+                        <select
+                          value={part.type}
+                          onChange={(e) => {
+                            const parts = [...structureForm.nested_parts];
+                            const newType = e.target.value;
+                            parts[idx] = {
+                              ...part,
+                              type: newType,
+                              options: newType === 'choice_group' ? (part.options || [{ label: '', text: '', marks: 1 }, { label: '', text: '', marks: 1 }]) : undefined,
+                              sub_parts: newType === 'choice_group' ? undefined : (part.sub_parts || [])
+                            };
+                            setStructureForm({ ...structureForm, nested_parts: parts });
+                          }}
+                          className="w-full mt-1 p-2 bg-gray-50 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500 bg-white border-gray-200"
+                        >
+                          <option value="compulsory">Compulsory Part</option>
+                          <option value="choice_group">Internal Choice (OR)</option>
+                        </select>
+                      </div>
+
+                      {part.type === 'compulsory' ? (
+                        <div className="col-span-9 space-y-4">
+                          <div className="grid grid-cols-12 gap-4">
+                            <div className="col-span-2">
+                              <label className="text-[10px] font-bold text-gray-400 uppercase">Label</label>
+                              <input value={part.label || ''} onChange={e => {
+                                const parts = [...structureForm.nested_parts];
+                                parts[idx].label = e.target.value;
+                                setStructureForm({ ...structureForm, nested_parts: parts });
+                              }} className="w-full mt-1 p-2 border rounded-lg text-sm font-bold text-center" placeholder="(a)" />
+                            </div>
+                            <div className="col-span-8">
+                              <label className="text-[10px] font-bold text-gray-400 uppercase">Description</label>
+                              <textarea value={part.text || ''} onChange={e => {
+                                const parts = [...structureForm.nested_parts];
+                                parts[idx].text = e.target.value;
+                                setStructureForm({ ...structureForm, nested_parts: parts });
+                              }} className="w-full mt-1 p-2 border rounded-lg text-sm" rows={1} placeholder="Part text..." />
+                            </div>
+                            <div className="col-span-2">
+                              <label className="text-[10px] font-bold text-gray-400 uppercase">Marks</label>
+                              <input type="number" value={part.marks || 0} onChange={e => {
+                                const parts = [...structureForm.nested_parts];
+                                parts[idx].marks = parseInt(e.target.value) || 0;
+                                setStructureForm({ ...structureForm, nested_parts: parts });
+                              }} className="w-full mt-1 p-2 border rounded-lg text-sm" />
+                            </div>
+                          </div>
+
+                          {/* Sub-parts Management */}
+                          <div className="ml-8 p-3 bg-indigo-50/30 rounded-lg border border-dashed border-indigo-100">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-tighter">Sub-parts (i, ii)</span>
+                              <button onClick={() => {
+                                const parts = [...structureForm.nested_parts];
+                                if (!parts[idx].sub_parts) parts[idx].sub_parts = [];
+                                parts[idx].sub_parts.push({ label: '', text: '', marks: 1 });
+                                setStructureForm({ ...structureForm, nested_parts: parts });
+                              }} className="text-[10px] font-bold text-indigo-600 hover:underline">+ Add Sub-part</button>
+                            </div>
+                            <div className="space-y-2">
+                              {(part.sub_parts || []).map((sp: any, spIdx: number) => (
+                                <div key={spIdx} className="flex items-center gap-2 group/sp">
+                                  <input
+                                    value={sp.label}
+                                    onChange={e => {
+                                      const parts = [...structureForm.nested_parts];
+                                      parts[idx].sub_parts[spIdx].label = e.target.value;
+                                      setStructureForm({ ...structureForm, nested_parts: parts });
+                                    }}
+                                    className="w-10 p-1 border rounded text-[10px] text-center font-bold"
+                                    placeholder="(i)"
+                                  />
+                                  <input
+                                    value={sp.text}
+                                    onChange={e => {
+                                      const parts = [...structureForm.nested_parts];
+                                      parts[idx].sub_parts[spIdx].text = e.target.value;
+                                      setStructureForm({ ...structureForm, nested_parts: parts });
+                                    }}
+                                    className="flex-1 p-1 border rounded text-[10px]"
+                                    placeholder="Sub-part content..."
+                                  />
+                                  <button onClick={() => {
+                                    const parts = [...structureForm.nested_parts];
+                                    parts[idx].sub_parts.splice(spIdx, 1);
+                                    setStructureForm({ ...structureForm, nested_parts: parts });
+                                  }} className="opacity-0 group-hover/sp:opacity-100 text-gray-300 hover:text-red-500">
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="col-span-9 space-y-4">
+                          <div className="flex justify-between items-center">
+                            <label className="text-[10px] font-bold text-amber-500 uppercase">OR Selection Block</label>
+                            <button onClick={() => {
+                              const parts = [...structureForm.nested_parts];
+                              parts[idx].options.push({ label: '', text: '', marks: 1 });
+                              setStructureForm({ ...structureForm, nested_parts: parts });
+                            }} className="text-xs font-bold text-amber-600 hover:underline">+ Add Choice</button>
+                          </div>
+                          {part.options.map((opt: any, oIdx: number) => (
+                            <div key={oIdx} className="bg-amber-50/50 p-4 rounded-xl border border-amber-100 space-y-3">
+                              <div className="flex items-center gap-3">
+                                <input value={opt.label} onChange={e => {
+                                  const parts = [...structureForm.nested_parts];
+                                  parts[idx].options[oIdx].label = e.target.value;
+                                  setStructureForm({ ...structureForm, nested_parts: parts });
+                                }} className="w-12 p-1.5 border border-amber-200 rounded text-xs text-center font-bold" placeholder="c" />
+                                <input value={opt.text} onChange={e => {
+                                  const parts = [...structureForm.nested_parts];
+                                  parts[idx].options[oIdx].text = e.target.value;
+                                  setStructureForm({ ...structureForm, nested_parts: parts });
+                                }} className="flex-1 p-1.5 border border-amber-200 rounded text-xs" placeholder="Choice content..." />
+                                <input type="number" value={opt.marks} onChange={e => {
+                                  const parts = [...structureForm.nested_parts];
+                                  parts[idx].options[oIdx].marks = parseInt(e.target.value) || 0;
+                                  setStructureForm({ ...structureForm, nested_parts: parts });
+                                }} className="w-12 p-1.5 border border-amber-200 rounded text-xs" />
+                                <button onClick={() => {
+                                  const parts = [...structureForm.nested_parts];
+                                  parts[idx].options.splice(oIdx, 1);
+                                  setStructureForm({ ...structureForm, nested_parts: parts });
+                                }} className="text-amber-400 hover:text-red-500"><Trash2 size={14} /></button>
+                              </div>
+
+                              {/* Nested Sub-parts for choice */}
+                              <div className="ml-8 p-3 bg-white/40 rounded-lg border border-dashed border-amber-200">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="text-[9px] font-bold text-amber-500 uppercase tracking-tighter">Nested Parts for choice</span>
+                                  <button onClick={() => {
+                                    const parts = [...structureForm.nested_parts];
+                                    if (!parts[idx].options[oIdx].sub_parts) parts[idx].options[oIdx].sub_parts = [];
+                                    parts[idx].options[oIdx].sub_parts.push({ label: '', text: '', marks: 1 });
+                                    setStructureForm({ ...structureForm, nested_parts: parts });
+                                  }} className="text-[9px] font-bold text-amber-600 hover:underline">+ Add Part</button>
+                                </div>
+                                <div className="space-y-2">
+                                  {(opt.sub_parts || []).map((sp: any, spIdx: number) => (
+                                    <div key={spIdx} className="flex items-center gap-2 group/sp">
+                                      <input
+                                        value={sp.label}
+                                        onChange={e => {
+                                          const parts = [...structureForm.nested_parts];
+                                          parts[idx].options[oIdx].sub_parts[spIdx].label = e.target.value;
+                                          setStructureForm({ ...structureForm, nested_parts: parts });
+                                        }}
+                                        className="w-10 p-1 border border-amber-100 rounded text-[10px] text-center font-bold"
+                                        placeholder="(i)"
+                                      />
+                                      <input
+                                        value={sp.text}
+                                        onChange={e => {
+                                          const parts = [...structureForm.nested_parts];
+                                          parts[idx].options[oIdx].sub_parts[spIdx].text = e.target.value;
+                                          setStructureForm({ ...structureForm, nested_parts: parts });
+                                        }}
+                                        className="flex-1 p-1 border border-amber-100 rounded text-[10px]"
+                                        placeholder="Sub-part content..."
+                                      />
+                                      <button onClick={() => {
+                                        const parts = [...structureForm.nested_parts];
+                                        parts[idx].options[oIdx].sub_parts.splice(spIdx, 1);
+                                        setStructureForm({ ...structureForm, nested_parts: parts });
+                                      }} className="opacity-0 group-hover/sp:opacity-100 text-amber-300 hover:text-red-500">
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
                       )}
-                      
-                      {question.question_type === 'numerical' && (
-                        <div className="mt-2 text-sm">
-                          <span className="font-medium">Answer:</span>{' '}
-                          <span className="text-green-700">
-                            <LaTeXRenderer content={question.correct_answer} />
-                          </span>
-                        </div>
-                      )}
-                      
-                      {question.question_type === 'true_false' && (
-                        <div className="mt-2 text-sm">
-                          <span className="font-medium">Answer:</span>{' '}
-                          <span className={question.correct_answer.toLowerCase() === 'true' ? 'text-green-700' : 'text-red-700'}>
-                            {question.correct_answer}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {question.question_type === 'fill_blank' && (
-                        <div className="mt-2 text-sm">
-                          <span className="font-medium">Answer:</span>{' '}
-                          <span className="text-blue-700 bg-blue-50 px-2 py-1 rounded">
-                            <LaTeXRenderer content={question.correct_answer} />
-                          </span>
-                        </div>
-                      )}
-                      
-                      {question.question_type === 'subjective' && question.correct_answer && (
-                        <div className="mt-2 text-sm">
-                          <span className="font-medium">Expected Answer:</span>
-                          <p className="text-gray-700 mt-1 p-2 bg-gray-50 rounded">
-                            <LaTeXRenderer content={question.correct_answer} />
-                          </p>
-                        </div>
-                      )}
                     </div>
-                  )}
+                  </div>
+                ))}
+              </div>
+            </div>
 
-                  {/* Expanded Details */}
-                  {expandedId === question.id && editingId !== question.id && (
-                    <div className="mt-4 pt-4 border-t space-y-2">
-                      {question.solution && (
-                        <div>
-                          <p className="text-xs font-medium text-gray-500 mb-1">
-                            Solution:
-                          </p>
-                          <div className="text-sm text-gray-700 p-2 bg-blue-50 rounded">
-                            <LaTeXRenderer content={question.solution} />
-                          </div>
-                        </div>
-                      )}
-                      {question.explanation && (
-                        <div>
-                          <p className="text-xs font-medium text-gray-500 mb-1">
-                            Explanation:
-                          </p>
-                          <div className="text-sm text-gray-700 p-2 bg-gray-50 rounded">
-                            <LaTeXRenderer content={question.explanation} />
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500">
-                        <span className="px-2 py-1 bg-gray-100 rounded">
-                          Difficulty: <span className="font-medium capitalize">{question.difficulty}</span>
-                        </span>
-                        <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded">
-                          Subject: {question.suggested_subject || question.assigned_subject || 'Uncategorized'}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
+            <div className="p-6 border-t bg-gray-50 flex justify-between items-center">
+              <div className="text-xs text-gray-400 italic flex items-center">
+                <AlertTriangle size={14} className="mr-2 text-amber-400" />
+                Updating structure will overwrite existing part data for this question.
+              </div>
+              <div className="flex space-x-3">
+                <button onClick={() => setStructureEditingId(null)} className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium tracking-tight">Discard</button>
+                <button onClick={saveStructure} className="px-8 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-100">Save Structure</button>
               </div>
             </div>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

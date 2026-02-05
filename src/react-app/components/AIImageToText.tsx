@@ -3,12 +3,25 @@ import { Upload, Copy, Loader, FileImage, X, CheckCircle, Sparkles, Eye } from '
 import { api } from '../hooks/useApi';
 import LaTeXRenderer from './LaTeXRenderer';
 
+interface NestedPart {
+  label: string;
+  text: string;
+  marks?: number;
+  type?: 'compulsory' | 'choice_group';
+  sub_parts?: Array<{ label: string; text: string; marks?: number }>;
+  options?: Array<{ label: string; text: string; marks?: number; sub_parts?: Array<{ label: string; text: string; marks?: number }> }>;
+}
+
 interface ExtractedQuestionData {
   question_text?: string;
   options?: string[];
   correct_answer?: string;
   solution?: string;
   explanation?: string;
+  is_nested?: boolean;
+  structure?: {
+    nested_parts?: NestedPart[];
+  };
 }
 
 interface AIImageToTextProps {
@@ -17,10 +30,10 @@ interface AIImageToTextProps {
   onExtractedQuestion?: (data: ExtractedQuestionData) => void;
 }
 
-export default function AIImageToText({ 
-  className = "", 
+export default function AIImageToText({
+  className = "",
   onExtractedText,
-  onExtractedQuestion 
+  onExtractedQuestion
 }: AIImageToTextProps) {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [extractedText, setExtractedText] = useState<string>('');
@@ -47,38 +60,52 @@ export default function AIImageToText({
   const processImage = async (file: File) => {
     setIsProcessing(true);
     setError(null);
-    
+
     try {
       const formData = new FormData();
       formData.append('image', file);
-      
+
       const response = await api.post('/questions/image-to-text/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      
+
       const data = response.data;
-      
+
       if (data.success) {
         setExtractedText(data.extracted_text);
         setHasLatex(data.has_latex || false);
-        
+
         // Notify parent component with extracted text
         if (onExtractedText) {
           onExtractedText(data.extracted_text);
         }
-        
+
         // Use parsed structure from API (Gemini AI parsed) if available
         if (data.parsed_structure) {
           const parsedStructure = data.parsed_structure;
+          // DEBUG: Log what backend returned
+          console.log('Backend parsed_structure:', JSON.stringify(parsedStructure, null, 2));
+
+          // For nested questions, question_text should be empty (don't fallback to extracted_text)
+          // For non-nested questions, fallback to extracted_text if no question_text
+          const isNested = parsedStructure.is_nested || false;
+          let questionText = parsedStructure.question_text;
+          if (!isNested && !questionText) {
+            questionText = data.extracted_text;
+          }
+
           const parsedQuestion: ExtractedQuestionData = {
-            question_text: parsedStructure.question_text || data.extracted_text,
+            question_text: questionText || '',
             options: parsedStructure.options || [],
             correct_answer: parsedStructure.correct_answer || '',
             solution: parsedStructure.solution || '',
             explanation: parsedStructure.solution || '', // Alias for compatibility
+            // Include nested structure if present
+            is_nested: isNested,
+            structure: parsedStructure.structure || undefined,
           };
           setParsedStructure(parsedQuestion);
-          
+
           // Notify parent component
           if (onExtractedQuestion) {
             onExtractedQuestion(parsedQuestion);
@@ -237,7 +264,7 @@ export default function AIImageToText({
                   )}
                 </label>
               </div>
-              
+
               {/* LaTeX Preview */}
               {hasLatex && extractedText && (
                 <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-3">
@@ -247,7 +274,7 @@ export default function AIImageToText({
                   </div>
                 </div>
               )}
-              
+
               <div className="relative">
                 <textarea
                   value={extractedText}
@@ -267,7 +294,7 @@ export default function AIImageToText({
                   )}
                 </button>
               </div>
-              
+
               {/* Action buttons */}
               <div className="flex gap-2">
                 <button
@@ -293,7 +320,7 @@ export default function AIImageToText({
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
               </div>
-              
+
               <p className="text-xs text-slate-500">
                 Click "Use as Question" to auto-fill the question form, or copy and paste manually.
               </p>
@@ -354,34 +381,32 @@ export default function AIImageToText({
                     {parsedStructure.options.map((option, index) => (
                       <div
                         key={index}
-                        className={`flex items-start gap-3 p-3 rounded-lg border ${
-                          parsedStructure.correct_answer && 
-                          (parsedStructure.correct_answer === String.fromCharCode(65 + index) || 
-                           parsedStructure.correct_answer === String(index + 1) ||
-                           parsedStructure.correct_answer.toLowerCase() === option.toLowerCase())
-                            ? 'bg-green-50 border-green-200'
-                            : 'bg-slate-50 border-slate-200'
-                        }`}
+                        className={`flex items-start gap-3 p-3 rounded-lg border ${parsedStructure.correct_answer &&
+                          (parsedStructure.correct_answer === String.fromCharCode(65 + index) ||
+                            parsedStructure.correct_answer === String(index + 1) ||
+                            parsedStructure.correct_answer.toLowerCase() === option.toLowerCase())
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-slate-50 border-slate-200'
+                          }`}
                       >
-                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ${
-                          parsedStructure.correct_answer && 
-                          (parsedStructure.correct_answer === String.fromCharCode(65 + index) || 
-                           parsedStructure.correct_answer === String(index + 1) ||
-                           parsedStructure.correct_answer.toLowerCase() === option.toLowerCase())
-                            ? 'bg-green-500 text-white'
-                            : 'bg-slate-200 text-slate-700'
-                        }`}>
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ${parsedStructure.correct_answer &&
+                          (parsedStructure.correct_answer === String.fromCharCode(65 + index) ||
+                            parsedStructure.correct_answer === String(index + 1) ||
+                            parsedStructure.correct_answer.toLowerCase() === option.toLowerCase())
+                          ? 'bg-green-500 text-white'
+                          : 'bg-slate-200 text-slate-700'
+                          }`}>
                           {String.fromCharCode(65 + index)}
                         </div>
                         <div className="flex-1 text-base">
                           <LaTeXRenderer content={option} />
                         </div>
-                        {parsedStructure.correct_answer && 
-                         (parsedStructure.correct_answer === String.fromCharCode(65 + index) || 
-                          parsedStructure.correct_answer === String(index + 1) ||
-                          parsedStructure.correct_answer.toLowerCase() === option.toLowerCase()) && (
-                          <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                        )}
+                        {parsedStructure.correct_answer &&
+                          (parsedStructure.correct_answer === String.fromCharCode(65 + index) ||
+                            parsedStructure.correct_answer === String(index + 1) ||
+                            parsedStructure.correct_answer.toLowerCase() === option.toLowerCase()) && (
+                            <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                          )}
                       </div>
                     ))}
                   </div>
@@ -401,10 +426,10 @@ export default function AIImageToText({
                         {(() => {
                           const answer = parsedStructure.correct_answer.trim();
                           const options = parsedStructure.options || [];
-                          
+
                           // Try to match the answer to an option
                           let optionIndex = -1;
-                          
+
                           // Check if answer is a number (1, 2, 3, 4) - convert to index
                           const numericMatch = answer.match(/^\(?(\d+)\)?$/);
                           if (numericMatch) {
@@ -419,16 +444,16 @@ export default function AIImageToText({
                               // Try to find matching option text
                               optionIndex = options.findIndex(
                                 opt => opt.trim().toLowerCase() === answer.toLowerCase() ||
-                                       opt.trim() === answer
+                                  opt.trim() === answer
                               );
                             }
                           }
-                          
+
                           // If we found a matching option
                           if (optionIndex >= 0 && optionIndex < options.length) {
                             const optionLetter = String.fromCharCode(65 + optionIndex); // A, B, C, D
                             const optionText = options[optionIndex];
-                            
+
                             return (
                               <div className="space-y-1">
                                 <div className="text-base font-semibold text-green-900">
@@ -437,7 +462,7 @@ export default function AIImageToText({
                               </div>
                             );
                           }
-                          
+
                           // If no match found, just display the answer as-is
                           return (
                             <div className="text-base font-medium text-green-900">

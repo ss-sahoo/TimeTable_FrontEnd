@@ -56,13 +56,20 @@ interface PatternSection {
 
 interface QuestionConfiguration {
   is_nested: boolean;
-  nested_type?: 'internal_choice' | 'multipart';
+  nested_type?: 'internal_choice' | 'multipart' | 'mixed';
   description?: string;
   options?: Array<{
     label: string;
     description?: string;
     marks?: number;
-    parts?: Array<{ label: string; marks: number; description?: string }>;
+    type?: 'compulsory' | 'choice_group';
+    options?: Array<{
+      label: string;
+      marks: number;
+      description?: string;
+      sub_parts?: Array<{ label: string; marks: number; description?: string }>;
+    }>;
+    sub_parts?: Array<{ label: string; marks: number; description?: string }>;
   }>;
   sub_questions?: Array<{ label: string; marks: number; description?: string }>;
 }
@@ -302,12 +309,12 @@ export default function PatternCreation() {
     const section = pattern.sections[sectionIndex];
     const existingConfig = section.question_configurations?.[questionNumber] || {
       is_nested: false,
-      nested_type: 'internal_choice',
+      nested_type: 'multipart',
       options: [
-        { label: 'Option A', parts: [{ label: 'a', marks: 1 }] },
-        { label: 'Option B', marks: 1 }
+        { label: 'a', marks: 2, parts: [{ label: 'i', marks: 1 }] },
+        { label: 'b', marks: 2 }
       ],
-      sub_questions: [{ label: 'i', marks: 1 }]
+      sub_questions: []
     };
 
     setActiveConfig({
@@ -1757,10 +1764,26 @@ export default function PatternCreation() {
                       <label className="block text-sm font-medium text-slate-700 mb-2">Structure Type</label>
                       <div className="grid grid-cols-2 gap-3">
                         <button
-                          onClick={() => setActiveConfig(prev => prev ? {
-                            ...prev,
-                            config: { ...prev.config, nested_type: 'internal_choice' }
-                          } : null)}
+                          onClick={() => setActiveConfig(prev => {
+                            if (!prev) return null;
+                            const newConfig = { ...prev.config, nested_type: 'internal_choice' as const };
+                            const subLabels = ['i', 'ii', 'iii', 'iv', 'v'];
+                            // Relabel options to Option A, B... if they are currently a, b...
+                            if (newConfig.options?.every(o => o.label.length === 1)) {
+                              newConfig.options = newConfig.options.map((o, i) => {
+                                const relabeledParts = (o.sub_parts || []).map((p, pi) => ({
+                                  ...p,
+                                  label: subLabels[pi] || '?'
+                                }));
+                                return {
+                                  ...o,
+                                  label: `Option ${String.fromCharCode(65 + i)}`,
+                                  sub_parts: relabeledParts
+                                };
+                              });
+                            }
+                            return { ...prev, config: newConfig };
+                          })}
                           className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeConfig.config.nested_type === 'internal_choice'
                             ? 'bg-blue-50 border-blue-500 text-blue-700'
                             : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
@@ -1770,10 +1793,35 @@ export default function PatternCreation() {
                           <span className="text-sm font-medium">Internal Choice (OR)</span>
                         </button>
                         <button
-                          onClick={() => setActiveConfig(prev => prev ? {
-                            ...prev,
-                            config: { ...prev.config, nested_type: 'multipart' }
-                          } : null)}
+                          onClick={() => setActiveConfig(prev => {
+                            if (!prev) return null;
+                            const newConfig = { ...prev.config, nested_type: 'multipart' as const };
+                            const subLabels = ['i', 'ii', 'iii', 'iv', 'v'];
+                            // Relabel options to a, b, c... if they are currently Option A, B...
+                            if (newConfig.options?.every(o => o.label.startsWith('Option'))) {
+                              newConfig.options = newConfig.options.map((o, i) => {
+                                const relabeledParts = (o.sub_parts || []).map((p, pi) => ({
+                                  ...p,
+                                  label: subLabels[pi] || '?'
+                                }));
+                                return {
+                                  ...o,
+                                  label: String.fromCharCode(97 + i),
+                                  sub_parts: relabeledParts
+                                };
+                              });
+                            } else {
+                              // If already in multipart or similar but subparts are wrong
+                              newConfig.options = (newConfig.options || []).map((o) => ({
+                                ...o,
+                                sub_parts: (o.sub_parts || []).map((p, pi) => ({
+                                  ...p,
+                                  label: subLabels[pi] || '?'
+                                }))
+                              }));
+                            }
+                            return { ...prev, config: newConfig };
+                          })}
                           className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeConfig.config.nested_type === 'multipart'
                             ? 'bg-blue-50 border-blue-500 text-blue-700'
                             : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
@@ -1782,14 +1830,46 @@ export default function PatternCreation() {
                           <List className="w-5 h-5" />
                           <span className="text-sm font-medium">Multi-Part (a, b, c)</span>
                         </button>
+
+                        <button
+                          onClick={() => setActiveConfig(prev => prev ? {
+                            ...prev,
+                            config: { ...prev.config, nested_type: 'mixed' }
+                          } : null)}
+                          className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${activeConfig.config.nested_type === 'mixed'
+                            ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                            }`}
+                        >
+                          <Layers className="w-5 h-5" />
+                          <span className="text-sm font-medium">Mixed Mode</span>
+                        </button>
                       </div>
                     </div>
 
-                    {/* Internal Choice Config */}
-                    {activeConfig.config.nested_type === 'internal_choice' && (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-medium text-slate-900">Options</h4>
+                    {/* Mixed / Complex Structure Editor */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-slate-900 text-sm">Question parts</h4>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setActiveConfig(prev => {
+                              if (!prev) return null;
+                              const currentOptions = prev.config.options || [];
+                              const labels = ['a', 'b', 'c', 'd', 'e'];
+                              return {
+                                ...prev,
+                                config: {
+                                  ...prev.config,
+                                  nested_type: (prev.config.nested_type === 'mixed' ? 'mixed' : (prev.config.nested_type || 'multipart')),
+                                  options: [...currentOptions, { type: 'compulsory', label: labels[currentOptions.length] || '?', marks: 2 }]
+                                }
+                              };
+                            })}
+                            className="text-[10px] font-bold text-blue-600 px-2 py-1 bg-blue-50 rounded border border-blue-100"
+                          >
+                            + Add Compulsory Part
+                          </button>
                           <button
                             onClick={() => setActiveConfig(prev => {
                               if (!prev) return null;
@@ -1798,266 +1878,347 @@ export default function PatternCreation() {
                                 ...prev,
                                 config: {
                                   ...prev.config,
-                                  options: [...currentOptions, { label: `Option ${String.fromCharCode(65 + currentOptions.length)}`, marks: 5 }]
+                                  nested_type: (prev.config.nested_type === 'mixed' ? 'mixed' : (prev.config.nested_type || 'internal_choice')),
+                                  options: [...currentOptions, { type: 'choice_group', label: 'OR Group', options: [{ label: '', marks: 5 }, { label: '', marks: 5 }] }]
                                 }
                               };
                             })}
-                            className="text-xs text-blue-600 hover:underline"
+                            className="text-[10px] font-bold text-indigo-600 px-2 py-1 bg-indigo-50 rounded border border-indigo-100"
                           >
-                            + Add Option
+                            + Add OR Group
                           </button>
                         </div>
+                      </div>
 
-                        <div className="space-y-4">
-                          {activeConfig.config.options?.map((option, idx) => (
-                            <div key={idx} className="p-4 border border-slate-200 rounded-xl bg-slate-50 relative group">
-                              <div className="flex items-center gap-3 mb-3">
+                      <div className="space-y-4">
+                        {(activeConfig.config.options || []).map((part, idx) => (
+                          <div key={idx} className={`p-4 border rounded-xl relative group ${part.type === 'choice_group' ? 'bg-indigo-50/50 border-indigo-200' : 'bg-slate-50 border-slate-200'}`}>
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="flex items-center gap-1">
                                 <input
                                   type="text"
-                                  className="w-24 px-2 py-1 text-sm font-bold border rounded bg-white"
-                                  value={option.label}
+                                  className="w-12 px-1 py-0.5 text-sm font-bold border rounded bg-white text-center"
+                                  value={part.label}
                                   onChange={(e) => {
+                                    const val = e.target.value;
                                     setActiveConfig(prev => {
                                       if (!prev) return null;
                                       const newOptions = [...(prev.config.options || [])];
-                                      newOptions[idx] = { ...newOptions[idx], label: e.target.value };
+                                      newOptions[idx] = { ...newOptions[idx], label: val };
                                       return { ...prev, config: { ...prev.config, options: newOptions } };
                                     });
                                   }}
                                 />
-                                <div className="flex-1">
+                              </div>
+
+                              <div className="flex-1">
+                                {part.type === 'choice_group' ? (
+                                  <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Internal Choice Group (Either-Or)</span>
+                                ) : (
                                   <input
                                     type="text"
-                                    placeholder="Internal Note (e.g. 'Theory based')"
-                                    className="w-full px-2 py-1 text-xs border rounded bg-transparent border-dashed border-slate-300 focus:border-blue-400 focus:bg-white outline-none"
-                                    value={option.description || ''}
+                                    placeholder="Part Note (e.g. 'State the law')"
+                                    className="w-full px-2 py-1 text-xs border rounded bg-transparent border-dashed border-slate-300 outline-none"
+                                    value={part.description || ''}
                                     onChange={(e) => {
+                                      const val = e.target.value;
                                       setActiveConfig(prev => {
                                         if (!prev) return null;
                                         const newOptions = [...(prev.config.options || [])];
-                                        newOptions[idx] = { ...newOptions[idx], description: e.target.value };
+                                        newOptions[idx] = { ...newOptions[idx], description: val };
                                         return { ...prev, config: { ...prev.config, options: newOptions } };
                                       });
                                     }}
                                   />
-                                </div>
+                                )}
+                              </div>
+
+                              {part.type !== 'choice_group' && (
                                 <div className="flex items-center gap-2">
-                                  <span className="text-xs text-slate-400 font-medium">Marks:</span>
                                   <input
                                     type="number"
                                     className="w-16 px-2 py-1 text-sm font-bold border rounded bg-white text-center"
-                                    value={option.marks}
+                                    value={part.marks || 0}
                                     onChange={(e) => {
-                                      const newMarks = parseInt(e.target.value) || 0;
+                                      const val = parseInt(e.target.value) || 0;
                                       setActiveConfig(prev => {
                                         if (!prev) return null;
                                         const newOptions = [...(prev.config.options || [])];
-                                        newOptions[idx] = { ...newOptions[idx], marks: newMarks };
+                                        newOptions[idx] = { ...newOptions[idx], marks: val };
                                         return { ...prev, config: { ...prev.config, options: newOptions } };
                                       });
                                     }}
                                   />
+                                  <span className="text-xs text-slate-400">m</span>
                                 </div>
-                                <button
-                                  onClick={() => {
-                                    setActiveConfig(prev => {
-                                      if (!prev) return null;
-                                      const newOptions = [...(prev.config.options || [])].filter((_, i) => i !== idx);
-                                      return { ...prev, config: { ...prev.config, options: newOptions } };
-                                    });
-                                  }}
-                                  className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
+                              )}
 
-                              <div className="pl-2 border-l-2 border-slate-300 ml-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className="text-xs text-slate-500">Sub-parts?</span>
+                              <button
+                                onClick={() => {
+                                  setActiveConfig(prev => {
+                                    if (!prev) return null;
+                                    const newOptions = [...(prev.config.options || [])].filter((_, i) => i !== idx);
+                                    return { ...prev, config: { ...prev.config, options: newOptions } };
+                                  });
+                                }}
+                                className="p-1.5 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+
+                            {/* Sub-parts for Compulsory parts */}
+                            {part.type !== 'choice_group' && (
+                              <div className="pl-6 border-l-2 border-slate-200 ml-2 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-bold text-slate-400">SUB-PARTS</span>
                                   <button
-                                    className="text-xs text-blue-600"
+                                    className="text-[10px] text-blue-600 font-bold hover:underline"
                                     onClick={() => {
                                       setActiveConfig(prev => {
                                         if (!prev) return null;
                                         const newOptions = [...(prev.config.options || [])];
-                                        const currentParts = newOptions[idx].parts || [];
+                                        const currentParts = newOptions[idx].sub_parts || [];
                                         newOptions[idx] = {
                                           ...newOptions[idx],
-                                          parts: [...currentParts, { label: String.fromCharCode(97 + currentParts.length), marks: 1 }]
+                                          sub_parts: [...currentParts, { label: (currentParts.length + 1).toString(), marks: 1 }]
                                         };
                                         return { ...prev, config: { ...prev.config, options: newOptions } };
                                       });
                                     }}
                                   >
-                                    + Add Part
+                                    + Add Sub-part
                                   </button>
                                 </div>
-
-                                {option.parts?.map((part, pIdx) => (
-                                  <div key={pIdx} className="flex items-center gap-2 mb-2">
+                                {(part.sub_parts || []).map((sp, spIdx) => (
+                                  <div key={spIdx} className="flex gap-2 items-center">
                                     <input
-                                      type="text"
-                                      className="w-10 px-1 py-0.5 text-xs font-mono border rounded bg-white text-center"
-                                      value={part.label}
-                                      onChange={(e) => {
+                                      className="w-8 border-b text-[11px] text-center bg-transparent"
+                                      value={sp.label}
+                                      onChange={e => {
+                                        const val = e.target.value;
                                         setActiveConfig(prev => {
                                           if (!prev) return null;
                                           const newOptions = [...(prev.config.options || [])];
-                                          const newParts = [...(newOptions[idx].parts || [])];
-                                          newParts[pIdx] = { ...newParts[pIdx], label: e.target.value };
-                                          newOptions[idx] = { ...newOptions[idx], parts: newParts };
+                                          newOptions[idx].sub_parts![spIdx].label = val;
                                           return { ...prev, config: { ...prev.config, options: newOptions } };
                                         });
                                       }}
                                     />
                                     <input
-                                      type="text"
-                                      className="flex-1 px-2 py-1 text-[11px] border rounded bg-white"
-                                      placeholder="Part Label (e.g. 'State...') "
-                                      value={part.description || ''}
-                                      onChange={(e) => {
+                                      className="flex-1 border-b text-[11px] bg-transparent"
+                                      value={sp.description || ''}
+                                      placeholder="Sub-part description"
+                                      onChange={e => {
+                                        const val = e.target.value;
                                         setActiveConfig(prev => {
                                           if (!prev) return null;
                                           const newOptions = [...(prev.config.options || [])];
-                                          const newParts = [...(newOptions[idx].parts || [])];
-                                          newParts[pIdx] = { ...newParts[pIdx], description: e.target.value };
-                                          newOptions[idx] = { ...newOptions[idx], parts: newParts };
+                                          newOptions[idx].sub_parts![spIdx].description = val;
                                           return { ...prev, config: { ...prev.config, options: newOptions } };
                                         });
                                       }}
                                     />
-                                    <div className="flex items-center gap-1">
-                                      <input
-                                        type="number"
-                                        className="w-10 px-1 py-1 text-xs border rounded bg-white text-center"
-                                        value={part.marks}
-                                        onChange={(e) => {
-                                          setActiveConfig(prev => {
-                                            if (!prev) return null;
-                                            const newOptions = [...(prev.config.options || [])];
-                                            const newParts = [...(newOptions[idx].parts || [])];
-                                            newParts[pIdx] = { ...newParts[pIdx], marks: parseInt(e.target.value) || 0 };
-                                            newOptions[idx] = { ...newOptions[idx], parts: newParts };
-                                            return { ...prev, config: { ...prev.config, options: newOptions } };
-                                          });
-                                        }}
-                                      />
-                                      <span className="text-[10px] text-slate-400">m</span>
-                                    </div>
+                                    <input
+                                      type="number"
+                                      className="w-10 border-b text-[11px] text-center bg-transparent"
+                                      value={sp.marks}
+                                      onChange={e => {
+                                        const val = parseInt(e.target.value) || 0;
+                                        setActiveConfig(prev => {
+                                          if (!prev) return null;
+                                          const newOptions = [...(prev.config.options || [])];
+                                          newOptions[idx].sub_parts![spIdx].marks = val;
+                                          return { ...prev, config: { ...prev.config, options: newOptions } };
+                                        });
+                                      }}
+                                    />
                                     <button
                                       onClick={() => {
                                         setActiveConfig(prev => {
                                           if (!prev) return null;
                                           const newOptions = [...(prev.config.options || [])];
-                                          const newParts = [...(newOptions[idx].parts || [])].filter((_, i) => i !== pIdx);
-                                          newOptions[idx] = { ...newOptions[idx], parts: newParts };
+                                          newOptions[idx].sub_parts = newOptions[idx].sub_parts!.filter((_, i) => i !== spIdx);
                                           return { ...prev, config: { ...prev.config, options: newOptions } };
                                         });
                                       }}
-                                      className="p-1 text-slate-300 hover:text-red-400 transition-colors"
+                                      className="text-slate-300 hover:text-red-400"
                                     >
                                       <Trash2 className="w-3 h-3" />
                                     </button>
                                   </div>
                                 ))}
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                            )}
 
-                    {/* Multipart Config */}
-                    {activeConfig.config.nested_type === 'multipart' && (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-medium text-slate-900">Sub-questions</h4>
-                          <button
-                            onClick={() => setActiveConfig(prev => {
-                              if (!prev) return null;
-                              const currentSubs = prev.config.sub_questions || [];
-                              const labels = ['i', 'ii', 'iii', 'iv', 'v'];
-                              return {
-                                ...prev,
-                                config: {
-                                  ...prev.config,
-                                  sub_questions: [...currentSubs, { label: labels[currentSubs.length] || '?', marks: 2 }]
-                                }
-                              };
-                            })}
-                            className="text-xs text-blue-600 hover:underline"
-                          >
-                            + Add Sub-question
-                          </button>
-                        </div>
+                            {/* Choice Options for Choice Groups */}
+                            {part.type === 'choice_group' && (
+                              <div className="pl-6 border-l-2 border-indigo-200 ml-2 space-y-3">
+                                {(part.options || []).map((opt, oIdx) => (
+                                  <div key={oIdx}>
+                                    <div className="bg-white p-2 rounded shadow-sm border border-indigo-50">
+                                      <div className="flex gap-2 items-center mb-2">
+                                        <input
+                                          className="w-10 text-xs font-bold text-center border-b"
+                                          value={opt.label}
+                                          placeholder="label"
+                                          onChange={e => {
+                                            const val = e.target.value;
+                                            setActiveConfig(prev => {
+                                              if (!prev) return null;
+                                              const newOptions = [...(prev.config.options || [])];
+                                              newOptions[idx].options![oIdx].label = val;
+                                              return { ...prev, config: { ...prev.config, options: newOptions } };
+                                            });
+                                          }}
+                                        />
+                                        <input
+                                          className="flex-1 text-xs border-b"
+                                          placeholder="Choice description"
+                                          value={opt.description || ''}
+                                          onChange={e => {
+                                            const val = e.target.value;
+                                            setActiveConfig(prev => {
+                                              if (!prev) return null;
+                                              const newOptions = [...(prev.config.options || [])];
+                                              newOptions[idx].options![oIdx].description = val;
+                                              return { ...prev, config: { ...prev.config, options: newOptions } };
+                                            });
+                                          }}
+                                        />
+                                        <input
+                                          type="number"
+                                          className="w-12 text-xs text-center border-b"
+                                          value={opt.marks}
+                                          onChange={e => {
+                                            const val = parseInt(e.target.value) || 0;
+                                            setActiveConfig(prev => {
+                                              if (!prev) return null;
+                                              const newOptions = [...(prev.config.options || [])];
+                                              newOptions[idx].options![oIdx].marks = val;
+                                              return { ...prev, config: { ...prev.config, options: newOptions } };
+                                            });
+                                          }}
+                                        />
+                                        <button
+                                          onClick={() => {
+                                            setActiveConfig(prev => {
+                                              if (!prev) return null;
+                                              const newOptions = [...(prev.config.options || [])];
+                                              newOptions[idx].options = newOptions[idx].options!.filter((_, i) => i !== oIdx);
+                                              return { ...prev, config: { ...prev.config, options: newOptions } };
+                                            });
+                                          }}
+                                          className="text-slate-300 hover:text-red-400"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
 
-                        <div className="space-y-3">
-                          {activeConfig.config.sub_questions?.map((sub, idx) => (
-                            <div key={idx} className="flex items-center gap-3 p-2 bg-slate-50 border border-slate-200 rounded-lg">
-                              <input
-                                type="text"
-                                className="w-12 px-2 py-1 text-sm font-mono border rounded bg-white text-center"
-                                value={sub.label}
-                                onChange={(e) => {
-                                  setActiveConfig(prev => {
-                                    if (!prev) return null;
-                                    const newSubs = [...(prev.config.sub_questions || [])];
-                                    newSubs[idx] = { ...newSubs[idx], label: e.target.value };
-                                    return { ...prev, config: { ...prev.config, sub_questions: newSubs } };
-                                  });
-                                }}
-                              />
-                              <div className="flex-1">
-                                <input
-                                  type="text"
-                                  placeholder="Sub-part Note (e.g. 'Conceptual')"
-                                  className="w-full px-2 py-1 text-[11px] border border-dashed border-slate-300 rounded bg-transparent focus:bg-white outline-none"
-                                  value={sub.description || ''}
-                                  onChange={(e) => {
+                                      {/* Sub-parts for this Choice */}
+                                      <div className="pl-4 border-l border-slate-100 space-y-2">
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-[9px] font-bold text-slate-400">Choice Sub-parts</span>
+                                          <button
+                                            className="text-[9px] text-indigo-500 font-bold hover:underline"
+                                            onClick={() => {
+                                              setActiveConfig(prev => {
+                                                if (!prev) return null;
+                                                const newOptions = [...(prev.config.options || [])];
+                                                const currentSubParts = newOptions[idx].options![oIdx].sub_parts || [];
+                                                newOptions[idx].options![oIdx].sub_parts = [...currentSubParts, { label: (currentSubParts.length + 1).toString(), marks: 1 }];
+                                                return { ...prev, config: { ...prev.config, options: newOptions } };
+                                              });
+                                            }}
+                                          >
+                                            + Add Sub-part
+                                          </button>
+                                        </div>
+                                        {(opt.sub_parts || []).map((sop, sopIdx) => (
+                                          <div key={sopIdx} className="flex gap-2 items-center">
+                                            <input
+                                              className="w-6 text-[10px] text-center border-b bg-transparent"
+                                              value={sop.label}
+                                              onChange={e => {
+                                                const val = e.target.value;
+                                                setActiveConfig(prev => {
+                                                  if (!prev) return null;
+                                                  const newOptions = [...(prev.config.options || [])];
+                                                  newOptions[idx].options![oIdx].sub_parts![sopIdx].label = val;
+                                                  return { ...prev, config: { ...prev.config, options: newOptions } };
+                                                });
+                                              }}
+                                            />
+                                            <input
+                                              className="flex-1 text-[10px] border-b bg-transparent"
+                                              value={sop.description || ''}
+                                              placeholder="part text"
+                                              onChange={e => {
+                                                const val = e.target.value;
+                                                setActiveConfig(prev => {
+                                                  if (!prev) return null;
+                                                  const newOptions = [...(prev.config.options || [])];
+                                                  newOptions[idx].options![oIdx].sub_parts![sopIdx].description = val;
+                                                  return { ...prev, config: { ...prev.config, options: newOptions } };
+                                                });
+                                              }}
+                                            />
+                                            <input
+                                              type="number"
+                                              className="w-8 text-[10px] text-center border-b bg-transparent"
+                                              value={sop.marks}
+                                              onChange={e => {
+                                                const val = parseInt(e.target.value) || 0;
+                                                setActiveConfig(prev => {
+                                                  if (!prev) return null;
+                                                  const newOptions = [...(prev.config.options || [])];
+                                                  newOptions[idx].options![oIdx].sub_parts![sopIdx].marks = val;
+                                                  return { ...prev, config: { ...prev.config, options: newOptions } };
+                                                });
+                                              }}
+                                            />
+                                            <button
+                                              onClick={() => {
+                                                setActiveConfig(prev => {
+                                                  if (!prev) return null;
+                                                  const newOptions = [...(prev.config.options || [])];
+                                                  newOptions[idx].options![oIdx].sub_parts = newOptions[idx].options![oIdx].sub_parts!.filter((_, i) => i !== sopIdx);
+                                                  return { ...prev, config: { ...prev.config, options: newOptions } };
+                                                });
+                                              }}
+                                              className="text-slate-300 hover:text-red-400"
+                                            >
+                                              <Trash2 className="w-2.5 h-2.5" />
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    {oIdx < (part.options || []).length - 1 && (
+                                      <div className="text-[9px] font-black text-indigo-300 text-center py-1 tracking-tighter">— OR —</div>
+                                    )}
+                                  </div>
+                                ))}
+                                <button
+                                  className="text-[10px] font-bold text-indigo-600 hover:underline"
+                                  onClick={() => {
                                     setActiveConfig(prev => {
                                       if (!prev) return null;
-                                      const newSubs = [...(prev.config.sub_questions || [])];
-                                      (newSubs[idx] as any).description = e.target.value;
-                                      return { ...prev, config: { ...prev.config, sub_questions: newSubs } };
+                                      const newOptions = [...(prev.config.options || [])];
+                                      if (!newOptions[idx].options) newOptions[idx].options = [];
+                                      newOptions[idx].options!.push({ label: '', marks: 5 });
+                                      return { ...prev, config: { ...prev.config, options: newOptions } };
                                     });
                                   }}
-                                />
+                                >
+                                  + Add Choice
+                                </button>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  className="w-16 px-2 py-1 text-sm border rounded bg-white text-center"
-                                  value={sub.marks}
-                                  onChange={(e) => {
-                                    setActiveConfig(prev => {
-                                      if (!prev) return null;
-                                      const newSubs = [...(prev.config.sub_questions || [])];
-                                      newSubs[idx] = { ...newSubs[idx], marks: parseInt(e.target.value) || 0 };
-                                      return { ...prev, config: { ...prev.config, sub_questions: newSubs } };
-                                    });
-                                  }}
-                                  placeholder="Marks"
-                                />
-                                <span className="text-sm text-slate-500">marks</span>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  setActiveConfig(prev => {
-                                    if (!prev) return null;
-                                    const newSubs = [...(prev.config.sub_questions || [])].filter((_, i) => i !== idx);
-                                    return { ...prev, config: { ...prev.config, sub_questions: newSubs } };
-                                  });
-                                }}
-                                className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
               </div>
