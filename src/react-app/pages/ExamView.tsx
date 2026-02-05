@@ -141,6 +141,26 @@ export default function ExamView() {
     }
   };
 
+  const handleDownloadQuestionPaper = async () => {
+    if (!exam) return;
+    try {
+      const response = await api.get(`/exams/exams/${exam.id}/question-paper/`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Question_Paper_${exam.title.replace(/\s+/g, '_')}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download question paper:', err);
+      alert('Failed to download question paper. Please try again.');
+    }
+  };
+
   const fetchAudience = async () => {
     try {
       setLoadingAudience(true);
@@ -375,6 +395,14 @@ export default function ExamView() {
                 <BarChart3 className="w-3.5 h-3.5" />
                 Evaluation
               </Link>
+              <button
+                onClick={handleDownloadQuestionPaper}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-slate-800 text-white hover:bg-slate-900 transition-colors"
+                title="Download Question Paper"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download PDF
+              </button>
               <button
                 onClick={() => navigate(`${basePath}/exams/${exam.id}/edit`)}
                 className="p-2 rounded-md hover:bg-slate-100 transition-colors"

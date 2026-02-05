@@ -61,6 +61,7 @@ interface ExtractedQuestion {
   suggested_section_id: number | null;
   assigned_subject: string;
   assigned_section_id: number | null;
+  structure?: any;
 }
 
 interface ImportResult {
@@ -125,7 +126,7 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
 
   const handlePreAnalysisConfirm = async () => {
     if (!preAnalysisResult?.is_valid) return;
-    
+
     setConfirmingPreAnalysis(true);
     setError('');
 
@@ -163,7 +164,7 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
         `/questions/pre-analyze/${preAnalysisJobId}/subjects/${subject.toLowerCase()}/download/`,
         { responseType: 'blob' }
       );
-      
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -214,7 +215,7 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
   const handleImport = async () => {
     // Validate that all selected questions are mapped
     const unmappedQuestions = selectedQuestionIds.filter(id => !sectionMappings[id]);
-    
+
     if (unmappedQuestions.length > 0) {
       setError(`${unmappedQuestions.length} question(s) are not assigned to any section`);
       return;
@@ -234,21 +235,21 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
       };
 
       const response = await api.post('/questions/bulk-import-extracted/', importData);
-      
+
       setImportResult(response.data);
       setCurrentStep('summary');
-      
+
       // If import was successful, notify parent
       if (response.data.success && response.data.imported_count > 0) {
         onImportComplete();
       }
     } catch (err: any) {
       console.error('Import failed:', err);
-      
+
       // Handle error response
       const errorMessage = err.response?.data?.error || 'Failed to import questions';
       const errorDetails = err.response?.data?.errors || [];
-      
+
       setImportResult({
         success: false,
         total_questions: selectedQuestionIds.length,
@@ -257,7 +258,7 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
         errors: errorDetails,
         message: errorMessage,
       });
-      
+
       setCurrentStep('summary');
     } finally {
       setImporting(false);
@@ -368,29 +369,26 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
                   <React.Fragment key={step}>
                     <div className="flex flex-col items-center">
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                          isCompleted
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${isCompleted
                             ? 'bg-green-500 text-white'
                             : isActive
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-200 text-gray-500'
-                        }`}
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-200 text-gray-500'
+                          }`}
                       >
                         {isCompleted ? '✓' : index + 1}
                       </div>
                       <span
-                        className={`text-xs mt-1 ${
-                          isActive ? 'text-blue-600 font-medium' : 'text-gray-500'
-                        }`}
+                        className={`text-xs mt-1 ${isActive ? 'text-blue-600 font-medium' : 'text-gray-500'
+                          }`}
                       >
                         {step}
                       </span>
                     </div>
                     {index < 4 && (
                       <div
-                        className={`flex-1 h-0.5 mx-2 transition-colors ${
-                          isCompleted ? 'bg-green-500' : 'bg-gray-200'
-                        }`}
+                        className={`flex-1 h-0.5 mx-2 transition-colors ${isCompleted ? 'bg-green-500' : 'bg-gray-200'
+                          }`}
                       />
                     )}
                   </React.Fragment>

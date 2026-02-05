@@ -136,7 +136,7 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
       // Transform the response to match the preview format expected by UI
       const extractData = extractResponse.data;
       const totalExtracted = extractData.total_extracted || sections.reduce((sum: number, s: any) => sum + (s.total_extracted || 0), 0);
-      
+
       // Create preview-like structure from extract response
       const previewData = {
         preview: {
@@ -364,12 +364,14 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
                       <span>{expandedSection === section.section_name ? 'Hide' : 'Show'} Questions ({section.questions.length})</span>
                       <span>{expandedSection === section.section_name ? '▲' : '▼'}</span>
                     </button>
-                    
+
                     {expandedSection === section.section_name && (
                       <div className="mt-3 space-y-2 max-h-96 overflow-y-auto">
                         {section.questions.slice(0, 10).map((q: any, qIndex: number) => (
                           <div key={qIndex} className="bg-gray-50 rounded-lg p-3 text-sm">
-                            <p className="font-medium text-gray-900">Q{q.question_number || qIndex + 1}:</p>
+                            <p className="font-medium text-gray-900">
+                              Q{q.question_number || qIndex + 1}: {q.structure?.nested_type ? `[${q.structure.nested_type.toUpperCase()}]` : ''}
+                            </p>
                             <p className="text-gray-700 mt-1 line-clamp-3">{q.question_text}</p>
                             {q.correct_answer && (
                               <p className="text-green-700 mt-1 font-medium">Answer: {q.correct_answer}</p>
@@ -478,13 +480,12 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
               <button
                 key={option.action}
                 onClick={() => handleConfirmImport(option.action)}
-                className={`px-6 py-3 rounded-lg transition-colors flex items-center space-x-2 ${
-                  option.action === 'import_all'
+                className={`px-6 py-3 rounded-lg transition-colors flex items-center space-x-2 ${option.action === 'import_all'
                     ? 'bg-green-600 text-white hover:bg-green-700'
                     : option.action === 'skip'
-                    ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                }`}
+                      ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  }`}
               >
                 <span>{option.label}</span>
               </button>
@@ -572,13 +573,13 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
             </div>
             <div>
               <p className="font-medium text-indigo-900">
-                {importTarget.mode === 'subject' 
+                {importTarget.mode === 'subject'
                   ? `Importing to subject: ${importTarget.targetSubject}`
                   : `Importing to section: ${importTarget.targetSectionName} (${importTarget.targetSubject})`
                 }
               </p>
               <p className="text-sm text-indigo-700">
-                {importTarget.mode === 'section' 
+                {importTarget.mode === 'section'
                   ? 'Only matching question types will be imported'
                   : 'Questions will fill sections in order'
                 }
@@ -592,13 +593,12 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
       <div className="flex items-center justify-center space-x-2 mb-6">
         {subjectsToProcess.map((subject, index) => (
           <React.Fragment key={subject}>
-            <div className={`flex items-center space-x-2 px-4 py-2 rounded-full ${
-              index < currentSubjectIndex
+            <div className={`flex items-center space-x-2 px-4 py-2 rounded-full ${index < currentSubjectIndex
                 ? 'bg-green-100 text-green-700'
                 : index === currentSubjectIndex
-                ? 'bg-indigo-100 text-indigo-700'
-                : 'bg-gray-100 text-gray-500'
-            }`}>
+                  ? 'bg-indigo-100 text-indigo-700'
+                  : 'bg-gray-100 text-gray-500'
+              }`}>
               {index < currentSubjectIndex ? (
                 <CheckCircle className="w-4 h-4" />
               ) : (

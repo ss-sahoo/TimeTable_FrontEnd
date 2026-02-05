@@ -1,5 +1,5 @@
 export const Fetch = async (endPoint, config, headerKey) => {
-  const baseUrl = "https://exams.dashoapp.com"
+  const baseUrl = "http://0.0.0.0:8000"
   const url = `${baseUrl}${endPoint.startsWith("/") ? endPoint : `/${endPoint}`}`
 
   const headers = new Headers(config.headers || {})
@@ -16,7 +16,7 @@ export const Fetch = async (endPoint, config, headerKey) => {
   // Optionally include the Authorization header if a token exists
   const authToken = localStorage.getItem("access_token")
   console.log('Fetch - Auth token from localStorage:', authToken ? 'Token found' : 'No token found')
-  
+
   if (authToken && !headers.has("Authorization")) {
     headers.append("Authorization", `Bearer ${authToken}`)
     console.log('Fetch - Authorization header added')

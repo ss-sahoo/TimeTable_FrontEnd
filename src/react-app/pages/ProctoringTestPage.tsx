@@ -112,7 +112,7 @@ const ProctoringTestPage: React.FC = () => {
 
     // Send to backend for analysis
     try {
-      const response = await fetch('http://localhost:8001/api/exams/test-proctoring/', {
+      const response = await fetch('http://0.0.0.0:8000/api/exams/test-proctoring/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -124,7 +124,7 @@ const ProctoringTestPage: React.FC = () => {
       });
 
       const result: AnalysisResult = await response.json();
-      
+
       setCurrentAnalysis(result);
       setSnapshotCount(prev => prev + 1);
 
@@ -381,13 +381,12 @@ const ProctoringTestPage: React.FC = () => {
                 violations.map((violation, index) => (
                   <div
                     key={index}
-                    className={`p-3 rounded-lg border ${
-                      violation.severity === 'high'
+                    className={`p-3 rounded-lg border ${violation.severity === 'high'
                         ? 'bg-red-500/20 border-red-500/50'
                         : violation.severity === 'medium'
-                        ? 'bg-orange-500/20 border-orange-500/50'
-                        : 'bg-yellow-500/20 border-yellow-500/50'
-                    }`}
+                          ? 'bg-orange-500/20 border-orange-500/50'
+                          : 'bg-yellow-500/20 border-yellow-500/50'
+                      }`}
                   >
                     <div className="flex items-start gap-3">
                       <span className="text-2xl">{getViolationIcon(violation.type)}</span>
@@ -400,13 +399,12 @@ const ProctoringTestPage: React.FC = () => {
                         </div>
                         <p className="text-sm text-slate-300">{violation.message}</p>
                         <div className="flex items-center gap-2 mt-2">
-                          <span className={`text-xs px-2 py-0.5 rounded ${
-                            violation.severity === 'high'
+                          <span className={`text-xs px-2 py-0.5 rounded ${violation.severity === 'high'
                               ? 'bg-red-600'
                               : violation.severity === 'medium'
-                              ? 'bg-orange-600'
-                              : 'bg-yellow-600'
-                          }`}>
+                                ? 'bg-orange-600'
+                                : 'bg-yellow-600'
+                            }`}>
                             {violation.severity.toUpperCase()}
                           </span>
                           <span className="text-xs text-slate-400">
