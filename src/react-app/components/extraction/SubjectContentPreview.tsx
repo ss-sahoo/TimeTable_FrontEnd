@@ -26,7 +26,7 @@ interface DocumentSection {
   type_hint: string;
   question_range: string;
   format_description: string;
-  start_marker: string;
+  start_marker?: string;
 }
 
 interface DocumentStructure {
@@ -68,15 +68,15 @@ const SubjectContentPreview: React.FC<SubjectContentPreviewProps> = ({
     try {
       setLoading(true);
       const response = await api.get(`/questions/pre-analyze/${preAnalysisJobId}/subjects/`);
-      
+
       const contents: SubjectContent[] = response.data.subjects.map((s: any) => ({
         subject: s.subject,
         content: s.content_preview,
         contentLength: s.full_content_length,
       }));
-      
+
       setSubjectContents(contents);
-      
+
       // Auto-expand first subject
       if (contents.length > 0) {
         setExpandedSubject(contents[0].subject);
@@ -96,7 +96,7 @@ const SubjectContentPreview: React.FC<SubjectContentPreviewProps> = ({
         `/questions/pre-analyze/${preAnalysisJobId}/subjects/${subject.toLowerCase()}/download/`,
         { responseType: 'blob' }
       );
-      
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -297,7 +297,7 @@ const SubjectContentPreview: React.FC<SubjectContentPreviewProps> = ({
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{subjectContent.subject}</h3>
                   <p className="text-sm text-gray-500">
-                    {subjectContent.contentLength > 1024 
+                    {subjectContent.contentLength > 1024
                       ? `${Math.round(subjectContent.contentLength / 1024)}KB`
                       : `${subjectContent.contentLength}B`}
                   </p>

@@ -175,6 +175,57 @@ const normalizeOptionValue = (value?: string | null) =>
   stripOptionContent(value).toLowerCase();
 
 /**
+ * Normalize options array to ensure all items are strings.
+ * Handles both string arrays and object arrays (e.g., {text: 'option'} or {value: 'option'}).
+ * Falls back to default empty options if input is invalid.
+ */
+const normalizeOptionsToStrings = (options: unknown): string[] => {
+  if (!options || !Array.isArray(options)) {
+    return ['', '', '', ''];
+  }
+
+  return options.map((opt: unknown) => {
+    if (typeof opt === 'string') {
+      return opt;
+    }
+    if (opt && typeof opt === 'object') {
+      // Handle common object formats for options
+      const objOpt = opt as Record<string, unknown>;
+      if (typeof objOpt.text === 'string') return objOpt.text;
+      if (typeof objOpt.value === 'string') return objOpt.value;
+      if (typeof objOpt.content === 'string') return objOpt.content;
+      if (typeof objOpt.option === 'string') return objOpt.option;
+      if (typeof objOpt.label === 'string') return objOpt.label;
+      // Try to stringify if nothing else works
+      try {
+        return JSON.stringify(opt);
+      } catch {
+        return '';
+      }
+    }
+    // Fallback: convert to string
+    return String(opt ?? '');
+  });
+};
+
+/**
+ * Safely convert an option to string for comparison/display.
+ * Handles both string options and object options.
+ */
+const safeOptionString = (opt: unknown): string => {
+  if (typeof opt === 'string') return opt;
+  if (opt && typeof opt === 'object') {
+    const objOpt = opt as Record<string, unknown>;
+    if (typeof objOpt.text === 'string') return objOpt.text;
+    if (typeof objOpt.value === 'string') return objOpt.value;
+    if (typeof objOpt.content === 'string') return objOpt.content;
+    if (typeof objOpt.option === 'string') return objOpt.option;
+    if (typeof objOpt.label === 'string') return objOpt.label;
+  }
+  return String(opt ?? '');
+};
+
+/**
  * Convert a letter answer (A, B, C, D) to the actual option text
  * If the answer is already the option text or not a letter, return as-is
  */
@@ -747,7 +798,7 @@ export default function EnhancedQuestionEditor() {
       }
 
       console.log('Loading existing question from results:', question);
-      const options = question.options || ['', '', '', ''];
+      const options = normalizeOptionsToStrings(question.options);
       const rawAnswer = question.correct_answer || '';
       const questionType = question.question_type || 'mcq';
       const correctAnswer = (questionType === 'single_mcq' || questionType === 'mcq' || questionType === 'multiple_mcq')
@@ -778,7 +829,7 @@ export default function EnhancedQuestionEditor() {
       }
 
       console.log('Loading existing question from array:', question);
-      const options = question.options || ['', '', '', ''];
+      const options = normalizeOptionsToStrings(question.options);
       const rawAnswer = question.correct_answer || '';
       const questionType = question.question_type || 'mcq';
       const correctAnswer = (questionType === 'single_mcq' || questionType === 'mcq' || questionType === 'multiple_mcq')
@@ -1469,7 +1520,7 @@ export default function EnhancedQuestionEditor() {
           formData.question_type === 'single_mcq' ||
             formData.question_type === 'multiple_mcq' ||
             formData.question_type === 'mcq'
-            ? formData.options.filter(opt => opt.trim())
+            ? formData.options.filter(opt => safeOptionString(opt).trim())
             : [],
         question_number: absoluteQuestionNumberForSave,
         question_number_in_pattern: currentQuestionNumber,
@@ -2419,7 +2470,7 @@ export default function EnhancedQuestionEditor() {
                       >
                         <option value="">Select correct option...</option>
                         {formData.options.map((option, index) => {
-                          if (!option.trim()) return null;
+                          if (!safeOptionString(option).trim()) return null;
                           return (
                             <option key={index} value={index}>
                               {String.fromCharCode(65 + index)}:{' '}
@@ -2432,7 +2483,7 @@ export default function EnhancedQuestionEditor() {
                       <div className="space-y-3">
                         <p className="text-sm text-purple-700 font-medium">Select all correct options:</p>
                         <div className="grid grid-cols-2 gap-3">
-                          {formData.options.filter(o => o.trim()).map((option, index) => {
+                          {formData.options.filter(o => safeOptionString(o).trim()).map((option, index) => {
                             const isChecked =
                               normalizeOptionValue(option) !== '' &&
                               (formData.correct_answer
@@ -2490,7 +2541,7 @@ export default function EnhancedQuestionEditor() {
                                   className="w-4 h-4 text-purple-600 border-purple-300 rounded focus:ring-purple-500"
                                 />
                                 <span className="text-sm font-medium text-purple-800">
-                                  {String.fromCharCode(65 + index)}: {option.replace(/<[^>]*>/g, '').substring(0, 30)}...
+                                  {String.fromCharCode(65 + index)}: {safeOptionString(option).replace(/<[^>]*>/g, '').substring(0, 30)}...
                                 </span>
                               </label>
                             );

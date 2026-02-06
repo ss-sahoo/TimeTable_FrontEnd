@@ -19,6 +19,7 @@ interface DocumentSection {
   format_description: string;
   marks_per_question?: number | null;
   negative_marking?: number | null;
+  start_marker?: string;
 }
 
 interface MarkingScheme {
@@ -39,6 +40,15 @@ interface DocumentStructure {
   total_questions_detected?: number;
 }
 
+interface SectionsBySubject {
+  [subject: string]: {
+    sections: DocumentSection[];
+    has_instructions?: boolean;
+    instructions_text?: string;
+    error?: string;
+  };
+}
+
 interface ValidationResult {
   isValid: boolean;
   documentType: string;
@@ -47,6 +57,7 @@ interface ValidationResult {
   detectedSubjects: string[];
   matchedSubjects: string[];
   documentStructure?: DocumentStructure | null;
+  detectedSectionsPerSubject?: SectionsBySubject | null;
   errorMessage?: string;
   reason?: string;
 }
@@ -76,6 +87,8 @@ interface BulkImportState {
   // Import target selection
   importTarget: ImportTarget | null;
   totalEstimatedQuestions: number;
+  // Per-subject sections (cached from pre-analysis)
+  sectionsBySubject: SectionsBySubject | null;
 }
 
 // Enhanced steps - includes structure analysis, target selection, and question extraction
@@ -92,6 +105,7 @@ const STEPS = [
 interface DocumentStructureViewProps {
   documentStructure?: DocumentStructure | null;
   matchedSubjects: string[];
+  sectionsBySubject?: SectionsBySubject | null;
   onBack: () => void;
   onProceed: () => void;
 }
@@ -99,11 +113,18 @@ interface DocumentStructureViewProps {
 const DocumentStructureView: React.FC<DocumentStructureViewProps> = ({
   documentStructure,
   matchedSubjects,
+  sectionsBySubject,
   onBack,
   onProceed,
 }) => {
   const sections = documentStructure?.sections || [];
   const hasStructure = sections.length > 0;
+  const hasSubjectSections = sectionsBySubject && Object.keys(sectionsBySubject).length > 0;
+
+  // Calculate total sections from per-subject data
+  const totalSubjectSections = hasSubjectSections
+    ? Object.values(sectionsBySubject!).reduce((sum, s) => sum + (s.sections?.length || 0), 0)
+    : 0;
 
   // Get section type badge color
   const getSectionTypeColor = (typeHint: string) => {
@@ -141,6 +162,18 @@ const DocumentStructureView: React.FC<DocumentStructureViewProps> = ({
     return labels[typeHint] || typeHint;
   };
 
+  // Get subject color
+  const getSubjectColor = (index: number) => {
+    const colors = [
+      { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600', icon: 'bg-blue-100' },
+      { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-600', icon: 'bg-green-100' },
+      { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600', icon: 'bg-purple-100' },
+      { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-600', icon: 'bg-amber-100' },
+      { bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-600', icon: 'bg-pink-100' },
+    ];
+    return colors[index % colors.length];
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -160,8 +193,10 @@ const DocumentStructureView: React.FC<DocumentStructureViewProps> = ({
         {/* Summary Stats */}
         <div className="grid grid-cols-4 gap-4 mt-4">
           <div className="bg-white rounded-lg p-4 text-center border border-amber-100">
-            <p className="text-3xl font-bold text-amber-600">{sections.length}</p>
-            <p className="text-sm text-gray-600">Sections</p>
+            <p className="text-3xl font-bold text-amber-600">
+              {hasSubjectSections ? totalSubjectSections : sections.length}
+            </p>
+            <p className="text-sm text-gray-600">Total Sections</p>
           </div>
           <div className="bg-white rounded-lg p-4 text-center border border-amber-100">
             <p className="text-3xl font-bold text-blue-600">{matchedSubjects.length}</p>
@@ -199,14 +234,91 @@ const DocumentStructureView: React.FC<DocumentStructureViewProps> = ({
         </div>
       )}
 
-      {/* Sections Grid */}
-      {hasStructure ? (
+      {/* Per-Subject Sections (NEW - Enhanced View) */}
+      {hasSubjectSections ? (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+            <BookOpen className="w-5 h-5 text-gray-600" />
+            <span>Sections by Subject ({totalSubjectSections} sections across {Object.keys(sectionsBySubject!).length} subjects)</span>
+          </h3>
+
+          <div className="space-y-6">
+            {Object.entries(sectionsBySubject!).map(([subject, subjectData], subjectIndex) => {
+              const color = getSubjectColor(subjectIndex);
+              const subjectSections = subjectData.sections || [];
+
+              return (
+                <div key={subject} className={`${color.bg} border ${color.border} rounded-xl overflow-hidden`}>
+                  {/* Subject Header */}
+                  <div className={`p-4 ${color.icon} border-b ${color.border}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-10 h-10 ${color.icon} rounded-lg flex items-center justify-center`}>
+                          <BookOpen className={`w-5 h-5 ${color.text}`} />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900">{subject}</h4>
+                          <p className="text-xs text-gray-600">
+                            {subjectSections.length} section(s) detected
+                          </p>
+                        </div>
+                      </div>
+                      {subjectData.has_instructions && (
+                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                          Has Instructions
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Subject Sections */}
+                  <div className="p-4">
+                    {subjectSections.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {subjectSections.map((section, sectionIndex) => (
+                          <div
+                            key={sectionIndex}
+                            className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                <span className={`w-6 h-6 ${color.icon} rounded-full flex items-center justify-center text-xs font-bold ${color.text}`}>
+                                  {sectionIndex + 1}
+                                </span>
+                                <h5 className="font-medium text-gray-900 text-sm">{section.name}</h5>
+                              </div>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getSectionTypeColor(section.type_hint)}`}>
+                                {formatTypeHint(section.type_hint)}
+                              </span>
+                            </div>
+                            {section.question_range && section.question_range !== 'Unknown' && (
+                              <p className="text-xs text-gray-500">Questions: {section.question_range}</p>
+                            )}
+                            {section.format_description && (
+                              <p className="text-xs text-gray-500 mt-1">{section.format_description}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 text-center py-2">
+                        No specific sections detected for this subject
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : hasStructure ? (
+        /* Fallback: Document-level Sections (Original View) */
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
             <Layers className="w-5 h-5 text-gray-600" />
             <span>Detected Sections ({sections.length})</span>
           </h3>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {sections.map((section, index) => (
               <div
@@ -229,7 +341,7 @@ const DocumentStructureView: React.FC<DocumentStructureViewProps> = ({
                     {formatTypeHint(section.type_hint)}
                   </span>
                 </div>
-                
+
                 {section.format_description && (
                   <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 mt-2">
                     {section.format_description}
@@ -380,7 +492,7 @@ const SubjectCategorization: React.FC<SubjectCategorizationProps> = ({
           <div>
             <h3 className="font-semibold text-green-900 mb-2">Ready for Review</h3>
             <p className="text-sm text-green-800">
-              In the next step, you'll be able to preview the content for each subject and download 
+              In the next step, you'll be able to preview the content for each subject and download
               individual files. You can review the categorization and make any necessary adjustments.
             </p>
           </div>
@@ -419,6 +531,7 @@ export default function BulkImportPage() {
     showValidationModal: false,
     importTarget: null,
     totalEstimatedQuestions: 0,
+    sectionsBySubject: null,
   });
 
   const handleFileSelect = async (file: File) => {
@@ -435,7 +548,7 @@ export default function BulkImportPage() {
       });
 
       const result = preAnalysisResponse.data;
-      
+
       const validationResult: ValidationResult = {
         isValid: result.is_valid,
         documentType: result.document_type,
@@ -444,9 +557,13 @@ export default function BulkImportPage() {
         detectedSubjects: result.detected_subjects || [],
         matchedSubjects: result.matched_subjects || [],
         documentStructure: parseDocumentStructure(result.document_structure),
+        detectedSectionsPerSubject: result.detected_sections_per_subject || null,
         errorMessage: result.error_message,
         reason: result.reason,
       };
+
+      // Store sections by subject from pre-analysis
+      const sectionsBySubject = result.detected_sections_per_subject || null;
 
       setState(prev => ({
         ...prev,
@@ -455,6 +572,7 @@ export default function BulkImportPage() {
         preAnalysisJobId: result.job_id,
         showValidationModal: true,
         totalEstimatedQuestions: result.total_estimated_questions || 0,
+        sectionsBySubject,
       }));
 
     } catch (error: any) {
@@ -479,8 +597,8 @@ export default function BulkImportPage() {
 
   const handleProceedToAnalysis = () => {
     // Move to step 2 (structure analysis)
-    setState(prev => ({ 
-      ...prev, 
+    setState(prev => ({
+      ...prev,
       showValidationModal: false,
       currentStep: 2
     }));
@@ -488,8 +606,8 @@ export default function BulkImportPage() {
 
   const handleProceedToReview = () => {
     // Move to step 4 (review & download)
-    setState(prev => ({ 
-      ...prev, 
+    setState(prev => ({
+      ...prev,
       currentStep: 4
     }));
   };
@@ -545,6 +663,7 @@ export default function BulkImportPage() {
           <DocumentStructureView
             documentStructure={state.validationResult.documentStructure}
             matchedSubjects={state.validationResult.matchedSubjects}
+            sectionsBySubject={state.sectionsBySubject}
             onBack={handleBackToUpload}
             onProceed={() => setState(prev => ({ ...prev, currentStep: 3 }))}
           />
@@ -592,10 +711,10 @@ export default function BulkImportPage() {
             extractedQuestionCount={state.totalEstimatedQuestions}
             documentStructure={state.validationResult.documentStructure}
             onBack={() => setState(prev => ({ ...prev, currentStep: 4 }))}
-            onProceed={(target) => setState(prev => ({ 
-              ...prev, 
+            onProceed={(target) => setState(prev => ({
+              ...prev,
               currentStep: 6,
-              importTarget: target 
+              importTarget: target
             }))}
           />
         );
@@ -803,8 +922,8 @@ export default function BulkImportPage() {
                         <Layers className="w-4 h-4" />
                         <span>Detected Question Types:</span>
                       </h4>
-                      {state.validationResult.documentStructure?.sections && 
-                       state.validationResult.documentStructure.sections.length > 0 ? (
+                      {state.validationResult.documentStructure?.sections &&
+                        state.validationResult.documentStructure.sections.length > 0 ? (
                         <div className="space-y-1.5 max-h-48 overflow-y-auto">
                           {state.validationResult.documentStructure.sections.map((section, idx) => (
                             <div

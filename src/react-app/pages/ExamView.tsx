@@ -35,11 +35,14 @@ import {
   Plus,
   Target,
   TrendingUp,
-  Layers
+  Layers,
+  Brain
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
 import QuestionBulkImport from '../components/extraction/QuestionBulkImport';
+import OMRManagement from '../components/OMRManagement';
+import AnswerSheetUpload from '../components/AnswerSheetUpload';
 
 const slugifySubject = (subject: string) =>
   subject
@@ -89,6 +92,10 @@ interface Exam {
   show_results_immediately: boolean;
   instructions: string;
   timezone?: string;
+  // Exam mode fields
+  exam_mode?: 'online' | 'offline_omr' | 'offline_subjective';
+  ai_evaluation_enabled?: boolean;
+  marking_strictness?: 'lenient' | 'moderate' | 'strict';
 }
 
 interface SectionQuestionStats {
@@ -112,7 +119,7 @@ export default function ExamView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showBulkImport, setShowBulkImport] = useState(false);
-  const [activeTab, setActiveTab] = useState<'details' | 'audience'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'audience' | 'evaluation'>('details');
   const [audienceData, setAudienceData] = useState<any>(null);
   const [loadingAudience, setLoadingAudience] = useState(false);
   const [audienceSearch, setAudienceSearch] = useState('');
@@ -496,6 +503,23 @@ export default function ExamView() {
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full" />
             )}
           </button>
+          {/* Show Evaluation tab for offline exam modes */}
+          {(exam.exam_mode === 'offline_omr' || exam.exam_mode === 'offline_subjective') && (
+            <button
+              onClick={() => setActiveTab('evaluation')}
+              className={`px-4 py-2 text-sm font-medium transition-colors relative flex items-center gap-1.5 ${activeTab === 'evaluation'
+                ? exam.exam_mode === 'offline_omr' ? 'text-green-600' : 'text-purple-600'
+                : 'text-slate-500 hover:text-slate-700'
+                }`}
+            >
+              <Brain className="w-3.5 h-3.5" />
+              {exam.exam_mode === 'offline_omr' ? 'OMR Evaluation' : 'AI Evaluation'}
+              {activeTab === 'evaluation' && (
+                <div className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full ${exam.exam_mode === 'offline_omr' ? 'bg-green-600' : 'bg-purple-600'
+                  }`} />
+              )}
+            </button>
+          )}
         </div>
 
         {/* Main Content Area */}
@@ -682,7 +706,7 @@ export default function ExamView() {
               )}
             </aside>
           </div>
-        ) : (
+        ) : activeTab === 'audience' ? (
           /* Audience Tab Content */
           <div className="space-y-4">
             {/* Audience Header & Info */}
@@ -876,7 +900,17 @@ export default function ExamView() {
               </div>
             </div>
           </div>
-        )}
+        ) : activeTab === 'evaluation' ? (
+          /* Evaluation Tab Content - OMR/AI Evaluation */
+          <div className="space-y-4">
+            {exam.exam_mode === 'offline_omr' && (
+              <OMRManagement examId={exam.id} examTitle={exam.title} />
+            )}
+            {exam.exam_mode === 'offline_subjective' && (
+              <AnswerSheetUpload examId={exam.id} examTitle={exam.title} />
+            )}
+          </div>
+        ) : null}
       </div>
 
       {/* Bulk Import Modal */}
