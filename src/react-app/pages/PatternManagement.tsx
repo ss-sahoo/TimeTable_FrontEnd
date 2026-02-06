@@ -20,7 +20,8 @@ import {
   Calculator,
   FileText,
   Hash,
-  Type
+  Type,
+  Monitor
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
@@ -52,6 +53,7 @@ interface ExamPattern {
     email: string;
   };
   is_active: boolean;
+  exam_mode: 'online' | 'offline_omr' | 'offline_subjective';
 }
 
 export default function PatternManagement() {
@@ -361,6 +363,12 @@ export default function PatternManagement() {
                   }`}>
                   {pattern.is_active ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
                   {pattern.is_active ? 'Active' : 'Inactive'}
+                </span>
+                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${pattern.exam_mode === 'online' ? 'bg-blue-100 text-blue-700' :
+                  pattern.exam_mode === 'offline_omr' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                  }`}>
+                  <Monitor className="w-3 h-3" />
+                  {pattern.exam_mode === 'online' ? 'Online' : pattern.exam_mode === 'offline_omr' ? 'Offline OMR' : 'Offline Subjective'}
                 </span>
               </div>
 

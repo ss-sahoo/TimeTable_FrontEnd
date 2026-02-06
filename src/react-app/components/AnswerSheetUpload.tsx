@@ -74,12 +74,12 @@ export default function AnswerSheetUpload({ examId, examTitle }: AnswerSheetUplo
             setLoading(true);
             setError(null);
 
-            const statusRes = await api.get(`/ai-evaluation/${examId}/ai-evaluation-status/`);
+            const [statusRes, submissionsRes] = await Promise.all([
+                api.get(`/ai-evaluation/${examId}/ai-evaluation-status/`),
+                api.get(`/ai-evaluation/${examId}/submissions/`)
+            ]);
             setAIStatus(statusRes.data);
-
-            // Note: We'd need an endpoint to list past submissions
-            // For now, status gives us counts
-            setSubmissions([]);
+            setSubmissions(submissionsRes.data);
         } catch (err) {
             console.error('Failed to fetch AI evaluation data:', err);
             setError('Failed to load AI evaluation status');
@@ -302,8 +302,8 @@ export default function AnswerSheetUpload({ examId, examTitle }: AnswerSheetUplo
             {/* Upload Zone */}
             <div
                 className={`mb-6 p-8 border-2 border-dashed rounded-xl text-center transition-all ${dragActive
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-slate-300 hover:border-purple-400 hover:bg-slate-50'
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-slate-300 hover:border-purple-400 hover:bg-slate-50'
                     }`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}

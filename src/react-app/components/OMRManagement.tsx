@@ -10,10 +10,10 @@ import {
     Clock,
     RefreshCw,
     Eye,
-    Trash2,
     Plus,
     ChevronDown,
-    ChevronRight
+    ChevronRight,
+    Award
 } from 'lucide-react';
 
 interface OMRSheet {
@@ -24,6 +24,7 @@ interface OMRSheet {
     answer_key_pdf: string | null;
     status: string;
     created_at: string;
+    metadata?: any;
 }
 
 interface OMRSubmission {
@@ -33,9 +34,48 @@ interface OMRSubmission {
     scanned_pdf: string;
     status: string;
     evaluation_result: any;
+    evaluation_results?: EvaluationResults;
     score: number | null;
     max_score: number | null;
+    percentage?: number | null;
     created_at: string;
+    submitted_at?: string;
+    student_name?: string;
+    student_email?: string;
+    annotated_pdf?: string;
+    annotated_pdf_url?: string;
+}
+
+interface EvaluationDetail {
+    question: string;
+    verdict: 'CORRECT' | 'INCORRECT' | 'NOT_ATTEMPTED';
+    student_answer: string[];
+    correct_answer: string[];
+    marks_awarded: number;
+    bubble_filled_remark?: string;
+}
+
+interface EvaluationResults {
+    score: number;
+    max_score: number;
+    percentage: number;
+    correct: number;
+    incorrect: number;
+    attempted: number;
+    total_questions: number;
+    pass: boolean;
+    details: EvaluationDetail[];
+}
+
+interface AnswerKey {
+    id: number;
+    exam: number;
+    answers: Record<string, {
+        correct: string[];
+        marks: number;
+        negative: number;
+    }>;
+    updated_at: string;
 }
 
 interface OMRManagementProps {
@@ -53,7 +93,24 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
     const [expandedSheet, setExpandedSheet] = useState<number | null>(null);
-    const [activeTab, setActiveTab] = useState<'sheets' | 'submissions'>('sheets');
+    const [activeTab, setActiveTab] = useState<'sheets' | 'submissions' | 'answer_key'>('sheets');
+    const [answerKey, setAnswerKey] = useState<AnswerKey | null>(null);
+    const [uploadingMaster, setUploadingMaster] = useState(false);
+    const [selectedMasterFile, setSelectedMasterFile] = useState<File | null>(null);
+
+    // Answer key form state
+    const [answerFormData, setAnswerFormData] = useState<Record<string, {
+        correct: string[];
+        marks: number;
+        negative: number;
+    }>>({});
+    const [totalQuestions, setTotalQuestions] = useState(20);
+    const [savingAnswerKey, setSavingAnswerKey] = useState(false);
+    const [defaultMarks, setDefaultMarks] = useState(4);
+    const [defaultNegative, setDefaultNegative] = useState(1);
+
+    // Submission details view
+    const [selectedSubmission, setSelectedSubmission] = useState<OMRSubmission | null>(null);
 
     useEffect(() => {
         fetchOMRData();
@@ -64,13 +121,20 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
             setLoading(true);
             setError(null);
 
-            const [sheetsRes, submissionsRes] = await Promise.all([
+            const [sheetsRes, submissionsRes, answerKeyRes] = await Promise.all([
                 api.get(`/omr/sheets/?exam_id=${examId}`),
-                api.get(`/omr/submissions/?exam_id=${examId}`)
+                api.get(`/omr/submissions/?exam_id=${examId}`),
+                api.get(`/omr/answer-keys/exam/${examId}/`).catch(() => ({ data: null }))
             ]);
 
             setSheets(sheetsRes.data.results || sheetsRes.data || []);
             setSubmissions(submissionsRes.data.results || submissionsRes.data || []);
+            setAnswerKey(answerKeyRes.data);
+
+            // Initialize answer form data from existing answer key
+            if (answerKeyRes.data?.answers) {
+                setAnswerFormData(answerKeyRes.data.answers);
+            }
         } catch (err) {
             console.error('Failed to fetch OMR data:', err);
             setError('Failed to load OMR data');
@@ -83,12 +147,9 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
         try {
             setGenerating(true);
             setError(null);
-
             await api.post(`/omr/sheets/generate/${examId}/`);
-
-            setSuccess('OMR sheet generated successfully!');
+            setSuccess('OMR sheet generation started!');
             await fetchOMRData();
-
             setTimeout(() => setSuccess(null), 3000);
         } catch (err: any) {
             console.error('Failed to generate OMR sheet:', err);
@@ -107,11 +168,9 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
 
     const handleUploadSubmission = async () => {
         if (!selectedFile) return;
-
         try {
             setUploading(true);
             setError(null);
-
             const formData = new FormData();
             formData.append('files', selectedFile);
             formData.append('auto_evaluate', 'true');
@@ -123,13 +182,36 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
             setSuccess('OMR sheet uploaded and evaluation started!');
             setSelectedFile(null);
             await fetchOMRData();
-
             setTimeout(() => setSuccess(null), 3000);
         } catch (err: any) {
             console.error('Failed to upload OMR submission:', err);
             setError(err.response?.data?.error || 'Failed to upload scanned sheet');
         } finally {
             setUploading(false);
+        }
+    };
+
+    const handleUploadMaster = async () => {
+        if (!selectedMasterFile) return;
+        try {
+            setUploadingMaster(true);
+            setError(null);
+            const formData = new FormData();
+            formData.append('file', selectedMasterFile);
+
+            const response = await api.post(`/omr/answer-keys/upload-master/${examId}/`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            setSuccess('Answer key extracted successfully from master sheet!');
+            setAnswerKey(response.data.answer_key);
+            setSelectedMasterFile(null);
+            setTimeout(() => setSuccess(null), 3000);
+        } catch (err: any) {
+            console.error('Failed to upload master sheet:', err);
+            setError(err.response?.data?.error || 'Failed to extract answer key');
+        } finally {
+            setUploadingMaster(false);
         }
     };
 
@@ -146,14 +228,115 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
         }
     };
 
+    // Toggle answer selection for a question
+    const handleAnswerToggle = (questionNum: number, option: string) => {
+        const qKey = `Q${questionNum}`;
+        setAnswerFormData(prev => {
+            const current = prev[qKey] || { correct: [], marks: defaultMarks, negative: defaultNegative };
+            const isSelected = current.correct.includes(option);
+
+            return {
+                ...prev,
+                [qKey]: {
+                    ...current,
+                    correct: isSelected
+                        ? current.correct.filter(o => o !== option)
+                        : [...current.correct, option]
+                }
+            };
+        });
+    };
+
+    // Set single answer (replace, not toggle)
+    const handleSetAnswer = (questionNum: number, option: string) => {
+        const qKey = `Q${questionNum}`;
+        setAnswerFormData(prev => ({
+            ...prev,
+            [qKey]: {
+                correct: [option],
+                marks: prev[qKey]?.marks ?? defaultMarks,
+                negative: prev[qKey]?.negative ?? defaultNegative
+            }
+        }));
+    };
+
+    // Update marks for a question
+    const handleMarksChange = (questionNum: number, marks: number, negative: number) => {
+        const qKey = `Q${questionNum}`;
+        setAnswerFormData(prev => ({
+            ...prev,
+            [qKey]: {
+                ...prev[qKey],
+                correct: prev[qKey]?.correct || [],
+                marks,
+                negative
+            }
+        }));
+    };
+
+    // Save answer key to backend
+    const handleSaveAnswerKey = async () => {
+        try {
+            setSavingAnswerKey(true);
+            setError(null);
+
+            // Validate: ensure all questions have at least one answer
+            const emptyQuestions: string[] = [];
+            for (let i = 1; i <= totalQuestions; i++) {
+                const qKey = `Q${i}`;
+                if (!answerFormData[qKey] || answerFormData[qKey].correct.length === 0) {
+                    emptyQuestions.push(qKey);
+                }
+            }
+
+            if (emptyQuestions.length > 0) {
+                setError(`Please select answers for: ${emptyQuestions.slice(0, 5).join(', ')}${emptyQuestions.length > 5 ? '...' : ''}`);
+                setSavingAnswerKey(false);
+                return;
+            }
+
+            // Build the payload
+            const payload: Record<string, any> = {};
+            for (let i = 1; i <= totalQuestions; i++) {
+                const qKey = `Q${i}`;
+                payload[qKey] = {
+                    correct: answerFormData[qKey].correct,
+                    marks: answerFormData[qKey].marks ?? defaultMarks,
+                    negative: answerFormData[qKey].negative ?? defaultNegative
+                };
+            }
+
+            const response = await api.post(`/omr/answer-keys/set-answers/${examId}/`, payload);
+
+            setSuccess('Answer key saved successfully!');
+            setAnswerKey(response.data.answer_key);
+            setTimeout(() => setSuccess(null), 3000);
+        } catch (err: any) {
+            console.error('Failed to save answer key:', err);
+            setError(err.response?.data?.error || err.response?.data?.details?.join(', ') || 'Failed to save answer key');
+        } finally {
+            setSavingAnswerKey(false);
+        }
+    };
+
+    // Initialize all questions with default values
+    const handleInitializeQuestions = () => {
+        const initial: Record<string, { correct: string[]; marks: number; negative: number }> = {};
+        for (let i = 1; i <= totalQuestions; i++) {
+            initial[`Q${i}`] = answerFormData[`Q${i}`] || { correct: [], marks: defaultMarks, negative: defaultNegative };
+        }
+        setAnswerFormData(initial);
+    };
+
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'generated':
             case 'completed':
+            case 'evaluated':
                 return (
                     <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
                         <CheckCircle className="w-3 h-3" />
-                        {status === 'generated' ? 'Generated' : 'Completed'}
+                        {status === 'generated' ? 'Generated' : status === 'evaluated' ? 'Evaluated' : 'Completed'}
                     </span>
                 );
             case 'pending':
@@ -225,7 +408,6 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
                 </button>
             </div>
 
-            {/* Alert Messages */}
             {error && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -240,215 +422,272 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
                 </div>
             )}
 
-            {/* Tab Navigation */}
             <div className="flex gap-2 mb-6">
                 <button
                     onClick={() => setActiveTab('sheets')}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'sheets'
-                            ? 'bg-green-100 text-green-700'
-                            : 'text-slate-600 hover:bg-slate-100'
-                        }`}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'sheets' ? 'bg-green-100 text-green-700' : 'text-slate-600 hover:bg-slate-100'}`}
                 >
                     OMR Sheets ({sheets.length})
                 </button>
                 <button
                     onClick={() => setActiveTab('submissions')}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'submissions'
-                            ? 'bg-green-100 text-green-700'
-                            : 'text-slate-600 hover:bg-slate-100'
-                        }`}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'submissions' ? 'bg-green-100 text-green-700' : 'text-slate-600 hover:bg-slate-100'}`}
                 >
                     Submissions ({submissions.length})
+                </button>
+                <button
+                    onClick={() => setActiveTab('answer_key')}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'answer_key' ? 'bg-green-100 text-green-700' : 'text-slate-600 hover:bg-slate-100'}`}
+                >
+                    Answer Key
                 </button>
             </div>
 
             {activeTab === 'sheets' && (
-                <>
+                <div className="space-y-3">
                     {sheets.length === 0 ? (
                         <div className="text-center py-12 text-slate-500">
                             <FileText className="w-12 h-12 mx-auto mb-4 text-slate-300" />
                             <p className="text-sm">No OMR sheets generated yet</p>
-                            <p className="text-xs mt-1">Click "Generate OMR Sheet" to create one</p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
-                            {sheets.map((sheet) => (
-                                <div
-                                    key={sheet.id}
-                                    className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-all"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <button
-                                                onClick={() => setExpandedSheet(expandedSheet === sheet.id ? null : sheet.id)}
-                                                className="p-1 text-slate-400 hover:text-slate-600"
-                                            >
-                                                {expandedSheet === sheet.id ? (
-                                                    <ChevronDown className="w-4 h-4" />
-                                                ) : (
-                                                    <ChevronRight className="w-4 h-4" />
-                                                )}
-                                            </button>
-                                            <div>
-                                                <p className="font-medium text-slate-900">Sheet ID: {sheet.sheet_id}</p>
-                                                <p className="text-xs text-slate-500">
-                                                    Created: {new Date(sheet.created_at).toLocaleString()}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            {getStatusBadge(sheet.status)}
-                                            <div className="flex gap-2">
-                                                {sheet.pdf_file && (
-                                                    <a
-                                                        href={sheet.pdf_file}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                        title="Download OMR Sheet"
-                                                    >
-                                                        <Download className="w-4 h-4" />
-                                                    </a>
-                                                )}
-                                                {sheet.answer_key_pdf && (
-                                                    <a
-                                                        href={sheet.answer_key_pdf}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                                                        title="Download Answer Key"
-                                                    >
-                                                        <Eye className="w-4 h-4" />
-                                                    </a>
-                                                )}
-                                            </div>
+                        sheets.map((sheet) => (
+                            <div key={sheet.id} className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-all">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <button onClick={() => setExpandedSheet(expandedSheet === sheet.id ? null : sheet.id)} className="p-1 text-slate-400 hover:text-slate-600">
+                                            {expandedSheet === sheet.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                        </button>
+                                        <div>
+                                            <p className="font-medium text-slate-900">Sheet ID: {sheet.sheet_id}</p>
+                                            <p className="text-xs text-slate-500">Created: {new Date(sheet.created_at).toLocaleString()}</p>
                                         </div>
                                     </div>
-
-                                    {expandedSheet === sheet.id && (
-                                        <div className="mt-4 pt-4 border-t border-slate-100">
-                                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                                <div>
-                                                    <span className="text-slate-500">Status:</span>
-                                                    <span className="ml-2 text-slate-900">{sheet.status}</span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-slate-500">Created:</span>
-                                                    <span className="ml-2 text-slate-900">
-                                                        {new Date(sheet.created_at).toLocaleString()}
-                                                    </span>
-                                                </div>
-                                            </div>
+                                    <div className="flex items-center gap-3">
+                                        {getStatusBadge(sheet.status)}
+                                        <div className="flex gap-2">
+                                            {sheet.pdf_file && (
+                                                <a href={sheet.pdf_file} target="_blank" rel="noopener noreferrer" className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Download">
+                                                    <Download className="w-4 h-4" />
+                                                </a>
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
-                            ))}
-                        </div>
+                            </div>
+                        ))
                     )}
-                </>
+                </div>
             )}
 
             {activeTab === 'submissions' && (
                 <>
-                    {/* Upload Section */}
-                    <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-dashed border-slate-300">
-                        <div className="flex items-center justify-between">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div className="bg-white p-3 rounded-lg border border-slate-200">
+                            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">Total</p>
+                            <p className="text-xl font-black text-slate-900">{submissions.length}</p>
+                        </div>
+                        <div className="bg-white p-3 rounded-lg border border-slate-200">
+                            <p className="text-[10px] uppercase tracking-wider text-green-500 font-bold mb-1">Evaluated</p>
+                            <p className="text-xl font-black text-green-600">{submissions.filter(s => s.status === 'evaluated').length}</p>
+                        </div>
+                        <div className="bg-white p-3 rounded-lg border border-slate-200">
+                            <p className="text-[10px] uppercase tracking-wider text-amber-500 font-bold mb-1">Pending</p>
+                            <p className="text-xl font-black text-amber-600">{submissions.filter(s => ['pending', 'processing'].includes(s.status)).length}</p>
+                        </div>
+                        <div className="bg-white p-3 rounded-lg border border-slate-200">
+                            <p className="text-[10px] uppercase tracking-wider text-red-500 font-bold mb-1">Failed</p>
+                            <p className="text-xl font-black text-red-600">{submissions.filter(s => s.status === 'failed').length}</p>
+                        </div>
+                    </div>
+
+                    <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-dashed border-slate-300 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <Upload className="w-5 h-5 text-slate-400" />
+                            <div>
+                                <p className="text-sm font-medium text-slate-700">Upload Scanned OMR Sheets</p>
+                                <p className="text-xs text-slate-500">PDF or image files</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={handleFileSelect} className="hidden" id="omr-upload" />
+                            <label htmlFor="omr-upload" className="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 cursor-pointer">
+                                Select File
+                            </label>
+                            {selectedFile && (
+                                <button onClick={handleUploadSubmission} disabled={uploading} className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50">
+                                    {uploading ? 'Uploading...' : 'Upload'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        {submissions.length === 0 ? (
+                            <div className="text-center py-12 text-slate-500">No submissions yet</div>
+                        ) : (
+                            submissions.map((submission) => (
+                                <div key={submission.id} className="border border-slate-200 rounded-lg p-4 transition-all">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="font-medium text-slate-900">{submission.student_name || `Submission #${submission.id}`}</p>
+                                            <p className="text-xs text-slate-500">{new Date(submission.created_at).toLocaleString()}</p>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            {submission.score !== null && <p className="font-bold">{submission.score}/{submission.max_score}</p>}
+                                            {getStatusBadge(submission.status)}
+
+                                            {/* Annotated PDF Download Button */}
+                                            {(submission.annotated_pdf || submission.annotated_pdf_url) && (
+                                                <a
+                                                    href={submission.annotated_pdf_url || submission.annotated_pdf}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    title="View Annotated Sheet"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                </a>
+                                            )}
+
+                                            <button onClick={() => handleEvaluate(submission.id)} className="p-2 hover:bg-slate-100 rounded-lg" title="Re-evaluate">
+                                                <Play className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </>
+            )}
+
+            {activeTab === 'answer_key' && (
+                <>
+                    {/* Configuration Section */}
+                    <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
-                                <Upload className="w-5 h-5 text-slate-400" />
+                                <Award className="w-6 h-6 text-green-600" />
                                 <div>
-                                    <p className="text-sm font-medium text-slate-700">Upload Scanned OMR Sheets</p>
-                                    <p className="text-xs text-slate-500">PDF or image files of scanned answer sheets</p>
+                                    <h3 className="text-sm font-bold text-green-800">Answer Key Configuration</h3>
+                                    <p className="text-xs text-green-600">Select correct answers for each question</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="file"
-                                    accept=".pdf,.png,.jpg,.jpeg"
-                                    onChange={handleFileSelect}
-                                    className="hidden"
-                                    id="omr-upload"
-                                />
-                                <label
-                                    htmlFor="omr-upload"
-                                    className="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 cursor-pointer"
+                            <div className="flex flex-wrap items-center gap-4">
+                                <div className="flex items-center gap-2">
+                                    <label className="text-xs font-medium text-slate-600">Questions:</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="200"
+                                        value={totalQuestions}
+                                        onChange={(e) => setTotalQuestions(parseInt(e.target.value) || 20)}
+                                        className="w-16 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <label className="text-xs font-medium text-slate-600">Default Marks:</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.5"
+                                        value={defaultMarks}
+                                        onChange={(e) => setDefaultMarks(parseFloat(e.target.value) || 1)}
+                                        className="w-16 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <label className="text-xs font-medium text-slate-600">Negative:</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.25"
+                                        value={defaultNegative}
+                                        onChange={(e) => setDefaultNegative(parseFloat(e.target.value) || 0)}
+                                        className="w-16 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleSaveAnswerKey}
+                                    disabled={savingAnswerKey}
+                                    className="px-4 py-2 text-sm font-bold text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-all shadow-lg shadow-green-200"
                                 >
-                                    Select File
-                                </label>
-                                {selectedFile && (
-                                    <>
-                                        <span className="text-xs text-slate-600">{selectedFile.name}</span>
-                                        <button
-                                            onClick={handleUploadSubmission}
-                                            disabled={uploading}
-                                            className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
-                                        >
-                                            {uploading ? 'Uploading...' : 'Upload & Evaluate'}
-                                        </button>
-                                    </>
-                                )}
+                                    {savingAnswerKey ? 'Saving...' : 'Save Answer Key'}
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Submissions List */}
-                    {submissions.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500">
-                            <Upload className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                            <p className="text-sm">No submissions yet</p>
-                            <p className="text-xs mt-1">Upload scanned OMR sheets to evaluate</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {submissions.map((submission) => (
+                    {/* Questions Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {Array.from({ length: totalQuestions }, (_, i) => i + 1).map((qNum) => {
+                            const qKey = `Q${qNum}`;
+                            const currentAnswers = answerFormData[qKey]?.correct || [];
+
+                            return (
                                 <div
-                                    key={submission.id}
-                                    className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-all"
+                                    key={qNum}
+                                    className={`p-4 rounded-xl border-2 transition-all ${currentAnswers.length > 0
+                                        ? 'border-green-300 bg-green-50'
+                                        : 'border-slate-200 bg-white hover:border-slate-300'
+                                        }`}
                                 >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="font-medium text-slate-900">Submission #{submission.id}</p>
-                                            <p className="text-xs text-slate-500">
-                                                Submitted: {new Date(submission.created_at).toLocaleString()}
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            {submission.score !== null && (
-                                                <div className="text-right">
-                                                    <p className="text-lg font-bold text-slate-900">
-                                                        {submission.score}/{submission.max_score}
-                                                    </p>
-                                                    <p className="text-xs text-slate-500">Score</p>
-                                                </div>
-                                            )}
-                                            {getStatusBadge(submission.status)}
-                                            <div className="flex gap-2">
-                                                {submission.status === 'pending' && (
-                                                    <button
-                                                        onClick={() => handleEvaluate(submission.id)}
-                                                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                                        title="Evaluate"
-                                                    >
-                                                        <Play className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                                {submission.scanned_pdf && (
-                                                    <a
-                                                        href={submission.scanned_pdf}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                        title="View Scanned Sheet"
-                                                    >
-                                                        <Eye className="w-4 h-4" />
-                                                    </a>
-                                                )}
-                                            </div>
-                                        </div>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="text-sm font-bold text-slate-700">Q{qNum}</span>
+                                        {currentAnswers.length > 0 && (
+                                            <CheckCircle className="w-4 h-4 text-green-500" />
+                                        )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {['A', 'B', 'C', 'D'].map((option) => {
+                                            const isSelected = currentAnswers.includes(option);
+                                            return (
+                                                <button
+                                                    key={option}
+                                                    onClick={() => handleSetAnswer(qNum, option)}
+                                                    className={`w-10 h-10 rounded-full text-sm font-bold transition-all ${isSelected
+                                                        ? 'bg-green-600 text-white shadow-lg shadow-green-300 scale-110'
+                                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                        }`}
+                                                >
+                                                    {option}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
-                            ))}
+                            );
+                        })}
+                    </div>
+
+                    {/* Summary */}
+                    <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-slate-700">
+                                    {Object.values(answerFormData).filter(a => a.correct.length > 0).length} of {totalQuestions} questions answered
+                                </p>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Total Marks: {totalQuestions * defaultMarks} | Per Question: +{defaultMarks} / -{defaultNegative}
+                                </p>
+                            </div>
+                            <button
+                                onClick={handleSaveAnswerKey}
+                                disabled={savingAnswerKey}
+                                className="px-6 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 transition-all shadow-lg"
+                            >
+                                {savingAnswerKey ? (
+                                    <span className="flex items-center gap-2">
+                                        <RefreshCw className="w-4 h-4 animate-spin" />
+                                        Saving...
+                                    </span>
+                                ) : (
+                                    'Save Answer Key'
+                                )}
+                            </button>
                         </div>
-                    )}
+                    </div>
                 </>
             )}
         </div>

@@ -16,12 +16,12 @@ import {
   Type,
   Hash,
   Zap,
-  Target,
-  TrendingUp,
-  Calendar,
   User,
   Settings,
-  Upload
+  Upload,
+  Monitor,
+  Target,
+  Calendar
 } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import QuestionBulkImport from '../components/extraction/QuestionBulkImport';
@@ -57,6 +57,15 @@ interface ExamPattern {
     email: string;
   };
   is_active: boolean;
+  exam_mode: 'online' | 'offline_omr' | 'offline_subjective';
+  omr_config: {
+    candidate_fields: Array<{
+      name: string;
+      type: 'digits' | 'options-only';
+      digits?: number;
+      options?: any[];
+    }>;
+  };
 }
 
 export default function PatternView() {
@@ -311,29 +320,55 @@ export default function PatternView() {
                           {pattern.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </div>
+                      <div className="flex items-center gap-3">
+                        <Monitor className="w-4 h-4 text-slate-400" />
+                        <span className="text-sm text-slate-600">Mode:</span>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${pattern.exam_mode === 'online' ? 'bg-blue-100 text-blue-700' :
+                          pattern.exam_mode === 'offline_omr' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                          }`}>
+                          {pattern.exam_mode === 'online' ? 'Online' : pattern.exam_mode === 'offline_omr' ? 'Offline OMR' : 'Offline Subjective'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-slate-900">Quick Stats</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-4 bg-slate-50 rounded-lg">
-                        <p className="text-2xl font-bold text-slate-900">{pattern.total_questions}</p>
-                        <p className="text-xs text-slate-600">Questions</p>
+                    <h3 className="text-lg font-semibold text-slate-900">
+                      {pattern.exam_mode === 'offline_omr' ? 'OMR Configuration' : 'Quick Stats'}
+                    </h3>
+                    {pattern.exam_mode === 'offline_omr' ? (
+                      <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                        <div className="space-y-3">
+                          {pattern.omr_config?.candidate_fields?.map((field, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-sm py-2 border-b border-slate-200 last:border-0">
+                              <span className="text-slate-600 font-medium">{field.name}</span>
+                              <span className="px-2 py-0.5 bg-white border border-slate-200 rounded text-xs text-slate-500 uppercase">
+                                {field.type === 'digits' ? `${field.digits} Digits` : `Options: ${field.options?.join(',')}`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="text-center p-4 bg-slate-50 rounded-lg">
-                        <p className="text-2xl font-bold text-slate-900">{pattern.total_marks}</p>
-                        <p className="text-xs text-slate-600">Total Marks</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center p-4 bg-slate-50 rounded-lg">
+                          <p className="text-2xl font-bold text-slate-900">{pattern.total_questions}</p>
+                          <p className="text-xs text-slate-600">Questions</p>
+                        </div>
+                        <div className="text-center p-4 bg-slate-50 rounded-lg">
+                          <p className="text-2xl font-bold text-slate-900">{pattern.total_marks}</p>
+                          <p className="text-xs text-slate-600">Total Marks</p>
+                        </div>
+                        <div className="text-center p-4 bg-slate-50 rounded-lg">
+                          <p className="text-2xl font-bold text-slate-900">{pattern.total_duration}</p>
+                          <p className="text-xs text-slate-600">Minutes</p>
+                        </div>
+                        <div className="text-center p-4 bg-slate-50 rounded-lg">
+                          <p className="text-2xl font-bold text-slate-900">{pattern.sections?.length || 0}</p>
+                          <p className="text-xs text-slate-600">Sections</p>
+                        </div>
                       </div>
-                      <div className="text-center p-4 bg-slate-50 rounded-lg">
-                        <p className="text-2xl font-bold text-slate-900">{pattern.total_duration}</p>
-                        <p className="text-xs text-slate-600">Minutes</p>
-                      </div>
-                      <div className="text-center p-4 bg-slate-50 rounded-lg">
-                        <p className="text-2xl font-bold text-slate-900">{pattern.sections?.length || 0}</p>
-                        <p className="text-xs text-slate-600">Sections</p>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -521,17 +556,19 @@ export default function PatternView() {
       </div>
 
       {/* Bulk Import Modal */}
-      {showBulkImport && pattern && (
-        <QuestionBulkImport
-          examId={pattern.id}
-          patternId={pattern.id}
-          onClose={() => setShowBulkImport(false)}
-          onImportComplete={() => {
-            setShowBulkImport(false);
-            refetch(); // Refresh pattern data to show new questions
-          }}
-        />
-      )}
-    </div>
+      {
+        showBulkImport && pattern && (
+          <QuestionBulkImport
+            examId={pattern.id}
+            patternId={pattern.id}
+            onClose={() => setShowBulkImport(false)}
+            onImportComplete={() => {
+              setShowBulkImport(false);
+              refetch(); // Refresh pattern data to show new questions
+            }}
+          />
+        )
+      }
+    </div >
   );
 }

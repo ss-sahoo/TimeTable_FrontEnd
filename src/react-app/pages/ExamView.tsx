@@ -36,7 +36,8 @@ import {
   Target,
   TrendingUp,
   Layers,
-  Brain
+  Brain,
+  RefreshCw
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
@@ -96,6 +97,9 @@ interface Exam {
   exam_mode?: 'online' | 'offline_omr' | 'offline_subjective';
   ai_evaluation_enabled?: boolean;
   marking_strictness?: 'lenient' | 'moderate' | 'strict';
+  omr_sheet_generated?: boolean;
+  omr_sheet_file?: string;
+  omr_metadata?: any;
 }
 
 interface SectionQuestionStats {
@@ -123,6 +127,7 @@ export default function ExamView() {
   const [audienceData, setAudienceData] = useState<any>(null);
   const [loadingAudience, setLoadingAudience] = useState(false);
   const [audienceSearch, setAudienceSearch] = useState('');
+  const [generatingOMR, setGeneratingOMR] = useState(false);
 
   useEffect(() => {
     if (examId) {
@@ -148,6 +153,11 @@ export default function ExamView() {
     }
   };
 
+  const effectiveExamMode = exam?.exam_mode && exam.exam_mode !== 'online'
+    ? exam.exam_mode
+    : (exam?.pattern as any)?.exam_mode || 'online';
+  const isOfflineMode = effectiveExamMode === 'offline_omr' || effectiveExamMode === 'offline_subjective';
+
   const handleDownloadQuestionPaper = async () => {
     if (!exam) return;
     try {
@@ -165,6 +175,40 @@ export default function ExamView() {
     } catch (err) {
       console.error('Failed to download question paper:', err);
       alert('Failed to download question paper. Please try again.');
+    }
+  };
+
+  const handlePublishExam = async () => {
+    if (!exam) return;
+    if (!confirm('Are you sure you want to publish this exam? This will make it visible to eligible students.')) return;
+
+    try {
+      setLoading(true);
+      await api.patch(`/exams/exams/${exam.id}/`, { status: 'published' });
+      await fetchExam(); // Refresh data to show published status and generated OMR
+      alert('Exam published successfully! OMR sheet is being generated.');
+    } catch (err: any) {
+      console.error('Failed to publish exam:', err);
+      const msg = err.response?.data?.error || err.response?.data?.detail || 'Failed to publish exam.';
+      alert(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateOMR = async () => {
+    if (!exam) return;
+    try {
+      setGeneratingOMR(true);
+      await api.post(`/omr/sheets/generate/${exam.id}/`);
+      alert('OMR sheet generation started!');
+      await fetchExam(); // Refresh to get the file link
+    } catch (err: any) {
+      console.error('Failed to generate OMR:', err);
+      const msg = err.response?.data?.error || 'Failed to generate OMR sheet.';
+      alert(msg);
+    } finally {
+      setGeneratingOMR(false);
     }
   };
 
@@ -395,13 +439,14 @@ export default function ExamView() {
                 <FileText className="w-3.5 h-3.5" />
                 Analytics
               </Link>
-              <Link
-                to={`${basePath}/exams/${exam.id}/evaluation`}
+              <button
+                onClick={() => isOfflineMode ? setActiveTab('evaluation') : navigate(`${basePath}/exams/${exam.id}/evaluation`)}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                title="Go to Evaluation"
               >
                 <BarChart3 className="w-3.5 h-3.5" />
                 Evaluation
-              </Link>
+              </button>
               <button
                 onClick={handleDownloadQuestionPaper}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-slate-800 text-white hover:bg-slate-900 transition-colors"
@@ -410,6 +455,44 @@ export default function ExamView() {
                 <Download className="w-3.5 h-3.5" />
                 Download PDF
               </button>
+              {exam.status === 'draft' && (
+                <button
+                  onClick={handlePublishExam}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm animate-pulse"
+                  title="Publish Exam"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Publish Exam
+                </button>
+              )}
+              {effectiveExamMode === 'offline_omr' && (
+                exam.omr_sheet_file ? (
+                  <a
+                    href={exam.omr_sheet_file}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors shadow-sm"
+                    title="Download OMR Sheet"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Download OMR
+                  </a>
+                ) : (
+                  <button
+                    onClick={handleGenerateOMR}
+                    disabled={generatingOMR}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors shadow-sm"
+                    title="Generate OMR Sheet"
+                  >
+                    {generatingOMR ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Plus className="w-3.5 h-3.5" />
+                    )}
+                    Generate OMR
+                  </button>
+                )
+              )}
               <button
                 onClick={() => navigate(`${basePath}/exams/${exam.id}/edit`)}
                 className="p-2 rounded-md hover:bg-slate-100 transition-colors"
@@ -504,18 +587,18 @@ export default function ExamView() {
             )}
           </button>
           {/* Show Evaluation tab for offline exam modes */}
-          {(exam.exam_mode === 'offline_omr' || exam.exam_mode === 'offline_subjective') && (
+          {isOfflineMode && (
             <button
               onClick={() => setActiveTab('evaluation')}
               className={`px-4 py-2 text-sm font-medium transition-colors relative flex items-center gap-1.5 ${activeTab === 'evaluation'
-                ? exam.exam_mode === 'offline_omr' ? 'text-green-600' : 'text-purple-600'
+                ? effectiveExamMode === 'offline_omr' ? 'text-green-600' : 'text-purple-600'
                 : 'text-slate-500 hover:text-slate-700'
                 }`}
             >
               <Brain className="w-3.5 h-3.5" />
-              {exam.exam_mode === 'offline_omr' ? 'OMR Evaluation' : 'AI Evaluation'}
+              {effectiveExamMode === 'offline_omr' ? 'OMR Evaluation' : 'AI Evaluation'}
               {activeTab === 'evaluation' && (
-                <div className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full ${exam.exam_mode === 'offline_omr' ? 'bg-green-600' : 'bg-purple-600'
+                <div className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full ${effectiveExamMode === 'offline_omr' ? 'bg-green-600' : 'bg-purple-600'
                   }`} />
               )}
             </button>
@@ -903,10 +986,10 @@ export default function ExamView() {
         ) : activeTab === 'evaluation' ? (
           /* Evaluation Tab Content - OMR/AI Evaluation */
           <div className="space-y-4">
-            {exam.exam_mode === 'offline_omr' && (
+            {effectiveExamMode === 'offline_omr' && (
               <OMRManagement examId={exam.id} examTitle={exam.title} />
             )}
-            {exam.exam_mode === 'offline_subjective' && (
+            {effectiveExamMode === 'offline_subjective' && (
               <AnswerSheetUpload examId={exam.id} examTitle={exam.title} />
             )}
           </div>
