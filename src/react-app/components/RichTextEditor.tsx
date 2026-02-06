@@ -5,31 +5,31 @@ import LaTeXRenderer from './LaTeXRenderer';
 // Helper component to render text with markdown-style formatting and LaTeX
 const FormattedTextPreview = ({ content }: { content: string }) => {
   if (!content) return <div className="text-slate-400">Preview will appear here...</div>;
-  
-  // Split by LaTeX first to preserve equations
-  const parts = content.split(/(\$\$[\s\S]*?\$\$|\$[^$]+?\$)/);
-  
+
+  // Split by LaTeX first to preserve equations (matches $$, $, \( \), \[ \])
+  const parts = content.split(/(\$\$[\s\S]*?\$\$|\$[^$]+?\$|\\\[[\s\S]*?\\\]|\\\([^\)]+?\\\))/);
+
   return (
     <div className="prose prose-sm max-w-none">
       {parts.map((part, index) => {
         // If this is a LaTeX equation, render it with LaTeXRenderer
-        if (part.startsWith('$$') || part.startsWith('$')) {
+        if (part.startsWith('$$') || part.startsWith('$') || part.startsWith('\\(') || part.startsWith('\\[')) {
           return <LaTeXRenderer key={index} content={part} />;
         }
-        
-        // Handle markdown-style formatting for regular text
-        let formatted = part;
-        
+
+        // Handle images (e.g., ![alt](url))
+        let formatted = part.replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" class="max-w-full h-auto rounded-lg my-4 border border-slate-200 shadow-sm" />');
+
         // Replace **bold** with <strong> (use a placeholder to avoid conflicts)
         formatted = formatted.replace(/\*\*(.*?)\*\*/g, '___BOLD_START___$1___BOLD_END___');
-        
+
         // Replace *italic* with <em> (now safe since bold is replaced)
         formatted = formatted.replace(/\*([^*]+?)\*/g, '<em>$1</em>');
-        
+
         // Replace bold placeholders with actual tags
         formatted = formatted.replace(/___BOLD_START___/g, '<strong>');
         formatted = formatted.replace(/___BOLD_END___/g, '</strong>');
-        
+
         // Handle lists (both ordered and unordered)
         const lines = formatted.split('\n');
         const processedLines = lines.map(line => {
@@ -43,7 +43,7 @@ const FormattedTextPreview = ({ content }: { content: string }) => {
           }
           return { type: 'text', content: line };
         });
-        
+
         // Wrap consecutive list items in appropriate tags
         let currentListType: string | null = null;
         const finalHtml = processedLines.reduce((acc, item, idx) => {
@@ -58,10 +58,10 @@ const FormattedTextPreview = ({ content }: { content: string }) => {
               acc += item.type === 'ol' ? '<ol>' : '<ul>';
             }
             acc += item.content;
-            
+
             // Close list if it's the last item or next item is not a list
-            if (idx === processedLines.length - 1 || 
-                (processedLines[idx + 1] && processedLines[idx + 1].type === 'text')) {
+            if (idx === processedLines.length - 1 ||
+              (processedLines[idx + 1] && processedLines[idx + 1].type === 'text')) {
               acc += currentListType === 'ol' ? '</ol>' : '</ul>';
               currentListType = null;
             }
@@ -75,7 +75,7 @@ const FormattedTextPreview = ({ content }: { content: string }) => {
           }
           return acc;
         }, '');
-        
+
         return (
           <span
             key={index}
@@ -95,12 +95,12 @@ interface RichTextEditorProps {
   label?: string;
 }
 
-export default function RichTextEditor({ 
-  value, 
-  onChange, 
-  placeholder = "Enter text here...", 
+export default function RichTextEditor({
+  value,
+  onChange,
+  placeholder = "Enter text here...",
   className = "",
-  label 
+  label
 }: RichTextEditorProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showEquationModal, setShowEquationModal] = useState(false);
@@ -117,10 +117,10 @@ export default function RichTextEditor({
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const selectedText = value.substring(start, end);
-    
+
     const newText = value.substring(0, start) + before + selectedText + after + value.substring(end);
     onChange(newText);
-    
+
     // Set cursor position after insertion
     setTimeout(() => {
       textarea.focus();
@@ -133,11 +133,11 @@ export default function RichTextEditor({
   const handleOrderedList = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    
+
     const start = textarea.selectionStart;
     const lines = value.substring(0, start).split('\n');
     const currentLine = lines[lines.length - 1];
-    
+
     // If at the start of a line or line is empty, insert numbered list
     if (currentLine.trim() === '' || start === 0) {
       insertText('\n1. ');
@@ -145,15 +145,15 @@ export default function RichTextEditor({
       insertText('\n2. ');
     }
   };
-  
+
   const handleUnorderedList = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    
+
     const start = textarea.selectionStart;
     const lines = value.substring(0, start).split('\n');
     const currentLine = lines[lines.length - 1];
-    
+
     // If at the start of a line or line is empty, insert bullet list
     if (currentLine.trim() === '' || start === 0) {
       insertText('\n• ');
@@ -182,7 +182,7 @@ export default function RichTextEditor({
           {label}
         </label>
       )}
-      
+
       {/* Toolbar */}
       <div className="border border-slate-300 rounded-t-lg bg-slate-50 p-2">
         <div className="flex items-center gap-2 flex-wrap">
@@ -195,7 +195,7 @@ export default function RichTextEditor({
           >
             <Bold className="w-4 h-4" />
           </button>
-          
+
           <button
             type="button"
             onClick={handleItalic}
@@ -204,7 +204,7 @@ export default function RichTextEditor({
           >
             <Italic className="w-4 h-4" />
           </button>
-          
+
           <button
             type="button"
             onClick={handleOrderedList}
@@ -213,7 +213,7 @@ export default function RichTextEditor({
           >
             <ListOrdered className="w-4 h-4" />
           </button>
-          
+
           <button
             type="button"
             onClick={handleUnorderedList}
@@ -234,7 +234,7 @@ export default function RichTextEditor({
           >
             <Image className="w-4 h-4" />
           </button>
-          
+
           <button
             type="button"
             onClick={() => setShowEquationModal(true)}
@@ -248,9 +248,8 @@ export default function RichTextEditor({
             <button
               type="button"
               onClick={() => setShowPreview(!showPreview)}
-              className={`p-2 rounded transition-colors ${
-                showPreview ? 'bg-blue-200 text-blue-700' : 'hover:bg-slate-200'
-              }`}
+              className={`p-2 rounded transition-colors ${showPreview ? 'bg-blue-200 text-blue-700' : 'hover:bg-slate-200'
+                }`}
               title="Toggle Preview"
             >
               <Eye className="w-4 h-4" />
@@ -289,6 +288,35 @@ export default function RichTextEditor({
         className="w-full h-32 px-3 py-2 border border-slate-300 border-t-0 rounded-b-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none font-mono text-sm"
       />
 
+      {/* Live LaTeX Preview */}
+      {(value.match(/\$\$[\s\S]*?\$\$/) || value.match(/\$.*?\$/) || value.match(/\\\[[\s\S]*?\\\]/) || value.match(/\\\([^\)]+?\\\)/)) && (
+        <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+          <div className="text-xs font-semibold text-slate-500 mb-2">Math Preview</div>
+          <div className="prose prose-sm max-w-none">
+            <FormattedTextPreview content={value} />
+          </div>
+        </div>
+      )}
+
+      {/* Live Image Preview (Shows images detected in the text) */}
+      {value.match(/!\[(.*?)\]\((.*?)\)/g) && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {Array.from(value.matchAll(/!\[(.*?)\]\((.*?)\)/g)).map((match, idx) => (
+            <div key={idx} className="relative group border border-slate-200 rounded-lg p-1 bg-white shadow-sm w-24 h-24 flex items-center justify-center overflow-hidden">
+              <img
+                src={match[2]}
+                alt={match[1] || 'Preview'}
+                className="max-w-full max-h-full object-contain"
+              />
+              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all" />
+              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white text-[10px] px-1 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity truncate">
+                {match[1] || 'Image'}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Formatted Preview */}
       {showPreview && value.trim() && (
         <div className="mt-2 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
@@ -318,7 +346,7 @@ export default function RichTextEditor({
                 <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
-            
+
             {/* Live Preview Section - Most Prominent */}
             <div className="mb-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200">
               <div className="flex items-center gap-2 mb-3">
@@ -335,7 +363,7 @@ export default function RichTextEditor({
                 )}
               </div>
             </div>
-            
+
             <div className="space-y-4">
               {/* Symbol Toolbar */}
               <div className="border border-slate-200 rounded-lg bg-slate-50">
@@ -347,152 +375,152 @@ export default function RichTextEditor({
                   {showSymbols ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
                 </button>
                 {showSymbols && (
-                <div className="px-4 pb-4 space-y-4">
-                
-                {/* Basic Operations */}
-                <div className="mb-4">
-                  <p className="text-xs text-slate-500 mb-2">Basic Operations</p>
-                  <div className="flex flex-wrap gap-1">
-                    {['+', '-', '\\times', '\\div', '\\pm', '\\mp', '\\cdot', '\\ast'].map((symbol) => (
-                      <button
-                        key={symbol}
-                        onClick={() => setEquation(prev => prev + symbol + ' ')}
-                        className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
-                      >
-                        {symbol}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                  <div className="px-4 pb-4 space-y-4">
 
-                {/* Relations */}
-                <div className="mb-4">
-                  <p className="text-xs text-slate-500 mb-2">Relations</p>
-                  <div className="flex flex-wrap gap-1">
-                    {['=', '\\neq', '<', '>', '\\leq', '\\geq', '\\ll', '\\gg', '\\approx', '\\equiv', '\\propto'].map((symbol) => (
-                      <button
-                        key={symbol}
-                        onClick={() => setEquation(prev => prev + symbol + ' ')}
-                        className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
-                      >
-                        {symbol}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    {/* Basic Operations */}
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-500 mb-2">Basic Operations</p>
+                      <div className="flex flex-wrap gap-1">
+                        {['+', '-', '\\times', '\\div', '\\pm', '\\mp', '\\cdot', '\\ast'].map((symbol) => (
+                          <button
+                            key={symbol}
+                            onClick={() => setEquation(prev => prev + symbol + ' ')}
+                            className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
+                          >
+                            {symbol}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                {/* Greek Letters */}
-                <div className="mb-4">
-                  <p className="text-xs text-slate-500 mb-2">Greek Letters</p>
-                  <div className="flex flex-wrap gap-1">
-                    {['\\alpha', '\\beta', '\\gamma', '\\delta', '\\epsilon', '\\theta', '\\lambda', '\\mu', '\\pi', '\\sigma', '\\tau', '\\phi', '\\chi', '\\psi', '\\omega'].map((symbol) => (
-                      <button
-                        key={symbol}
-                        onClick={() => setEquation(prev => prev + symbol + ' ')}
-                        className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
-                      >
-                        {symbol}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    {/* Relations */}
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-500 mb-2">Relations</p>
+                      <div className="flex flex-wrap gap-1">
+                        {['=', '\\neq', '<', '>', '\\leq', '\\geq', '\\ll', '\\gg', '\\approx', '\\equiv', '\\propto'].map((symbol) => (
+                          <button
+                            key={symbol}
+                            onClick={() => setEquation(prev => prev + symbol + ' ')}
+                            className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
+                          >
+                            {symbol}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                {/* Calculus & Analysis */}
-                <div className="mb-4">
-                  <p className="text-xs text-slate-500 mb-2">Calculus & Analysis</p>
-                  <div className="flex flex-wrap gap-1">
-                    {['\\int', '\\iint', '\\iiint', '\\oint', '\\sum', '\\prod', '\\lim', '\\infty', '\\partial', '\\nabla'].map((symbol) => (
-                      <button
-                        key={symbol}
-                        onClick={() => setEquation(prev => prev + symbol + ' ')}
-                        className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
-                      >
-                        {symbol}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    {/* Greek Letters */}
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-500 mb-2">Greek Letters</p>
+                      <div className="flex flex-wrap gap-1">
+                        {['\\alpha', '\\beta', '\\gamma', '\\delta', '\\epsilon', '\\theta', '\\lambda', '\\mu', '\\pi', '\\sigma', '\\tau', '\\phi', '\\chi', '\\psi', '\\omega'].map((symbol) => (
+                          <button
+                            key={symbol}
+                            onClick={() => setEquation(prev => prev + symbol + ' ')}
+                            className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
+                          >
+                            {symbol}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                {/* Fractions & Powers */}
-                <div className="mb-4">
-                  <p className="text-xs text-slate-500 mb-2">Fractions & Powers</p>
-                  <div className="flex flex-wrap gap-1">
-                    {['\\frac{a}{b}', 'x^{y}', 'x_{y}', '\\sqrt{x}', '\\sqrt[n]{x}', 'x^2', 'x^3', 'x^n'].map((symbol) => (
-                      <button
-                        key={symbol}
-                        onClick={() => setEquation(prev => prev + symbol + ' ')}
-                        className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
-                      >
-                        {symbol}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    {/* Calculus & Analysis */}
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-500 mb-2">Calculus & Analysis</p>
+                      <div className="flex flex-wrap gap-1">
+                        {['\\int', '\\iint', '\\iiint', '\\oint', '\\sum', '\\prod', '\\lim', '\\infty', '\\partial', '\\nabla'].map((symbol) => (
+                          <button
+                            key={symbol}
+                            onClick={() => setEquation(prev => prev + symbol + ' ')}
+                            className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
+                          >
+                            {symbol}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                {/* Brackets */}
-                <div className="mb-4">
-                  <p className="text-xs text-slate-500 mb-2">Brackets</p>
-                  <div className="flex flex-wrap gap-1">
-                    {['()', '[]', '\\{\\}', '\\langle\\rangle', '\\left(\\right)', '\\left[\\right]', '\\left\\{\\right\\}'].map((symbol) => (
-                      <button
-                        key={symbol}
-                        onClick={() => setEquation(prev => prev + symbol + ' ')}
-                        className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
-                      >
-                        {symbol}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    {/* Fractions & Powers */}
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-500 mb-2">Fractions & Powers</p>
+                      <div className="flex flex-wrap gap-1">
+                        {['\\frac{a}{b}', 'x^{y}', 'x_{y}', '\\sqrt{x}', '\\sqrt[n]{x}', 'x^2', 'x^3', 'x^n'].map((symbol) => (
+                          <button
+                            key={symbol}
+                            onClick={() => setEquation(prev => prev + symbol + ' ')}
+                            className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
+                          >
+                            {symbol}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                {/* Functions */}
-                <div className="mb-4">
-                  <p className="text-xs text-slate-500 mb-2">Functions</p>
-                  <div className="flex flex-wrap gap-1">
-                    {['\\sin', '\\cos', '\\tan', '\\log', '\\ln', '\\exp', '\\sinh', '\\cosh', '\\tanh'].map((symbol) => (
-                      <button
-                        key={symbol}
-                        onClick={() => setEquation(prev => prev + symbol + ' ')}
-                        className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
-                      >
-                        {symbol}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    {/* Brackets */}
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-500 mb-2">Brackets</p>
+                      <div className="flex flex-wrap gap-1">
+                        {['()', '[]', '\\{\\}', '\\langle\\rangle', '\\left(\\right)', '\\left[\\right]', '\\left\\{\\right\\}'].map((symbol) => (
+                          <button
+                            key={symbol}
+                            onClick={() => setEquation(prev => prev + symbol + ' ')}
+                            className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
+                          >
+                            {symbol}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                {/* Arrows */}
-                <div className="mb-4">
-                  <p className="text-xs text-slate-500 mb-2">Arrows</p>
-                  <div className="flex flex-wrap gap-1">
-                    {['->', '\\<-', '\\leftrightarrow', '\\Rightarrow', '\\Leftarrow', '\\Leftrightarrow', '\\uparrow', '\\downarrow'].map((symbol) => (
-                      <button
-                        key={symbol}
-                        onClick={() => setEquation(prev => prev + symbol + ' ')}
-                        className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
-                      >
-                        {symbol}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    {/* Functions */}
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-500 mb-2">Functions</p>
+                      <div className="flex flex-wrap gap-1">
+                        {['\\sin', '\\cos', '\\tan', '\\log', '\\ln', '\\exp', '\\sinh', '\\cosh', '\\tanh'].map((symbol) => (
+                          <button
+                            key={symbol}
+                            onClick={() => setEquation(prev => prev + symbol + ' ')}
+                            className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
+                          >
+                            {symbol}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                {/* Sets */}
-                <div className="mb-4">
-                  <p className="text-xs text-slate-500 mb-2">Sets</p>
-                  <div className="flex flex-wrap gap-1">
-                    {['\\in', '\\notin', '\\subset', '\\supset', '\\subseteq', '\\supseteq', '\\cup', '\\cap', '\\emptyset', '\\mathbb{R}', '\\mathbb{N}', '\\mathbb{Z}', '\\mathbb{Q}'].map((symbol) => (
-                      <button
-                        key={symbol}
-                        onClick={() => setEquation(prev => prev + symbol + ' ')}
-                        className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
-                      >
-                        {symbol}
-                      </button>
-                    ))}
+                    {/* Arrows */}
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-500 mb-2">Arrows</p>
+                      <div className="flex flex-wrap gap-1">
+                        {['->', '\\<-', '\\leftrightarrow', '\\Rightarrow', '\\Leftarrow', '\\Leftrightarrow', '\\uparrow', '\\downarrow'].map((symbol) => (
+                          <button
+                            key={symbol}
+                            onClick={() => setEquation(prev => prev + symbol + ' ')}
+                            className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
+                          >
+                            {symbol}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Sets */}
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-500 mb-2">Sets</p>
+                      <div className="flex flex-wrap gap-1">
+                        {['\\in', '\\notin', '\\subset', '\\supset', '\\subseteq', '\\supseteq', '\\cup', '\\cap', '\\emptyset', '\\mathbb{R}', '\\mathbb{N}', '\\mathbb{Z}', '\\mathbb{Q}'].map((symbol) => (
+                          <button
+                            key={symbol}
+                            onClick={() => setEquation(prev => prev + symbol + ' ')}
+                            className="px-2 py-1 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors text-sm font-mono"
+                          >
+                            {symbol}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                </div>
                 )}
               </div>
 
@@ -576,7 +604,7 @@ export default function RichTextEditor({
                   <div><code>{'\\infty'}</code> → ∞</div>
                 </div>
               </div>
-              
+
               <div className="flex gap-3 pt-4 border-t border-slate-200">
                 <button
                   onClick={() => {
