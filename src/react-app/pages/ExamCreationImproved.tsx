@@ -8,7 +8,15 @@ import {
   BookOpen,
   Settings,
   AlertCircle,
-  Zap
+  Zap,
+  Monitor,
+  FileSpreadsheet,
+  UserCheck,
+  CheckCircle,
+  Plus,
+  Trash2,
+  Edit,
+  FileText
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
@@ -21,6 +29,8 @@ interface ExamPattern {
   total_marks: number;
   duration_minutes: number;
   sections: PatternSection[];
+  exam_mode?: 'online' | 'offline_omr' | 'offline_subjective';
+  omr_config?: any;
   created_at: string;
 }
 
@@ -48,6 +58,8 @@ interface ExamFormData {
   disable_right_click: boolean;
   enable_webcam_proctoring: boolean;
   allow_tab_switching: boolean;
+  exam_mode: 'online' | 'offline_omr' | 'offline_subjective';
+  omr_config: any;
 }
 
 export default function ExamCreationImproved() {
@@ -101,6 +113,8 @@ export default function ExamCreationImproved() {
     disable_right_click: true,
     enable_webcam_proctoring: false,
     allow_tab_switching: false,
+    exam_mode: 'online',
+    omr_config: {},
   });
 
   useEffect(() => {
@@ -143,6 +157,8 @@ export default function ExamCreationImproved() {
         disable_right_click: exam.disable_right_click,
         enable_webcam_proctoring: exam.enable_webcam_proctoring,
         allow_tab_switching: exam.allow_tab_switching,
+        exam_mode: exam.exam_mode || 'online',
+        omr_config: exam.omr_config || {},
       });
 
       // Find and set the selected pattern
@@ -170,6 +186,10 @@ export default function ExamCreationImproved() {
     const pattern = patterns.find(p => p.id === patternId);
     setSelectedPattern(pattern || null);
     handleInputChange('pattern', patternId);
+    if (pattern) {
+      handleInputChange('exam_mode', pattern.exam_mode || 'online');
+      handleInputChange('omr_config', pattern.omr_config || {});
+    }
   };
 
   const validateForm = () => {
@@ -231,6 +251,8 @@ export default function ExamCreationImproved() {
         institute: user?.institute_id,
         created_by: user?.id,
         duration_minutes: selectedPattern?.duration_minutes || 60, // Get duration from selected pattern
+        exam_mode: formData.exam_mode,
+        omr_config: formData.omr_config,
       };
 
       // Remove the pattern field since we're using pattern_id
@@ -352,6 +374,144 @@ export default function ExamCreationImproved() {
                       </p>
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* Conduct & Evaluation Section */}
+              <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                    <Monitor className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Conduct & Evaluation</h2>
+                    <p className="text-sm text-slate-600">Choose how this exam will be conducted and evaluated</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Mode Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-3">Exam Mode</label>
+                    <div className="grid grid-cols-1 gap-3">
+                      {[
+                        { id: 'online', name: 'Online (Computer Based)', icon: Monitor, color: 'text-blue-600', bg: 'bg-blue-50' },
+                        { id: 'offline_omr', name: 'Offline OMR-Based', icon: FileSpreadsheet, color: 'text-green-600', bg: 'bg-green-50' },
+                        { id: 'offline_subjective', name: 'Offline Subjective', icon: Edit, color: 'text-orange-600', bg: 'bg-orange-50' },
+                      ].map((mode) => (
+                        <button
+                          key={mode.id}
+                          type="button"
+                          onClick={() => handleInputChange('exam_mode', mode.id)}
+                          className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left ${formData.exam_mode === mode.id
+                            ? 'border-indigo-500 bg-indigo-50/30'
+                            : 'border-slate-100 hover:border-slate-200'
+                            }`}
+                        >
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${mode.bg}`}>
+                            <mode.icon className={`w-5 h-5 ${mode.color}`} />
+                          </div>
+                          <div className="flex-1">
+                            <p className={`text-sm font-bold ${formData.exam_mode === mode.id ? 'text-indigo-900' : 'text-slate-700'}`}>
+                              {mode.name}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {mode.id === 'online' ? 'Standard in-app testing' : mode.id === 'offline_omr' ? 'Auto-grade scanned sheets' : 'Handwritten with AI assist'}
+                            </p>
+                          </div>
+                          {formData.exam_mode === mode.id && <CheckCircle className="w-5 h-5 text-indigo-600" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* OMR Configuration (Conditional) */}
+                  {formData.exam_mode === 'offline_omr' && (
+                    <div className="bg-slate-50 rounded-xl border border-slate-200 p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                          <UserCheck className="w-4 h-4 text-green-600" />
+                          OMR Candidate Fields
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentFields = formData.omr_config?.candidate_fields || [];
+                            handleInputChange('omr_config', {
+                              ...formData.omr_config,
+                              candidate_fields: [...currentFields, { name: 'New Field', type: 'digits', digits: 5 }]
+                            });
+                          }}
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-white px-2 py-1 rounded shadow-sm border border-slate-200"
+                        >
+                          + Add Field
+                        </button>
+                      </div>
+
+                      <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                        {(formData.omr_config?.candidate_fields || []).map((field: any, idx: number) => (
+                          <div key={idx} className="bg-white p-3 rounded-lg border border-slate-200 group relative">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newFields = [...formData.omr_config.candidate_fields];
+                                newFields.splice(idx, 1);
+                                handleInputChange('omr_config', { ...formData.omr_config, candidate_fields: newFields });
+                              }}
+                              className="absolute top-2 right-2 p-1 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Field Name</label>
+                                <input
+                                  type="text"
+                                  value={field.name}
+                                  onChange={(e) => {
+                                    const newFields = [...formData.omr_config.candidate_fields];
+                                    newFields[idx] = { ...field, name: e.target.value };
+                                    handleInputChange('omr_config', { ...formData.omr_config, candidate_fields: newFields });
+                                  }}
+                                  className="w-full text-xs font-medium border-0 border-b border-transparent focus:border-indigo-500 p-0 focus:ring-0"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Type</label>
+                                <select
+                                  value={field.type}
+                                  onChange={(e) => {
+                                    const newFields = [...formData.omr_config.candidate_fields];
+                                    newFields[idx] = { ...field, type: e.target.value };
+                                    handleInputChange('omr_config', { ...formData.omr_config, candidate_fields: newFields });
+                                  }}
+                                  className="w-full text-xs border-0 border-b border-transparent focus:border-indigo-500 p-0 focus:ring-0 bg-transparent"
+                                >
+                                  <option value="digits">Digits (Numbers)</option>
+                                  <option value="options-only">Set Selection</option>
+                                </select>
+                              </div>
+                            </div>
+                            {field.type === 'digits' && (
+                              <div className="mt-2 pt-2 border-t border-slate-50">
+                                <label className="text-[10px] font-bold text-slate-400 mr-2">Number of Digits:</label>
+                                <input
+                                  type="number"
+                                  value={field.digits}
+                                  onChange={(e) => {
+                                    const newFields = [...formData.omr_config.candidate_fields];
+                                    newFields[idx] = { ...field, digits: parseInt(e.target.value) || 1 };
+                                    handleInputChange('omr_config', { ...formData.omr_config, candidate_fields: newFields });
+                                  }}
+                                  className="w-12 text-xs border-0 border-b border-indigo-200 p-0 focus:ring-0 text-indigo-600 font-bold"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -697,7 +857,7 @@ export default function ExamCreationImproved() {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }

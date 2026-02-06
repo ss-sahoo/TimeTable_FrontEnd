@@ -88,6 +88,15 @@ interface ExamPattern {
   total_duration: number | string;
   is_active: boolean;
   sections: PatternSection[];
+  exam_mode: 'online' | 'offline_omr' | 'offline_subjective';
+  omr_config: {
+    candidate_fields: Array<{
+      name: string;
+      type: 'digits' | 'options-only';
+      digits?: number;
+      options?: any[];
+    }>;
+  };
 }
 
 const SUBJECT_COLORS = [
@@ -129,6 +138,13 @@ export default function PatternCreation() {
     total_duration: '',
     is_active: true,
     sections: [],
+    exam_mode: 'online',
+    omr_config: {
+      candidate_fields: [
+        { name: 'Roll No', type: 'digits', digits: 8 },
+        { name: 'Set', type: 'options-only', options: ['A', 'B', 'C', 'D'] }
+      ]
+    }
   });
 
   const [nextSectionOrder, setNextSectionOrder] = useState(1);
@@ -1053,6 +1069,154 @@ export default function PatternCreation() {
                     {errors.description}
                   </p>
                 )}
+              </div>
+
+              {/* Conduct & Evaluation Section */}
+              <div className="mt-6 border-t border-slate-100 pt-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <Settings className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Conduct & Evaluation</h2>
+                    <p className="text-xs text-slate-600">Choose how exams using this pattern will be conducted</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-2">
+                      Default Exam Mode
+                    </label>
+                    <div className="grid grid-cols-1 gap-2">
+                      {[
+                        { id: 'online', name: 'Online (Computer Based)', icon: Zap, color: 'text-blue-600', bg: 'bg-blue-50' },
+                        { id: 'offline_omr', name: 'Offline OMR-Based', icon: FileText, color: 'text-green-600', bg: 'bg-green-50' },
+                        { id: 'offline_subjective', name: 'Offline Subjective', icon: Edit, color: 'text-orange-600', bg: 'bg-orange-50' },
+                      ].map((mode) => (
+                        <button
+                          key={mode.id}
+                          type="button"
+                          onClick={() => handleInputChange('exam_mode', mode.id)}
+                          className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${pattern.exam_mode === mode.id
+                            ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-500'
+                            : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                        >
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${mode.bg}`}>
+                            <mode.icon className={`w-4 h-4 ${mode.color}`} />
+                          </div>
+                          <span className={`text-sm font-medium ${pattern.exam_mode === mode.id ? 'text-blue-700' : 'text-slate-700'}`}>
+                            {mode.name}
+                          </span>
+                          {pattern.exam_mode === mode.id && (
+                            <CheckCircle className="w-4 h-4 text-blue-600 ml-auto" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {pattern.exam_mode === 'offline_omr' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-medium text-slate-700">
+                          OMR Candidate Fields
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newFields = [...pattern.omr_config.candidate_fields, { name: 'New Field', type: 'digits', digits: 5 }];
+                            handleInputChange('omr_config', { ...pattern.omr_config, candidate_fields: newFields });
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" /> Add Field
+                        </button>
+                      </div>
+
+                      <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                        {pattern.omr_config.candidate_fields.map((field, idx) => (
+                          <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2 relative group">
+                            <div className="flex items-center justify-between">
+                              <input
+                                type="text"
+                                value={field.name}
+                                onChange={(e) => {
+                                  const newFields = [...pattern.omr_config.candidate_fields];
+                                  newFields[idx] = { ...field, name: e.target.value };
+                                  handleInputChange('omr_config', { ...pattern.omr_config, candidate_fields: newFields });
+                                }}
+                                className="bg-transparent border-none p-0 text-sm font-medium focus:ring-0 w-2/3"
+                                placeholder="Field Name"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newFields = pattern.omr_config.candidate_fields.filter((_, i) => i !== idx);
+                                  handleInputChange('omr_config', { ...pattern.omr_config, candidate_fields: newFields });
+                                }}
+                                className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={field.type}
+                                onChange={(e) => {
+                                  const newFields = [...pattern.omr_config.candidate_fields];
+                                  const type = e.target.value as 'digits' | 'options-only';
+                                  newFields[idx] = {
+                                    ...field,
+                                    type,
+                                    digits: type === 'digits' ? 5 : undefined,
+                                    options: type === 'options-only' ? ['A', 'B', 'C', 'D'] : undefined
+                                  };
+                                  handleInputChange('omr_config', { ...pattern.omr_config, candidate_fields: newFields });
+                                }}
+                                className="text-xs border-slate-200 rounded-md py-1"
+                              >
+                                <option value="digits">Digits (Roll No, etc.)</option>
+                                <option value="options-only">Options (Set, Category)</option>
+                              </select>
+                              {field.type === 'digits' ? (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[10px] text-slate-500 uppercase font-medium">Digits:</span>
+                                  <input
+                                    type="number"
+                                    value={field.digits}
+                                    onChange={(e) => {
+                                      const newFields = [...pattern.omr_config.candidate_fields];
+                                      newFields[idx] = { ...field, digits: parseInt(e.target.value) || 1 };
+                                      handleInputChange('omr_config', { ...pattern.omr_config, candidate_fields: newFields });
+                                    }}
+                                    className="w-12 text-xs border-slate-200 rounded-md py-1"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 overflow-hidden">
+                                  <span className="text-[10px] text-slate-500 uppercase font-medium">Options:</span>
+                                  <input
+                                    type="text"
+                                    value={field.options?.join(',')}
+                                    onChange={(e) => {
+                                      const newFields = [...pattern.omr_config.candidate_fields];
+                                      newFields[idx] = { ...field, options: e.target.value.split(',').map(s => s.trim()) };
+                                      handleInputChange('omr_config', { ...pattern.omr_config, candidate_fields: newFields });
+                                    }}
+                                    className="flex-1 min-w-0 text-xs border-slate-200 rounded-md py-1"
+                                    placeholder="A,B,C,D"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Add Subject Section */}
