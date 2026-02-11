@@ -66,7 +66,20 @@ const WebcamMonitor: React.FC<WebcamMonitorProps> = ({
   const status = getStatusDetails();
 
   return (
-    <div className={`fixed bottom-6 right-6 z-50 ${className}`}>
+    <div className={`${className}`}>
+      {/* Hidden Webcam - Always mounted to keep camera active */}
+      <div className={isMinimized ? 'fixed -left-[9999px] -top-[9999px]' : 'hidden'}>
+        <Webcam
+          ref={webcamRef}
+          audio={false}
+          screenshotFormat="image/jpeg"
+          videoConstraints={{ facingMode: 'user' }}
+          onUserMedia={handleUserMedia}
+          onUserMediaError={handleCameraError}
+          className="w-1 h-1 opacity-0"
+        />
+      </div>
+
       <AnimatePresence mode="wait">
         {isMinimized ? (
           <motion.button
@@ -85,9 +98,12 @@ const WebcamMonitor: React.FC<WebcamMonitorProps> = ({
                 </span>
               )}
             </div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 pr-2 group-hover:text-blue-600 transition-colors">
-              Proctoring Active
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 pr-2 group-hover:text-blue-600 transition-colors">
+                Camera Active
+              </span>
+            </div>
           </motion.button>
         ) : (
           <motion.div

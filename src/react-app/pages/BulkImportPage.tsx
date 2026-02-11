@@ -63,18 +63,27 @@ interface ValidationResult {
 }
 
 // Helper to parse document structure from API response
-const parseDocumentStructure = (data: any): DocumentStructure | null => {
-  if (!data) return null;
+const parseDocumentStructure = (data: unknown): DocumentStructure | null => {
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
   return {
-    has_instructions: data.has_instructions || false,
-    instructions_text: data.instructions_text || '',
-    marking_scheme: data.marking_scheme || {},
-    sections: data.sections || [],
-    question_numbering_format: data.question_numbering_format || 'auto-detect',
-    answer_format: data.answer_format || 'auto-detect',
-    total_sections: data.total_sections || 0,
-    total_questions_detected: data.total_questions_detected || 0,
+    has_instructions: Boolean(d.has_instructions),
+    instructions_text: String(d.instructions_text || ''),
+    marking_scheme: (d.marking_scheme as MarkingScheme) || {},
+    sections: (d.sections as DocumentSection[]) || [],
+    question_numbering_format: String(d.question_numbering_format || 'auto-detect'),
+    answer_format: String(d.answer_format || 'auto-detect'),
+    total_sections: Number(d.total_sections || 0),
+    total_questions_detected: Number(d.total_questions_detected || 0),
   };
+};
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (typeof error === 'object' && error !== null) {
+    const maybe = error as { response?: { data?: { error?: string } } };
+    if (maybe.response?.data?.error) return maybe.response.data.error;
+  }
+  return fallback;
 };
 
 interface BulkImportState {
@@ -522,6 +531,13 @@ const SubjectCategorization: React.FC<SubjectCategorizationProps> = ({
 export default function BulkImportPage() {
   const { examId, patternId } = useParams<{ examId: string; patternId: string }>();
   const navigate = useNavigate();
+  const [autoCreateMode, setAutoCreateMode] = useState(false);
+  const [autoCreateConfig, setAutoCreateConfig] = useState({
+    examTitle: '',
+    patternName: '',
+    totalDuration: '',
+    startInHours: '24',
+  });
 
   const [state, setState] = useState<BulkImportState>({
     currentStep: 1,
@@ -535,6 +551,51 @@ export default function BulkImportPage() {
   });
 
   const handleFileSelect = async (file: File) => {
+    // Fast path: auto create pattern + exam + import directly from PDF
+    if (autoCreateMode) {
+      setState(prev => ({ ...prev, isValidating: true, showValidationModal: false }));
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (autoCreateConfig.examTitle.trim()) formData.append('exam_title', autoCreateConfig.examTitle.trim());
+        if (autoCreateConfig.patternName.trim()) formData.append('pattern_name', autoCreateConfig.patternName.trim());
+        if (autoCreateConfig.totalDuration.trim()) formData.append('total_duration', autoCreateConfig.totalDuration.trim());
+        if (autoCreateConfig.startInHours.trim()) formData.append('start_in_hours', autoCreateConfig.startInHours.trim());
+
+        const response = await api.post('/questions/auto-create-exam-from-pdf/', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+
+        const newExamId = response?.data?.exam?.id;
+        const newPatternId = response?.data?.pattern?.id;
+
+        if (newExamId && newPatternId) {
+          navigate(`/pattern/${newPatternId}/questions?examId=${newExamId}`);
+          return;
+        }
+
+        setState(prev => ({ ...prev, isValidating: false }));
+      } catch (error: unknown) {
+        console.error('Auto create exam from PDF failed:', error);
+        setState(prev => ({
+          ...prev,
+          isValidating: false,
+          validationResult: {
+            isValid: false,
+            documentType: 'error',
+            documentTypeDisplay: 'Error',
+            confidence: 0,
+            detectedSubjects: [],
+            matchedSubjects: [],
+            errorMessage: getErrorMessage(error, 'Failed to auto-create exam from PDF'),
+            reason: 'Please try again or use the guided extraction flow.',
+          },
+          showValidationModal: true,
+        }));
+      }
+      return;
+    }
+
     setState(prev => ({ ...prev, isValidating: true, showValidationModal: true }));
 
     try {
@@ -575,7 +636,7 @@ export default function BulkImportPage() {
         sectionsBySubject,
       }));
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Pre-analysis failed:', error);
       setState(prev => ({
         ...prev,
@@ -587,7 +648,7 @@ export default function BulkImportPage() {
           confidence: 0,
           detectedSubjects: [],
           matchedSubjects: [],
-          errorMessage: error.response?.data?.error || 'Failed to analyze file',
+          errorMessage: getErrorMessage(error, 'Failed to analyze file'),
           reason: 'The file could not be processed. Please try a different file.',
         },
         showValidationModal: true,
@@ -647,11 +708,63 @@ export default function BulkImportPage() {
     switch (state.currentStep) {
       case 1:
         return (
-          <FileUploader
-            onFileSelect={handleFileSelect}
-            acceptedFileTypes={['.txt', '.docx', '.doc', '.pdf', '.jpg', '.jpeg', '.png']}
-            maxSizeMB={10}
-          />
+          <div className="space-y-5">
+            <div className="border border-indigo-200 bg-indigo-50 rounded-xl p-4">
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <p className="font-semibold text-indigo-900">Auto Create Exam from PDF</p>
+                  <p className="text-xs text-indigo-700">Creates new pattern + exam + imports questions/options/answers/types automatically.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={autoCreateMode}
+                  onChange={(e) => setAutoCreateMode(e.target.checked)}
+                />
+              </label>
+
+              {autoCreateMode && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                  <input
+                    type="text"
+                    value={autoCreateConfig.examTitle}
+                    onChange={(e) => setAutoCreateConfig(prev => ({ ...prev, examTitle: e.target.value }))}
+                    placeholder="Exam title (optional)"
+                    className="px-3 py-2 border border-indigo-200 rounded-lg text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={autoCreateConfig.patternName}
+                    onChange={(e) => setAutoCreateConfig(prev => ({ ...prev, patternName: e.target.value }))}
+                    placeholder="Pattern name (optional)"
+                    className="px-3 py-2 border border-indigo-200 rounded-lg text-sm"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={autoCreateConfig.totalDuration}
+                    onChange={(e) => setAutoCreateConfig(prev => ({ ...prev, totalDuration: e.target.value }))}
+                    placeholder="Duration in minutes (optional)"
+                    className="px-3 py-2 border border-indigo-200 rounded-lg text-sm"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    value={autoCreateConfig.startInHours}
+                    onChange={(e) => setAutoCreateConfig(prev => ({ ...prev, startInHours: e.target.value }))}
+                    placeholder="Start in hours"
+                    className="px-3 py-2 border border-indigo-200 rounded-lg text-sm"
+                  />
+                </div>
+              )}
+            </div>
+
+            <FileUploader
+              onFileSelect={handleFileSelect}
+              acceptedFileTypes={['.txt', '.docx', '.doc', '.pdf', '.jpg', '.jpeg', '.png']}
+              maxSizeMB={10}
+            />
+          </div>
         );
 
       case 2:

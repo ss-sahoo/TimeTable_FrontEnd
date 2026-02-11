@@ -29,7 +29,7 @@ const TeacherManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
-  
+
   // Single teacher form
   const [teacherForm, setTeacherForm] = useState<CreateTeacherPayload>({
     name: "",
@@ -38,12 +38,12 @@ const TeacherManagement: React.FC = () => {
     employee_id: "",
     subjects: "",
   });
-  
+
   // Bulk upload
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [bulkJson, setBulkJson] = useState("");
   const [bulkMethod, setBulkMethod] = useState<"file" | "json">("file");
-  
+
   // Messages
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [createdTeacher, setCreatedTeacher] = useState<Teacher | null>(null);
@@ -70,9 +70,8 @@ const TeacherManagement: React.FC = () => {
   const fetchTeachers = async () => {
     setLoading(true);
     try {
-      const endpoint = user?.role === "super_admin" || user?.role === "SUPER_ADMIN"
-        ? "/timetable/superadmin/teachers/"
-        : "/timetable/admin/teachers/";
+      // Use the correct endpoint - /timetable/teachers/ for listing teachers
+      const endpoint = "/timetable/teachers/";
       const response = await api.get(endpoint);
       setTeachers(response.data.teachers || response.data || []);
     } catch (error) {
@@ -116,13 +115,13 @@ const TeacherManagement: React.FC = () => {
       }
 
       const response = await api.post(endpoint, payload);
-      
+
       setCreatedTeacher(response.data);
-      setMessage({ 
-        type: "success", 
-        text: `Teacher created successfully! Username: ${response.data.username}` 
+      setMessage({
+        type: "success",
+        text: `Teacher created successfully! Username: ${response.data.username}`
       });
-      
+
       // Reset form
       setTeacherForm({
         name: "",
@@ -135,9 +134,9 @@ const TeacherManagement: React.FC = () => {
       // Refresh teachers list
       fetchTeachers();
     } catch (error: any) {
-      setMessage({ 
-        type: "error", 
-        text: error.response?.data?.error || error.message || "Failed to create teacher" 
+      setMessage({
+        type: "error",
+        text: error.response?.data?.error || error.message || "Failed to create teacher"
       });
     } finally {
       setLoading(false);
@@ -161,7 +160,7 @@ const TeacherManagement: React.FC = () => {
         // File upload method
         const formData = new FormData();
         formData.append("file", bulkFile);
-        
+
         if (user?.role === "super_admin" || user?.role === "SUPER_ADMIN") {
           if (centerId) {
             formData.append("center_id", centerId);
@@ -176,7 +175,7 @@ const TeacherManagement: React.FC = () => {
       } else if (bulkMethod === "json" && bulkJson.trim()) {
         // JSON method
         const jsonData = JSON.parse(bulkJson);
-        
+
         const payload: any = {
           teachers: jsonData.teachers || jsonData,
         };
@@ -195,9 +194,9 @@ const TeacherManagement: React.FC = () => {
       }
 
       setBulkResult(response.data);
-      setMessage({ 
-        type: "success", 
-        text: `Bulk creation completed! Success: ${response.data.success}, Failed: ${response.data.failed}` 
+      setMessage({
+        type: "success",
+        text: `Bulk creation completed! Success: ${response.data.success}, Failed: ${response.data.failed}`
       });
 
       // Reset form
@@ -207,9 +206,9 @@ const TeacherManagement: React.FC = () => {
       // Refresh teachers list
       fetchTeachers();
     } catch (error: any) {
-      setMessage({ 
-        type: "error", 
-        text: error.response?.data?.error || error.message || "Failed to bulk create teachers" 
+      setMessage({
+        type: "error",
+        text: error.response?.data?.error || error.message || "Failed to bulk create teachers"
       });
     } finally {
       setLoading(false);
@@ -250,10 +249,10 @@ const TeacherManagement: React.FC = () => {
               {teachers.map((teacher) => (
                 <div key={teacher.user_id} style={styles.teacherCard}>
                   <div style={styles.teacherAvatar}>
-                    {teacher.name.charAt(0).toUpperCase()}
+                    {teacher.name?.charAt(0)?.toUpperCase() || 'T'}
                   </div>
                   <div style={styles.teacherInfo}>
-                    <h4 style={styles.teacherName}>{teacher.name}</h4>
+                    <h4 style={styles.teacherName}>{teacher.name || 'Unknown'}</h4>
                     <p style={styles.teacherCode}>{teacher.teacher_code}</p>
                     {teacher.email && <p style={styles.teacherDetail}>📧 {teacher.email}</p>}
                     {teacher.phone_number && <p style={styles.teacherDetail}>📱 {teacher.phone_number}</p>}
@@ -361,8 +360,8 @@ const TeacherManagement: React.FC = () => {
               <button style={styles.cancelBtn} onClick={() => setShowCreateModal(false)}>
                 Cancel
               </button>
-              <button 
-                style={styles.confirmBtn} 
+              <button
+                style={styles.confirmBtn}
                 onClick={handleCreateTeacher}
                 disabled={loading}
               >
@@ -376,7 +375,7 @@ const TeacherManagement: React.FC = () => {
       {/* Bulk Upload Modal */}
       {showBulkModal && (
         <div style={styles.modalOverlay} onClick={() => setShowBulkModal(false)}>
-          <div style={{...styles.modalContent, width: "600px"}} onClick={(e) => e.stopPropagation()}>
+          <div style={{ ...styles.modalContent, width: "600px" }} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
               <h3 style={styles.modalTitle}>Bulk Upload Teachers</h3>
               <button style={styles.closeBtn} onClick={() => setShowBulkModal(false)}>×</button>
@@ -418,8 +417,8 @@ const TeacherManagement: React.FC = () => {
                     <p style={styles.hint}>
                       File should contain columns: name, email, phone_number, employee_id, subjects
                     </p>
-                    <a 
-                      href="/templates/teacher_bulk_upload_template.xlsx" 
+                    <a
+                      href="/templates/teacher_bulk_upload_template.xlsx"
                       download
                       style={styles.downloadLink}
                     >
@@ -471,11 +470,11 @@ const TeacherManagement: React.FC = () => {
                       <span style={styles.statLabel}>Total</span>
                     </div>
                     <div style={styles.statItem}>
-                      <span style={{...styles.statValue, color: "#16a34a"}}>{bulkResult.success}</span>
+                      <span style={{ ...styles.statValue, color: "#16a34a" }}>{bulkResult.success}</span>
                       <span style={styles.statLabel}>Success</span>
                     </div>
                     <div style={styles.statItem}>
-                      <span style={{...styles.statValue, color: "#dc2626"}}>{bulkResult.failed}</span>
+                      <span style={{ ...styles.statValue, color: "#dc2626" }}>{bulkResult.failed}</span>
                       <span style={styles.statLabel}>Failed</span>
                     </div>
                   </div>
@@ -495,8 +494,8 @@ const TeacherManagement: React.FC = () => {
               <button style={styles.cancelBtn} onClick={() => setShowBulkModal(false)}>
                 Cancel
               </button>
-              <button 
-                style={styles.confirmBtn} 
+              <button
+                style={styles.confirmBtn}
                 onClick={handleBulkCreate}
                 disabled={loading}
               >

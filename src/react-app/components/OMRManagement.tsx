@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router';
 import { api } from '../hooks/useApi';
+
 import {
     FileText,
     Download,
@@ -13,7 +15,8 @@ import {
     Plus,
     ChevronDown,
     ChevronRight,
-    Award
+    Award,
+    ExternalLink
 } from 'lucide-react';
 
 interface OMRSheet {
@@ -78,13 +81,47 @@ interface AnswerKey {
     updated_at: string;
 }
 
+// Interface for exam question with correct answers
+interface ExamQuestionData {
+    id: number;
+    question_number: number;
+    section_name?: string;
+    question: {
+        id: number;
+        question_text: string;
+        question_type: string;
+        options: string[];
+        correct_answer: string;
+        marks: number;
+        negative_marks: number;
+        subject?: string;
+    };
+    marks: number;
+    negative_marks: number;
+}
+
 interface OMRManagementProps {
     examId: number;
     examTitle?: string;
+    patternId?: number;
 }
 
-export default function OMRManagement({ examId, examTitle }: OMRManagementProps) {
+
+const slugifySubject = (subject: string) =>
+    subject
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+export default function OMRManagement({ examId, examTitle, patternId }: OMRManagementProps) {
+    const location = useLocation();
+    const isSuperAdminPath = location.pathname.startsWith('/superadmin');
+    const isCenterAdminPath = location.pathname.startsWith('/center-admin');
+    const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
+
     const [loading, setLoading] = useState(true);
+
     const [generating, setGenerating] = useState(false);
     const [sheets, setSheets] = useState<OMRSheet[]>([]);
     const [submissions, setSubmissions] = useState<OMRSubmission[]>([]);
@@ -97,6 +134,9 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
     const [answerKey, setAnswerKey] = useState<AnswerKey | null>(null);
     const [uploadingMaster, setUploadingMaster] = useState(false);
     const [selectedMasterFile, setSelectedMasterFile] = useState<File | null>(null);
+
+    // Exam questions state (for auto-populating answer key)
+    const [examQuestions, setExamQuestions] = useState<ExamQuestionData[]>([]);
 
     // Answer key form state
     const [answerFormData, setAnswerFormData] = useState<Record<string, {
@@ -112,6 +152,46 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
     // Submission details view
     const [selectedSubmission, setSelectedSubmission] = useState<OMRSubmission | null>(null);
 
+    // Helper function to convert correct_answer to option letter (A, B, C, D)
+    const getAnswerLetter = (question: ExamQuestionData['question']): string[] => {
+        if (!question.correct_answer || !question.options || question.options.length === 0) {
+            return [];
+        }
+
+        const correctAnswer = question.correct_answer.trim().toUpperCase();
+
+        // If already a letter (A, B, C, D), return it
+        if (['A', 'B', 'C', 'D'].includes(correctAnswer)) {
+            return [correctAnswer];
+        }
+
+        // Check if it's comma-separated letters (for multiple correct)
+        if (/^[A-D](,[A-D])*$/i.test(correctAnswer.replace(/\s/g, ''))) {
+            return correctAnswer.split(',').map(l => l.trim().toUpperCase()).filter(l => ['A', 'B', 'C', 'D'].includes(l));
+        }
+
+        // Try to find the option index by matching text
+        const optionIndex = question.options.findIndex(
+            opt => opt.trim().toLowerCase() === question.correct_answer.trim().toLowerCase()
+        );
+
+        if (optionIndex !== -1 && optionIndex < 4) {
+            return [String.fromCharCode(65 + optionIndex)]; // 65 = 'A'
+        }
+
+        // Try partial match
+        const partialMatchIndex = question.options.findIndex(
+            opt => opt.toLowerCase().includes(question.correct_answer.toLowerCase()) ||
+                question.correct_answer.toLowerCase().includes(opt.toLowerCase())
+        );
+
+        if (partialMatchIndex !== -1 && partialMatchIndex < 4) {
+            return [String.fromCharCode(65 + partialMatchIndex)];
+        }
+
+        return [];
+    };
+
     useEffect(() => {
         fetchOMRData();
     }, [examId]);
@@ -121,19 +201,55 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
             setLoading(true);
             setError(null);
 
-            const [sheetsRes, submissionsRes, answerKeyRes] = await Promise.all([
+            const [sheetsRes, submissionsRes, answerKeyRes, questionsRes] = await Promise.all([
                 api.get(`/omr/sheets/?exam_id=${examId}`),
                 api.get(`/omr/submissions/?exam_id=${examId}`),
-                api.get(`/omr/answer-keys/exam/${examId}/`).catch(() => ({ data: null }))
+                api.get(`/omr/answer-keys/exam/${examId}/`).catch(() => ({ data: null })),
+                api.get(`/questions/exams/${examId}/questions/`).catch(() => ({ data: [] }))
             ]);
 
             setSheets(sheetsRes.data.results || sheetsRes.data || []);
             setSubmissions(submissionsRes.data.results || submissionsRes.data || []);
             setAnswerKey(answerKeyRes.data);
 
-            // Initialize answer form data from existing answer key
+            // Store and SORT exam questions by section/subject to ensure sequential numbering
+            const untypedQuestions = questionsRes.data.results || questionsRes.data || [];
+            const sortedQuestions = [...untypedQuestions].sort((a: any, b: any) => {
+                const secA = (a.section_name || a.question?.subject || 'General').toLowerCase();
+                const secB = (b.section_name || b.question?.subject || 'General').toLowerCase();
+                if (secA !== secB) return secA.localeCompare(secB);
+                return (a.question_number || 0) - (b.question_number || 0);
+            });
+            setExamQuestions(sortedQuestions);
+
+            // Update total questions based on exam questions
+            if (sortedQuestions.length > 0) {
+                setTotalQuestions(sortedQuestions.length);
+            }
+
+            // Always prioritize derived answer key from sorted questions to stay in sync with OMR
+            const autoAnswerData: Record<string, { correct: string[]; marks: number; negative: number }> = {};
+            sortedQuestions.forEach((eq: ExamQuestionData, index: number) => {
+                const qNum = index + 1;
+                const qKey = `Q${qNum}`;
+                const question = eq.question;
+
+                if (question) {
+                    const answerLetters = getAnswerLetter(question);
+                    const marks = eq.marks || question.marks || defaultMarks;
+                    const negative = eq.negative_marks || question.negative_marks || defaultNegative;
+
+                    autoAnswerData[qKey] = {
+                        correct: answerLetters,
+                        marks: typeof marks === 'number' ? marks : parseFloat(marks as any) || defaultMarks,
+                        negative: typeof negative === 'number' ? negative : parseFloat(negative as any) || defaultNegative
+                    };
+                }
+            });
+            setAnswerFormData(autoAnswerData);
+
             if (answerKeyRes.data?.answers) {
-                setAnswerFormData(answerKeyRes.data.answers);
+                setAnswerKey(answerKeyRes.data);
             }
         } catch (err) {
             console.error('Failed to fetch OMR data:', err);
@@ -142,6 +258,7 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
             setLoading(false);
         }
     };
+
 
     const handleGenerateSheet = async () => {
         try {
@@ -326,6 +443,69 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
             initial[`Q${i}`] = answerFormData[`Q${i}`] || { correct: [], marks: defaultMarks, negative: defaultNegative };
         }
         setAnswerFormData(initial);
+    };
+
+    // Sync answer key from exam questions
+    const handleSyncFromExam = async () => {
+        if (examQuestions.length === 0) {
+            setError('No exam questions found to sync from.');
+            setTimeout(() => setError(null), 3000);
+            return;
+        }
+
+        const autoAnswerData: Record<string, { correct: string[]; marks: number; negative: number }> = {};
+
+        // Use database question_number for stable mapping between generator, key, and evaluator
+        examQuestions.forEach((eq: ExamQuestionData) => {
+            const qNum = eq.question_number;
+            const qKey = `Q${qNum}`;
+
+            const question = eq.question;
+
+            if (question) {
+                const answerLetters = getAnswerLetter(question);
+                const marks = eq.marks || question.marks || defaultMarks;
+                const negative = eq.negative_marks || question.negative_marks || defaultNegative;
+
+                autoAnswerData[qKey] = {
+                    correct: answerLetters,
+                    marks: typeof marks === 'number' ? marks : parseFloat(marks as any) || defaultMarks,
+                    negative: typeof negative === 'number' ? negative : parseFloat(negative as any) || defaultNegative
+                };
+            }
+        });
+
+        setAnswerFormData(autoAnswerData);
+        setTotalQuestions(examQuestions.length);
+
+        // Auto-save to database
+        const populatedCount = Object.values(autoAnswerData).filter(a => a.correct.length > 0).length;
+        if (populatedCount > 0) {
+            // Build payload for auto-save
+            // Build payload using actual question numbers present in the sync
+            const payload: Record<string, any> = {};
+            examQuestions.forEach((eq) => {
+                const qKey = `Q${eq.question_number}`;
+                if (autoAnswerData[qKey] && autoAnswerData[qKey].correct.length > 0) {
+                    payload[qKey] = {
+                        correct: autoAnswerData[qKey].correct,
+                        marks: autoAnswerData[qKey].marks,
+                        negative: autoAnswerData[qKey].negative
+                    };
+                }
+            });
+
+
+            try {
+                const saveRes = await api.post(`/omr/answer-keys/set-answers/${examId}/`, payload);
+                setAnswerKey(saveRes.data.answer_key);
+                setSuccess(`Synced and saved ${populatedCount} answers from exam questions!`);
+            } catch (saveErr) {
+                console.error('Failed to save answer key:', saveErr);
+                setSuccess(`Synced ${populatedCount} answers (save manually to persist)`);
+            }
+            setTimeout(() => setSuccess(null), 4000);
+        }
     };
 
     const getStatusBadge = (status: string) => {
@@ -571,7 +751,11 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
                                 <Award className="w-6 h-6 text-green-600" />
                                 <div>
                                     <h3 className="text-sm font-bold text-green-800">Answer Key Configuration</h3>
-                                    <p className="text-xs text-green-600">Select correct answers for each question</p>
+                                    <p className="text-xs text-green-600">
+                                        {examQuestions.length > 0
+                                            ? `Auto-synced from ${examQuestions.length} exam questions. Click "Sync from Exam" to refresh.`
+                                            : 'Select correct answers for each question or sync from exam'}
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex flex-wrap items-center gap-4">
@@ -608,57 +792,144 @@ export default function OMRManagement({ examId, examTitle }: OMRManagementProps)
                                         className="w-16 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                     />
                                 </div>
-                                <button
-                                    onClick={handleSaveAnswerKey}
-                                    disabled={savingAnswerKey}
-                                    className="px-4 py-2 text-sm font-bold text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-all shadow-lg shadow-green-200"
-                                >
-                                    {savingAnswerKey ? 'Saving...' : 'Save Answer Key'}
-                                </button>
+                                <div className="px-4 py-2 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg border border-blue-200">
+                                    <span className="flex items-center gap-1.5">
+                                        <CheckCircle className="w-3.5 h-3.5" />
+                                        Answers are synced from Exam Questions
+                                    </span>
+                                </div>
+
                             </div>
                         </div>
                     </div>
 
-                    {/* Questions Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {Array.from({ length: totalQuestions }, (_, i) => i + 1).map((qNum) => {
-                            const qKey = `Q${qNum}`;
-                            const currentAnswers = answerFormData[qKey]?.correct || [];
+                    {/* Questions Grid with Section Headers */}
+                    <div className="space-y-6">
+                        {(() => {
+                            // Group questions by section - collect all question indices per section
+                            const sectionMap: Map<string, { section: string; subject: string; questionIndices: number[] }> = new Map();
 
-                            return (
-                                <div
-                                    key={qNum}
-                                    className={`p-4 rounded-xl border-2 transition-all ${currentAnswers.length > 0
-                                        ? 'border-green-300 bg-green-50'
-                                        : 'border-slate-200 bg-white hover:border-slate-300'
-                                        }`}
-                                >
-                                    <div className="flex items-center justify-between mb-3">
-                                        <span className="text-sm font-bold text-slate-700">Q{qNum}</span>
-                                        {currentAnswers.length > 0 && (
-                                            <CheckCircle className="w-4 h-4 text-green-500" />
-                                        )}
+                            const subjectQuestionCount: Record<string, number> = {};
+                            const questionSubjectInfo: Record<number, { index: number; slug: string }> = {};
+
+                            examQuestions.forEach((eq, idx) => {
+                                const sectionName = eq.section_name || 'Section';
+                                const subject = eq.question?.subject || sectionName;
+                                const key = `${subject}-${sectionName}`;
+
+                                const subjectSlug = slugifySubject(subject);
+                                if (!subjectQuestionCount[subjectSlug]) {
+                                    subjectQuestionCount[subjectSlug] = 0;
+                                }
+                                subjectQuestionCount[subjectSlug]++;
+                                questionSubjectInfo[idx + 1] = {
+                                    index: subjectQuestionCount[subjectSlug],
+                                    slug: subjectSlug
+                                };
+
+                                if (!sectionMap.has(key)) {
+
+                                    sectionMap.set(key, {
+                                        section: sectionName,
+                                        subject: subject,
+                                        questionIndices: []
+                                    });
+                                }
+                                sectionMap.get(key)!.questionIndices.push(idx + 1); // 1-indexed for Q1, Q2, etc.
+                            });
+
+                            const sectionGroups = Array.from(sectionMap.values());
+
+                            // If no sections found, create a single "All Questions" group
+                            if (sectionGroups.length === 0) {
+                                sectionGroups.push({
+                                    section: 'All Questions',
+                                    subject: 'General',
+                                    questionIndices: Array.from({ length: totalQuestions }, (_, i) => i + 1)
+                                });
+                            }
+
+                            return sectionGroups.map((group, groupIdx) => (
+                                <div key={groupIdx} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                                    {/* Section Header */}
+                                    <div className="px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                                                    <span className="text-sm font-bold">{groupIdx + 1}</span>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-sm">
+                                                        {group.subject !== group.section
+                                                            ? `${group.subject} - Section ${group.section}`
+                                                            : group.section}
+                                                    </h4>
+                                                    <p className="text-xs text-white/80">
+                                                        {group.questionIndices.length} questions (Q{Math.min(...group.questionIndices)} - Q{Math.max(...group.questionIndices)})
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-medium">
+                                                    {group.questionIndices.filter(qNum => (answerFormData[`Q${qNum}`]?.correct || []).length > 0).length} / {group.questionIndices.length} answered
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex gap-2">
-                                        {['A', 'B', 'C', 'D'].map((option) => {
-                                            const isSelected = currentAnswers.includes(option);
+
+                                    {/* Questions in this section */}
+                                    <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                                        {group.questionIndices.map((qNum) => {
+                                            const qKey = `Q${qNum}`;
+                                            const currentAnswers = answerFormData[qKey]?.correct || [];
+
                                             return (
-                                                <button
-                                                    key={option}
-                                                    onClick={() => handleSetAnswer(qNum, option)}
-                                                    className={`w-10 h-10 rounded-full text-sm font-bold transition-all ${isSelected
-                                                        ? 'bg-green-600 text-white shadow-lg shadow-green-300 scale-110'
-                                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                <div
+                                                    key={qNum}
+                                                    className={`p-3 rounded-lg border-2 transition-all ${currentAnswers.length > 0
+                                                        ? 'border-green-300 bg-green-50'
+                                                        : 'border-slate-200 bg-white hover:border-slate-300'
                                                         }`}
                                                 >
-                                                    {option}
-                                                </button>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <Link
+                                                            to={`${basePath}/pattern/${patternId}/question/${questionSubjectInfo[qNum]?.slug}/${questionSubjectInfo[qNum]?.index}?examId=${examId}`}
+                                                            className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                                                            title="View/Edit Question Details"
+                                                        >
+                                                            Q{qNum}
+                                                            <ExternalLink className="w-2.5 h-2.5" />
+                                                        </Link>
+                                                        {currentAnswers.length > 0 && (
+                                                            <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex gap-1.5">
+                                                        {['A', 'B', 'C', 'D'].map((option) => {
+                                                            const isSelected = currentAnswers.includes(option);
+                                                            return (
+                                                                <button
+                                                                    key={option}
+                                                                    disabled={true}
+                                                                    className={`w-8 h-8 rounded-full text-xs font-bold transition-all cursor-not-allowed ${isSelected
+                                                                        ? 'bg-green-600 text-white shadow-md scale-105'
+                                                                        : 'bg-slate-100 text-slate-400'
+                                                                        }`}
+                                                                >
+                                                                    {option}
+                                                                </button>
+
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
                                             );
                                         })}
                                     </div>
                                 </div>
-                            );
-                        })}
+                            ));
+                        })()}
                     </div>
 
                     {/* Summary */}

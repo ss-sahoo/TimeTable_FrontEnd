@@ -145,7 +145,7 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
           subject: currentSubject,
           total_extracted: totalExtracted,
           total_will_import: 0, // Will be calculated by confirm API
-          total_overflow: totalExtracted, // All questions are overflow until pattern sections exist
+          total_overflow: 0, // Don't show overflow at extraction stage
           total_remaining_after_import: 0,
           section_mappings: sections.map((section: any) => ({
             pattern_section_name: section.section_name,
@@ -305,24 +305,30 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-4 gap-4 mt-4">
-            <div className="bg-white rounded-lg p-4 text-center border border-indigo-100">
+          {/* Stats - Only show Extracted, hide others when 0 */}
+          <div className="flex flex-wrap gap-4 mt-4">
+            <div className="bg-white rounded-lg p-4 text-center border border-indigo-100 flex-1 min-w-[120px]">
               <p className="text-3xl font-bold text-indigo-600">{preview.total_extracted}</p>
               <p className="text-sm text-gray-600">Extracted</p>
             </div>
-            <div className="bg-white rounded-lg p-4 text-center border border-green-100">
-              <p className="text-3xl font-bold text-green-600">{preview.total_will_import}</p>
-              <p className="text-sm text-gray-600">Will Import</p>
-            </div>
-            <div className="bg-white rounded-lg p-4 text-center border border-amber-100">
-              <p className="text-3xl font-bold text-amber-600">{preview.total_overflow}</p>
-              <p className="text-sm text-gray-600">Overflow</p>
-            </div>
-            <div className="bg-white rounded-lg p-4 text-center border border-blue-100">
-              <p className="text-3xl font-bold text-blue-600">{preview.total_remaining_after_import}</p>
-              <p className="text-sm text-gray-600">Still Needed</p>
-            </div>
+            {preview.total_will_import > 0 && (
+              <div className="bg-white rounded-lg p-4 text-center border border-green-100 flex-1 min-w-[120px]">
+                <p className="text-3xl font-bold text-green-600">{preview.total_will_import}</p>
+                <p className="text-sm text-gray-600">Will Import</p>
+              </div>
+            )}
+            {preview.total_overflow > 0 && (
+              <div className="bg-white rounded-lg p-4 text-center border border-amber-100 flex-1 min-w-[120px]">
+                <p className="text-3xl font-bold text-amber-600">{preview.total_overflow}</p>
+                <p className="text-sm text-gray-600">Overflow</p>
+              </div>
+            )}
+            {preview.total_remaining_after_import > 0 && (
+              <div className="bg-white rounded-lg p-4 text-center border border-blue-100 flex-1 min-w-[120px]">
+                <p className="text-3xl font-bold text-blue-600">{preview.total_remaining_after_import}</p>
+                <p className="text-sm text-gray-600">Still Needed</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -481,10 +487,10 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
                 key={option.action}
                 onClick={() => handleConfirmImport(option.action)}
                 className={`px-6 py-3 rounded-lg transition-colors flex items-center space-x-2 ${option.action === 'import_all'
-                    ? 'bg-green-600 text-white hover:bg-green-700'
-                    : option.action === 'skip'
-                      ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : option.action === 'skip'
+                    ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
                   }`}
               >
                 <span>{option.label}</span>
@@ -594,10 +600,10 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
         {subjectsToProcess.map((subject, index) => (
           <React.Fragment key={subject}>
             <div className={`flex items-center space-x-2 px-4 py-2 rounded-full ${index < currentSubjectIndex
-                ? 'bg-green-100 text-green-700'
-                : index === currentSubjectIndex
-                  ? 'bg-indigo-100 text-indigo-700'
-                  : 'bg-gray-100 text-gray-500'
+              ? 'bg-green-100 text-green-700'
+              : index === currentSubjectIndex
+                ? 'bg-indigo-100 text-indigo-700'
+                : 'bg-gray-100 text-gray-500'
               }`}>
               {index < currentSubjectIndex ? (
                 <CheckCircle className="w-4 h-4" />

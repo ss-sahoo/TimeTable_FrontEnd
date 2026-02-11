@@ -233,13 +233,51 @@ const ExamResults: React.FC = () => {
       id: key,
       ...value,
     }));
+
+    // Deduplicate entries by question_number and subject
+    // Prefer entries with actual user answers over empty ones
+    const uniqueMap = new Map<string, typeof entries[0]>();
+    entries.forEach((entry) => {
+      const uniqueKey = `${entry.subject || 'General'}-${entry.question_number || entry.id}`;
+      const existing = uniqueMap.get(uniqueKey);
+
+      if (!existing) {
+        // First occurrence - add it
+        uniqueMap.set(uniqueKey, entry);
+      } else {
+        // Prefer entry with actual user_answer over empty one
+        const existingHasAnswer = existing.user_answer && existing.user_answer.trim() !== '';
+        const newHasAnswer = entry.user_answer && entry.user_answer.trim() !== '';
+
+        if (!existingHasAnswer && newHasAnswer) {
+          // Replace with entry that has an actual answer
+          uniqueMap.set(uniqueKey, entry);
+        }
+      }
+    });
+
+    let uniqueEntries = Array.from(uniqueMap.values());
+
+    // Sort by subject and then by question number
+    uniqueEntries.sort((a, b) => {
+      const subjectA = (a.subject || 'General').toLowerCase();
+      const subjectB = (b.subject || 'General').toLowerCase();
+      if (subjectA !== subjectB) {
+        return subjectA.localeCompare(subjectB);
+      }
+      const numA = a.question_number || 0;
+      const numB = b.question_number || 0;
+      return numA - numB;
+    });
+
+    // Apply filter
     if (detailFilter === 'correct') {
-      return entries.filter((entry) => entry.is_correct);
+      return uniqueEntries.filter((entry) => entry.is_correct);
     }
     if (detailFilter === 'incorrect') {
-      return entries.filter((entry) => !entry.is_correct);
+      return uniqueEntries.filter((entry) => !entry.is_correct);
     }
-    return entries;
+    return uniqueEntries;
   }, [result, detailFilter]);
   const accuracy = useMemo(() => {
     if (!result || totalMarks === 0) return 0;
@@ -261,7 +299,10 @@ const ExamResults: React.FC = () => {
   const canDownloadAnswerSheet = activeTab === 'detailed' && detailedEntries.length > 0;
 
   const RenderStudentAnswer = ({ answer }: { answer: string }) => {
-    if (!answer) return <span>Not attempted</span>;
+    // Check for empty or whitespace-only answers
+    if (!answer || answer.trim() === '') {
+      return <span className="text-slate-400 italic">Not attempted</span>;
+    }
 
     try {
       const parsed = JSON.parse(answer);
@@ -278,22 +319,27 @@ const ExamResults: React.FC = () => {
                   {Object.entries(parsed.parts[parsed.selected_choice]).map(([key, value]: [string, any]) => (
                     <div key={key}>
                       <span className="text-[10px] font-bold text-slate-500 uppercase">Part {parseInt(key) + 1}</span>
-                      <p className="text-sm text-slate-900 mt-1">{value || <span className="text-slate-400 italic">No answer provided</span>}</p>
+                      <div className="text-sm text-slate-900 mt-1">
+                        {value ? <LaTeXRenderer content={String(value)} /> : <span className="text-slate-400 italic">No answer provided</span>}
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-slate-900">{parsed.text || <span className="text-slate-400 italic">No text response provided</span>}</p>
+                <div className="text-sm text-slate-900">
+                  {parsed.text ? <LaTeXRenderer content={parsed.text} /> : <span className="text-slate-400 italic">No text response provided</span>}
+                </div>
               )}
             </div>
           );
         }
       }
     } catch (e) {
-      // Not a JSON or not our structured format, fall back to plain text
+      // Not a JSON or not our structured format, fall back to LaTeX rendering
     }
 
-    return <span>{answer}</span>;
+    // Render with LaTeX support for math formulas
+    return <LaTeXRenderer content={answer} />;
   };
 
   const handleDownloadPdf = async () => {
@@ -812,75 +858,95 @@ const ExamResults: React.FC = () => {
                       </div>
 
                       <div className="space-y-4">
-                        {detailedEntries.map((detail, index) => (
-                          <div
-                            key={detail.id || index}
-                            className="print-block-avoid border border-slate-200 rounded-2xl bg-white shadow-sm p-5 space-y-4"
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                              <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold uppercase tracking-wider">
-                                    {detail.subject || 'General'}
-                                  </span>
-                                  <p className="text-xs uppercase text-slate-500 font-medium">Question {detail.question_number || index + 1}</p>
+                        {detailedEntries.map((detail, index) => {
+                          // Check if we need to show a subject header
+                          const prevSubject = index > 0 ? detailedEntries[index - 1].subject : null;
+                          const currentSubject = detail.subject || 'General';
+                          const showSubjectHeader = currentSubject !== prevSubject;
+
+                          return (
+                            <React.Fragment key={detail.id || index}>
+                              {showSubjectHeader && (
+                                <div className="flex items-center gap-3 pt-4 pb-2">
+                                  <div className="h-px flex-1 bg-slate-200" />
+                                  <h4 className="text-sm font-bold text-blue-600 uppercase tracking-wider px-3 py-1 bg-blue-50 rounded-full">
+                                    {currentSubject}
+                                  </h4>
+                                  <div className="h-px flex-1 bg-slate-200" />
                                 </div>
-                                <h3 className="text-base font-semibold text-slate-900">{detail.question_type.replace(/_/g, ' ').toUpperCase()}</h3>
-                              </div>
-                              <div className="flex items-center gap-2 text-xs text-slate-500">
-                                <span className="font-semibold text-slate-700">
-                                  Marks {detail.marks_obtained}/{detail.max_marks}
-                                </span>
-                                <span
-                                  className={`px-4 py-1 rounded-full text-xs font-semibold ${detail.is_correct ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                                    }`}
-                                >
-                                  {detail.is_correct ? 'Correct' : 'Incorrect'}
-                                </span>
-                                {(detail as any).evaluation_status === 'ai_evaluated' && (
-                                  <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] font-bold uppercase">
-                                    AI Evaluated
-                                  </span>
+                              )}
+                              <div
+                                key={detail.id || index}
+                                className="print-block-avoid border border-slate-200 rounded-2xl bg-white shadow-sm p-5 space-y-4"
+                              >
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold uppercase tracking-wider">
+                                        {detail.subject || 'General'}
+                                      </span>
+                                      <p className="text-xs uppercase text-slate-500 font-medium">Question {detail.question_number || index + 1}</p>
+                                    </div>
+                                    <h3 className="text-base font-semibold text-slate-900">{detail.question_type.replace(/_/g, ' ').toUpperCase()}</h3>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                                    <span className="font-semibold text-slate-700">
+                                      Marks {detail.marks_obtained}/{detail.max_marks}
+                                    </span>
+                                    <span
+                                      className={`px-4 py-1 rounded-full text-xs font-semibold ${detail.is_correct ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                                        }`}
+                                    >
+                                      {detail.is_correct ? 'Correct' : 'Incorrect'}
+                                    </span>
+                                    {(detail as any).evaluation_status === 'ai_evaluated' && (
+                                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] font-bold uppercase">
+                                        AI Evaluated
+                                      </span>
+                                    )}
+                                    {(detail as any).evaluation_status === 'auto_evaluated' && (
+                                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold uppercase">
+                                        Auto Graded
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="bg-slate-50 rounded-xl p-4">
+                                  <LaTeXRenderer content={detail.question_text} />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                                    <p className="text-xs font-semibold text-emerald-700 uppercase mb-1">Student Answer</p>
+                                    <div className="text-sm text-emerald-900">
+                                      <RenderStudentAnswer answer={detail.user_answer} />
+                                    </div>
+                                  </div>
+                                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                                    <p className="text-xs font-semibold text-blue-700 uppercase mb-1">Correct Answer</p>
+                                    <div className="text-sm text-blue-900">
+                                      <LaTeXRenderer content={detail.correct_answer} />
+                                    </div>
+                                  </div>
+                                </div>
+                                {detail.explanation && (
+                                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-sm text-slate-700">
+                                    <p className="text-[10px] uppercase font-bold text-slate-500 mb-2 flex items-center gap-1">
+                                      {(detail as any).evaluation_status === 'ai_evaluated' ? (
+                                        <>
+                                          <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                                          AI Evaluation Feedback
+                                        </>
+                                      ) : 'Explanation / Feedback'}
+                                    </p>
+                                    <div className="prose prose-sm max-w-none">
+                                      <LaTeXRenderer content={detail.explanation} />
+                                    </div>
+                                  </div>
                                 )}
-                                {(detail as any).evaluation_status === 'auto_evaluated' && (
-                                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold uppercase">
-                                    Auto Graded
-                                  </span>
-                                )}
                               </div>
-                            </div>
-                            <div className="bg-slate-50 rounded-xl p-4">
-                              <LaTeXRenderer content={detail.question_text} />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
-                                <p className="text-xs font-semibold text-emerald-700 uppercase mb-1">Student Answer</p>
-                                <div className="text-sm text-emerald-900">
-                                  <RenderStudentAnswer answer={detail.user_answer} />
-                                </div>
-                              </div>
-                              <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
-                                <p className="text-xs font-semibold text-blue-700 uppercase mb-1">Correct Answer</p>
-                                <p className="text-sm text-blue-900">{detail.correct_answer}</p>
-                              </div>
-                            </div>
-                            {detail.explanation && (
-                              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-sm text-slate-700">
-                                <p className="text-[10px] uppercase font-bold text-slate-500 mb-2 flex items-center gap-1">
-                                  {(detail as any).evaluation_status === 'ai_evaluated' ? (
-                                    <>
-                                      <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-                                      AI Evaluation Feedback
-                                    </>
-                                  ) : 'Explanation / Feedback'}
-                                </p>
-                                <div className="prose prose-sm max-w-none">
-                                  <LaTeXRenderer content={detail.explanation} />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                            </React.Fragment>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -888,24 +954,24 @@ const ExamResults: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
-          </button>
-          <button
-            onClick={() => navigate(`${basePath}/student-analytics`)}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
-          >
-            <BarChart3 className="w-4 h-4" />
-            View Analytics
-          </button>
+          {/* Action Buttons */}
+          <div className="flex justify-center gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Dashboard
+            </button>
+            <button
+              onClick={() => navigate(`${basePath}/student-analytics`)}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
+            >
+              <BarChart3 className="w-4 h-4" />
+              View Analytics
+            </button>
+          </div>
         </div>
       </div>
     </div>

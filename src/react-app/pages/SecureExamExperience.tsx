@@ -109,6 +109,7 @@ const SecureExamExperience: React.FC = () => {
   const [currentToastViolation, setCurrentToastViolation] = useState<any>(null);
   const [activeSubject, setActiveSubject] = useState<string>('All');
   const [isPaused, setIsPaused] = useState(false);
+  const [isWebcamMinimized, setIsWebcamMinimized] = useState(false);
 
   // Pre-exam flow states
   const [examStarted, setExamStarted] = useState(false);
@@ -619,14 +620,14 @@ const SecureExamExperience: React.FC = () => {
                                       handleAnswerChange(currentQuestion.id, JSON.stringify(currentAns));
                                     }}
                                     className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${(function () {
-                                        let sel = '';
-                                        try {
-                                          sel = JSON.parse(currentAnswer?.answer as string || '{}').selected_choice;
-                                        } catch (e) { }
-                                        return sel === (part.label || `Choice ${String.fromCharCode(65 + idx)}`);
-                                      })()
-                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                      let sel = '';
+                                      try {
+                                        sel = JSON.parse(currentAnswer?.answer as string || '{}').selected_choice;
+                                      } catch (e) { }
+                                      return sel === (part.label || `Choice ${String.fromCharCode(65 + idx)}`);
+                                    })()
+                                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                       }`}
                                   >
                                     {(function () {
@@ -825,6 +826,15 @@ const SecureExamExperience: React.FC = () => {
 
               {/* Navigation Bar */}
               <div className="px-8 py-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
+                {/* Left side - Autosave status */}
+                <div className="hidden sm:flex items-center gap-2 px-4 py-2 border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 rounded-xl">
+                  <div className={`w-2 h-2 rounded-full ${autoSaveStatus === 'saving' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
+                    {autoSaveStatus === 'saving' ? 'Syncing...' : 'Autosave Active'}
+                  </span>
+                </div>
+
+                {/* Right side - Navigation buttons */}
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => handleQuestionNavigation(Math.max(0, currentQuestionIndex - 1))}
@@ -834,15 +844,6 @@ const SecureExamExperience: React.FC = () => {
                     <ChevronLeft className="w-4 h-4" />
                     Previous
                   </button>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="hidden sm:flex items-center gap-2 px-4 py-2 border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 rounded-xl">
-                    <div className={`w-2 h-2 rounded-full ${autoSaveStatus === 'saving' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
-                      {autoSaveStatus === 'saving' ? 'Syncing...' : 'Autosave Active'}
-                    </span>
-                  </div>
 
                   <button
                     onClick={() => handleQuestionNavigation(Math.min(questions.length - 1, currentQuestionIndex + 1))}
@@ -949,15 +950,55 @@ const SecureExamExperience: React.FC = () => {
 
       {/* Proctoring & Violation UI */}
       {examAttempt?.exam.enable_webcam_proctoring && (
-        <div className="fixed bottom-6 right-6 z-50">
-          <WebcamMonitor
-            attemptId={parseInt(attemptId!)}
-            onViolationDetected={handleViolationDetected}
-            captureInterval={20}
-            showPreview={true}
-            autoStart={true}
-            className="w-48 shadow-2xl rounded-xl border-2 border-white dark:border-slate-800 overflow-hidden"
-          />
+        <div className={`fixed z-50 transition-all duration-300 ${isWebcamMinimized
+          ? 'bottom-4 left-1/2 -translate-x-1/2'
+          : 'bottom-6 left-6'
+          }`}>
+          {isWebcamMinimized ? (
+            // Minimized View - Compact Bar
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full shadow-2xl border-2 border-white dark:border-slate-800"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <Monitor className="w-4 h-4 text-white" />
+                <span className="text-xs font-bold text-white uppercase tracking-wider">Camera Active</span>
+              </div>
+              <button
+                onClick={() => setIsWebcamMinimized(false)}
+                className="p-1.5 hover:bg-white/20 rounded-full transition-all"
+                title="Maximize camera"
+              >
+                <Maximize className="w-4 h-4 text-white" />
+              </button>
+            </motion.div>
+          ) : (
+            // Maximized View - Full Camera
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="relative"
+            >
+              <WebcamMonitor
+                attemptId={parseInt(attemptId!)}
+                onViolationDetected={handleViolationDetected}
+                captureInterval={20}
+                showPreview={true}
+                autoStart={true}
+                className="w-48 shadow-2xl rounded-xl border-2 border-white dark:border-slate-800 overflow-hidden"
+              />
+              {/* Minimize Button Overlay */}
+              <button
+                onClick={() => setIsWebcamMinimized(true)}
+                className="absolute top-2 right-2 p-1.5 bg-slate-900/80 hover:bg-slate-900 rounded-lg transition-all shadow-lg z-10"
+                title="Minimize camera"
+              >
+                <Minimize className="w-3.5 h-3.5 text-white" />
+              </button>
+            </motion.div>
+          )}
         </div>
       )}
 

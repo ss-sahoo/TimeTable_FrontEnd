@@ -59,22 +59,22 @@ const BatchSchedule: React.FC = () => {
   const [centerId, setCenterId] = useState<string>("bb67db93-5d47-4639-aa05-7ddb80d106a1");
   const [centerName, setCenterName] = useState<string>("Center Test");
   const [timetableId, setTimetableId] = useState<string>("");
-  
+
   // State for batches from API
   const [batches, setBatches] = useState<Batch[]>([]);
   const [allBatchesFromAPI, setAllBatchesFromAPI] = useState<Batch[]>([]); // All batches from API
   const [activeBatch, setActiveBatch] = useState<string>("");
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  
+
   // State for teachers from API
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loadingTeachers, setLoadingTeachers] = useState<boolean>(false);
-  
+
   // Loading and error states
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingAllBatches, setLoadingAllBatches] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Add Batch State
   const [showAddBatch, setShowAddBatch] = useState(false);
   const [newBatchName, setNewBatchName] = useState("");
@@ -84,15 +84,15 @@ const BatchSchedule: React.FC = () => {
   const [selectedBatchToAdd, setSelectedBatchToAdd] = useState<string>("");
 
   // Teacher assignments state
-  const [teacherAssignments, setTeacherAssignments] = useState<{batchId: string, teachers: Teacher[], timetableId?: string}[]>([]);
+  const [teacherAssignments, setTeacherAssignments] = useState<{ batchId: string, teachers: Teacher[], timetableId?: string }[]>([]);
 
   // New states for save functionality and help section
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [showHelp, setShowHelp] = useState(true);
-  
+
   // State for timetable name (display only)
   const [timetableName, setTimetableName] = useState<string>("");
-  
+
   // State for free classes count
   const [freeClassesCount, setFreeClassesCount] = useState<number>(0);
 
@@ -103,18 +103,18 @@ const BatchSchedule: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   // ===================== API FUNCTIONS =====================
-  
+
   // Function to get access token
   const getAccessToken = () => {
     return localStorage.getItem("access_token");
   };
-  
+
   // Function to fetch free classes count for timetable
   const fetchFreeClassesCount = async (ttId: string) => {
     try {
       const accessToken = getAccessToken();
       if (!accessToken || !ttId) return;
-      
+
       const response = await fetch(
         `https://exams.dashoapp.com/api/timetable/timetables/${ttId}/`,
         {
@@ -125,7 +125,7 @@ const BatchSchedule: React.FC = () => {
           },
         }
       );
-      
+
       if (response.ok) {
         const data = await response.json();
         const count = data.free_classes_count || 0;
@@ -136,7 +136,7 @@ const BatchSchedule: React.FC = () => {
       console.error("Error fetching free classes count:", error);
     }
   };
-  
+
   // Generate FREE slots based on free_classes_count
   const generateFreeSlots = (): Teacher[] => {
     const freeSlots: Teacher[] = [];
@@ -160,16 +160,16 @@ const BatchSchedule: React.FC = () => {
   const fetchAssignedBatches = async (ttId: string) => {
     try {
       const accessToken = getAccessToken();
-      
+
       if (!accessToken) {
         throw new Error("No access token found. Please login again.");
       }
-      
+
       if (!ttId) {
         console.log("No timetable ID provided");
         return { batches: [] };
       }
-      
+
       const response = await fetch(
         `https://exams.dashoapp.com/api/timetable/timetables/${ttId}/batch-assignments/`,
         {
@@ -180,7 +180,7 @@ const BatchSchedule: React.FC = () => {
           },
         }
       );
-      
+
       if (!response.ok) {
         // Handle 404 as empty result (no assignments yet)
         if (response.status === 404) {
@@ -189,17 +189,17 @@ const BatchSchedule: React.FC = () => {
         }
         throw new Error(`Failed to fetch assigned batches: ${response.status}`);
       }
-      
+
       const data = await response.json();
       console.log("Assigned batches API response:", data);
-      
+
       // Handle null or undefined response
       if (!data) {
         return { batches: [] };
       }
-      
+
       return data;
-      
+
     } catch (error: any) {
       console.error("Error fetching assigned batches:", error);
       return { batches: [] };
@@ -210,18 +210,18 @@ const BatchSchedule: React.FC = () => {
   const assignBatchToTimetable = async (ttId: string, batchCode: string) => {
     try {
       const accessToken = getAccessToken();
-      
+
       if (!accessToken) {
         throw new Error("No access token found. Please login again.");
       }
-      
+
       const payload = {
         timetable_id: ttId,
         batch_code: batchCode,
       };
-      
+
       console.log("Assigning batch with payload:", payload);
-      
+
       const response = await fetch(
         "https://exams.dashoapp.com/api/timetable/admin/timetables/assign-batch/",
         {
@@ -233,16 +233,16 @@ const BatchSchedule: React.FC = () => {
           body: JSON.stringify(payload)
         }
       );
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(`Failed to assign batch: ${response.status} - ${JSON.stringify(errorData)}`);
       }
-      
+
       const data = await response.json();
       console.log("Batch assigned successfully:", data);
       return data;
-      
+
     } catch (error: any) {
       console.error("Error assigning batch:", error);
       throw error;
@@ -254,11 +254,11 @@ const BatchSchedule: React.FC = () => {
     setLoadingTeachers(true);
     try {
       const accessToken = getAccessToken();
-      
+
       if (!accessToken) {
         throw new Error("No access token found. Please login again.");
       }
-      
+
       const response = await fetch(
         `https://exams.dashoapp.com/api/timetable/centers/${centerId}/users/?role=teacher`,
         {
@@ -269,15 +269,15 @@ const BatchSchedule: React.FC = () => {
           },
         }
       );
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch teachers: ${response.status}`);
       }
-      
+
       const data = await response.json();
       console.log("Teachers API response:", data);
       console.log("First teacher raw data:", data.results?.[0]);
-      
+
       // Transform API data to match our UI format
       const formattedTeachers: Teacher[] = data.results.map((teacher: any) => ({
         id: teacher.id,
@@ -292,55 +292,55 @@ const BatchSchedule: React.FC = () => {
         email: teacher.email,
         phone: teacher.phone
       }));
-      
+
       console.log("Formatted teachers with subjects:", formattedTeachers);
-      
+
       setTeachers(formattedTeachers);
-      
+
     } catch (error: any) {
       console.error("Error fetching teachers:", error);
-      
+
       // Fallback to mock data if API fails
       setTeachers([
-        { 
-          id: "T001", 
-          name: "Dr. Sharma", 
-          code: "TCH-CENT-230", 
-          subject: "Mathematics", 
-          department: "CSE", 
-          minLecturesPerDay: 1, 
-          maxLecturesPerDay: 3, 
-          minLecturesPerWeek: 4, 
-          maxLecturesPerWeek: 8 
+        {
+          id: "T001",
+          name: "Dr. Sharma",
+          code: "TCH-CENT-230",
+          subject: "Mathematics",
+          department: "CSE",
+          minLecturesPerDay: 1,
+          maxLecturesPerDay: 3,
+          minLecturesPerWeek: 4,
+          maxLecturesPerWeek: 8
         },
-        { 
-          id: "T002", 
-          name: "Prof. Kumar", 
-          code: "TCH-CENT-231", 
-          subject: "Data Structures", 
-          department: "CSE", 
-          minLecturesPerDay: 1, 
-          maxLecturesPerDay: 2, 
-          minLecturesPerWeek: 3, 
-          maxLecturesPerWeek: 6 
+        {
+          id: "T002",
+          name: "Prof. Kumar",
+          code: "TCH-CENT-231",
+          subject: "Data Structures",
+          department: "CSE",
+          minLecturesPerDay: 1,
+          maxLecturesPerDay: 2,
+          minLecturesPerWeek: 3,
+          maxLecturesPerWeek: 6
         },
-        { 
-          id: "T003", 
-          name: "Dr. Singh", 
-          code: "TCH-CENT-232", 
-          subject: "Algorithms", 
-          department: "CSE", 
-          minLecturesPerDay: 1, 
-          maxLecturesPerDay: 2, 
-          minLecturesPerWeek: 2, 
-          maxLecturesPerWeek: 5 
+        {
+          id: "T003",
+          name: "Dr. Singh",
+          code: "TCH-CENT-232",
+          subject: "Algorithms",
+          department: "CSE",
+          minLecturesPerDay: 1,
+          maxLecturesPerDay: 2,
+          minLecturesPerWeek: 2,
+          maxLecturesPerWeek: 5
         },
       ]);
     } finally {
       setLoadingTeachers(false);
     }
   };
-  
+
   // Function to remove batch from timetable via API (uses AllApi)
   const removeBatchFromTimetableAPI = async (ttId: string, batchCode: string) => {
     try {
@@ -369,15 +369,15 @@ const BatchSchedule: React.FC = () => {
   const assignTeacherAPI = async (batchCode: string, teacherCode: string, minLecturesPerWeek: number, minLecturesPerDay: number, maxLecturesPerDay: number, maxLecturesPerWeek: number) => {
     try {
       const accessToken = getAccessToken();
-      
+
       if (!accessToken) {
         throw new Error("No access token found. Please login again.");
       }
-      
+
       if (!timetableId) {
         throw new Error("Please select a timetable first");
       }
-      
+
       const payload = {
         timetable_id: timetableId,
         batch_code: batchCode,
@@ -387,9 +387,9 @@ const BatchSchedule: React.FC = () => {
         max_lectures_per_day: maxLecturesPerDay,
         max_lectures_per_week: maxLecturesPerWeek
       };
-      
+
       console.log("Assigning teacher with payload:", payload);
-      
+
       const response = await fetch(
         "https://exams.dashoapp.com/api/timetable/admin/timetables/assign-teacher/",
         {
@@ -401,31 +401,31 @@ const BatchSchedule: React.FC = () => {
           body: JSON.stringify(payload)
         }
       );
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(`Failed to assign teacher: ${response.status} - ${JSON.stringify(errorData)}`);
       }
-      
+
       const data = await response.json();
       console.log("Teacher assigned successfully:", data);
       return data;
-      
+
     } catch (error: any) {
       console.error("Error assigning teacher:", error);
       throw error;
     }
   };
-  
+
   // Function to fetch timetable details (for display name)
   const fetchTimetableDetails = async (ttId: string) => {
     try {
       const accessToken = getAccessToken();
-      
+
       if (!accessToken || !ttId) {
         return;
       }
-      
+
       const response = await fetch(
         `https://exams.dashoapp.com/api/timetable/timetables/${ttId}/`,
         {
@@ -436,12 +436,12 @@ const BatchSchedule: React.FC = () => {
           },
         }
       );
-      
+
       if (response.ok) {
         const data = await response.json();
         setTimetableName(data.name || `Timetable ${ttId.slice(0, 8)}`);
       }
-      
+
     } catch (error: any) {
       console.error("Error fetching timetable details:", error);
       setTimetableName(`Timetable ${ttId.slice(0, 8)}`);
@@ -453,11 +453,11 @@ const BatchSchedule: React.FC = () => {
     setLoadingAllBatches(true);
     try {
       const accessToken = getAccessToken();
-      
+
       if (!accessToken) {
         throw new Error("No access token found. Please login again.");
       }
-      
+
       const response = await fetch(
         `https://exams.dashoapp.com/api/timetable/centers/${centerId}/batches/`,
         {
@@ -468,14 +468,14 @@ const BatchSchedule: React.FC = () => {
           },
         }
       );
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch batches: ${response.status}`);
       }
-      
+
       const data = await response.json();
       console.log("All Batches API response:", data);
-      
+
       // Transform API data to match our UI format
       const formattedBatches: Batch[] = data.results.map((batch: any, index: number) => ({
         id: batch.id,
@@ -491,18 +491,18 @@ const BatchSchedule: React.FC = () => {
         year: extractYearFromBatchName(batch.name) || `${new Date(batch.start_date).getFullYear()} Year`,
         students: batch.student_count.toString()
       }));
-      
+
       setAllBatchesFromAPI(formattedBatches);
-      
+
       // Filter out batches that are already added
       const availableBatches = formattedBatches.filter(
         batch => !batches.some(addedBatch => addedBatch.id === batch.id)
       );
-      
+
       if (availableBatches.length > 0) {
         setSelectedBatchToAdd(availableBatches[0].id);
       }
-      
+
     } catch (error: any) {
       console.error("Error fetching all batches:", error);
       alert(`Failed to fetch batches: ${error.message}`);
@@ -515,14 +515,14 @@ const BatchSchedule: React.FC = () => {
   const fetchBatchesFromAPI = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const accessToken = getAccessToken();
-      
+
       if (!accessToken) {
         throw new Error("No access token found. Please login again.");
       }
-      
+
       // First fetch all batches for the center (for the "Add Batch" dropdown)
       const allBatchesResponse = await fetch(
         `https://exams.dashoapp.com/api/timetable/centers/${centerId}/batches/`,
@@ -534,14 +534,14 @@ const BatchSchedule: React.FC = () => {
           },
         }
       );
-      
+
       if (!allBatchesResponse.ok) {
         throw new Error(`Failed to fetch batches: ${allBatchesResponse.status}`);
       }
-      
+
       const allBatchesData = await allBatchesResponse.json();
       console.log("All Batches API response:", allBatchesData);
-      
+
       // Transform API data to match our UI format
       const formattedAllBatches: Batch[] = (allBatchesData.results || []).map((batch: any, index: number) => ({
         id: batch.id,
@@ -557,10 +557,10 @@ const BatchSchedule: React.FC = () => {
         year: extractYearFromBatchName(batch.name) || `${new Date(batch.start_date).getFullYear()} Year`,
         students: batch.student_count.toString()
       }));
-      
+
       setAllBatchesFromAPI(formattedAllBatches);
       setCenterName(allBatchesData.center_name || "Center Test");
-      
+
       // Now fetch assigned batches for the current timetable
       if (timetableId) {
         await loadAssignedBatches(timetableId, formattedAllBatches);
@@ -568,12 +568,12 @@ const BatchSchedule: React.FC = () => {
         // No timetable selected, show empty
         setBatches([]);
       }
-      
+
     } catch (error: any) {
       console.error("Error fetching batches:", error);
       setError(error.message || "Failed to load batches");
       setBatches([]);
-      
+
     } finally {
       setLoading(false);
     }
@@ -584,45 +584,45 @@ const BatchSchedule: React.FC = () => {
     try {
       const assignedData = await fetchAssignedBatches(ttId);
       console.log("Assigned batches data:", assignedData);
-      
+
       const batchesSource = allBatches || allBatchesFromAPI;
-      
+
       // Handle the new API response format: { batches: [...] }
       const batchesArray = assignedData?.batches || assignedData?.results || [];
-      
+
       if (!batchesArray || batchesArray.length === 0) {
         console.log("No batches assigned to this timetable");
         setBatches([]);
         setActiveBatch("");
         return;
       }
-      
+
       // Get the batch codes that are assigned
-      const assignedBatchCodes: string[] = batchesArray.map((assignment: any) => 
+      const assignedBatchCodes: string[] = batchesArray.map((assignment: any) =>
         assignment.batch_code
       ).filter(Boolean);
-      
+
       console.log("Assigned batch codes:", assignedBatchCodes);
-      
+
       // Filter all batches to only show assigned ones
-      const assignedBatches = batchesSource.filter(batch => 
+      const assignedBatches = batchesSource.filter(batch =>
         assignedBatchCodes.includes(batch.code)
       ).map((batch, index) => ({
         ...batch,
         color: BATCH_COLORS[index % BATCH_COLORS.length]
       }));
-      
+
       console.log("Filtered assigned batches:", assignedBatches);
-      
+
       setBatches(assignedBatches);
-      
+
       // Load teacher assignments from the API response
-      const newTeacherAssignments: {batchId: string, teachers: Teacher[], timetableId?: string}[] = [];
-      
+      const newTeacherAssignments: { batchId: string, teachers: Teacher[], timetableId?: string }[] = [];
+
       for (const batchAssignment of batchesArray) {
         const batchCode = batchAssignment.batch_code;
         const batchObj = assignedBatches.find(b => b.code === batchCode);
-        
+
         if (batchObj && batchAssignment.teachers && batchAssignment.teachers.length > 0) {
           const teachers: Teacher[] = batchAssignment.teachers.map((t: any) => ({
             id: t.teacher_id || t.teacher_code,
@@ -635,7 +635,7 @@ const BatchSchedule: React.FC = () => {
             minLecturesPerWeek: t.total_lectures || 4,
             maxLecturesPerWeek: t.max_lectures_per_week || 8,
           }));
-          
+
           newTeacherAssignments.push({
             batchId: batchObj.id,
             teachers,
@@ -643,7 +643,7 @@ const BatchSchedule: React.FC = () => {
           });
         }
       }
-      
+
       if (newTeacherAssignments.length > 0) {
         console.log("Loaded teacher assignments from API:", newTeacherAssignments);
         setTeacherAssignments(prev => {
@@ -652,14 +652,14 @@ const BatchSchedule: React.FC = () => {
           return [...otherAssignments, ...newTeacherAssignments];
         });
       }
-      
+
       // Set first batch as active if available
       if (assignedBatches.length > 0 && !activeBatch) {
         setActiveBatch(assignedBatches[0].id);
       } else if (assignedBatches.length === 0) {
         setActiveBatch("");
       }
-      
+
     } catch (error: any) {
       console.error("Error loading assigned batches:", error);
       setBatches([]);
@@ -672,48 +672,48 @@ const BatchSchedule: React.FC = () => {
       alert("Please select a batch to add");
       return;
     }
-    
+
     if (!timetableId) {
       alert("Please select a timetable first");
       return;
     }
-    
+
     const batchToAdd = allBatchesFromAPI.find(batch => batch.id === selectedBatchToAdd);
-    
+
     if (!batchToAdd) {
       alert("Selected batch not found");
       return;
     }
-    
+
     // Check if batch is already added
     if (batches.some(batch => batch.id === batchToAdd.id)) {
       alert("This batch is already assigned to this timetable");
       return;
     }
-    
+
     try {
       // Call the assign-batch API
       await assignBatchToTimetable(timetableId, batchToAdd.code);
-      
+
       // Add the batch with a new color
       const newBatch = {
         ...batchToAdd,
         color: BATCH_COLORS[batches.length % BATCH_COLORS.length]
       };
-      
+
       setBatches(prev => [...prev, newBatch]);
-      
+
       // If no batch is active, set this as active
       if (!activeBatch) {
         setActiveBatch(newBatch.id);
       }
-      
+
       // Close the selector
       setShowBatchSelector(false);
       setSelectedBatchToAdd("");
-      
+
       alert(`Batch "${newBatch.name}" assigned successfully!`);
-      
+
     } catch (error: any) {
       alert(`Failed to assign batch: ${error.message}`);
     }
@@ -725,11 +725,11 @@ const BatchSchedule: React.FC = () => {
     if (!batchToRemove) {
       return;
     }
-    
+
     if (!timetableId) {
       return;
     }
-    
+
     // Open confirmation modal
     setConfirmModalType("batch");
     setConfirmModalData({ batchId, batchName: batchToRemove.name });
@@ -739,22 +739,22 @@ const BatchSchedule: React.FC = () => {
   // Confirm batch removal
   const confirmRemoveBatch = async () => {
     if (!confirmModalData?.batchId || !timetableId) return;
-    
+
     const batchToRemove = batches.find(b => b.id === confirmModalData.batchId);
     if (!batchToRemove) return;
-    
+
     setIsDeleting(true);
-    
+
     try {
       // Call the remove-batch API
       await removeBatchFromTimetableAPI(timetableId, batchToRemove.code);
-      
+
       // Remove batch from view
       setBatches(prev => prev.filter(batch => batch.id !== confirmModalData.batchId));
-      
+
       // Remove teacher assignments for this batch
       setTeacherAssignments(prev => prev.filter(assignment => assignment.batchId !== confirmModalData.batchId));
-      
+
       // If active batch is being removed, set another batch as active
       if (activeBatch === confirmModalData.batchId) {
         const remainingBatches = batches.filter(batch => batch.id !== confirmModalData.batchId);
@@ -764,11 +764,11 @@ const BatchSchedule: React.FC = () => {
           setActiveBatch("");
         }
       }
-      
+
       // Close modal
       setShowConfirmModal(false);
       setConfirmModalData(null);
-      
+
     } catch (error: any) {
       console.error("Failed to remove batch:", error);
     } finally {
@@ -816,7 +816,7 @@ const BatchSchedule: React.FC = () => {
     const totalMaxPerDay = teachers.reduce((sum, t) => sum + t.maxLecturesPerDay, 0);
     const totalMinPerWeek = teachers.reduce((sum, t) => sum + t.minLecturesPerWeek, 0);
     const totalMaxPerWeek = teachers.reduce((sum, t) => sum + t.maxLecturesPerWeek, 0);
-    
+
     return {
       teachers: teachers.length,
       totalMinPerDay,
@@ -844,21 +844,21 @@ const BatchSchedule: React.FC = () => {
       alert("This teacher is already assigned to this batch!");
       return;
     }
-    
+
     const activeBatchObj = getActiveBatch();
     if (!activeBatchObj) {
       alert("No active batch selected");
       return;
     }
-    
+
     if (!timetableId) {
       alert("Please select a timetable first");
       return;
     }
-    
+
     // Close dropdown immediately for better UX
     setOpenDropdown(null);
-    
+
     try {
       // Call the assign-teacher API immediately
       console.log("Assigning teacher via API:", {
@@ -869,7 +869,7 @@ const BatchSchedule: React.FC = () => {
         maxLecturesPerDay: teacher.maxLecturesPerDay,
         maxLecturesPerWeek: teacher.maxLecturesPerWeek
       });
-      
+
       await assignTeacherAPI(
         activeBatchObj.code,
         teacher.code,
@@ -878,37 +878,37 @@ const BatchSchedule: React.FC = () => {
         teacher.maxLecturesPerDay,
         teacher.maxLecturesPerWeek
       );
-      
+
       // If API call succeeds, update local state
       const updatedTeachers = [...currentTeachers, { ...teacher }];
       updateBatchAssignments(activeBatch, updatedTeachers);
-      
+
       // DEBUG: Log what's being saved
       console.log("Teacher assigned successfully to batch:", activeBatch);
       console.log("Teacher:", teacher);
-      
+
       // Update localStorage
       const updatedAssignments = [...teacherAssignments];
       const assignmentIndex = updatedAssignments.findIndex(a => a.batchId === activeBatch);
-      
+
       if (assignmentIndex >= 0) {
-        updatedAssignments[assignmentIndex] = { 
-          ...updatedAssignments[assignmentIndex], 
+        updatedAssignments[assignmentIndex] = {
+          ...updatedAssignments[assignmentIndex],
           teachers: updatedTeachers,
-          timetableId 
+          timetableId
         };
       } else {
-        updatedAssignments.push({ 
-          batchId: activeBatch, 
+        updatedAssignments.push({
+          batchId: activeBatch,
           teachers: updatedTeachers,
-          timetableId 
+          timetableId
         });
       }
-      
+
       setTeacherAssignments(updatedAssignments);
       localStorage.setItem("batchTeacherAssignments", JSON.stringify(updatedAssignments));
       console.log("Saved to localStorage:", updatedAssignments);
-      
+
     } catch (error: any) {
       console.error("Failed to assign teacher:", error);
       alert(`Failed to assign teacher: ${error.message}`);
@@ -919,15 +919,15 @@ const BatchSchedule: React.FC = () => {
     const currentTeachers = getBatchAssignments(activeBatch);
     const teacherToRemove = currentTeachers.find(t => t.id === teacherId);
     const activeBatchObj = getActiveBatch();
-    
+
     if (!teacherToRemove || !activeBatchObj) {
       return;
     }
-    
+
     if (!timetableId) {
       return;
     }
-    
+
     // Open confirmation modal
     setConfirmModalType("teacher");
     setConfirmModalData({ teacherId, teacherName: teacherToRemove.name });
@@ -937,15 +937,15 @@ const BatchSchedule: React.FC = () => {
   // Confirm teacher removal
   const confirmRemoveTeacher = async () => {
     if (!confirmModalData?.teacherId || !timetableId) return;
-    
+
     const currentTeachers = getBatchAssignments(activeBatch);
     const teacherToRemove = currentTeachers.find(t => t.id === confirmModalData.teacherId);
     const activeBatchObj = getActiveBatch();
-    
+
     if (!teacherToRemove || !activeBatchObj) return;
-    
+
     setIsDeleting(true);
-    
+
     try {
       // Call the remove-teacher API
       console.log("Removing teacher:", {
@@ -953,26 +953,26 @@ const BatchSchedule: React.FC = () => {
         batchCode: activeBatchObj.code,
         teacherCode: teacherToRemove.code
       });
-      
+
       const result = await removeTeacherFromBatchAPI(timetableId, activeBatchObj.code, teacherToRemove.code);
       console.log("Remove teacher API result:", result);
-      
+
       // Update local state
       const updatedTeachers = currentTeachers.filter(t => t.id !== confirmModalData.teacherId);
       updateBatchAssignments(activeBatch, updatedTeachers);
-      
+
       // Also update localStorage
-      const updatedAssignments = teacherAssignments.map(a => 
-        a.batchId === activeBatch 
+      const updatedAssignments = teacherAssignments.map(a =>
+        a.batchId === activeBatch
           ? { ...a, teachers: updatedTeachers }
           : a
       );
       localStorage.setItem("batchTeacherAssignments", JSON.stringify(updatedAssignments));
-      
+
       // Close modal
       setShowConfirmModal(false);
       setConfirmModalData(null);
-      
+
     } catch (error: any) {
       console.error("Failed to remove teacher:", error);
       setError(`Failed to remove teacher: ${error.message}`);
@@ -986,8 +986,8 @@ const BatchSchedule: React.FC = () => {
 
   const updateTeacherLimits = (teacherId: string, field: keyof Teacher, value: number) => {
     const currentTeachers = getBatchAssignments(activeBatch);
-    const updatedTeachers = currentTeachers.map(teacher => 
-      teacher.id === teacherId 
+    const updatedTeachers = currentTeachers.map(teacher =>
+      teacher.id === teacherId
         ? { ...teacher, [field]: value }
         : teacher
     );
@@ -1000,24 +1000,24 @@ const BatchSchedule: React.FC = () => {
       alert("Please select a timetable first");
       return;
     }
-    
+
     const activeBatchObj = getActiveBatch();
     if (!activeBatchObj) {
       alert("No active batch found");
       return;
     }
-    
+
     setSaveStatus("saving");
-    
+
     try {
       const assignments = getBatchAssignments(activeBatch);
-      
+
       if (assignments.length === 0) {
         throw new Error("No teachers assigned to save");
       }
-      
+
       // Assign each teacher to the batch
-      const assignmentPromises = assignments.map(teacher => 
+      const assignmentPromises = assignments.map(teacher =>
         assignTeacherAPI(
           activeBatchObj.code,
           teacher.code,
@@ -1027,12 +1027,12 @@ const BatchSchedule: React.FC = () => {
           teacher.maxLecturesPerWeek
         )
       );
-      
+
       await Promise.all(assignmentPromises);
-      
+
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 3000);
-      
+
     } catch (error: any) {
       console.error("Failed to save assignments:", error);
       setSaveStatus("error");
@@ -1097,7 +1097,7 @@ const BatchSchedule: React.FC = () => {
           return t;
         })
       }));
-      
+
       // Only update if there are changes
       const hasChanges = JSON.stringify(updatedAssignments) !== JSON.stringify(teacherAssignments);
       if (hasChanges) {
@@ -1123,10 +1123,10 @@ const BatchSchedule: React.FC = () => {
         console.log("No timetable_id found in localStorage");
         setError("No timetable selected. Please select a timetable from the Slots tab first.");
       }
-      
+
       await fetchTeachersFromAPI();
     };
-    
+
     fetchAllData();
   }, [centerId]);
 
@@ -1172,7 +1172,7 @@ const BatchSchedule: React.FC = () => {
         <div style={styles.errorState}>
           <h3 style={styles.title}>Error Loading Batches</h3>
           <p>{error}</p>
-          <button 
+          <button
             style={styles.retryButton}
             onClick={refreshBatches}
           >
@@ -1184,12 +1184,12 @@ const BatchSchedule: React.FC = () => {
   }
 
   const activeBatchObj = getActiveBatch();
-  
+
   // Get available batches for adding (batches not already assigned)
   const availableBatches = allBatchesFromAPI.filter(
     apiBatch => !batches.some(viewBatch => viewBatch.id === apiBatch.id)
   );
-  
+
   if (!activeBatchObj && batches.length > 0) {
     // Show loading while setting active batch
     return (
@@ -1232,7 +1232,7 @@ const BatchSchedule: React.FC = () => {
           <div style={styles.emptyIcon}>📋</div>
           <h3 style={styles.emptyTitle}>No Batches Assigned</h3>
           <p style={styles.emptyText}>
-            {!timetableId 
+            {!timetableId
               ? "No timetable selected. Please select a timetable from the Slots tab first."
               : "No batches are assigned to this timetable yet. Click 'Add Batch' to assign one."
             }
@@ -1243,7 +1243,7 @@ const BatchSchedule: React.FC = () => {
               onClick={openBatchSelector}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M12 5v14M5 12h14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12 5v14M5 12h14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               Add Batch to Timetable
             </button>
@@ -1264,7 +1264,7 @@ const BatchSchedule: React.FC = () => {
                   ×
                 </button>
               </div>
-              
+
               <div style={styles.modalBody}>
                 {loadingAllBatches ? (
                   <div style={styles.loadingState}>
@@ -1281,7 +1281,7 @@ const BatchSchedule: React.FC = () => {
                     <p style={styles.modalText}>
                       Select a batch to assign to this timetable:
                     </p>
-                    
+
                     <div style={styles.batchSelector}>
                       <select
                         value={selectedBatchToAdd}
@@ -1295,7 +1295,7 @@ const BatchSchedule: React.FC = () => {
                           </option>
                         ))}
                       </select>
-                      
+
                       {selectedBatchToAdd && (
                         <div style={styles.selectedBatchInfo}>
                           <div style={styles.batchInfoRow}>
@@ -1322,7 +1322,7 @@ const BatchSchedule: React.FC = () => {
                   </>
                 )}
               </div>
-              
+
               <div style={styles.modalFooter}>
                 <button
                   style={styles.modalCancel}
@@ -1358,24 +1358,24 @@ const BatchSchedule: React.FC = () => {
             Assign teachers and set lecture limits for batches in <strong>{centerName}</strong>
           </p>
         </div>
-        
+
         {/* Action Buttons */}
         <div style={styles.headerActions}>
           {/* Refresh Buttons */}
           <div style={styles.refreshButtons}>
           </div>
-          
+
           <div style={styles.actionButtons}>
             <button
-            style={styles.addBatchButton}
-            onClick={openBatchSelector}
-            title="Add Batch from API"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M12 5v14M5 12h14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Add Batch
-          </button>
+              style={styles.addBatchButton}
+              onClick={openBatchSelector}
+              title="Add Batch from API"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 5v14M5 12h14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Add Batch
+            </button>
             <button
               style={styles.saveButton}
               onClick={saveAssignments}
@@ -1384,37 +1384,37 @@ const BatchSchedule: React.FC = () => {
               {saveStatus === "saving" ? (
                 <>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={styles.spinningIcon}>
-                    <path d="M21 12a9 9 0 11-6.219-8.56" strokeWidth="2" strokeLinecap="round"/>
+                    <path d="M21 12a9 9 0 11-6.219-8.56" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                   Saving...
                 </>
               ) : saveStatus === "saved" ? (
                 <>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M20 6L9 17l-5-5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M20 6L9 17l-5-5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   Saved
                 </>
               ) : saveStatus === "error" ? (
                 <>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   Error
                 </>
               ) : (
                 <>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M17 21v-8H7v8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M7 3v5h8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M17 21v-8H7v8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M7 3v5h8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   Save Batch
                 </>
               )}
             </button>
-            
-          
+
+
           </div>
         </div>
       </div>
@@ -1477,7 +1477,7 @@ const BatchSchedule: React.FC = () => {
                 ×
               </button>
             </div>
-            
+
             <div style={styles.modalBody}>
               {loadingAllBatches ? (
                 <div style={styles.loadingState}>
@@ -1494,7 +1494,7 @@ const BatchSchedule: React.FC = () => {
                   <p style={styles.modalText}>
                     Select a batch to add to your view:
                   </p>
-                  
+
                   <div style={styles.batchSelector}>
                     <select
                       value={selectedBatchToAdd}
@@ -1507,7 +1507,7 @@ const BatchSchedule: React.FC = () => {
                         </option>
                       ))}
                     </select>
-                    
+
                     <div style={styles.selectedBatchInfo}>
                       {selectedBatchToAdd && (
                         <>
@@ -1542,7 +1542,7 @@ const BatchSchedule: React.FC = () => {
                 </>
               )}
             </div>
-            
+
             <div style={styles.modalFooter}>
               <button
                 style={styles.modalCancel}
@@ -1567,7 +1567,7 @@ const BatchSchedule: React.FC = () => {
         {batches.map((batch) => {
           const batchStats = getBatchStats(batch.id);
           const isActive = activeBatch === batch.id;
-          
+
           return (
             <div key={batch.id} style={styles.batchTabWrapper}>
               <button
@@ -1580,7 +1580,7 @@ const BatchSchedule: React.FC = () => {
               >
                 <div style={styles.tabContent}>
                   <div style={styles.tabLeft}>
-                    <div style={{...styles.batchDot, backgroundColor: batch.color || BATCH_COLORS[0]}}></div>
+                    <div style={{ ...styles.batchDot, backgroundColor: batch.color || BATCH_COLORS[0] }}></div>
                     <div style={styles.batchInfoCompact}>
                       <span style={styles.batchTabName}>{batch.name}</span>
                       <div style={styles.batchMeta}>
@@ -1612,7 +1612,7 @@ const BatchSchedule: React.FC = () => {
         {/* Batch Info Header */}
         <div style={styles.batchInfoHeader}>
           <div style={styles.batchInfo}>
-            <div style={{...styles.batchColorDot, backgroundColor: activeBatchObj.color || BATCH_COLORS[0]}}></div>
+            <div style={{ ...styles.batchColorDot, backgroundColor: activeBatchObj.color || BATCH_COLORS[0] }}></div>
             <div>
               <h4 style={styles.activeBatchTitle}>{activeBatchObj.name}</h4>
               <div style={styles.batchDetails}>
@@ -1657,14 +1657,14 @@ const BatchSchedule: React.FC = () => {
           {/* Add Teacher Button Row */}
           <div style={styles.addTeacherRow}>
             <div style={styles.addTeacherCell}>
-              <button 
+              <button
                 style={styles.addTeacherBtn}
                 onClick={() => setOpenDropdown(openDropdown === "add-teacher" ? null : "add-teacher")}
                 disabled={loadingTeachers}
               >
                 {loadingTeachers ? "Loading Teachers..." : "+ Add Teacher"}
               </button>
-              
+
               {/* Teachers Dropdown */}
               {openDropdown === "add-teacher" && (
                 <div style={styles.teachersDropdown}>
@@ -1687,7 +1687,7 @@ const BatchSchedule: React.FC = () => {
                         {generateFreeSlots().map((freeSlot) => (
                           <div
                             key={freeSlot.id}
-                            style={{...styles.teacherItem, ...styles.freeSlotItem}}
+                            style={{ ...styles.teacherItem, ...styles.freeSlotItem }}
                             onClick={() => assignTeacher(freeSlot)}
                           >
                             <div style={styles.teacherMainInfo}>
@@ -1700,7 +1700,7 @@ const BatchSchedule: React.FC = () => {
                               Free Period • No Teacher Required
                             </div>
                             <div style={styles.teacherLimits}>
-                              Day: {freeSlot.minLecturesPerDay}-{freeSlot.maxLecturesPerDay} • 
+                              Day: {freeSlot.minLecturesPerDay}-{freeSlot.maxLecturesPerDay} •
                               Week: {freeSlot.minLecturesPerWeek}-{freeSlot.maxLecturesPerWeek}
                             </div>
                           </div>
@@ -1710,7 +1710,7 @@ const BatchSchedule: React.FC = () => {
                         </div>
                       </>
                     )}
-                    
+
                     {/* Regular Teachers */}
                     {teachers.length === 0 && freeClassesCount === 0 ? (
                       <div style={styles.noTeachersMessage}>
@@ -1733,7 +1733,7 @@ const BatchSchedule: React.FC = () => {
                             {teacher.name} • {teacher.department}
                           </div>
                           <div style={styles.teacherLimits}>
-                            Day: {teacher.minLecturesPerDay}-{teacher.maxLecturesPerDay} • 
+                            Day: {teacher.minLecturesPerDay}-{teacher.maxLecturesPerDay} •
                             Week: {teacher.minLecturesPerWeek}-{teacher.maxLecturesPerWeek}
                           </div>
                         </div>
@@ -1776,10 +1776,10 @@ const BatchSchedule: React.FC = () => {
                   <div style={styles.teacherCell}>
                     <div style={styles.teacherInfoCompact}>
                       <div style={styles.teacherAvatar}>
-                        {teacher.name.charAt(0)}
+                        {teacher.name?.charAt(0) || 'T'}
                       </div>
                       <div>
-                        <div style={styles.teacherName}>{teacher.name}</div>
+                        <div style={styles.teacherName}>{teacher.name || 'Unknown'}</div>
                         <div style={styles.teacherDept}>{teacher.department}</div>
                       </div>
                     </div>
@@ -1926,7 +1926,7 @@ const BatchSchedule: React.FC = () => {
             </span>
           </div>
         </div>
-        
+
         {/* Info Note */}
         <div style={styles.infoNote}>
           <span style={styles.infoNoteIcon}>ⓘ</span>
@@ -1948,22 +1948,22 @@ const BatchSchedule: React.FC = () => {
                 {confirmModalType === "batch" ? "Remove Batch" : "Remove Teacher"}
               </h3>
             </div>
-            
+
             <div style={styles.confirmModalBody}>
               <p style={styles.confirmModalText}>
-                {confirmModalType === "batch" 
+                {confirmModalType === "batch"
                   ? `Are you sure you want to remove batch "${confirmModalData?.batchName}" from this timetable?`
                   : `Are you sure you want to remove "${confirmModalData?.teacherName}" from this batch?`
                 }
               </p>
               <p style={styles.confirmModalWarning}>
-                {confirmModalType === "batch" 
+                {confirmModalType === "batch"
                   ? "This will also remove all teacher assignments for this batch."
                   : "This action cannot be undone."
                 }
               </p>
             </div>
-            
+
             <div style={styles.confirmModalFooter}>
               <button
                 style={styles.confirmModalCancel}
@@ -3113,7 +3113,7 @@ styleSheet.insertRule(`
 // Create an Error Boundary wrapper
 const BatchScheduleWithErrorBoundary: React.FC = () => {
   const [hasError, setHasError] = useState(false);
-  
+
   if (hasError) {
     return (
       <div style={{
@@ -3130,7 +3130,7 @@ const BatchScheduleWithErrorBoundary: React.FC = () => {
         <p style={{ fontSize: "14px", color: "#64748b", marginBottom: "24px" }}>
           Please refresh the page or clear localStorage
         </p>
-        <button 
+        <button
           onClick={() => window.location.reload()}
           style={{
             padding: "10px 20px",
@@ -3145,7 +3145,7 @@ const BatchScheduleWithErrorBoundary: React.FC = () => {
         >
           Refresh Page
         </button>
-        <button 
+        <button
           onClick={() => {
             localStorage.removeItem("batchTeacherAssignments");
             window.location.reload();
@@ -3167,7 +3167,7 @@ const BatchScheduleWithErrorBoundary: React.FC = () => {
       </div>
     );
   }
-  
+
   try {
     return <BatchSchedule />;
   } catch (error) {

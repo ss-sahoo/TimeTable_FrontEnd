@@ -7,6 +7,91 @@ interface LaTeXRendererProps {
   className?: string;
 }
 
+// Helper function to detect and render image URLs in text
+function renderTextWithImages(text: string, key: number) {
+  // Regex to detect image URLs (common image hosting services and extensions)
+  const imageUrlRegex = /(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|svg|webp|bmp)(?:\?[^\s]*)?)/gi;
+
+  // Also match mathpix CDN URLs and other common image URLs
+  const urlRegex = /(https?:\/\/(?:cdn\.mathpix\.com|i\.imgur\.com|media\.geeksforgeeks\.org)[^\s]+)/gi;
+
+  const parts: Array<{ type: 'text' | 'image'; content: string }> = [];
+  let lastIndex = 0;
+
+  // Combine both regex patterns
+  const combinedRegex = new RegExp(
+    `(${imageUrlRegex.source}|${urlRegex.source})`,
+    'gi'
+  );
+
+  let match;
+  const tempText = text;
+  const matches: Array<{ index: number; url: string }> = [];
+
+  // Find all image URLs
+  combinedRegex.lastIndex = 0;
+  while ((match = combinedRegex.exec(tempText)) !== null) {
+    matches.push({ index: match.index, url: match[0] });
+  }
+
+  // Build parts array
+  matches.forEach((m, i) => {
+    // Add text before this image
+    if (m.index > lastIndex) {
+      parts.push({ type: 'text', content: tempText.substring(lastIndex, m.index) });
+    }
+    // Add the image
+    parts.push({ type: 'image', content: m.url });
+    lastIndex = m.index + m.url.length;
+  });
+
+  // Add remaining text
+  if (lastIndex < tempText.length) {
+    parts.push({ type: 'text', content: tempText.substring(lastIndex) });
+  }
+
+  // If no images found, just return text
+  if (parts.length === 0) {
+    return (
+      <span key={key} style={{ whiteSpace: 'pre-wrap' }}>
+        {text}
+      </span>
+    );
+  }
+
+  // Render text and images
+  return (
+    <span key={key} style={{ whiteSpace: 'pre-wrap' }}>
+      {parts.map((part, idx) => {
+        if (part.type === 'image') {
+          return (
+            <img
+              key={idx}
+              src={part.content}
+              alt="Question image"
+              className="max-w-full h-auto my-2 rounded-lg border border-slate-200 dark:border-slate-700"
+              style={{ maxHeight: '400px', display: 'block' }}
+              onError={(e) => {
+                // Fallback: show URL if image fails to load
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const link = document.createElement('a');
+                link.href = part.content;
+                link.textContent = part.content;
+                link.className = 'text-blue-600 underline';
+                link.target = '_blank';
+                target.parentNode?.insertBefore(link, target.nextSibling);
+              }}
+            />
+          );
+        } else {
+          return <span key={idx}>{part.content}</span>;
+        }
+      })}
+    </span>
+  );
+}
+
 export default function LaTeXRenderer({ content, className = '' }: LaTeXRendererProps) {
   // Handle undefined or null content
   if (!content) {
@@ -148,12 +233,8 @@ export default function LaTeXRenderer({ content, className = '' }: LaTeXRenderer
             return <code key={part.index} className="text-xs">${part.content}$</code>;
           }
         } else {
-          // Regular text - preserve line breaks
-          return (
-            <span key={part.index} style={{ whiteSpace: 'pre-wrap' }}>
-              {part.content}
-            </span>
-          );
+          // Regular text - check for image URLs and render them
+          return renderTextWithImages(part.content, part.index);
         }
       })}
     </div>

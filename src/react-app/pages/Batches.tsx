@@ -44,10 +44,12 @@ interface Batch {
 interface Program {
   id: string;
   name: string;
-  center: string;
-  center_id: string;
+  institute: string;
+  institute_id: string;
   category?: string;
   description?: string;
+  is_active?: boolean;
+  batches_count?: number;
 }
 
 export default function Batches() {
@@ -89,13 +91,8 @@ export default function Batches() {
   useEffect(() => {
     fetchBatches();
     fetchCenters();
+    fetchPrograms();
   }, []);
-
-  useEffect(() => {
-    if (centers.length > 0) {
-      fetchPrograms();
-    }
-  }, [centers]);
 
   const fetchBatches = async () => {
     try {
@@ -116,10 +113,11 @@ export default function Batches() {
       const response = await api.get('/timetable/programs/');
       const allPrograms = response.data.programs || [];
 
-      // Filter programs to only show those belonging to the institute's centers
-      if (centers.length > 0) {
-        const centerIds = new Set(centers.map(c => String(c.id)));
-        setPrograms(allPrograms.filter((p: any) => centerIds.has(String(p.center_id))));
+      // Filter programs by user's institute
+      const userInstituteId = user?.institute_id || user?.institute?.id;
+      if (userInstituteId) {
+        const targetId = String(userInstituteId);
+        setPrograms(allPrograms.filter((p: any) => String(p.institute_id) === targetId));
       } else {
         setPrograms(allPrograms);
       }
@@ -231,20 +229,12 @@ export default function Batches() {
     );
   }, [batches, searchQuery, programFilter, centerFilter]);
 
-  const programsByCenter = useMemo(() => {
-    return centers.map(center => {
-      const centerPrograms = programs.filter(p => String(p.center_id) === String(center.id));
-      const filteredCenterPrograms = centerPrograms.filter(p =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-
-      return {
-        ...center,
-        programs: filteredCenterPrograms,
-        totalPrograms: centerPrograms.length
-      };
-    }).filter(c => c.programs.length > 0 || (searchQuery === '' && c.totalPrograms > 0));
-  }, [centers, programs, searchQuery]);
+  // Since programs are at institute level, just show all programs for the user's institute
+  const filteredPrograms = useMemo(() => {
+    return programs.filter(p =>
+      p.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [programs, searchQuery]);
 
   const getBatchStatus = (batch: Batch) => {
     if (!batch.start_date) return 'draft';
@@ -535,57 +525,55 @@ export default function Batches() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="space-y-8"
+              className="space-y-6"
             >
-              {programsByCenter.map((centerGroup) => (
-                <div key={centerGroup.id} className="space-y-4">
-                  <div className="flex items-center gap-3 px-2">
-                    <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-slate-200 flex items-center justify-center">
-                      <Building2 className="w-5 h-5 text-indigo-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-black text-slate-900">{centerGroup.name}</h3>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        {centerGroup.programs.length} Active Programs
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {centerGroup.programs.map((program) => (
-                      <div key={program.id} className="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
-                            <BookOpen className="w-5 h-5 text-slate-400 group-hover:text-indigo-600" />
-                          </div>
-                          <button className="p-2 text-slate-300 hover:text-indigo-600 transition-colors">
-                            <ArrowUpRight className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <h4 className="text-sm font-black text-slate-800 mb-1">{program.name}</h4>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
-                          {program.category || 'Academic Track'}
-                        </p>
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                          <div className="flex items-center gap-1.5">
-                            <div className="flex -space-x-2">
-                              {[1, 2, 3].map(i => (
-                                <div key={i} className="w-6 h-6 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[8px] font-black text-slate-400">
-                                  {i}
-                                </div>
-                              ))}
-                            </div>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">12 Batches</span>
-                          </div>
-                          <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-widest">Active</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              <div className="flex items-center gap-3 px-2">
+                <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-slate-200 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-indigo-600" />
                 </div>
-              ))}
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Institute Programs</h3>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    {filteredPrograms.length} Active Programs
+                  </p>
+                </div>
+              </div>
 
-              {programsByCenter.length === 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredPrograms.map((program) => (
+                  <div key={program.id} className="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
+                        <BookOpen className="w-5 h-5 text-slate-400 group-hover:text-indigo-600" />
+                      </div>
+                      <button className="p-2 text-slate-300 hover:text-indigo-600 transition-colors">
+                        <ArrowUpRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <h4 className="text-sm font-black text-slate-800 mb-1">{program.name}</h4>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
+                      {program.category || 'Academic Track'}
+                    </p>
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex -space-x-2">
+                          {[1, 2, 3].map(i => (
+                            <div key={i} className="w-6 h-6 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[8px] font-black text-slate-400">
+                              {i}
+                            </div>
+                          ))}
+                        </div>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{program.batches_count || 0} Batches</span>
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${program.is_active !== false ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500 bg-slate-100'}`}>
+                        {program.is_active !== false ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {filteredPrograms.length === 0 && (
                 <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
                   <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
                     <BookOpen className="w-10 h-10 text-slate-200" />
@@ -677,11 +665,9 @@ export default function Batches() {
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all appearance-none cursor-pointer"
                     >
                       <option value="">Select Program</option>
-                      {programs
-                        .filter(p => !formData.center_id || String(p.center_id) === String(formData.center_id))
-                        .map((program) => (
-                          <option key={program.id} value={program.id}>{program.name}</option>
-                        ))}
+                      {programs.map((program) => (
+                        <option key={program.id} value={program.id}>{program.name}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -763,7 +749,7 @@ export default function Batches() {
                           </div>
                           <div>
                             <span className="block text-sm font-black text-slate-700">{p.name}</span>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{p.center}</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{p.institute}</span>
                           </div>
                         </div>
                         <button className="text-slate-300 hover:text-indigo-600 transition-colors">

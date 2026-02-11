@@ -144,7 +144,7 @@ interface ExamFormData {
   allow_negative_marking: boolean;
   negative_marking_percentage: number;
   // Exam mode settings
-  exam_mode: 'online' | 'offline_omr' | 'offline_subjective';
+  exam_mode: 'online' | 'offline_omr' | 'offline_subjective' | 'hybrid';
   ai_evaluation_enabled: boolean;
   marking_strictness: 'lenient' | 'moderate' | 'strict';
   // Shuffle settings
@@ -893,14 +893,14 @@ export default function ExamCreation() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
                     {/* Online Mode */}
                     <button
                       type="button"
                       onClick={() => handleInputChange('exam_mode', 'online')}
                       className={`p-4 rounded-lg border-2 text-left transition-all ${formData.exam_mode === 'online'
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-slate-200 hover:border-slate-300'
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300'
                         }`}
                     >
                       <div className="flex items-center gap-2 mb-2">
@@ -915,8 +915,8 @@ export default function ExamCreation() {
                       type="button"
                       onClick={() => handleInputChange('exam_mode', 'offline_omr')}
                       className={`p-4 rounded-lg border-2 text-left transition-all ${formData.exam_mode === 'offline_omr'
-                          ? 'border-green-500 bg-green-50'
-                          : 'border-slate-200 hover:border-slate-300'
+                        ? 'border-green-500 bg-green-50'
+                        : 'border-slate-200 hover:border-slate-300'
                         }`}
                     >
                       <div className="flex items-center gap-2 mb-2">
@@ -931,8 +931,8 @@ export default function ExamCreation() {
                       type="button"
                       onClick={() => handleInputChange('exam_mode', 'offline_subjective')}
                       className={`p-4 rounded-lg border-2 text-left transition-all ${formData.exam_mode === 'offline_subjective'
-                          ? 'border-purple-500 bg-purple-50'
-                          : 'border-slate-200 hover:border-slate-300'
+                        ? 'border-purple-500 bg-purple-50'
+                        : 'border-slate-200 hover:border-slate-300'
                         }`}
                     >
                       <div className="flex items-center gap-2 mb-2">
@@ -941,10 +941,26 @@ export default function ExamCreation() {
                       </div>
                       <p className="text-xs text-slate-600">Upload answer sheets for AI-powered grading</p>
                     </button>
+
+                    {/* Hybrid Mode */}
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('exam_mode', 'hybrid')}
+                      className={`p-4 rounded-lg border-2 text-left transition-all ${formData.exam_mode === 'hybrid'
+                        ? 'border-orange-500 bg-orange-50'
+                        : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`w-3 h-3 rounded-full ${formData.exam_mode === 'hybrid' ? 'bg-orange-500' : 'bg-slate-300'}`} />
+                        <span className="font-medium text-slate-900">Hybrid</span>
+                      </div>
+                      <p className="text-xs text-slate-600">Combine online & offline modes for flexibility</p>
+                    </button>
                   </div>
 
-                  {/* AI Evaluation Settings - Only for offline_subjective */}
-                  {formData.exam_mode === 'offline_subjective' && (
+                  {/* AI Evaluation Settings - For offline_subjective and hybrid modes */}
+                  {(formData.exam_mode === 'offline_subjective' || formData.exam_mode === 'hybrid') && (
                     <div className="mt-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
                       <div className="flex items-center justify-between mb-3">
                         <div>
@@ -970,8 +986,8 @@ export default function ExamCreation() {
                               type="button"
                               onClick={() => handleInputChange('marking_strictness', 'lenient')}
                               className={`px-3 py-2 text-xs rounded-lg transition-all ${formData.marking_strictness === 'lenient'
-                                  ? 'bg-green-500 text-white'
-                                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                                ? 'bg-green-500 text-white'
+                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                                 }`}
                             >
                               Lenient
@@ -980,8 +996,8 @@ export default function ExamCreation() {
                               type="button"
                               onClick={() => handleInputChange('marking_strictness', 'moderate')}
                               className={`px-3 py-2 text-xs rounded-lg transition-all ${formData.marking_strictness === 'moderate'
-                                  ? 'bg-yellow-500 text-white'
-                                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                                ? 'bg-yellow-500 text-white'
+                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                                 }`}
                             >
                               Moderate
@@ -990,8 +1006,8 @@ export default function ExamCreation() {
                               type="button"
                               onClick={() => handleInputChange('marking_strictness', 'strict')}
                               className={`px-3 py-2 text-xs rounded-lg transition-all ${formData.marking_strictness === 'strict'
-                                  ? 'bg-red-500 text-white'
-                                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                                ? 'bg-red-500 text-white'
+                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                                 }`}
                             >
                               Strict

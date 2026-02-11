@@ -112,7 +112,7 @@ const ProctoringTestPage: React.FC = () => {
 
     // Send to backend for analysis
     try {
-      const response = await fetch('http://0.0.0.0:8000/api/exams/test-proctoring/', {
+      const response = await fetch('https://exams.dashoapp.com/api/exams/test-proctoring/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -382,10 +382,10 @@ const ProctoringTestPage: React.FC = () => {
                   <div
                     key={index}
                     className={`p-3 rounded-lg border ${violation.severity === 'high'
-                        ? 'bg-red-500/20 border-red-500/50'
-                        : violation.severity === 'medium'
-                          ? 'bg-orange-500/20 border-orange-500/50'
-                          : 'bg-yellow-500/20 border-yellow-500/50'
+                      ? 'bg-red-500/20 border-red-500/50'
+                      : violation.severity === 'medium'
+                        ? 'bg-orange-500/20 border-orange-500/50'
+                        : 'bg-yellow-500/20 border-yellow-500/50'
                       }`}
                   >
                     <div className="flex items-start gap-3">
@@ -400,10 +400,10 @@ const ProctoringTestPage: React.FC = () => {
                         <p className="text-sm text-slate-300">{violation.message}</p>
                         <div className="flex items-center gap-2 mt-2">
                           <span className={`text-xs px-2 py-0.5 rounded ${violation.severity === 'high'
-                              ? 'bg-red-600'
-                              : violation.severity === 'medium'
-                                ? 'bg-orange-600'
-                                : 'bg-yellow-600'
+                            ? 'bg-red-600'
+                            : violation.severity === 'medium'
+                              ? 'bg-orange-600'
+                              : 'bg-yellow-600'
                             }`}>
                             {violation.severity.toUpperCase()}
                           </span>

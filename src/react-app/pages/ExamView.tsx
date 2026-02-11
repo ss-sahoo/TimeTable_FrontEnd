@@ -128,6 +128,8 @@ export default function ExamView() {
   const [loadingAudience, setLoadingAudience] = useState(false);
   const [audienceSearch, setAudienceSearch] = useState('');
   const [generatingOMR, setGeneratingOMR] = useState(false);
+  const [sectionToDelete, setSectionToDelete] = useState<PatternSection | null>(null);
+  const [deletingSection, setDeletingSection] = useState(false);
 
   useEffect(() => {
     if (examId) {
@@ -209,6 +211,29 @@ export default function ExamView() {
       alert(msg);
     } finally {
       setGeneratingOMR(false);
+    }
+  };
+
+  const handleDeleteSection = async () => {
+    if (!exam || !sectionToDelete) return;
+
+    try {
+      setDeletingSection(true);
+      // Delete the section via API
+      await api.delete(`/patterns/patterns/${exam.pattern.id}/sections/${sectionToDelete.id}/`);
+
+      // Refresh exam data to get updated pattern
+      await fetchExam();
+
+      // Close modal
+      setSectionToDelete(null);
+      alert(`Section "${sectionToDelete.name}" deleted successfully!`);
+    } catch (err: any) {
+      console.error('Failed to delete section:', err);
+      const msg = err.response?.data?.error || err.response?.data?.detail || 'Failed to delete section.';
+      alert(msg);
+    } finally {
+      setDeletingSection(false);
     }
   };
 
@@ -681,14 +706,23 @@ export default function ExamView() {
                           </div>
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <Link
-                            to={`${basePath}/pattern/${exam.pattern.id}/question/${slug}/${section.localStart}?examId=${exam.id}`}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium text-xs transition-colors ${isComplete ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-blue-600 text-white hover:bg-blue-700'
-                              }`}
-                          >
-                            {isComplete ? <Eye className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-                            {isComplete ? 'View' : `Add (${Math.max(stats.remaining, 0)})`}
-                          </Link>
+                          <div className="flex items-center justify-end gap-2">
+                            <Link
+                              to={`${basePath}/pattern/${exam.pattern.id}/question/${slug}/${section.localStart}?examId=${exam.id}`}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium text-xs transition-colors ${isComplete ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                            >
+                              {isComplete ? <Eye className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                              {isComplete ? 'View' : `Add (${Math.max(stats.remaining, 0)})`}
+                            </Link>
+                            <button
+                              onClick={() => setSectionToDelete(section)}
+                              className="inline-flex items-center justify-center p-1.5 rounded-md text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors"
+                              title={`Delete section "${section.name}"`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -987,8 +1021,9 @@ export default function ExamView() {
           /* Evaluation Tab Content - OMR/AI Evaluation */
           <div className="space-y-4">
             {effectiveExamMode === 'offline_omr' && (
-              <OMRManagement examId={exam.id} examTitle={exam.title} />
+              <OMRManagement examId={exam.id} examTitle={exam.title} patternId={exam.pattern.id} />
             )}
+
             {effectiveExamMode === 'offline_subjective' && (
               <AnswerSheetUpload examId={exam.id} examTitle={exam.title} />
             )}
@@ -1007,6 +1042,69 @@ export default function ExamView() {
             fetchExam(); // Refresh exam data to show new questions
           }}
         />
+      )}
+
+      {/* Delete Section Confirmation Modal */}
+      {sectionToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div className="bg-red-50 px-6 py-4 border-b border-red-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-red-800">Delete Section</h3>
+                  <p className="text-sm text-red-600">This action cannot be undone</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-slate-700 mb-4">
+                Are you sure you want to delete the section <span className="font-bold text-slate-900">"{sectionToDelete.name}"</span>?
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-amber-800">
+                    <p className="font-medium mb-1">Warning:</p>
+                    <ul className="list-disc list-inside space-y-1 text-xs">
+                      <li>This will remove the section from the pattern</li>
+                      <li>Questions linked to this section may become orphaned</li>
+                      <li>Section: {sectionToDelete.subject} - Q{sectionToDelete.start_question} to Q{sectionToDelete.end_question}</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setSectionToDelete(null)}
+                disabled={deletingSection}
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteSection}
+                disabled={deletingSection}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {deletingSection ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Delete Section
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

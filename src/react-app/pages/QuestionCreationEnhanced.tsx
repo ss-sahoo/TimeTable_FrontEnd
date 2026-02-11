@@ -1943,8 +1943,9 @@ export default function EnhancedQuestionEditor() {
 
     const clamped = Math.min(Math.max(newQuestionNumber, 1), group.total_questions || 1);
     const querySuffix = examIdFromQuery ? `?examId=${examIdFromQuery}` : '';
-    navigate(`/pattern/${patternId}/question/${subjectSlug}/${clamped}${querySuffix}`);
+    navigate(`/pattern/${patternId}/question/${subjectSlug}/${clamped}${querySuffix}`, { replace: true });
   };
+
 
   const handleSubjectChange = (subjectSlug: string) => {
     if (!patternId) return;
@@ -1952,8 +1953,9 @@ export default function EnhancedQuestionEditor() {
     if (!group) return;
     const desiredNumber = currentQuestionNumber <= group.total_questions ? currentQuestionNumber : 1;
     const querySuffix = examIdFromQuery ? `?examId=${examIdFromQuery}` : '';
-    navigate(`/pattern/${patternId}/question/${subjectSlug}/${Math.max(1, desiredNumber)}${querySuffix}`);
+    navigate(`/pattern/${patternId}/question/${subjectSlug}/${Math.max(1, desiredNumber)}${querySuffix}`, { replace: true });
   };
+
 
   const getSectionColor = (type: string) => {
     switch (type) {
@@ -2263,9 +2265,9 @@ export default function EnhancedQuestionEditor() {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => {
-                  const prefix = location.pathname.startsWith('/superadmin') ? '/superadmin' : '/center-admin';
-                  navigate(`${prefix}/patterns/${patternId}/view`);
+                  navigate(-1);
                 }}
+
                 className="p-2 hover:bg-slate-100 rounded-xl transition-all duration-200 hover:scale-110"
               >
                 <ArrowLeft className="w-5 h-5 text-slate-600" />

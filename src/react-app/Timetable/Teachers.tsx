@@ -165,16 +165,16 @@ const TeachersAvailability: React.FC = () => {
       prev.map(teacher =>
         teacher.teacher_code === teacherCode
           ? {
-              ...teacher,
-              days: teacher.days.map(day => ({
-                ...day,
-                slots: day.slots.map(slot =>
-                  slot.slot_id === slotId
-                    ? { ...slot, is_available: newStatus }
-                    : slot
-                )
-              }))
-            }
+            ...teacher,
+            days: teacher.days.map(day => ({
+              ...day,
+              slots: day.slots.map(slot =>
+                slot.slot_id === slotId
+                  ? { ...slot, is_available: newStatus }
+                  : slot
+              )
+            }))
+          }
           : teacher
       )
     );
@@ -190,16 +190,16 @@ const TeachersAvailability: React.FC = () => {
         prev.map(teacher =>
           teacher.teacher_code === teacherCode
             ? {
-                ...teacher,
-                days: teacher.days.map(day => ({
-                  ...day,
-                  slots: day.slots.map(slot =>
-                    slot.slot_id === slotId
-                      ? { ...slot, is_available: currentStatus }
-                      : slot
-                  )
-                }))
-              }
+              ...teacher,
+              days: teacher.days.map(day => ({
+                ...day,
+                slots: day.slots.map(slot =>
+                  slot.slot_id === slotId
+                    ? { ...slot, is_available: currentStatus }
+                    : slot
+                )
+              }))
+            }
             : teacher
         )
       );
@@ -237,16 +237,16 @@ const TeachersAvailability: React.FC = () => {
             </div>
           )}
         </div>
-        
+
         {/* Header Actions */}
         <div style={styles.headerActions}>
-          <button 
+          <button
             style={styles.refreshBtn}
             onClick={loadAvailability}
             disabled={loading}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             Refresh
           </button>
@@ -299,8 +299,8 @@ const TeachersAvailability: React.FC = () => {
 
             {/* Teacher Rows */}
             {teachers.map(teacher => (
-              <div 
-                key={teacher.teacher_code} 
+              <div
+                key={teacher.teacher_code}
                 style={{
                   ...styles.teacherRow,
                   backgroundColor: expandedTeacher === teacher.teacher_code ? '#f0f9ff' : '#ffffff'
@@ -309,19 +309,19 @@ const TeachersAvailability: React.FC = () => {
                 {/* Teacher Info */}
                 <div style={styles.teacherInfoCell}>
                   <div style={styles.teacherAvatar}>
-                    {teacher.teacher_name.charAt(0).toUpperCase()}
+                    {teacher.teacher_name?.charAt(0)?.toUpperCase() || 'T'}
                   </div>
                   <div style={styles.teacherDetails}>
-                    <div style={styles.teacherName}>{teacher.teacher_name}</div>
+                    <div style={styles.teacherName}>{teacher.teacher_name || 'Unknown'}</div>
                     <div style={styles.teacherCode}>{teacher.teacher_code}</div>
                     <div style={styles.slotCount}>
-                      <button 
+                      <button
                         style={styles.expandBtn}
                         onClick={() => setExpandedTeacher(
                           expandedTeacher === teacher.teacher_code ? null : teacher.teacher_code
                         )}
                       >
-                        {expandedTeacher === teacher.teacher_code ? '▼' : '▶'} 
+                        {expandedTeacher === teacher.teacher_code ? '▼' : '▶'}
                         {teacher.days.length} days
                       </button>
                     </div>
@@ -402,26 +402,26 @@ const TeachersAvailability: React.FC = () => {
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
               <div style={styles.modalTeacherInfo}>
-                <div style={{...styles.teacherAvatar, width: '48px', height: '48px', fontSize: '18px'}}>
-                  {teachers.find(t => t.teacher_code === expandedTeacher)!.teacher_name.charAt(0).toUpperCase()}
+                <div style={{ ...styles.teacherAvatar, width: '48px', height: '48px', fontSize: '18px' }}>
+                  {teachers.find(t => t.teacher_code === expandedTeacher)?.teacher_name?.charAt(0)?.toUpperCase() || 'T'}
                 </div>
                 <div>
                   <h3 style={styles.modalTitle}>
-                    {teachers.find(t => t.teacher_code === expandedTeacher)!.teacher_name}
+                    {teachers.find(t => t.teacher_code === expandedTeacher)?.teacher_name || 'Unknown'}
                   </h3>
                   <p style={styles.modalSubtitle}>
-                    {teachers.find(t => t.teacher_code === expandedTeacher)!.teacher_code}
+                    {teachers.find(t => t.teacher_code === expandedTeacher)?.teacher_code || 'N/A'}
                   </p>
                 </div>
               </div>
               <button style={styles.closeModalBtn} onClick={() => setExpandedTeacher(null)}>×</button>
             </div>
-            
+
             <div style={styles.modalGrid}>
               {uniqueDays.map(dayInfo => {
                 const teacher = teachers.find(t => t.teacher_code === expandedTeacher)!;
                 const daySlots = getTeacherSlotsForDay(teacher, dayInfo.date);
-                
+
                 return (
                   <div key={dayInfo.date} style={styles.modalDayCard}>
                     <div style={styles.modalDayHeader}>
@@ -434,7 +434,7 @@ const TeachersAvailability: React.FC = () => {
                         <div style={styles.modalDayDate}>{dayInfo.date}</div>
                       </div>
                     </div>
-                    
+
                     {daySlots.length > 0 ? (
                       <div style={styles.modalSlotsGrid}>
                         {daySlots.map(slot => {
@@ -457,13 +457,13 @@ const TeachersAvailability: React.FC = () => {
                               borderColor: bgColor
                             }}>
                               <div style={styles.modalSlotHeader}>
-                                <span style={{color: textColor, fontWeight: '600'}}>{slot.slot_code}</span>
-                                <span style={{color: textColor, fontSize: '12px'}}>
+                                <span style={{ color: textColor, fontWeight: '600' }}>{slot.slot_code}</span>
+                                <span style={{ color: textColor, fontSize: '12px' }}>
                                   {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
                                 </span>
                               </div>
                               <div style={styles.modalSlotInfo}>
-                                <span style={{color: textColor, fontSize: '11px'}}>
+                                <span style={{ color: textColor, fontSize: '11px' }}>
                                   {(slot.batch_name || slot.subject_name) ? (
                                     <>{slot.batch_name} {slot.subject_name && `- ${slot.subject_name}`}</>
                                   ) : statusText}
@@ -512,7 +512,7 @@ const TeachersAvailability: React.FC = () => {
           </div>
           {/* Busy state removed from UI */}
         </div>
-        
+
         <div style={styles.statsInfo}>
           <div style={styles.statsItem}>
             <span style={styles.statsValue}>{teachers.reduce((acc, t) => acc + (t.days?.length || 0), 0)}</span>
@@ -525,7 +525,7 @@ const TeachersAvailability: React.FC = () => {
             <span style={styles.statsLabel}>Total Slots</span>
           </div>
           <div style={styles.statsItem}>
-            <button 
+            <button
               style={styles.expandAllBtn}
               onClick={() => setExpandedTeacher(null)}
             >
