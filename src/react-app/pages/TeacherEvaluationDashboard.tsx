@@ -34,9 +34,11 @@ import {
   MessageSquare,
   Download,
   Upload,
-  MoreVertical
+  MoreVertical,
+  Cpu
 } from 'lucide-react';
 import { useApi, api } from '../hooks/useApi';
+import AnswerSheetUpload from '../components/AnswerSheetUpload';
 
 interface QuestionEvaluation {
   id: number;
@@ -94,8 +96,9 @@ interface EvaluationSettings {
 export default function TeacherEvaluationDashboard() {
   const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview' | 'pending' | 'completed' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'pending' | 'completed' | 'settings' | 'ai-subjective'>('overview');
   const [selectedEvaluation, setSelectedEvaluation] = useState<QuestionEvaluation | null>(null);
+  // ... rest of the state ...
   const [showEvaluationModal, setShowEvaluationModal] = useState(false);
   const [evaluationForm, setEvaluationForm] = useState({
     marks_obtained: 0,
@@ -156,7 +159,7 @@ export default function TeacherEvaluationDashboard() {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       });
-      
+
       if (response.ok) {
         await refreshData();
       }
@@ -191,9 +194,50 @@ export default function TeacherEvaluationDashboard() {
   const handleBatchAIEvaluation = async () => {
     try {
       await api.post(`/evaluation/exams/${examId}/batch-ai/`);
-        await refreshData();
+      await refreshData();
     } catch (error) {
       console.error('Batch AI evaluation failed:', error);
+    }
+  };
+
+  const handleSettingToggle = async (key: keyof EvaluationSettings) => {
+    if (!settings) return;
+
+    try {
+      const newValue = !settings[key];
+      const response = await fetch(`/api/evaluation/exams/${examId}/settings/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: JSON.stringify({ [key]: newValue })
+      });
+
+      if (response.ok) {
+        await refreshData();
+      }
+    } catch (error) {
+      console.error('Failed to update setting:', error);
+    }
+  };
+
+  const handleUpdateSettingValue = async (key: keyof EvaluationSettings, value: any) => {
+    try {
+      const response = await fetch(`/api/evaluation/exams/${examId}/settings/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: JSON.stringify({ [key]: value })
+      });
+
+      if (response.ok) {
+        await refreshData();
+      }
+    } catch (error) {
+      console.error('Failed to update setting value:', error);
     }
   };
 
@@ -220,7 +264,7 @@ export default function TeacherEvaluationDashboard() {
 
   const filteredEvaluations = (pendingEvaluations?.evaluations || []).filter(evaluation => {
     const matchesSearch = evaluation.question.question_text.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         evaluation.student_answer.toLowerCase().includes(searchTerm.toLowerCase());
+      evaluation.student_answer.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || evaluation.evaluation_status === statusFilter;
     const matchesType = typeFilter === 'all' || evaluation.evaluation_type === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
@@ -277,16 +321,16 @@ export default function TeacherEvaluationDashboard() {
               { id: 'overview', label: 'Overview', icon: BarChart3 },
               { id: 'pending', label: 'Pending', icon: Clock, count: progress?.pending_evaluation },
               { id: 'completed', label: 'Completed', icon: CheckCircle },
+              { id: 'ai-subjective', label: 'AI Subjective', icon: Brain },
               { id: 'settings', label: 'Settings', icon: Settings }
             ].map(({ id, label, icon: Icon, count }) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id as any)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg transition-colors ${
-                  activeTab === id
-                    ? 'bg-white text-blue-600 border-b-2 border-blue-600'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-                }`}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg transition-colors ${activeTab === id
+                  ? 'bg-white text-blue-600 border-b-2 border-blue-600'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                  }`}
               >
                 <Icon className="w-4 h-4" />
                 {label}
@@ -543,6 +587,7 @@ export default function TeacherEvaluationDashboard() {
                     <input
                       type="checkbox"
                       checked={settings?.enable_auto_evaluation || false}
+                      onChange={() => handleSettingToggle('enable_auto_evaluation')}
                       className="sr-only peer"
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -558,6 +603,7 @@ export default function TeacherEvaluationDashboard() {
                     <input
                       type="checkbox"
                       checked={settings?.enable_manual_evaluation || false}
+                      onChange={() => handleSettingToggle('enable_manual_evaluation')}
                       className="sr-only peer"
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -573,6 +619,7 @@ export default function TeacherEvaluationDashboard() {
                     <input
                       type="checkbox"
                       checked={settings?.enable_ai_evaluation || false}
+                      onChange={() => handleSettingToggle('enable_ai_evaluation')}
                       className="sr-only peer"
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -583,7 +630,11 @@ export default function TeacherEvaluationDashboard() {
                   <div className="ml-6 space-y-4 border-l-2 border-slate-200 pl-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">AI Model</label>
-                      <select className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                      <select
+                        value={settings?.ai_model_preference || 'gpt-3.5-turbo'}
+                        onChange={(e) => handleUpdateSettingValue('ai_model_preference', e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
                         <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
                         <option value="gpt-4">GPT-4</option>
                         <option value="claude-3">Claude 3</option>
@@ -597,8 +648,9 @@ export default function TeacherEvaluationDashboard() {
                         type="range"
                         min="0"
                         max="1"
-                        step="0.1"
+                        step="0.05"
                         value={settings?.ai_confidence_threshold || 0.7}
+                        onChange={(e) => handleUpdateSettingValue('ai_confidence_threshold', parseFloat(e.target.value))}
                         className="w-full"
                       />
                     </div>
@@ -606,6 +658,11 @@ export default function TeacherEvaluationDashboard() {
                 )}
               </div>
             </div>
+          </div>
+        )}
+        {activeTab === 'ai-subjective' && (
+          <div className="space-y-6">
+            <AnswerSheetUpload examId={parseInt(examId || '0')} />
           </div>
         )}
       </div>

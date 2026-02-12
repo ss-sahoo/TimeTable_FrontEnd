@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Trash2, Save } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Trash2, Save, Upload, Image as ImageIcon, X } from 'lucide-react';
 import { useApi, api } from '@/react-app/hooks/useApi';
-import { Exam, ExamSubject, Question, CreateQuestion } from '@/shared/types';
+import { Exam, ExamSubject, Question, CreateQuestion, QuestionImage } from '@/shared/types';
 import RichTextEditor from '@/react-app/components/RichTextEditor';
 import AIImageToText from '@/react-app/components/AIImageToText';
 
@@ -18,12 +18,14 @@ export default function EnhancedQuestionEditor() {
     question_type: 'Single Correct MCQ',
     text: '',
     options: ['', '', '', ''],
-    correct_option: '',
+    correct_answer: '',
     solution: '',
   });
 
   const [options, setOptions] = useState<string[]>(['', '', '', '']);
+  const [images, setImages] = useState<QuestionImage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const { data: exam } = useApi<Exam>(`/api/exams/${examId}`);
@@ -40,27 +42,31 @@ export default function EnhancedQuestionEditor() {
         question_type: existingQuestion.question_type,
         text: existingQuestion.text,
         options: existingQuestion.options ? (Array.isArray(existingQuestion.options) ? existingQuestion.options : JSON.parse(existingQuestion.options)) : ['', '', '', ''],
-        correct_option: existingQuestion.correct_option || '',
+        correct_answer: existingQuestion.correct_answer || '',
         solution: existingQuestion.solution || '',
       });
-      
+
       if (existingQuestion.options) {
-        const parsedOptions = Array.isArray(existingQuestion.options) 
-          ? existingQuestion.options 
+        const parsedOptions = Array.isArray(existingQuestion.options)
+          ? existingQuestion.options
           : JSON.parse(existingQuestion.options);
         setOptions(parsedOptions);
+      }
+
+      if (existingQuestion.images) {
+        setImages(existingQuestion.images);
       }
     } else {
       // Set default subject and section based on question number
       if (subjects && subjects.length > 0) {
-        const defaultSubject = subjects.find(s => 
+        const defaultSubject = subjects.find(s =>
           currentQuestionNumber >= s.start_question && currentQuestionNumber <= s.end_question
         ) || subjects[0];
-        
+
         // Determine section based on question number ranges
         let sectionName = 'Part A';
         let questionType: CreateQuestion['question_type'] = 'Single Correct MCQ';
-        
+
         // This is a simplified logic - in real app, you'd get this from sections data
         if (currentQuestionNumber <= 30) {
           sectionName = 'Part A';
@@ -72,7 +78,7 @@ export default function EnhancedQuestionEditor() {
           sectionName = 'Part C';
           questionType = 'Subjective';
         }
-        
+
         setFormData(prev => ({
           ...prev,
           subject: defaultSubject.name,
@@ -131,7 +137,7 @@ export default function EnhancedQuestionEditor() {
 
       setSaveStatus('saved');
       refetchQuestion();
-      
+
       // Clear saved status after 2 seconds
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {
@@ -141,21 +147,51 @@ export default function EnhancedQuestionEditor() {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.[0] || !existingQuestion) return;
+
+    setUploading(true);
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('caption', file.name);
+
+    try {
+      const response = await api.post(`/api/questions/${existingQuestion.id}/images/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setImages(prev => [...prev, response.data]);
+    } catch (error) {
+      console.error('Failed to upload image:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleImageDelete = async (imageId: number) => {
+    try {
+      await api.delete(`/api/questions/images/${imageId}/`);
+      setImages(prev => prev.filter(img => img.id !== imageId));
+    } catch (error) {
+      console.error('Failed to delete image:', error);
+    }
+  };
+
   const navigateToQuestion = (newQuestionNumber: number) => {
     navigate(`/exam/${examId}/question/${newQuestionNumber}`);
   };
 
   const getQuestionBounds = () => {
     if (!subjects) return { min: 1, max: 100 };
-    
-    const currentSubject = subjects.find(s => 
+
+    const currentSubject = subjects.find(s =>
       currentQuestionNumber >= s.start_question && currentQuestionNumber <= s.end_question
     );
-    
+
     if (currentSubject) {
       return { min: currentSubject.start_question, max: currentSubject.end_question };
     }
-    
+
     return { min: 1, max: Math.max(...subjects.map(s => s.end_question)) };
   };
 
@@ -212,7 +248,7 @@ export default function EnhancedQuestionEditor() {
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              
+
               <div className="flex items-center gap-2">
                 <span className={`px-3 py-1 rounded-lg font-medium text-sm ${currentSection.color}`}>
                   {currentSection.name}
@@ -221,7 +257,7 @@ export default function EnhancedQuestionEditor() {
                   {currentQuestionNumber}
                 </span>
               </div>
-              
+
               <button
                 onClick={() => navigateToQuestion(Math.min(max, currentQuestionNumber + 1))}
                 disabled={currentQuestionNumber >= max}
@@ -249,7 +285,7 @@ export default function EnhancedQuestionEditor() {
                     {currentSection.name} - {currentSection.type}
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -267,7 +303,7 @@ export default function EnhancedQuestionEditor() {
                       ))}
                     </select>
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
                       Section
@@ -308,7 +344,7 @@ export default function EnhancedQuestionEditor() {
                         Add Option
                       </button>
                     </div>
-                    
+
                     <div className="space-y-4">
                       {options.map((option, index) => (
                         <div key={index} className="flex items-start gap-3">
@@ -337,24 +373,86 @@ export default function EnhancedQuestionEditor() {
                   </div>
                 )}
 
-                {/* Correct Answer */}
+                {/* Correct Answer Section */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Correct Answer
+                    {formData.question_type === 'Subjective' ? 'Reference Answer / Key Points' : 'Correct Answer'}
                   </label>
-                  <input
-                    type="text"
-                    value={formData.correct_option}
-                    onChange={(e) => handleInputChange('correct_option', e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={
-                      formData.question_type === 'Single Correct MCQ' 
-                        ? "e.g., A, B, C, D" 
-                        : formData.question_type === 'Numerical'
-                        ? "e.g., 42, 3.14"
-                        : "Enter the correct answer or key points"
-                    }
-                  />
+
+                  {formData.question_type === 'Subjective' ? (
+                    <RichTextEditor
+                      value={formData.correct_answer || ''}
+                      onChange={(value) => handleInputChange('correct_answer', value)}
+                      placeholder="Enter the model answer or key points for this subjective question..."
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={formData.correct_answer || ''}
+                      onChange={(e) => handleInputChange('correct_answer', e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder={
+                        formData.question_type === 'Single Correct MCQ'
+                          ? "e.g., A, B, C, D"
+                          : formData.question_type === 'Numerical'
+                            ? "e.g., 42, 3.14"
+                            : "Enter the correct answer"
+                      }
+                    />
+                  )}
+                </div>
+
+                {/* Diagrams / Images Section */}
+                <div className="pt-6 border-t border-slate-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                      <ImageIcon className="w-5 h-5 text-blue-600" />
+                      Diagrams & Images
+                    </h3>
+                    <label className={`flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                      <Upload className="w-4 h-4" />
+                      <span>{uploading ? 'Uploading...' : 'Upload Image'}</span>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={uploading || !existingQuestion}
+                      />
+                    </label>
+                  </div>
+
+                  {!existingQuestion && (
+                    <p className="text-sm text-amber-600 mb-4 bg-amber-50 p-3 rounded-lg border border-amber-100">
+                      Please save the question text first before uploading images.
+                    </p>
+                  )}
+
+                  {images.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {images.map((img) => (
+                        <div key={img.id} className="relative group rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                          <img
+                            src={img.image}
+                            alt={img.caption || 'Question diagram'}
+                            className="w-full h-32 object-contain"
+                          />
+                          <button
+                            onClick={() => handleImageDelete(img.id)}
+                            className="absolute top-1 right-1 p-1.5 bg-red-100 text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-200"
+                            title="Delete image"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 bg-slate-50 rounded-lg border-2 border-dashed border-slate-200 text-slate-400">
+                      <ImageIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No diagrams uploaded yet</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Solution */}
@@ -375,7 +473,7 @@ export default function EnhancedQuestionEditor() {
                       <span className="text-red-600 text-sm">Please fill in the question text</span>
                     )}
                   </div>
-                  
+
                   <button
                     onClick={handleSave}
                     disabled={loading}
