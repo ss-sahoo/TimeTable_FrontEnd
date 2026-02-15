@@ -18,7 +18,7 @@ export default function EnhancedQuestionEditor() {
     question_type: 'Single Correct MCQ',
     text: '',
     options: ['', '', '', ''],
-    correct_option: '',
+    correct_answer: '',
     solution: '',
   });
 
@@ -26,9 +26,9 @@ export default function EnhancedQuestionEditor() {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
-  const { data: exam } = useApi<Exam>(`/api/exams/${examId}`);
-  const { data: subjects } = useApi<ExamSubject[]>(`/api/exams/${examId}/subjects`);
-  const { data: existingQuestion, refetch: refetchQuestion } = useApi<Question>(`/api/questions/${currentQuestionNumber}?exam_id=${examId}`);
+  const { data: exam } = useApi<Exam>(`/exams/${examId}`);
+  const { data: subjects } = useApi<ExamSubject[]>(`/exams/${examId}/subjects`);
+  const { data: existingQuestion, refetch: refetchQuestion } = useApi<Question>(`/questions/${currentQuestionNumber}?exam_id=${examId}`);
 
   // Initialize form when question data loads
   useEffect(() => {
@@ -40,27 +40,27 @@ export default function EnhancedQuestionEditor() {
         question_type: existingQuestion.question_type,
         text: existingQuestion.text,
         options: existingQuestion.options ? (Array.isArray(existingQuestion.options) ? existingQuestion.options : JSON.parse(existingQuestion.options)) : ['', '', '', ''],
-        correct_option: existingQuestion.correct_option || '',
+        correct_answer: existingQuestion.correct_answer || '',
         solution: existingQuestion.solution || '',
       });
-      
+
       if (existingQuestion.options) {
-        const parsedOptions = Array.isArray(existingQuestion.options) 
-          ? existingQuestion.options 
+        const parsedOptions = Array.isArray(existingQuestion.options)
+          ? existingQuestion.options
           : JSON.parse(existingQuestion.options);
         setOptions(parsedOptions);
       }
     } else {
       // Set default subject and section based on question number
       if (subjects && subjects.length > 0) {
-        const defaultSubject = subjects.find(s => 
+        const defaultSubject = subjects.find(s =>
           currentQuestionNumber >= s.start_question && currentQuestionNumber <= s.end_question
         ) || subjects[0];
-        
+
         // Determine section based on question number ranges
         let sectionName = 'Part A';
         let questionType: CreateQuestion['question_type'] = 'Single Correct MCQ';
-        
+
         // This is a simplified logic - in real app, you'd get this from sections data
         if (currentQuestionNumber <= 30) {
           sectionName = 'Part A';
@@ -72,7 +72,7 @@ export default function EnhancedQuestionEditor() {
           sectionName = 'Part C';
           questionType = 'Subjective';
         }
-        
+
         setFormData(prev => ({
           ...prev,
           subject: defaultSubject.name,
@@ -131,7 +131,7 @@ export default function EnhancedQuestionEditor() {
 
       setSaveStatus('saved');
       refetchQuestion();
-      
+
       // Clear saved status after 2 seconds
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {
@@ -147,15 +147,15 @@ export default function EnhancedQuestionEditor() {
 
   const getQuestionBounds = () => {
     if (!subjects) return { min: 1, max: 100 };
-    
-    const currentSubject = subjects.find(s => 
+
+    const currentSubject = subjects.find(s =>
       currentQuestionNumber >= s.start_question && currentQuestionNumber <= s.end_question
     );
-    
+
     if (currentSubject) {
       return { min: currentSubject.start_question, max: currentSubject.end_question };
     }
-    
+
     return { min: 1, max: Math.max(...subjects.map(s => s.end_question)) };
   };
 
@@ -212,7 +212,7 @@ export default function EnhancedQuestionEditor() {
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              
+
               <div className="flex items-center gap-2">
                 <span className={`px-3 py-1 rounded-lg font-medium text-sm ${currentSection.color}`}>
                   {currentSection.name}
@@ -221,7 +221,7 @@ export default function EnhancedQuestionEditor() {
                   {currentQuestionNumber}
                 </span>
               </div>
-              
+
               <button
                 onClick={() => navigateToQuestion(Math.min(max, currentQuestionNumber + 1))}
                 disabled={currentQuestionNumber >= max}
@@ -249,7 +249,7 @@ export default function EnhancedQuestionEditor() {
                     {currentSection.name} - {currentSection.type}
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -267,7 +267,7 @@ export default function EnhancedQuestionEditor() {
                       ))}
                     </select>
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
                       Section
@@ -308,7 +308,7 @@ export default function EnhancedQuestionEditor() {
                         Add Option
                       </button>
                     </div>
-                    
+
                     <div className="space-y-4">
                       {options.map((option, index) => (
                         <div key={index} className="flex items-start gap-3">
@@ -344,15 +344,15 @@ export default function EnhancedQuestionEditor() {
                   </label>
                   <input
                     type="text"
-                    value={formData.correct_option}
-                    onChange={(e) => handleInputChange('correct_option', e.target.value)}
+                    value={formData.correct_answer}
+                    onChange={(e) => handleInputChange('correct_answer', e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder={
-                      formData.question_type === 'Single Correct MCQ' 
-                        ? "e.g., A, B, C, D" 
+                      formData.question_type === 'Single Correct MCQ'
+                        ? "e.g., A, B, C, D"
                         : formData.question_type === 'Numerical'
-                        ? "e.g., 42, 3.14"
-                        : "Enter the correct answer or key points"
+                          ? "e.g., 42, 3.14"
+                          : "Enter the correct answer or key points"
                     }
                   />
                 </div>
@@ -375,7 +375,7 @@ export default function EnhancedQuestionEditor() {
                       <span className="text-red-600 text-sm">Please fill in the question text</span>
                     )}
                   </div>
-                  
+
                   <button
                     onClick={handleSave}
                     disabled={loading}

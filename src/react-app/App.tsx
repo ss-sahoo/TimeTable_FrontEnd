@@ -90,6 +90,9 @@ import Timetablelanding from "./pages/TimeTablelanding";
 import TimetableLogin from "./pages/TimetableLogin";
 import TimetableRegister from "./pages/TimetableRegister";
 import ManagerDashboard from "./pages/ManagerDashboard";
+import ExtractionV3Page from "@/react-app/pages/ExtractionV3";
+import ExtractionReviewPage from "@/react-app/pages/ExtractionV3/Review";
+import ExtractionV2Page from "@/react-app/pages/ExtractionNew/ExtractionV2Page";
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -203,6 +206,8 @@ function RoleProtectedRoute({
 
   return <Layout>{children}</Layout>;
 }
+
+
 
 // Helper function to get dashboard route based on role and domain
 function getDashboardRoute(role: string | undefined): string {
@@ -574,6 +579,21 @@ function AppRoutes() {
         <RoleProtectedRoute allowedRoles={['super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
           <EnhancedQuestionEditor />
         </RoleProtectedRoute>
+      } />
+      <Route path="/exams/:examId/extraction-v3" element={
+        <FullscreenProtectedRoute>
+          <ExtractionV3Page />
+        </FullscreenProtectedRoute>
+      } />
+      <Route path="/exams/:examId/extraction-v2" element={
+        <FullscreenProtectedRoute>
+          <ExtractionV2Page />
+        </FullscreenProtectedRoute>
+      } />
+      <Route path="/exams/:examId/extraction-v3/review/:jobId" element={
+        <FullscreenProtectedRoute>
+          <ExtractionReviewPage />
+        </FullscreenProtectedRoute>
       } />
       <Route path="/exam-view/:examId" element={
         <RoleProtectedRoute allowedRoles={['student', 'STUDENT', 'super_admin', 'SUPER_ADMIN', 'institute_admin', 'ADMIN', 'admin', 'teacher', 'TEACHER', 'exam_admin']}>
