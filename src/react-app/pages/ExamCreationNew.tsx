@@ -193,7 +193,7 @@ const getDefaultFormData = (): ExamFormData => ({
   start_date: '',
   end_date: '',
   duration_minutes: 60,
-  max_attempts: 1,
+  max_attempts: 1000,
   passing_marks: 50,
   is_published: false,
   allow_negative_marking: false,
@@ -381,7 +381,7 @@ export default function ExamCreation() {
         start_date: formatDateTimeLocal(exam.start_date, resolvedTimezone),
         end_date: formatDateTimeLocal(exam.end_date, resolvedTimezone),
         duration_minutes: exam.duration_minutes || 60,
-        max_attempts: exam.max_attempts || 1,
+        max_attempts: exam.max_attempts || 1000,
         passing_marks: exam.passing_marks || 50,
         is_published: exam.is_published || false,
         allow_negative_marking: exam.allow_negative_marking || false,
@@ -911,6 +911,7 @@ export default function ExamCreation() {
                     </button>
 
                     {/* Offline OMR Mode */}
+                    {/* 
                     <button
                       type="button"
                       onClick={() => handleInputChange('exam_mode', 'offline_omr')}
@@ -925,8 +926,10 @@ export default function ExamCreation() {
                       </div>
                       <p className="text-xs text-slate-600">Generate OMR sheets, scan and auto-evaluate</p>
                     </button>
+                    */}
 
                     {/* Offline Subjective Mode */}
+                    {/* 
                     <button
                       type="button"
                       onClick={() => handleInputChange('exam_mode', 'offline_subjective')}
@@ -941,8 +944,10 @@ export default function ExamCreation() {
                       </div>
                       <p className="text-xs text-slate-600">Upload answer sheets for AI-powered grading</p>
                     </button>
+                    */}
 
                     {/* Hybrid Mode */}
+                    {/* 
                     <button
                       type="button"
                       onClick={() => handleInputChange('exam_mode', 'hybrid')}
@@ -957,6 +962,7 @@ export default function ExamCreation() {
                       </div>
                       <p className="text-xs text-slate-600">Combine online & offline modes for flexibility</p>
                     </button>
+                    */}
                   </div>
 
                   {/* AI Evaluation Settings - For offline_subjective and hybrid modes */}
@@ -1057,6 +1063,8 @@ export default function ExamCreation() {
                         )}
                       </button>
 
+                      {/* Copy from Existing - Commented out */}
+                      {/* 
                       <button
                         type="button"
                         onClick={() => {
@@ -1086,6 +1094,7 @@ export default function ExamCreation() {
                           <CheckCircle className="w-5 h-5 text-blue-600 absolute top-4 right-4" />
                         )}
                       </button>
+                      */}
                     </div>
                   )}
 

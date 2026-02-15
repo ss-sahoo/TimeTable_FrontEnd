@@ -22,7 +22,10 @@ import {
   Download,
   Upload,
   Mail,
-  Share2
+  Share2,
+  CheckSquare,
+  Square,
+  X
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
@@ -61,6 +64,11 @@ export default function ExamManagement() {
   const { user } = useAuthContext();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Multi-select state for bulk delete
+  const [selectedExams, setSelectedExams] = useState<number[]>([]);
+  const [showSelectionMode, setShowSelectionMode] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -215,6 +223,57 @@ export default function ExamManagement() {
     }
   };
 
+  // Multi-select functions
+  const toggleExamSelection = (examId: number) => {
+    setSelectedExams(prev => 
+      prev.includes(examId) 
+        ? prev.filter(id => id !== examId)
+        : [...prev, examId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedExams.length === exams.length) {
+      setSelectedExams([]);
+    } else {
+      setSelectedExams(exams.map(exam => exam.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedExams.length === 0) return;
+    
+    const confirmMessage = `Are you sure you want to delete ${selectedExams.length} exam(s)? This action cannot be undone.`;
+    if (!window.confirm(confirmMessage)) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await api.post('/exams/exams/bulk-delete/', {
+        exam_ids: selectedExams
+      });
+      
+      if (response.data.success) {
+        // Remove deleted exams from the list
+        setExams(exams.filter(exam => !selectedExams.includes(exam.id)));
+        setSelectedExams([]);
+        setShowSelectionMode(false);
+        alert(`Successfully deleted ${response.data.deleted_count} exam(s)`);
+      } else {
+        alert('Failed to delete exams: ' + (response.data.error || 'Unknown error'));
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      alert('Failed to delete exams: ' + errorMessage);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const cancelSelection = () => {
+    setSelectedExams([]);
+    setShowSelectionMode(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#f9fafb' }}>
@@ -232,20 +291,60 @@ export default function ExamManagement() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-black">Exam Management</h1>
-            <p className="text-base" style={{ color: '#6b6b6b' }}>Manage and organize your exams</p>
+            {showSelectionMode ? (
+              <h1 className="text-2xl font-bold text-black">Select Exams</h1>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold text-black">Exam Management</h1>
+                <p className="text-base" style={{ color: '#6b6b6b' }}>Manage and organize your exams</p>
+              </>
+            )}
           </div>
-          <Link
-            to="/exams/create"
-            data-tour-id="cta-create-exam"
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-white rounded-lg transition-colors"
-            style={{ backgroundColor: '#216865' }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a524f'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#216865'}
-          >
-            <Plus className="w-4 h-4" />
-            Create Exam
-          </Link>
+          <div className="flex items-center gap-3">
+            {!showSelectionMode ? (
+              <button
+                onClick={() => setShowSelectionMode(true)}
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-slate-300 rounded-lg transition-colors hover:bg-slate-50"
+              >
+                <CheckSquare className="w-4 h-4" />
+                Select
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={cancelSelection}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-slate-300 rounded-lg transition-colors hover:bg-slate-50"
+                >
+                  <X className="w-4 h-4" />
+                  Cancel
+                </button>
+                {selectedExams.length > 0 && (
+                  <button
+                    onClick={handleBulkDelete}
+                    disabled={isDeleting}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
+                    style={{ backgroundColor: '#dc2626' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#b91c1c'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {isDeleting ? 'Deleting...' : `Delete ${selectedExams.length} Selected`}
+                  </button>
+                )}
+              </div>
+            )}
+            <Link
+              to="/exams/create"
+              data-tour-id="cta-create-exam"
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm text-white rounded-lg transition-colors"
+              style={{ backgroundColor: '#216865' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a524f'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#216865'}
+            >
+              <Plus className="w-4 h-4" />
+              Create Exam
+            </Link>
+          </div>
         </div>
 
         <div
@@ -418,11 +517,50 @@ export default function ExamManagement() {
           )}
         </div>
 
+        {/* Selection Header */}
+        {showSelectionMode && exams.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={toggleSelectAll}
+                className="flex items-center gap-2 text-sm text-blue-700 hover:text-blue-900"
+              >
+                {selectedExams.length === exams.length ? (
+                  <CheckSquare className="w-5 h-5" />
+                ) : (
+                  <Square className="w-5 h-5" />
+                )}
+                Select All ({selectedExams.length}/{exams.length})
+              </button>
+            </div>
+            <span className="text-sm text-blue-600">
+              {selectedExams.length} exam{selectedExams.length !== 1 ? 's' : ''} selected
+            </span>
+          </div>
+        )}
+
         {/* Exams Grid */}
         <div id="exam-grid" data-tour-id="exam-list" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {exams.map((exam) => (
-            <div key={exam.id} className="bg-white rounded-lg border border-slate-200 p-4 hover:shadow-md transition-shadow">
+            <div 
+              key={exam.id} 
+              className={`bg-white rounded-lg border p-4 hover:shadow-md transition-shadow ${
+                selectedExams.includes(exam.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200'
+              }`}
+            >
               <div className="flex items-start justify-between mb-3">
+                {showSelectionMode && (
+                  <button
+                    onClick={() => toggleExamSelection(exam.id)}
+                    className="mr-2 flex-shrink-0"
+                  >
+                    {selectedExams.includes(exam.id) ? (
+                      <CheckSquare className="w-5 h-5 text-blue-600" />
+                    ) : (
+                      <Square className="w-5 h-5 text-slate-400" />
+                    )}
+                  </button>
+                )}
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 truncate">{exam.title}</h3>
                   <p className="text-xs text-slate-600 dark:text-gray-400 mt-1 line-clamp-2">{exam.description}</p>
@@ -525,7 +663,16 @@ export default function ExamManagement() {
                 ? 'Try adjusting your search or filter criteria.'
                 : 'Get started by creating your first exam.'}
             </p>
-            {!searchTerm && statusFilter === 'all' && visibilityFilter === 'all' && !selectedCenter && !selectedBatch && (
+            {showSelectionMode && (
+              <button
+                onClick={cancelSelection}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm border border-slate-300 rounded-lg transition-colors hover:bg-slate-50 mb-4"
+              >
+                <X className="w-4 h-4" />
+                Exit Selection Mode
+              </button>
+            )}
+            {!searchTerm && statusFilter === 'all' && visibilityFilter === 'all' && !selectedCenter && !selectedBatch && !showSelectionMode && (
               <Link
                 to="/exams/create"
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg transition-colors"

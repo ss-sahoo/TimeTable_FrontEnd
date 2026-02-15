@@ -22,7 +22,10 @@ import {
   Download,
   Upload,
   Mail,
-  Share2
+  Share2,
+  CheckSquare,
+  Square,
+  X
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
@@ -73,6 +76,11 @@ export default function ExamManagement() {
   const { user } = useAuthContext();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Multi-select state for bulk delete
+  const [selectedExams, setSelectedExams] = useState<number[]>([]);
+  const [showSelectionMode, setShowSelectionMode] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -208,6 +216,56 @@ export default function ExamManagement() {
     } finally {
       setDeleting(null);
     }
+  };
+
+  // Multi-select functions for bulk delete
+  const toggleExamSelection = (examId: number) => {
+    setSelectedExams(prev => 
+      prev.includes(examId) 
+        ? prev.filter(id => id !== examId)
+        : [...prev, examId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedExams.length === exams.length) {
+      setSelectedExams([]);
+    } else {
+      setSelectedExams(exams.map(exam => exam.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedExams.length === 0) return;
+    
+    const confirmMessage = `Are you sure you want to delete ${selectedExams.length} exam(s)? This action cannot be undone.`;
+    if (!window.confirm(confirmMessage)) return;
+
+    setIsBulkDeleting(true);
+    try {
+      const response = await api.post('/exams/exams/bulk-delete/', {
+        exam_ids: selectedExams
+      });
+      
+      if (response.data.success) {
+        setExams(exams.filter(exam => !selectedExams.includes(exam.id)));
+        setSelectedExams([]);
+        setShowSelectionMode(false);
+        alert(`Successfully deleted ${response.data.deleted_count} exam(s)`);
+      } else {
+        alert('Failed to delete exams: ' + (response.data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Failed to bulk delete exams:', error);
+      alert('Failed to delete exams. Please try again.');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  const cancelSelection = () => {
+    setSelectedExams([]);
+    setShowSelectionMode(false);
   };
 
   const handlePublishExam = async (examId: number) => {
@@ -347,16 +405,55 @@ export default function ExamManagement() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Exam Management</h1>
-            <p className="text-xs text-slate-600 mt-1">Manage and organize your exams</p>
+            {showSelectionMode ? (
+              <h1 className="text-2xl font-bold text-slate-900">Select Exams</h1>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold text-slate-900">Exam Management</h1>
+                <p className="text-xs text-slate-600 mt-1">Manage and organize your exams</p>
+              </>
+            )}
           </div>
-          <Link
-            to={`${basePath}/exams/create`}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
-          >
-            <Plus className="w-4 h-4" />
-            Create Exam
-          </Link>
+          <div className="flex items-center gap-3">
+            {!showSelectionMode ? (
+              <button
+                onClick={() => setShowSelectionMode(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-all duration-200"
+              >
+                <CheckSquare className="w-4 h-4" />
+                Select
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={cancelSelection}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-all duration-200"
+                >
+                  <X className="w-4 h-4" />
+                  Cancel
+                </button>
+                {selectedExams.length > 0 && (
+                  <button
+                    onClick={handleBulkDelete}
+                    disabled={isBulkDeleting}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 disabled:opacity-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {isBulkDeleting ? 'Deleting...' : `Delete ${selectedExams.length} Selected`}
+                  </button>
+                )}
+              </>
+            )}
+            {!showSelectionMode && (
+              <Link
+                to={`${basePath}/exams/create`}
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
+              >
+                <Plus className="w-4 h-4" />
+                Create Exam
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Stats Cards - Compact Design */}
@@ -498,6 +595,26 @@ export default function ExamManagement() {
           </div>
         )}
 
+        {/* Selection Header */}
+        {showSelectionMode && exams.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 flex items-center justify-between">
+            <button
+              onClick={toggleSelectAll}
+              className="flex items-center gap-2 text-sm text-blue-700 hover:text-blue-900"
+            >
+              {selectedExams.length === exams.length ? (
+                <CheckSquare className="w-5 h-5" />
+              ) : (
+                <Square className="w-5 h-5" />
+              )}
+              Select All ({selectedExams.length}/{exams.length})
+            </button>
+            <span className="text-sm text-blue-600">
+              {selectedExams.length} exam{selectedExams.length !== 1 ? 's' : ''} selected
+            </span>
+          </div>
+        )}
+
         {/* Exams Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {exams.map((exam) => {
@@ -515,8 +632,25 @@ export default function ExamManagement() {
             const canShareExam = exam.is_question_complete && !!getExamLink(exam);
 
             return (
-              <div key={exam.id} className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-lg hover:border-slate-300 transition-all duration-200">
+              <div 
+                key={exam.id} 
+                className={`bg-white rounded-xl border p-5 hover:shadow-lg hover:border-slate-300 transition-all duration-200 ${
+                  selectedExams.includes(exam.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200'
+                }`}
+              >
                 <div className="flex items-start justify-between mb-4">
+                  {showSelectionMode && (
+                    <button
+                      onClick={() => toggleExamSelection(exam.id)}
+                      className="mr-2 flex-shrink-0"
+                    >
+                      {selectedExams.includes(exam.id) ? (
+                        <CheckSquare className="w-5 h-5 text-blue-600" />
+                      ) : (
+                        <Square className="w-5 h-5 text-slate-400" />
+                      )}
+                    </button>
+                  )}
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-slate-900 truncate mb-1">{exam.title}</h3>
                     <p className="text-xs text-slate-600 line-clamp-2">{exam.description}</p>
@@ -686,7 +820,16 @@ export default function ExamManagement() {
                 ? 'Try adjusting your search or filter criteria.'
                 : 'Get started by creating your first exam.'}
             </p>
-            {!searchTerm && statusFilter === 'all' && visibilityFilter === 'all' && !selectedCenter && !selectedBatch && (
+            {showSelectionMode && (
+              <button
+                onClick={cancelSelection}
+                className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-medium border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-all duration-200 mb-4"
+              >
+                <X className="w-4 h-4" />
+                Exit Selection Mode
+              </button>
+            )}
+            {!searchTerm && statusFilter === 'all' && visibilityFilter === 'all' && !selectedCenter && !selectedBatch && !showSelectionMode && (
               <Link
                 to={`${basePath}/exams/create`}
                 className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
