@@ -480,6 +480,16 @@ export default function ExamView() {
                 <Download className="w-3.5 h-3.5" />
                 Download PDF
               </button>
+              {exam && (
+                <button
+                  onClick={() => navigate(`/exams/${exam.id}/extraction-v3`)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors shadow-sm"
+                  title="AI Bulk Import Questions"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Bulk Import
+                </button>
+              )}
               {exam.status === 'draft' && (
                 <button
                   onClick={handlePublishExam}
@@ -649,6 +659,14 @@ export default function ExamView() {
                   >
                     <Upload className="w-3 h-3" />
                     AI Bulk Import
+                  </button>
+                  <button
+                    onClick={() => navigate(`/exams/${exam.id}/extraction-v3`)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm"
+                    title="Use modern AI pipeline to extract questions"
+                  >
+                    <Zap className="w-3 h-3" />
+                    Smart Extract V3
                   </button>
                   <Link
                     to={`${basePath}/patterns/${exam.pattern.id}/view`}
@@ -1028,84 +1046,89 @@ export default function ExamView() {
               <AnswerSheetUpload examId={exam.id} examTitle={exam.title} />
             )}
           </div>
-        ) : null}
-      </div>
+        ) : null
+        }
+      </div >
 
       {/* Bulk Import Modal */}
-      {showBulkImport && exam && (
-        <QuestionBulkImport
-          examId={exam.id}
-          patternId={exam.pattern.id}
-          onClose={() => setShowBulkImport(false)}
-          onImportComplete={() => {
-            setShowBulkImport(false);
-            fetchExam(); // Refresh exam data to show new questions
-          }}
-        />
-      )}
+      {
+        showBulkImport && exam && (
+          <QuestionBulkImport
+            examId={exam.id}
+            patternId={exam.pattern.id}
+            onClose={() => setShowBulkImport(false)}
+            onImportComplete={() => {
+              setShowBulkImport(false);
+              fetchExam(); // Refresh exam data to show new questions
+            }}
+          />
+        )
+      }
 
       {/* Delete Section Confirmation Modal */}
-      {sectionToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
-            <div className="bg-red-50 px-6 py-4 border-b border-red-100">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                  <Trash2 className="w-5 h-5 text-red-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-red-800">Delete Section</h3>
-                  <p className="text-sm text-red-600">This action cannot be undone</p>
-                </div>
-              </div>
-            </div>
-            <div className="px-6 py-5">
-              <p className="text-slate-700 mb-4">
-                Are you sure you want to delete the section <span className="font-bold text-slate-900">"{sectionToDelete.name}"</span>?
-              </p>
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-amber-800">
-                    <p className="font-medium mb-1">Warning:</p>
-                    <ul className="list-disc list-inside space-y-1 text-xs">
-                      <li>This will remove the section from the pattern</li>
-                      <li>Questions linked to this section may become orphaned</li>
-                      <li>Section: {sectionToDelete.subject} - Q{sectionToDelete.start_question} to Q{sectionToDelete.end_question}</li>
-                    </ul>
+      {
+        sectionToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+              <div className="bg-red-50 px-6 py-4 border-b border-red-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                    <Trash2 className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-red-800">Delete Section</h3>
+                    <p className="text-sm text-red-600">This action cannot be undone</p>
                   </div>
                 </div>
               </div>
-            </div>
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
-              <button
-                onClick={() => setSectionToDelete(null)}
-                disabled={deletingSection}
-                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteSection}
-                disabled={deletingSection}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {deletingSection ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-4 h-4" />
-                    Delete Section
-                  </>
-                )}
-              </button>
+              <div className="px-6 py-5">
+                <p className="text-slate-700 mb-4">
+                  Are you sure you want to delete the section <span className="font-bold text-slate-900">"{sectionToDelete.name}"</span>?
+                </p>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-amber-800">
+                      <p className="font-medium mb-1">Warning:</p>
+                      <ul className="list-disc list-inside space-y-1 text-xs">
+                        <li>This will remove the section from the pattern</li>
+                        <li>Questions linked to this section may become orphaned</li>
+                        <li>Section: {sectionToDelete.subject} - Q{sectionToDelete.start_question} to Q{sectionToDelete.end_question}</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setSectionToDelete(null)}
+                  disabled={deletingSection}
+                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteSection}
+                  disabled={deletingSection}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {deletingSection ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Delete Section
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }

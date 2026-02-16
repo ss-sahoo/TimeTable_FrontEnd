@@ -28,9 +28,9 @@ export default function EnhancedQuestionEditor() {
   const [uploading, setUploading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
-  const { data: exam } = useApi<Exam>(`/api/exams/${examId}`);
-  const { data: subjects } = useApi<ExamSubject[]>(`/api/exams/${examId}/subjects`);
-  const { data: existingQuestion, refetch: refetchQuestion } = useApi<Question>(`/api/questions/${currentQuestionNumber}?exam_id=${examId}`);
+  const { data: exam } = useApi<Exam>(`/exams/${examId}`);
+  const { data: subjects } = useApi<ExamSubject[]>(`/exams/${examId}/subjects`);
+  const { data: existingQuestion, refetch: refetchQuestion } = useApi<Question>(`/questions/${currentQuestionNumber}?exam_id=${examId}`);
 
   // Initialize form when question data loads
   useEffect(() => {
@@ -453,6 +453,19 @@ export default function EnhancedQuestionEditor() {
                       <p className="text-sm">No diagrams uploaded yet</p>
                     </div>
                   )}
+                  <input
+                    type="text"
+                    value={formData.correct_answer}
+                    onChange={(e) => handleInputChange('correct_answer', e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder={
+                      formData.question_type === 'Single Correct MCQ'
+                        ? "e.g., A, B, C, D"
+                        : formData.question_type === 'Numerical'
+                          ? "e.g., 42, 3.14"
+                          : "Enter the correct answer or key points"
+                    }
+                  />
                 </div>
 
                 {/* Solution */}
