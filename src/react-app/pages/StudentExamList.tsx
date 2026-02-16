@@ -22,10 +22,12 @@ import {
   Monitor,
   ChevronRight,
   TrendingUp,
+  SlidersHorizontal,
+  Upload,
+  FileText,
   BarChart3,
   Shield,
-  X,
-  SlidersHorizontal
+  X
 } from 'lucide-react';
 
 interface Exam {
@@ -43,6 +45,7 @@ interface Exam {
   allow_late_submission: boolean;
   require_fullscreen: boolean;
   enable_webcam_proctoring: boolean;
+  exam_mode?: 'online' | 'offline_omr' | 'offline_subjective';
   status: string;
   can_start?: boolean;
   time_remaining?: number;
@@ -195,6 +198,21 @@ export default function StudentExamList() {
   };
 
   const getActionButton = (exam: Exam) => {
+    // Handle Offline Subjective Exams
+    if (exam.exam_mode === 'offline_subjective') {
+      const isCompleted = exam.status === 'completed';
+      return (
+        <button
+          onClick={() => navigate(`/exam-access/${exam.id}`)}
+          className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 shadow-sm transition-all ${isCompleted ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+        >
+          {isCompleted ? <Eye className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
+          {isCompleted ? 'View Results & Uploads' : 'Upload Answer Sheet'}
+        </button>
+      );
+    }
+
     switch (exam.status) {
       case 'available':
         return (

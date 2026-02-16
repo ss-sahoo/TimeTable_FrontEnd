@@ -50,15 +50,15 @@ export const MarkingSchemeSchema = z.object({
   max_marks: z.number(),
   negative_marking_percentage: z.number().min(0).max(100).optional(), // Legacy field
   negative_marks: z.number().min(0).optional(), // New field for negative marks
-  
+
   // MCQ specific
   partial_marking: z.boolean().optional(), // For multiple correct MCQ
   marks_per_correct_option: z.number().optional(), // For partial marking
-  
+
   // Numerical specific
   tolerance_range: z.number().optional(), // ±tolerance for numerical answers
   decimal_precision: z.number().optional(), // Decimal places for rounding
-  
+
   // Subjective specific
   manual_grading: z.boolean().optional(), // Always true for subjective
 });
@@ -87,6 +87,16 @@ export const CreateSectionSchema = z.object({
   marking_scheme: MarkingSchemeSchema,
 });
 
+// Question Image schema
+export const QuestionImageSchema = z.object({
+  id: z.number(),
+  image: z.string(),
+  caption: z.string().optional(),
+  order: z.number().default(1),
+});
+
+export type QuestionImage = z.infer<typeof QuestionImageSchema>;
+
 // Question schema
 export const QuestionSchema = z.object({
   id: z.number(),
@@ -102,6 +112,7 @@ export const QuestionSchema = z.object({
   numerical_answer: z.number().nullable(), // For numerical questions
   tolerance_range: z.number().nullable(), // For numerical questions
   solution: z.string().nullable(),
+  images: z.array(QuestionImageSchema).optional(),
   created_at: z.string(),
   updated_at: z.string(),
 });

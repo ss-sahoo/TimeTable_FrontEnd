@@ -14,7 +14,8 @@ import {
   Download,
   Upload,
   RefreshCw,
-  FileText
+  FileText,
+  Brain
 } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 
@@ -62,6 +63,11 @@ const ExamAccess: React.FC = () => {
   const [omrSubmissions, setOmrSubmissions] = useState<any[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
 
+  // Subjective Upload State
+  const [subjectiveFile, setSubjectiveFile] = useState<File | null>(null);
+  const [subjectiveUploading, setSubjectiveUploading] = useState(false);
+  const [subjectiveSuccess, setSubjectiveSuccess] = useState(false);
+
   const { data: examData, loading: examLoading, error: examError } = useApi<Exam>(`/exams/exams/${examId}/`);
 
   useEffect(() => {
@@ -106,7 +112,7 @@ const ExamAccess: React.FC = () => {
       // Then set up interval
       const interval = setInterval(updateTimer, 1000);
 
-      if (exam.exam_mode === 'offline_omr') {
+      if (exam.exam_mode === 'offline_omr' || exam.exam_mode === 'offline_subjective') {
         fetchSubmissions();
       }
 
@@ -184,6 +190,32 @@ const ExamAccess: React.FC = () => {
     }
 
     setSystemChecks(checks);
+  };
+
+  const handleSubjectiveUpload = async () => {
+    if (!subjectiveFile || !exam) return;
+
+    setSubjectiveUploading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', subjectiveFile);
+      formData.append('auto_evaluate', 'true');
+
+      await api.post(`/ai-evaluation/${exam.id}/upload-answer-sheet/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      setSubjectiveSuccess(true);
+      setSubjectiveFile(null);
+      fetchSubmissions(); // Update list
+    } catch (err: any) {
+      console.error('Failed to upload subjective answer sheet:', err);
+      setError(err.response?.data?.error || 'Failed to upload answer sheet. Please try again.');
+    } finally {
+      setSubjectiveUploading(false);
+    }
   };
 
 
@@ -328,13 +360,22 @@ const ExamAccess: React.FC = () => {
   };
 
   const fetchSubmissions = async () => {
-    if (!examId) return;
+    if (!examId || !exam) return;
     try {
       setLoadingSubmissions(true);
-      const response = await api.get(`/omr/submissions/?exam_id=${examId}`);
+      let endpoint = '';
+      if (exam.exam_mode === 'offline_omr') {
+        endpoint = `/omr/submissions/?exam_id=${examId}`;
+      } else if (exam.exam_mode === 'offline_subjective') {
+        endpoint = `/ai-evaluation/${examId}/submissions/`;
+      }
+
+      if (!endpoint) return;
+
+      const response = await api.get(endpoint);
       setOmrSubmissions(response.data.results || response.data || []);
     } catch (err) {
-      console.error('Failed to fetch OMR submissions:', err);
+      console.error('Failed to fetch submissions:', err);
     } finally {
       setLoadingSubmissions(false);
     }
@@ -467,90 +508,92 @@ const ExamAccess: React.FC = () => {
             </div>
           )}
 
-          {/* System Requirements Check */}
-          <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 mb-8">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Monitor className="w-5 h-5" />
-              System Requirements
-            </h3>
+          {/* System Requirements Check - Hide for offline exams */}
+          {exam.exam_mode === 'online' && (
+            <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 mb-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Monitor className="w-5 h-5" />
+                System Requirements
+              </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div className={`flex items-center gap-3 p-3 rounded-lg border ${systemChecks.camera ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
-                }`}>
-                <Camera className={`w-5 h-5 ${systemChecks.camera ? 'text-green-600' : 'text-red-600'}`} />
-                <div>
-                  <div className="font-medium text-gray-900">Camera</div>
-                  <div className={`text-sm ${systemChecks.camera ? 'text-green-600' : 'text-red-600'}`}>
-                    {systemChecks.camera ? 'Available' : 'Required for proctoring'}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className={`flex items-center gap-3 p-3 rounded-lg border ${systemChecks.camera ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                  }`}>
+                  <Camera className={`w-5 h-5 ${systemChecks.camera ? 'text-green-600' : 'text-red-600'}`} />
+                  <div>
+                    <div className="font-medium text-gray-900">Camera</div>
+                    <div className={`text-sm ${systemChecks.camera ? 'text-green-600' : 'text-red-600'}`}>
+                      {systemChecks.camera ? 'Available' : 'Required for proctoring'}
+                    </div>
                   </div>
+                  {systemChecks.camera ? (
+                    <CheckCircle className="w-5 h-5 text-green-600 ml-auto" />
+                  ) : (
+                    <AlertTriangle className="w-5 h-5 text-red-600 ml-auto" />
+                  )}
                 </div>
-                {systemChecks.camera ? (
-                  <CheckCircle className="w-5 h-5 text-green-600 ml-auto" />
-                ) : (
-                  <AlertTriangle className="w-5 h-5 text-red-600 ml-auto" />
-                )}
+
+                <div className={`flex items-center gap-3 p-3 rounded-lg border ${systemChecks.fullscreen ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                  }`}>
+                  <Monitor className={`w-5 h-5 ${systemChecks.fullscreen ? 'text-green-600' : 'text-red-600'}`} />
+                  <div>
+                    <div className="font-medium text-gray-900">Fullscreen Mode</div>
+                    <div className={`text-sm ${systemChecks.fullscreen ? 'text-green-600' : 'text-red-600'}`}>
+                      {systemChecks.fullscreen ? 'Supported' : 'Not supported'}
+                    </div>
+                  </div>
+                  {systemChecks.fullscreen ? (
+                    <CheckCircle className="w-5 h-5 text-green-600 ml-auto" />
+                  ) : (
+                    <AlertTriangle className="w-5 h-5 text-red-600 ml-auto" />
+                  )}
+                </div>
+
+                <div className={`flex items-center gap-3 p-3 rounded-lg border ${systemChecks.notifications ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
+                  }`}>
+                  <Shield className={`w-5 h-5 ${systemChecks.notifications ? 'text-green-600' : 'text-yellow-600'}`} />
+                  <div>
+                    <div className="font-medium text-gray-900">Notifications</div>
+                    <div className={`text-sm ${systemChecks.notifications ? 'text-green-600' : 'text-yellow-600'}`}>
+                      {systemChecks.notifications ? 'Enabled' : 'Recommended'}
+                    </div>
+                  </div>
+                  {systemChecks.notifications ? (
+                    <CheckCircle className="w-5 h-5 text-green-600 ml-auto" />
+                  ) : (
+                    <AlertTriangle className="w-5 h-5 text-yellow-600 ml-auto" />
+                  )}
+                </div>
+
+                <div className={`flex items-center gap-3 p-3 rounded-lg border ${systemChecks.microphone ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
+                  }`}>
+                  <Camera className={`w-5 h-5 ${systemChecks.microphone ? 'text-green-600' : 'text-yellow-600'}`} />
+                  <div>
+                    <div className="font-medium text-gray-900">Microphone</div>
+                    <div className={`text-sm ${systemChecks.microphone ? 'text-green-600' : 'text-yellow-600'}`}>
+                      {systemChecks.microphone ? 'Available' : 'Optional'}
+                    </div>
+                  </div>
+                  {systemChecks.microphone ? (
+                    <CheckCircle className="w-5 h-5 text-green-600 ml-auto" />
+                  ) : (
+                    <AlertTriangle className="w-5 h-5 text-yellow-600 ml-auto" />
+                  )}
+                </div>
               </div>
 
-              <div className={`flex items-center gap-3 p-3 rounded-lg border ${systemChecks.fullscreen ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
-                }`}>
-                <Monitor className={`w-5 h-5 ${systemChecks.fullscreen ? 'text-green-600' : 'text-red-600'}`} />
-                <div>
-                  <div className="font-medium text-gray-900">Fullscreen Mode</div>
-                  <div className={`text-sm ${systemChecks.fullscreen ? 'text-green-600' : 'text-red-600'}`}>
-                    {systemChecks.fullscreen ? 'Supported' : 'Not supported'}
-                  </div>
+              {(!systemChecks.camera || !systemChecks.notifications) && (
+                <div className="mb-4">
+                  <button
+                    onClick={handleRequestPermissions}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Request Permissions
+                  </button>
                 </div>
-                {systemChecks.fullscreen ? (
-                  <CheckCircle className="w-5 h-5 text-green-600 ml-auto" />
-                ) : (
-                  <AlertTriangle className="w-5 h-5 text-red-600 ml-auto" />
-                )}
-              </div>
-
-              <div className={`flex items-center gap-3 p-3 rounded-lg border ${systemChecks.notifications ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
-                }`}>
-                <Shield className={`w-5 h-5 ${systemChecks.notifications ? 'text-green-600' : 'text-yellow-600'}`} />
-                <div>
-                  <div className="font-medium text-gray-900">Notifications</div>
-                  <div className={`text-sm ${systemChecks.notifications ? 'text-green-600' : 'text-yellow-600'}`}>
-                    {systemChecks.notifications ? 'Enabled' : 'Recommended'}
-                  </div>
-                </div>
-                {systemChecks.notifications ? (
-                  <CheckCircle className="w-5 h-5 text-green-600 ml-auto" />
-                ) : (
-                  <AlertTriangle className="w-5 h-5 text-yellow-600 ml-auto" />
-                )}
-              </div>
-
-              <div className={`flex items-center gap-3 p-3 rounded-lg border ${systemChecks.microphone ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
-                }`}>
-                <Camera className={`w-5 h-5 ${systemChecks.microphone ? 'text-green-600' : 'text-yellow-600'}`} />
-                <div>
-                  <div className="font-medium text-gray-900">Microphone</div>
-                  <div className={`text-sm ${systemChecks.microphone ? 'text-green-600' : 'text-yellow-600'}`}>
-                    {systemChecks.microphone ? 'Available' : 'Optional'}
-                  </div>
-                </div>
-                {systemChecks.microphone ? (
-                  <CheckCircle className="w-5 h-5 text-green-600 ml-auto" />
-                ) : (
-                  <AlertTriangle className="w-5 h-5 text-yellow-600 ml-auto" />
-                )}
-              </div>
+              )}
             </div>
-
-            {(!systemChecks.camera || !systemChecks.notifications) && (
-              <div className="mb-4">
-                <button
-                  onClick={handleRequestPermissions}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Request Permissions
-                </button>
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Security Notice */}
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
@@ -702,6 +745,133 @@ const ExamAccess: React.FC = () => {
                                   VIEW DETAILED RESULT
                                 </button>
                               )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : exam?.exam_mode === 'offline_subjective' ? (
+              <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8">
+                <div className="mb-6">
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Subjective Exam Instructions</h3>
+                  <p className="text-gray-600 mb-4">This is an offline subjective exam. Please follow the steps below:</p>
+                  <div className="flex flex-col md:flex-row gap-4 justify-center mb-8">
+                    <button
+                      onClick={() => window.open(`/api/exams/exams/${exam.id}/question-paper/`, '_blank')}
+                      className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-all font-semibold"
+                    >
+                      <Download className="w-5 h-5" />
+                      Download Question Paper
+                    </button>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 pt-6">
+                  <h4 className="font-semibold text-gray-900 mb-4">Upload Handwritten Answer Sheet</h4>
+
+                  {subjectiveSuccess ? (
+                    <div className="p-8 bg-green-50 border border-green-200 rounded-xl text-center">
+                      <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-3" />
+                      <h5 className="text-lg font-bold text-green-800 mb-1">Upload Successful!</h5>
+                      <p className="text-green-700 mb-4">Your answer sheet has been submitted for AI evaluation. This may take a minute.</p>
+                      <button
+                        onClick={() => {
+                          setSubjectiveSuccess(false);
+                          fetchSubmissions();
+                        }}
+                        className="text-green-700 font-semibold hover:underline"
+                      >
+                        Upload Another Sheet / Refresh Submissions
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="max-w-md mx-auto">
+                        <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-all ${subjectiveFile ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+                          }`}>
+                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <Upload className={`w-8 h-8 mb-2 ${subjectiveFile ? 'text-blue-600' : 'text-gray-400'}`} />
+                            <p className="text-sm text-gray-700">
+                              {subjectiveFile ? subjectiveFile.name : 'Click to select answer sheet (PDF/Image)'}
+                            </p>
+                          </div>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".pdf,image/*"
+                            onChange={(e) => setSubjectiveFile(e.target.files?.[0] || null)}
+                          />
+                        </label>
+                      </div>
+
+                      {subjectiveFile && (
+                        <button
+                          onClick={handleSubjectiveUpload}
+                          disabled={subjectiveUploading}
+                          className="w-full max-w-md px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-bold transition-all shadow-md flex items-center justify-center gap-2"
+                        >
+                          {subjectiveUploading ? (
+                            <RefreshCw className="w-5 h-5 animate-spin" />
+                          ) : (
+                            <Upload className="w-5 h-5" />
+                          )}
+                          {subjectiveUploading ? 'Processing with AI...' : 'Submit for AI Evaluation'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Submissions List */}
+                <div className="mt-12 text-left">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-blue-600" />
+                    Your AI Evaluations
+                  </h4>
+
+                  {loadingSubmissions ? (
+                    <div className="flex justify-center py-8">
+                      <RefreshCw className="w-6 h-6 text-blue-600 animate-spin" />
+                    </div>
+                  ) : omrSubmissions.length === 0 ? (
+                    <div className="p-8 text-center bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                      <p className="text-gray-500 text-sm">No submissions found yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {omrSubmissions.map((sub) => (
+                        <div key={sub.id} className="p-4 bg-white border border-gray-200 rounded-xl flex items-center justify-between hover:border-blue-300 transition-all">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center">
+                              <Brain className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900">Evaluation #{sub.id}</p>
+                              <p className="text-xs text-gray-500">{new Date(sub.created_at).toLocaleString()}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4">
+                            {sub.score !== null && (
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-gray-900">{sub.score}/{sub.evaluation_result.max_score}</p>
+                                <p className="text-xs text-green-600 font-medium">{sub.percentage?.toFixed(1)}% Score</p>
+                              </div>
+                            )}
+
+                            <div className="text-right flex flex-col items-end gap-1">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-green-100 text-green-700">
+                                COMPLETED
+                              </span>
+                              <button
+                                onClick={() => navigate(`/exam-results/exam/${exam.id}`)}
+                                className="text-[10px] text-blue-600 font-bold hover:underline"
+                              >
+                                VIEW REPORT
+                              </button>
                             </div>
                           </div>
                         </div>

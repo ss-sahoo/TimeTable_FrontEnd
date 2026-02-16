@@ -12,7 +12,12 @@ import {
     Brain,
     ChevronDown,
     ChevronRight,
-    BarChart3
+    BarChart3,
+    X,
+    Save,
+    Edit2,
+    Maximize2,
+    Edit
 } from 'lucide-react';
 
 interface EvaluationResult {
@@ -64,6 +69,7 @@ export default function AnswerSheetUpload({ examId, examTitle }: AnswerSheetUplo
     const [uploading, setUploading] = useState(false);
     const [expandedSubmission, setExpandedSubmission] = useState<number | null>(null);
     const [dragActive, setDragActive] = useState(false);
+    const [reviewSubmission, setReviewSubmission] = useState<AnswerSheetSubmission | null>(null);
 
     useEffect(() => {
         fetchData();
@@ -434,7 +440,14 @@ export default function AnswerSheetUpload({ examId, examTitle }: AnswerSheetUplo
                                         )}
                                         {getStatusBadge(submission.status)}
                                         <button
+                                            onClick={() => setReviewSubmission(submission)}
                                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                            title="Review & Edit Marks"
+                                        >
+                                            <Edit className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                                             title="View Details"
                                         >
                                             <Eye className="w-4 h-4" />
@@ -487,6 +500,233 @@ export default function AnswerSheetUpload({ examId, examTitle }: AnswerSheetUplo
                     <p className="text-xs mt-1">Upload PDF or image files to start AI evaluation</p>
                 </div>
             )}
+            {/* Review Modal */}
+            {reviewSubmission && (
+                <EvaluationReviewModal
+                    submission={reviewSubmission}
+                    onClose={() => setReviewSubmission(null)}
+                    onUpdate={fetchData}
+                    examId={examId}
+                />
+            )}
+        </div>
+    );
+}
+
+interface EvaluationReviewModalProps {
+    submission: AnswerSheetSubmission;
+    onClose: () => void;
+    onUpdate: () => void;
+    examId: number;
+}
+
+function EvaluationReviewModal({ submission, onClose, onUpdate, examId }: EvaluationReviewModalProps) {
+    const [grades, setGrades] = useState(submission.evaluation_result?.grades || []);
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    const [editForm, setEditForm] = useState({ mark: 0, reasoning: '' });
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleEdit = (index: number) => {
+        setEditingIndex(index);
+        setEditForm({
+            mark: grades[index].mark,
+            reasoning: grades[index].reasoning
+        });
+    };
+
+    const handleSave = async (index: number) => {
+        try {
+            setSaving(true);
+            setError(null);
+            const grade = grades[index];
+
+            const response = await api.post(`/ai-evaluation/${examId}/submissions/${submission.id}/update-mark/`, {
+                question_no: grade.question_no,
+                part_no: (grade as any).part_no || null,
+                mark: editForm.mark,
+                reasoning: editForm.reasoning
+            });
+
+            if (response.data.success) {
+                const newGrades = [...grades];
+                newGrades[index] = {
+                    ...newGrades[index],
+                    mark: editForm.mark,
+                    reasoning: editForm.reasoning
+                };
+                setGrades(newGrades);
+                setEditingIndex(null);
+                onUpdate();
+            }
+        } catch (err: any) {
+            console.error('Failed to update mark:', err);
+            setError(err.response?.data?.error || 'Failed to update mark');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    // Construct PDF URL
+    // file_path is likely a relative path from media root
+    const pdfUrl = submission.file_path ? `/api/media/${submission.file_path}` : '';
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-[95vw] h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+                {/* Modal Header */}
+                <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <Brain className="w-6 h-6 text-purple-600" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-slate-900">
+                                Reviewing: {submission.evaluation_result?.student_name || 'Student Submission'}
+                            </h3>
+                            <p className="text-xs text-slate-500">
+                                Total Score: <span className="font-bold text-slate-900">{submission.evaluation_result?.total_score}/{submission.evaluation_result?.max_score}</span>
+                                ({submission.evaluation_result?.percentage.toFixed(1)}%)
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-slate-200 rounded-lg transition-colors text-slate-500"
+                    >
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+
+                {/* Modal Content - Side by Side */}
+                <div className="flex-1 flex overflow-hidden">
+                    {/* Left: PDF Viewer */}
+                    <div className="flex-1 bg-slate-700 border-r border-slate-200 flex flex-col">
+                        <div className="px-4 py-2 bg-slate-800 text-white text-xs font-medium flex items-center justify-between">
+                            <span>Answer Sheet (Original PDF)</span>
+                            <div className="flex gap-2">
+                                <a
+                                    href={pdfUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="hover:text-purple-300 flex items-center gap-1"
+                                >
+                                    <Maximize2 className="w-3 h-3" />
+                                    Open Full Window
+                                </a>
+                            </div>
+                        </div>
+                        <div className="flex-1 relative">
+                            {pdfUrl ? (
+                                <iframe
+                                    src={`${pdfUrl}#toolbar=0`}
+                                    className="w-full h-full border-none"
+                                    title="Student Answer Sheet"
+                                />
+                            ) : (
+                                <div className="absolute inset-0 flex items-center justify-center text-slate-400">
+                                    PDF not available
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Right: Grading Details */}
+                    <div className="w-[450px] flex flex-col bg-white">
+                        <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 text-slate-700 text-xs font-bold uppercase tracking-wider">
+                            AI Grading Details & Adjustments
+                        </div>
+
+                        {error && (
+                            <div className="m-4 p-3 bg-red-50 border border-red-100 rounded-lg text-red-600 text-xs flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4" />
+                                {error}
+                            </div>
+                        )}
+
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                            {grades.map((grade, idx) => (
+                                <div key={idx} className={`p-4 rounded-xl border transition-all ${editingIndex === idx ? 'border-purple-300 ring-2 ring-purple-50 shadow-md' : 'border-slate-100 bg-slate-50/50'}`}>
+                                    <div className="flex items-start justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="bg-white px-2 py-0.5 rounded border border-slate-200 text-sm font-bold text-slate-700">
+                                                Q{grade.question_no}
+                                            </span>
+                                            {(grade as any).part_no && (
+                                                <span className="text-xs text-slate-500">Part {(grade as any).part_no}</span>
+                                            )}
+                                        </div>
+
+                                        {editingIndex === idx ? (
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="number"
+                                                    step="0.5"
+                                                    min="0"
+                                                    max={grade.max_mark}
+                                                    value={editForm.mark}
+                                                    onChange={(e) => setEditForm(prev => ({ ...prev, mark: parseFloat(e.target.value) || 0 }))}
+                                                    className="w-20 px-2 py-1 border border-purple-300 rounded text-sm font-bold focus:outline-none focus:ring-2 focus:ring-purple-200"
+                                                />
+                                                <span className="text-xs font-medium text-slate-400">/ {grade.max_mark}</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-lg font-bold text-slate-900">{grade.mark}</span>
+                                                <span className="text-xs font-medium text-slate-400">/ {grade.max_mark}</span>
+                                                <button
+                                                    onClick={() => handleEdit(idx)}
+                                                    className="p-1 px-2 text-xs font-medium text-purple-600 hover:bg-purple-50 rounded transition-colors flex items-center gap-1"
+                                                >
+                                                    <Edit2 className="w-3 h-3" />
+                                                    Edit
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {editingIndex === idx ? (
+                                        <div className="space-y-3">
+                                            <textarea
+                                                value={editForm.reasoning}
+                                                onChange={(e) => setEditForm(prev => ({ ...prev, reasoning: e.target.value }))}
+                                                className="w-full p-2 text-sm border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-100 min-h-[100px]"
+                                                placeholder="Teacher adjustment reasoning..."
+                                            />
+                                            <div className="flex justify-end gap-2">
+                                                <button
+                                                    onClick={() => setEditingIndex(null)}
+                                                    className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 rounded"
+                                                    disabled={saving}
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onClick={() => handleSave(idx)}
+                                                    disabled={saving}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+                                                >
+                                                    {saving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                                                    Update Mark
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-xs text-slate-600 leading-relaxed bg-white/60 p-2 rounded border border-slate-100 italic">
+                                            {grade.reasoning}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-[10px] text-slate-500">
+                            <p>Manual overrides reflect instantly in student scores.</p>
+                            <p>AI generated report is automatically updated.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

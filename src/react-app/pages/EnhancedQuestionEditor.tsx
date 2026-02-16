@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Trash2, Save } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Trash2, Save, Upload, Image as ImageIcon, X } from 'lucide-react';
 import { useApi, api } from '@/react-app/hooks/useApi';
-import { Exam, ExamSubject, Question, CreateQuestion } from '@/shared/types';
+import { Exam, ExamSubject, Question, CreateQuestion, QuestionImage } from '@/shared/types';
 import RichTextEditor from '@/react-app/components/RichTextEditor';
 import AIImageToText from '@/react-app/components/AIImageToText';
 
@@ -23,7 +23,9 @@ export default function EnhancedQuestionEditor() {
   });
 
   const [options, setOptions] = useState<string[]>(['', '', '', '']);
+  const [images, setImages] = useState<QuestionImage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const { data: exam } = useApi<Exam>(`/exams/${examId}`);
@@ -49,6 +51,10 @@ export default function EnhancedQuestionEditor() {
           ? existingQuestion.options
           : JSON.parse(existingQuestion.options);
         setOptions(parsedOptions);
+      }
+
+      if (existingQuestion.images) {
+        setImages(existingQuestion.images);
       }
     } else {
       // Set default subject and section based on question number
@@ -138,6 +144,36 @@ export default function EnhancedQuestionEditor() {
       setSaveStatus('error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.[0] || !existingQuestion) return;
+
+    setUploading(true);
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('caption', file.name);
+
+    try {
+      const response = await api.post(`/api/questions/${existingQuestion.id}/images/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setImages(prev => [...prev, response.data]);
+    } catch (error) {
+      console.error('Failed to upload image:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleImageDelete = async (imageId: number) => {
+    try {
+      await api.delete(`/api/questions/images/${imageId}/`);
+      setImages(prev => prev.filter(img => img.id !== imageId));
+    } catch (error) {
+      console.error('Failed to delete image:', error);
     }
   };
 
@@ -337,11 +373,86 @@ export default function EnhancedQuestionEditor() {
                   </div>
                 )}
 
-                {/* Correct Answer */}
+                {/* Correct Answer Section */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Correct Answer
+                    {formData.question_type === 'Subjective' ? 'Reference Answer / Key Points' : 'Correct Answer'}
                   </label>
+
+                  {formData.question_type === 'Subjective' ? (
+                    <RichTextEditor
+                      value={formData.correct_answer || ''}
+                      onChange={(value) => handleInputChange('correct_answer', value)}
+                      placeholder="Enter the model answer or key points for this subjective question..."
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={formData.correct_answer || ''}
+                      onChange={(e) => handleInputChange('correct_answer', e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder={
+                        formData.question_type === 'Single Correct MCQ'
+                          ? "e.g., A, B, C, D"
+                          : formData.question_type === 'Numerical'
+                            ? "e.g., 42, 3.14"
+                            : "Enter the correct answer"
+                      }
+                    />
+                  )}
+                </div>
+
+                {/* Diagrams / Images Section */}
+                <div className="pt-6 border-t border-slate-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                      <ImageIcon className="w-5 h-5 text-blue-600" />
+                      Diagrams & Images
+                    </h3>
+                    <label className={`flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                      <Upload className="w-4 h-4" />
+                      <span>{uploading ? 'Uploading...' : 'Upload Image'}</span>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={uploading || !existingQuestion}
+                      />
+                    </label>
+                  </div>
+
+                  {!existingQuestion && (
+                    <p className="text-sm text-amber-600 mb-4 bg-amber-50 p-3 rounded-lg border border-amber-100">
+                      Please save the question text first before uploading images.
+                    </p>
+                  )}
+
+                  {images.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {images.map((img) => (
+                        <div key={img.id} className="relative group rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                          <img
+                            src={img.image}
+                            alt={img.caption || 'Question diagram'}
+                            className="w-full h-32 object-contain"
+                          />
+                          <button
+                            onClick={() => handleImageDelete(img.id)}
+                            className="absolute top-1 right-1 p-1.5 bg-red-100 text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-200"
+                            title="Delete image"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 bg-slate-50 rounded-lg border-2 border-dashed border-slate-200 text-slate-400">
+                      <ImageIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No diagrams uploaded yet</p>
+                    </div>
+                  )}
                   <input
                     type="text"
                     value={formData.correct_answer}
