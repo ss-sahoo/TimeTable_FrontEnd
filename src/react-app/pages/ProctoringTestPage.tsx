@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, AlertTriangle, CheckCircle, Eye, EyeOff, Users, Activity, Zap } from 'lucide-react';
+import { API_BASE_URL } from '../hooks/useApi';
 
 interface ViolationLog {
   timestamp: string;
@@ -112,7 +113,7 @@ const ProctoringTestPage: React.FC = () => {
 
     // Send to backend for analysis
     try {
-      const response = await fetch('https://exams.dashoapp.com/api/exams/test-proctoring/', {
+      const response = await fetch(`${API_BASE_URL}/exams/test-proctoring/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

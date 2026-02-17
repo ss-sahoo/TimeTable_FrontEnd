@@ -10,7 +10,7 @@ import TeacherManagement from "../Timetable/TeacherManagement";
 import Users from "./Users";
 import { fetchAllTimetables, updateFreeClassesCount, cleanTimetableId } from "../AllApi";
 import { useAuthContext } from "../contexts/AuthContext";
-import { api } from "../hooks/useApi";
+import { api, API_BASE_URL } from "../hooks/useApi";
 import { JSX } from "react";
 
 
@@ -59,7 +59,7 @@ const Timetable: React.FC = () => {
         console.error("Failed to fetch center name:", error);
       }
     };
-    
+
     getCenterName();
   }, [user]);
 
@@ -72,7 +72,7 @@ const Timetable: React.FC = () => {
         // Handle different response formats: { timetables: [...] }, { results: [...] }, or direct array
         const timetableList = data.timetables || data.results || (Array.isArray(data) ? data : []);
         setTimetables(timetableList);
-        
+
         // Check if there's a stored timetable_id
         const storedId = localStorage.getItem("timetable_id");
         if (storedId) {
@@ -84,7 +84,7 @@ const Timetable: React.FC = () => {
         setLoadingTimetables(false);
       }
     };
-    
+
     loadTimetables();
   }, [centerName, refreshKey]);
 
@@ -118,13 +118,13 @@ const Timetable: React.FC = () => {
   const formatTimetableName = (tt: any) => {
     const dateRange = `${tt.from_date} → ${tt.to_date}`;
     const slots = tt.slots_count || tt.total_slots || 0;
-    return `${tt.name  || 'Timetable'} (${dateRange}) - ${slots} slots`;
+    return `${tt.name || 'Timetable'} (${dateRange}) - ${slots} slots`;
   };
 
   return (
     <div style={styles.page}>
       <h2 style={styles.title}>Institute Timetable</h2>
-      
+
       <div style={styles.timetableSelector}>
         <div style={styles.selectorRow}>
           <label style={styles.dropdownLabel}>📅 Select Timetable:</label>
@@ -177,6 +177,25 @@ const Timetable: React.FC = () => {
         {activeTab === "instructions" && (
           <>
             <Instructions onTimetableCreated={handleTimetableCreated} />
+            {selectedTimetable && (
+              <div style={{ marginTop: "24px", padding: "16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                <h3 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "12px", color: "#1e293b" }}>Center Details</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <div>
+                    <p style={{ color: "#64748b", fontSize: "14px", marginBottom: "4px" }}>Center Name</p>
+                    <p style={{ fontWeight: "500" }}>{selectedTimetable.center_name || (selectedTimetable as any).center?.name || 'Main Center'}</p>
+                  </div>
+                  <div>
+                    <p style={{ color: "#64748b", fontSize: "14px", marginBottom: "4px" }}>Location</p>
+                    <p style={{ fontWeight: "500" }}>{(selectedTimetable as any).center?.city || 'Default City'}</p>
+                  </div>
+                  <div style={{ gridColumn: "span 2" }}>
+                    <p style={{ color: "#64748b", fontSize: "14px", marginBottom: "4px" }}>Address</p>
+                    <p style={{ fontWeight: "500" }}>{(selectedTimetable as any).center?.address || 'No address provided'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
             <div style={{ marginTop: "24px" }}>
               <TeacherManagement />
             </div>
@@ -236,7 +255,7 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
   // Get days from date range (for display)
   const getDaysFromDateRange = (startDate: string, endDate: string): string[] => {
     if (!startDate || !endDate) return [];
-    
+
     const ALL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
     const DAY_ABBREVIATIONS: Record<string, string> = {
       "Monday": "M",
@@ -251,7 +270,7 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
     const start = new Date(startDate);
     const end = new Date(endDate);
     const daysInRange: string[] = [];
-    
+
     const dayIndexMap: Record<number, string> = {
       1: "Monday",
       2: "Tuesday",
@@ -261,19 +280,19 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
       6: "Saturday",
       0: "Sunday"
     };
-    
+
     const currentDate = new Date(start);
     while (currentDate <= end) {
       const dayIndex = currentDate.getDay();
       const dayName = dayIndexMap[dayIndex];
-      
+
       if (dayName && !daysInRange.includes(dayName)) {
         daysInRange.push(dayName);
       }
-      
+
       currentDate.setDate(currentDate.getDate() + 1);
     }
-    
+
     return daysInRange.sort((a, b) => ALL_DAYS.indexOf(a) - ALL_DAYS.indexOf(b));
   };
 
@@ -315,7 +334,7 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
       };
 
       const createResponse = await fetch(
-        "https://exams.dashoapp.com/api/timetable/admin/timetables/create/",
+        `${API_BASE_URL}/timetable/admin/timetables/create/`,
         {
           method: "POST",
           headers: {
@@ -340,16 +359,16 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
         startDate: calendarRange.startDate,
         endDate: calendarRange.endDate
       }));
-      
-      setCreateMessage({ 
-        type: 'success', 
-        text: `Timetable "${timetableName}" created successfully! You can now add slots in the Slots tab.` 
+
+      setCreateMessage({
+        type: 'success',
+        text: `Timetable "${timetableName}" created successfully! You can now add slots in the Slots tab.`
       });
 
       // Reset form
       setTimetableName("");
       setCalendarRange({ startDate: "", endDate: "" });
-      
+
       // Close modal after 2 seconds and notify parent to refresh list
       setTimeout(() => {
         setShowCreateModal(false);
@@ -407,7 +426,7 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
       <div style={styles.headerRow}>
         <h3 style={styles.tabTitle}>Timetable Configuration</h3>
       </div>
-      
+
       {/* Create New Timetable Card */}
       <div style={styles.configCard}>
         <div style={styles.configHeader}>
@@ -417,7 +436,7 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
         <p style={styles.configDescription}>
           Start by creating a new timetable with a name and date range. You'll add specific slots and batches after creation.
         </p>
-        <button 
+        <button
           style={styles.saveConfigBtn}
           onClick={() => setShowCreateModal(true)}
         >
@@ -428,7 +447,7 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
       {/* Create Timetable Modal */}
       {showCreateModal && (
         <div style={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
-          <div style={{...styles.modalContent, width: 500}} onClick={(e) => e.stopPropagation()}>
+          <div style={{ ...styles.modalContent, width: 500 }} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
               <h3 style={styles.modalTitle}>Create New Timetable</h3>
               <button
@@ -439,19 +458,19 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
               </button>
             </div>
 
-            <div style={{padding: 16}}>
-              <label style={{display: 'block', marginBottom: 8, color: '#475569'}}>Timetable name</label>
+            <div style={{ padding: 16 }}>
+              <label style={{ display: 'block', marginBottom: 8, color: '#475569' }}>Timetable name</label>
               <input
                 type="text"
                 value={timetableName}
                 onChange={(e) => setTimetableName(e.target.value)}
                 placeholder="e.g. JEE Main 2025 Schedule"
-                style={{width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #e2e8f0'}}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #e2e8f0' }}
               />
             </div>
 
             {/* Calendar Range Selection */}
-            <div style={{padding: 12, borderTop: '1px solid #eef2f7'}}>
+            <div style={{ padding: 12, borderTop: '1px solid #eef2f7' }}>
               <div style={styles.timeNote}>
                 <p style={styles.noteText}>
                   💡 <strong>Note:</strong> Select the date range for your timetable. You can add specific time slots after creation.
@@ -462,51 +481,51 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
                 <div style={styles.calendarHeader}>
                   <span style={styles.selectionTitle}>Select Date Range</span>
                 </div>
-          
+
                 <div style={styles.calendarInputs}>
                   <div style={styles.dateInputGroup}>
                     <label style={styles.dateLabel}>Start Date</label>
                     <input
                       type="date"
                       value={calendarRange.startDate}
-                      onChange={(e) => setCalendarRange({...calendarRange, startDate: e.target.value})}
+                      onChange={(e) => setCalendarRange({ ...calendarRange, startDate: e.target.value })}
                       style={styles.dateInput}
                       min={getCurrentDate()}
                     />
                     <button
                       style={styles.quickDateBtn}
-                      onClick={() => setCalendarRange({...calendarRange, startDate: getCurrentDate()})}
+                      onClick={() => setCalendarRange({ ...calendarRange, startDate: getCurrentDate() })}
                     >
                       Today
                     </button>
                   </div>
-            
+
                   <div style={styles.dateInputGroup}>
                     <label style={styles.dateLabel}>End Date</label>
                     <input
                       type="date"
                       value={calendarRange.endDate}
-                      onChange={(e) => setCalendarRange({...calendarRange, endDate: e.target.value})}
+                      onChange={(e) => setCalendarRange({ ...calendarRange, endDate: e.target.value })}
                       style={styles.dateInput}
                       min={calendarRange.startDate || getCurrentDate()}
                     />
                     <div style={styles.quickDateButtons}>
                       <button
                         style={styles.quickDateBtn}
-                        onClick={() => setCalendarRange({...calendarRange, endDate: getNextWeekDate()})}
+                        onClick={() => setCalendarRange({ ...calendarRange, endDate: getNextWeekDate() })}
                       >
                         Next Week
                       </button>
                       <button
                         style={styles.quickDateBtn}
-                        onClick={() => setCalendarRange({...calendarRange, endDate: getNextMonthDate()})}
+                        onClick={() => setCalendarRange({ ...calendarRange, endDate: getNextMonthDate() })}
                       >
                         Next Month
                       </button>
                     </div>
                   </div>
                 </div>
-          
+
                 {calendarRange.startDate && calendarRange.endDate && (
                   <div style={styles.calendarInfo}>
                     <p>📅 Date range: <strong>{getDaysCountFromRange()}</strong> days</p>
@@ -548,7 +567,7 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
           </div>
         </div>
       )}
-      
+
       {/* Free Classes Configuration */}
       <div style={styles.configCard}>
         <div style={styles.configHeader}>
@@ -569,7 +588,7 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
             style={styles.numberInput}
             placeholder="Enter count"
           />
-          <button 
+          <button
             style={styles.saveConfigBtn}
             onClick={handleSaveFreeClasses}
             disabled={saving}
@@ -577,7 +596,7 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
             {saving ? "Saving..." : "💾 Save"}
           </button>
         </div>
-        
+
         {/* Save Message */}
         {saveMessage && (
           <div style={{
@@ -589,11 +608,11 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
             {saveMessage.type === 'success' ? '✓' : '✗'} {saveMessage.text}
           </div>
         )}
-        
+
         <div style={styles.hintBox}>
           <p style={styles.hintTitle}>💡 What does this mean?</p>
           <p style={styles.hintDescription}>
-            This setting controls how many free periods can be scheduled at the same time slot across different batches. 
+            This setting controls how many free periods can be scheduled at the same time slot across different batches.
             For example, if set to 3, up to 3 batches can have a free period during the same time slot.
           </p>
         </div>
@@ -702,8 +721,8 @@ const Generate = () => {
             <input type="checkbox" /> Include breaks
           </label>
         </div>
-        <button 
-          style={styles.successBtn} 
+        <button
+          style={styles.successBtn}
           onClick={() => setIsGenerating(true)}
           disabled={isGenerating}
         >
