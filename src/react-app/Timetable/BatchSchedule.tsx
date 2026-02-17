@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { removeBatchFromTimetable, removeTeacherFromBatch } from "../AllApi";
+import { API_BASE_URL } from "../hooks/useApi";
 
 /* ================= TYPES ================= */
 interface Teacher {
@@ -116,7 +117,7 @@ const BatchSchedule: React.FC = () => {
       if (!accessToken || !ttId) return;
 
       const response = await fetch(
-        `https://exams.dashoapp.com/api/timetable/timetables/${ttId}/`,
+        `${API_BASE_URL}/timetable/timetables/${ttId}/`,
         {
           method: "GET",
           headers: {
@@ -171,7 +172,7 @@ const BatchSchedule: React.FC = () => {
       }
 
       const response = await fetch(
-        `https://exams.dashoapp.com/api/timetable/timetables/${ttId}/batch-assignments/`,
+        `${API_BASE_URL}/timetable/timetables/${ttId}/batch-assignments/`,
         {
           method: "GET",
           headers: {
@@ -223,7 +224,7 @@ const BatchSchedule: React.FC = () => {
       console.log("Assigning batch with payload:", payload);
 
       const response = await fetch(
-        "https://exams.dashoapp.com/api/timetable/admin/timetables/assign-batch/",
+        `${API_BASE_URL}/timetable/admin/timetables/assign-batch/`,
         {
           method: "POST",
           headers: {
@@ -260,7 +261,7 @@ const BatchSchedule: React.FC = () => {
       }
 
       const response = await fetch(
-        `https://exams.dashoapp.com/api/timetable/centers/${centerId}/users/?role=teacher`,
+        `${API_BASE_URL}/timetable/centers/${centerId}/users/?role=teacher`,
         {
           method: "GET",
           headers: {
@@ -391,7 +392,7 @@ const BatchSchedule: React.FC = () => {
       console.log("Assigning teacher with payload:", payload);
 
       const response = await fetch(
-        "https://exams.dashoapp.com/api/timetable/admin/timetables/assign-teacher/",
+        `${API_BASE_URL}/timetable/admin/timetables/assign-teacher/`,
         {
           method: "POST",
           headers: {
@@ -427,7 +428,7 @@ const BatchSchedule: React.FC = () => {
       }
 
       const response = await fetch(
-        `https://exams.dashoapp.com/api/timetable/timetables/${ttId}/`,
+        `${API_BASE_URL}/timetable/timetables/${ttId}/`,
         {
           method: "GET",
           headers: {
@@ -459,7 +460,7 @@ const BatchSchedule: React.FC = () => {
       }
 
       const response = await fetch(
-        `https://exams.dashoapp.com/api/timetable/centers/${centerId}/batches/`,
+        `${API_BASE_URL}/timetable/centers/${centerId}/batches/`,
         {
           method: "GET",
           headers: {
@@ -525,7 +526,7 @@ const BatchSchedule: React.FC = () => {
 
       // First fetch all batches for the center (for the "Add Batch" dropdown)
       const allBatchesResponse = await fetch(
-        `https://exams.dashoapp.com/api/timetable/centers/${centerId}/batches/`,
+        `${API_BASE_URL}/timetable/centers/${centerId}/batches/`,
         {
           method: "GET",
           headers: {

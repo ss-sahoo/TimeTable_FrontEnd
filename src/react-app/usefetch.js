@@ -1,5 +1,15 @@
 export const Fetch = async (endPoint, config, headerKey) => {
-  const baseUrl = "http://0.0.0.0:8000"
+  const getBaseUrl = () => {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return "http://0.0.0.0:8000";
+      }
+    }
+    return "https://exams.dashoapp.com";
+  };
+
+  const baseUrl = getBaseUrl();
   const url = `${baseUrl}${endPoint.startsWith("/") ? endPoint : `/${endPoint}`}`
 
   const headers = new Headers(config.headers || {})

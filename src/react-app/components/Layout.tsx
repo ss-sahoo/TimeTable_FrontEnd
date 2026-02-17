@@ -114,12 +114,19 @@ export default function Layout({ children }: LayoutProps) {
   const getNavigation = (): NavigationItem[] => {
     // For timetable domain, show timetable-specific navigation
     if (isTimetableDomain) {
-      return [
+      const items = [
         { name: 'Home', href: '/timetable', icon: Home },
         { name: 'Batches', href: '/batches', icon: GraduationCap },
         { name: 'Users', href: '/users', icon: Users },
         { name: 'Settings', href: '/settings', icon: Settings },
       ];
+
+      // Add Centers for Super Admin on timetable domain
+      if (user?.role?.toUpperCase() === 'SUPER_ADMIN') {
+        items.splice(3, 0, { name: 'Centers', href: '/centers', icon: MapPin });
+      }
+
+      return items;
     }
 
     // For exam domain, show exam-specific navigation
@@ -174,23 +181,23 @@ export default function Layout({ children }: LayoutProps) {
 
   const isActive = (path: string) => {
     const [pathPart, queryPart] = path.split('?');
-    
+
     // For paths with query parameters (like ?tab=centers)
     if (queryPart) {
       // Must match both pathname AND query parameter
       return location.pathname === pathPart && location.search.includes(queryPart);
     }
-    
+
     // For Home/Dashboard without query params - only active if exact match and NO tab query param
     if (pathPart === '/superadmin/dashboard' || pathPart === '/dashboard' || pathPart === '/center-admin/dashboard') {
       return location.pathname === pathPart && !location.search.includes('tab=');
     }
-    
+
     // For timetable home
     if (pathPart === '/timetable' && location.pathname === '/timetable') {
       return true;
     }
-    
+
     // For other paths - exact match only (don't use startsWith to avoid /dashboard matching /dashboard-something)
     return location.pathname === path;
   };

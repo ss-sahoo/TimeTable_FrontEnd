@@ -486,6 +486,11 @@ function AppRoutes() {
           <Batches />
         </ProtectedRoute>
       } />
+      <Route path="/centers" element={
+        <ProtectedRoute>
+          <CentersContent />
+        </ProtectedRoute>
+      } />
 
       {/* Exam Hub - Main exam management page with tabs */}
       <Route path="/exam" element={
