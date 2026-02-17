@@ -127,6 +127,7 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
         pre_analysis_job_id: preAnalysisJobId,
         subject: currentSubject,
         document_structure: documentStructure,
+        exam_id: examId,
       });
 
       const sections = extractResponse.data.sections || [];
