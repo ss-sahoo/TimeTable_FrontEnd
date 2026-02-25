@@ -957,8 +957,10 @@ export default function PatternCreation() {
                                 <input
                                   type="number"
                                   value={section.min_questions_to_attempt}
-                                  className="w-full px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 text-slate-500"
-                                  readOnly
+                                  onChange={(e) => updateSection(globalIndex, 'min_questions_to_attempt', parseInt(e.target.value) || 1)}
+                                  className="w-full px-2 py-1 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors"
+                                  min="1"
+                                  max={section.end_question - section.start_question + 1}
                                 />
                               </div>
                             </div>

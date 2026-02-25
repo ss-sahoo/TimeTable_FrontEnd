@@ -23,7 +23,15 @@ interface CreateTeacherPayload {
   subjects?: string;
 }
 
-const TeacherManagement: React.FC = () => {
+interface TeacherManagementProps {
+  selectedCenterId?: string | null;
+  selectedCenterName?: string | null;
+}
+
+const TeacherManagement: React.FC<TeacherManagementProps> = ({
+  selectedCenterId: propCenterId,
+  selectedCenterName: propCenterName
+}) => {
   const { user } = useAuthContext();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,24 +62,45 @@ const TeacherManagement: React.FC = () => {
   const [centerId, setCenterId] = useState<string>("");
 
   useEffect(() => {
-    const getCenterInfo = async () => {
-      try {
-        const response = await api.get("/auth/profile/");
-        setCenterName(response.data?.center_name || response.data?.center?.name || "");
-        setCenterId(response.data?.center_id || user?.center_id || "");
-      } catch (error) {
-        console.error("Failed to fetch center info:", error);
-      }
-    };
-    getCenterInfo();
-  }, [user]);
+    if (propCenterId) {
+      setCenterId(propCenterId);
+    }
+    if (propCenterName) {
+      setCenterName(propCenterName);
+    }
+
+    if (!propCenterId || !propCenterName) {
+      const getCenterInfo = async () => {
+        try {
+          const response = await api.get("/auth/profile/");
+          if (!propCenterName) {
+            setCenterName(response.data?.center_name || response.data?.center?.name || "");
+          }
+          if (!propCenterId) {
+            setCenterId(response.data?.center_id || user?.center_id || "");
+          }
+        } catch (error) {
+          console.error("Failed to fetch center info:", error);
+        }
+      };
+      getCenterInfo();
+    }
+  }, [user, propCenterId, propCenterName]);
 
   // Fetch teachers list
   const fetchTeachers = async () => {
     setLoading(true);
     try {
       // Use the correct endpoint - /timetable/teachers/ for listing teachers
-      const endpoint = "/timetable/teachers/";
+      let endpoint = "/timetable/teachers/";
+
+      // If we have a centerId (especially for super admin), filter by it
+      if (centerId) {
+        endpoint += `?center_id=${centerId}`;
+      } else if (centerName) {
+        endpoint += `?center_name=${centerName}`;
+      }
+
       const response = await api.get(endpoint);
       setTeachers(response.data.teachers || response.data || []);
     } catch (error) {
@@ -82,8 +111,10 @@ const TeacherManagement: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchTeachers();
-  }, [user]);
+    if (centerId || centerName) {
+      fetchTeachers();
+    }
+  }, [user, centerId, centerName]);
 
   // Create single teacher
   const handleCreateTeacher = async () => {

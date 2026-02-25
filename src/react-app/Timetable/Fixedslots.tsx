@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { assignFixedSlot, deleteFixedSlotById, fetchFixedSlots, fetchCenterTeachers, cleanTimetableId } from "../AllApi";
 import { Fetch } from "../usefetch";
+import { useTimetableCenter } from "../contexts/TimetableCenterContext";
 
 /* ================= TYPES ================= */
 interface SlotData {
@@ -108,7 +109,9 @@ const FixedSlots: React.FC = () => {
   // Map to store fixed slot IDs: key = "batch_code|slot_code", value = fixed_slot_id
   const [fixedSlotsMap, setFixedSlotsMap] = useState<Map<string, string>>(new Map());
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
-  const centerId = "bb67db93-5d47-4639-aa05-7ddb80d106a1";
+
+  const { selectedCenterId } = useTimetableCenter();
+  const centerId = selectedCenterId || "";
 
   /* Get timetable ID from localStorage */
   useEffect(() => {
@@ -210,7 +213,7 @@ const FixedSlots: React.FC = () => {
           id: teacher.id,
           name: `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || teacher.name || 'Unknown',
           code: teacher.teacher_code || `TCH-${teacher.id?.slice(0, 8) || 'XXX'}`,
-          subject: teacher.subject || "General",
+          subject: teacher.teacher_subjects || teacher.subject || "General",
           department: teacher.department || "General",
           type: 'teacher',
           email: teacher.email,
@@ -232,7 +235,7 @@ const FixedSlots: React.FC = () => {
       console.log("Fetching fixed slots for mapping:", timetableId);
       const data = await fetchFixedSlots(timetableId);
       const fixedSlots = data.fixed_slots || [];
-      
+
       // Create a map: "batch_code|slot_code" -> fixed_slot_id
       const newMap = new Map<string, string>();
       fixedSlots.forEach((fs: any) => {
@@ -298,7 +301,7 @@ const FixedSlots: React.FC = () => {
   /* Get batch stats from active batch data */
   const getBatchStats = () => {
     if (!activeBatchData || !activeBatchData.days) return { assigned: 0, fixed: 0, total: 0, remaining: 0 };
-    
+
     let total = 0;
     let assigned = 0;
     let fixed = 0;
@@ -322,7 +325,7 @@ const FixedSlots: React.FC = () => {
     try {
       console.log("Assigning fixed slot:", { timetableId, slotCode, activeBatchCode, teacher });
       const response = await assignFixedSlot(timetableId, slotCode, activeBatchCode, teacher.code, teacher.subject);
-      
+
       // Optimistic update with returned ID
       const fixedSlotId = response?.id || response?.fixed_slot_id;
       if (activeBatchData) {
@@ -332,26 +335,26 @@ const FixedSlots: React.FC = () => {
             ...day,
             slots: day.slots.map(slot =>
               slot.slot_code === slotCode
-                ? { 
-                    ...slot, 
-                    is_assigned: true,
-                    is_fixed: true,
-                    teacher_code: teacher.code, 
-                    teacher_name: teacher.name, 
-                    subject: teacher.subject,
-                    id: fixedSlotId,
-                    fixed_slot_id: fixedSlotId
-                  }
+                ? {
+                  ...slot,
+                  is_assigned: true,
+                  is_fixed: true,
+                  teacher_code: teacher.code,
+                  teacher_name: teacher.name,
+                  subject: teacher.subject,
+                  id: fixedSlotId,
+                  fixed_slot_id: fixedSlotId
+                }
                 : slot
             )
           }))
         });
       }
-      
+
       setOpenDropdown(null);
       setDropdownPosition(null);
       console.log("Fixed slot assignment successful, ID:", fixedSlotId);
-      
+
       // Update fixedSlotsMap with new ID
       if (fixedSlotId) {
         const mapKey = `${activeBatchCode}|${slotCode}`;
@@ -359,7 +362,7 @@ const FixedSlots: React.FC = () => {
         newMap.set(mapKey, fixedSlotId);
         setFixedSlotsMap(newMap);
       }
-      
+
       // Refresh to get the latest data with IDs
       if (activeBatchId) {
         loadBatchDetails(activeBatchId);
@@ -384,7 +387,7 @@ const FixedSlots: React.FC = () => {
       console.log("Assigning special slot:", { timetableId, slotCode, activeBatchCode, slotType });
       // Call API without teacher_code - just timetable_id, slot_code, batch_code, and subject
       const response = await assignFixedSlot(timetableId, slotCode, activeBatchCode, null, slotType);
-      
+
       // Optimistic update with returned ID
       const fixedSlotId = response?.id || response?.fixed_slot_id;
       if (activeBatchData) {
@@ -394,26 +397,26 @@ const FixedSlots: React.FC = () => {
             ...day,
             slots: day.slots.map(slot =>
               slot.slot_code === slotCode
-                ? { 
-                    ...slot, 
-                    is_assigned: true,
-                    is_fixed: true,
-                    teacher_code: null, 
-                    teacher_name: slotType, 
-                    subject: slotType,
-                    id: fixedSlotId,
-                    fixed_slot_id: fixedSlotId
-                  }
+                ? {
+                  ...slot,
+                  is_assigned: true,
+                  is_fixed: true,
+                  teacher_code: null,
+                  teacher_name: slotType,
+                  subject: slotType,
+                  id: fixedSlotId,
+                  fixed_slot_id: fixedSlotId
+                }
                 : slot
             )
           }))
         });
       }
-      
+
       setOpenDropdown(null);
       setDropdownPosition(null);
       console.log("Special slot assignment successful, ID:", fixedSlotId);
-      
+
       // Update fixedSlotsMap with new ID
       if (fixedSlotId) {
         const mapKey = `${activeBatchCode}|${slotCode}`;
@@ -421,7 +424,7 @@ const FixedSlots: React.FC = () => {
         newMap.set(mapKey, fixedSlotId);
         setFixedSlotsMap(newMap);
       }
-      
+
       // Refresh to get the latest data with IDs
       if (activeBatchId) {
         loadBatchDetails(activeBatchId);
@@ -447,7 +450,7 @@ const FixedSlots: React.FC = () => {
       // 1. From slot data (if available)
       // 2. From fixedSlotsMap (fetched from fixed-slots API)
       const fixedSlotId = slot.fixed_slot_id || slot.id || fixedSlotsMap.get(slotKey);
-      
+
       if (!fixedSlotId) {
         // Refresh the fixed slots map and try again
         await loadFixedSlotsMap();
@@ -458,16 +461,16 @@ const FixedSlots: React.FC = () => {
           return;
         }
       }
-      
+
       const idToDelete = fixedSlotId || fixedSlotsMap.get(slotKey);
       console.log("Removing fixed slot by ID:", { fixedSlotId: idToDelete, slotCode: slot.slot_code, batchCode: activeBatchCode });
       await deleteFixedSlotById(idToDelete!);
-      
+
       // Update the fixedSlotsMap
       const newMap = new Map(fixedSlotsMap);
       newMap.delete(slotKey);
       setFixedSlotsMap(newMap);
-      
+
       // Optimistic update
       if (activeBatchData) {
         setActiveBatchData({
@@ -476,22 +479,22 @@ const FixedSlots: React.FC = () => {
             ...day,
             slots: day.slots.map(s =>
               s.slot_code === slot.slot_code
-                ? { 
-                    ...s, 
-                    is_assigned: false,
-                    is_fixed: false,
-                    teacher_code: null, 
-                    teacher_name: null, 
-                    subject: null,
-                    fixed_slot_id: undefined,
-                    id: undefined
-                  }
+                ? {
+                  ...s,
+                  is_assigned: false,
+                  is_fixed: false,
+                  teacher_code: null,
+                  teacher_name: null,
+                  subject: null,
+                  fixed_slot_id: undefined,
+                  id: undefined
+                }
                 : s
             )
           }))
         });
       }
-      
+
       console.log("Fixed slot removal successful");
     } catch (err: any) {
       console.error("Failed to remove:", err);
@@ -506,20 +509,20 @@ const FixedSlots: React.FC = () => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
-    
+
     let top = rect.bottom + 8;
     let left = rect.left;
-    
+
     const estimatedDropdownHeight = 350;
     if (top + estimatedDropdownHeight > viewportHeight - 20) {
       top = rect.top - estimatedDropdownHeight - 8;
     }
-    
+
     const dropdownWidth = 350;
     if (left + dropdownWidth > window.innerWidth - 20) {
       left = window.innerWidth - dropdownWidth - 20;
     }
-    
+
     setDropdownPosition({ top, left });
     setOpenDropdown(openDropdown === dropdownKey ? null : dropdownKey);
   };
@@ -554,7 +557,7 @@ const FixedSlots: React.FC = () => {
             </div>
           )}
         </div>
-        <button 
+        <button
           style={styles.refreshBtn}
           onClick={() => { loadBatchList(); loadTeachers(); }}
           disabled={loading || loadingTeachers}
@@ -595,7 +598,7 @@ const FixedSlots: React.FC = () => {
             {batchList.map((batch, index) => {
               const isActive = activeBatchId === batch.batch_id;
               const color = BATCH_COLORS[index % BATCH_COLORS.length];
-              
+
               return (
                 <button
                   key={batch.batch_id}
@@ -607,7 +610,7 @@ const FixedSlots: React.FC = () => {
                   }}
                 >
                   <div style={styles.tabContent}>
-                    <div style={{...styles.batchDot, backgroundColor: color}}></div>
+                    <div style={{ ...styles.batchDot, backgroundColor: color }}></div>
                     <span style={styles.batchTabName}>{batch.batch_name}</span>
                     <span style={styles.batchCodeBadge}>{batch.batch_code}</span>
                   </div>
@@ -712,7 +715,7 @@ const FixedSlots: React.FC = () => {
                                       <span style={styles.slotCode}>{slot.slot_code}</span>
                                       {isFixed && <span style={styles.fixedBadge}>FIXED</span>}
                                     </div>
-                                    
+
                                     {isFixed ? (
                                       <div style={styles.assignedInfo}>
                                         <strong style={styles.teacherName}>{slot.teacher_name || slot.subject}</strong>
@@ -774,7 +777,7 @@ const FixedSlots: React.FC = () => {
               ×
             </button>
           </div>
-          
+
           {/* Special Slots Section */}
           <div style={styles.specialSlotsSection}>
             <div style={styles.sectionLabel}>Quick Assign</div>
@@ -799,12 +802,12 @@ const FixedSlots: React.FC = () => {
               </button>
             </div>
           </div>
-          
+
           {/* Divider */}
           <div style={styles.dropdownDivider}>
             <span style={styles.dividerText}>or select a teacher</span>
           </div>
-          
+
           <div style={styles.itemsList}>
             {loadingTeachers ? (
               <div style={styles.loadingText}>Loading teachers...</div>

@@ -1342,13 +1342,45 @@ export default function EnhancedQuestionEditor() {
                 className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 h-20"
               />
             </div>
-            <div className="bg-white rounded-lg p-4 border border-purple-200">
-              <p className="text-sm text-purple-700">
-                <strong>Note:</strong> Subjective questions require manual grading and have no negative marking.
-              </p>
+
+
+          </div>
+          <div className="mt-4 border-t border-purple-200 pt-4">
+            <label className="block text-sm font-medium text-purple-800 mb-2 flex items-center justify-between">
+              <span>Model Answer / Detailed Solution (Required for AI Evaluation)</span>
+              <span className="text-xs font-normal text-purple-600 bg-purple-100 px-2 py-0.5 rounded">
+                AI Reference
+              </span>
+            </label>
+
+            <div className="mb-4">
+              <AIImageToText
+                className="mb-3 bg-white/80"
+                onExtractedText={(text) => handleInputChange('solution', text)}
+                onExtractedQuestion={(data) => {
+                  // Prioritize solution field from extraction, then correct_answer, then extracted text
+                  const answerText = data.solution || data.correct_answer || data.question_text || '';
+                  if (answerText) handleInputChange('solution', answerText);
+                }}
+              />
+            </div>
+
+            <div className="bg-white rounded-lg border border-purple-300 overflow-hidden shadow-sm">
+              <RichTextEditor
+                value={formData.solution}
+                onChange={(val) => handleInputChange('solution', val)}
+                placeholder="Enter the ideal answer here. The AI will compare student responses against this model answer."
+              />
             </div>
           </div>
-        </div>
+
+          <div className="bg-white rounded-lg p-4 border border-purple-200 mt-4">
+            <p className="text-sm text-purple-700">
+              <strong>Note:</strong> Provides a clear model answer to ensure accurate AI evaluation. For subjective questions, the AI checks for key concepts matching your model answer.
+            </p>
+          </div>
+        </div >
+
       );
     }
 

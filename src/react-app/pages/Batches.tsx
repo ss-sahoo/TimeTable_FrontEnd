@@ -24,12 +24,14 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../hooks/useApi';
 import { useAuthContext } from '../contexts/AuthContext';
+import { useTimetableCenter } from '../contexts/TimetableCenterContext';
+import ManageBatchModal from '../components/common/ManageBatchModal';
 
 interface Batch {
   id: string;
   code: string;
   name: string;
-  program: string | null;
+  program: { id: string; name: string } | null;
   program_id: string | null;
   center: string | null;
   center_id: string | null;
@@ -54,6 +56,10 @@ interface Program {
 
 export default function Batches() {
   const { user } = useAuthContext();
+  const { selectedCenterId, centers: contextCenters } = useTimetableCenter();
+  const isStudent = user?.role?.toUpperCase() === 'STUDENT';
+  const isTeacher = user?.role?.toUpperCase() === 'TEACHER';
+  const isReadOnly = isStudent || isTeacher;
   const [activeTab, setActiveTab] = useState<'batches' | 'programs'>('batches');
   const [batches, setBatches] = useState<Batch[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
@@ -72,6 +78,10 @@ export default function Batches() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [programError, setProgramError] = useState<string | null>(null);
 
+  // Manage Batch State
+  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
+  const [showManageModal, setShowManageModal] = useState(false);
+
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -88,17 +98,33 @@ export default function Batches() {
     center_id: '',
   });
 
+  // Sync center filter and form data with selectedCenterId
+  useEffect(() => {
+    if (selectedCenterId) {
+      setCenterFilter(selectedCenterId);
+      setFormData(prev => ({ ...prev, center_id: selectedCenterId }));
+      setProgramData(prev => ({ ...prev, center_id: selectedCenterId }));
+    } else {
+      setCenterFilter('all');
+    }
+  }, [selectedCenterId]);
+
   useEffect(() => {
     fetchBatches();
     fetchCenters();
     fetchPrograms();
-  }, []);
+  }, [selectedCenterId]);
 
   const fetchBatches = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get('/timetable/batches/');
+      // Construct endpoint with center_id if selected
+      const endpoint = selectedCenterId
+        ? `/timetable/batches/?center_id=${selectedCenterId}`
+        : '/timetable/batches/';
+
+      const response = await api.get(endpoint);
       setBatches(response.data.batches || []);
     } catch (err: any) {
       console.error('Failed to fetch batches:', err);
@@ -179,7 +205,7 @@ export default function Batches() {
 
       await api.post('/timetable/admin/batches/create/', payload);
 
-      setFormData({ code: '', name: '', program_id: '', center_id: '', start_date: '', end_date: '' });
+      setFormData({ code: '', name: '', program_id: '', center_id: selectedCenterId || '', start_date: '', end_date: '' });
       setShowCreateModal(false);
       fetchBatches();
     } catch (err: any) {
@@ -204,7 +230,7 @@ export default function Batches() {
       await api.post('/timetable/superadmin/programs/create/', payload);
 
       await fetchPrograms();
-      setProgramData({ name: '', description: '', category: '', center_id: '' });
+      setProgramData({ name: '', description: '', category: '', center_id: selectedCenterId || '' });
       setShowProgramModal(false);
     } catch (err: any) {
       console.error('Failed to create program:', err);
@@ -219,15 +245,16 @@ export default function Batches() {
       (batch) => {
         const matchesSearch = batch.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           batch.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (batch.program && batch.program.toLowerCase().includes(searchQuery.toLowerCase()));
+          (batch.program && batch.program.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-        const matchesProgram = programFilter === 'all' || batch.program === programFilter;
-        const matchesCenter = centerFilter === 'all' || String(batch.center_id) === centerFilter;
 
-        return matchesSearch && matchesProgram && matchesCenter;
+        const matchesProgram = programFilter === 'all' || batch.program?.name === programFilter;
+
+        // Center filtering is done server-side via the API query parameter
+        return matchesSearch && matchesProgram;
       }
     );
-  }, [batches, searchQuery, programFilter, centerFilter]);
+  }, [batches, searchQuery, programFilter]);
 
   // Since programs are at institute level, just show all programs for the user's institute
   const filteredPrograms = useMemo(() => {
@@ -316,54 +343,58 @@ export default function Batches() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h2 className="text-xl font-black text-slate-900 tracking-tight">
-              Academic Management
+              {isStudent ? 'My Batches' : 'Academic Management'}
             </h2>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-              {activeTab === 'batches' ? 'Batches & Enrollments' : 'Programs & Curriculum'}
+              {isStudent ? 'Batches you are enrolled in' : activeTab === 'batches' ? 'Batches & Enrollments' : 'Programs & Curriculum'}
             </p>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowProgramModal(true)}
-              className="inline-flex items-center rounded-xl bg-white px-4 py-2 text-[10px] font-black text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 transition-all uppercase tracking-widest"
-            >
-              <Plus className="mr-2 h-3.5 w-3.5 text-slate-400" />
-              New Program
-            </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center rounded-xl bg-indigo-600 px-4 py-2 text-[10px] font-black text-white shadow-md shadow-indigo-200 hover:bg-indigo-500 transition-all uppercase tracking-widest"
-            >
-              <Plus className="mr-2 h-3.5 w-3.5" />
-              New Batch
-            </button>
-          </div>
+          {!isReadOnly && (
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowProgramModal(true)}
+                className="inline-flex items-center rounded-xl bg-white px-4 py-2 text-[10px] font-black text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 transition-all uppercase tracking-widest"
+              >
+                <Plus className="mr-2 h-3.5 w-3.5 text-slate-400" />
+                New Program
+              </button>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center rounded-xl bg-indigo-600 px-4 py-2 text-[10px] font-black text-white shadow-md shadow-indigo-200 hover:bg-indigo-500 transition-all uppercase tracking-widest"
+              >
+                <Plus className="mr-2 h-3.5 w-3.5" />
+                New Batch
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-1 shadow-sm max-w-md">
-          <div className="flex gap-1">
-            <button
-              onClick={() => setActiveTab('batches')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'batches'
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'text-slate-500 hover:bg-slate-50'
-                }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              Batches
-            </button>
-            <button
-              onClick={() => setActiveTab('programs')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'programs'
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'text-slate-500 hover:bg-slate-50'
-                }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              Programs
-            </button>
+        {!isStudent && (
+          <div className="bg-white rounded-xl border border-slate-200 p-1 shadow-sm max-w-md">
+            <div className="flex gap-1">
+              <button
+                onClick={() => setActiveTab('batches')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'batches'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-500 hover:bg-slate-50'
+                  }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Batches
+              </button>
+              <button
+                onClick={() => setActiveTab('programs')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black transition-all uppercase tracking-widest ${activeTab === 'programs'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-500 hover:bg-slate-50'
+                  }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                Programs
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="px-4 md:px-6 pb-12">
@@ -452,7 +483,7 @@ export default function Batches() {
                               {batch.name}
                             </h3>
                             <p className="text-xs font-bold text-slate-400 flex items-center gap-1">
-                              <BookOpen className="w-3 h-3" /> {batch.program || 'General Track'}
+                              <BookOpen className="w-3 h-3" /> {batch.program?.name || 'General Track'}
                             </p>
                           </div>
                           <div className={`h-10 w-10 flex-shrink-0 rounded-xl ${status === 'active' ? 'bg-emerald-50 text-emerald-600' : status === 'upcoming' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'} flex items-center justify-center shadow-inner`}>
@@ -499,7 +530,13 @@ export default function Batches() {
                           <Users className="w-3.5 h-3.5" />
                           <span>{batch.teachers_count} Mentors</span>
                         </div>
-                        <button className="text-xs font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 group/btn">
+                        <button
+                          onClick={() => {
+                            setSelectedBatch(batch);
+                            setShowManageModal(true);
+                          }}
+                          className="text-xs font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 group/btn"
+                        >
                           Manage <ChevronRight className="w-3 h-3 group-hover/btn:translate-x-0.5 transition-transform" />
                         </button>
                       </div>
@@ -835,6 +872,20 @@ export default function Batches() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Manage Batch Modal */}
+      {showManageModal && selectedBatch && (
+        <ManageBatchModal
+          batch={selectedBatch}
+          onClose={() => {
+            setShowManageModal(false);
+            setSelectedBatch(null);
+          }}
+          onUpdate={() => {
+            fetchBatches();
+          }}
+        />
       )}
     </div>
   );

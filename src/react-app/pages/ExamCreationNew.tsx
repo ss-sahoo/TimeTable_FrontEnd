@@ -100,6 +100,7 @@ interface ExamPattern {
   total_duration: number;
   sections: PatternSection[];
   created_at: string;
+  exam_mode?: 'online' | 'offline_omr' | 'offline_subjective';
 }
 
 interface PatternSection {
@@ -474,10 +475,17 @@ export default function ExamCreation() {
     setSelectedPattern(pattern || null);
     handleInputChange('pattern', patternId);
     if (pattern) {
-      // Auto-fill duration from pattern
+      // Auto-fill duration and exam mode from pattern
       const newDuration = pattern.total_duration;
+      const newMode = pattern.exam_mode || 'online';
+
       setFormData(prev => {
-        const newData = { ...prev, pattern: patternId, duration_minutes: newDuration };
+        const newData = {
+          ...prev,
+          pattern: patternId,
+          duration_minutes: newDuration,
+          exam_mode: newMode
+        };
         if (!isFlexibleWindow && prev.start_date) {
           const startDate = new Date(prev.start_date);
           const endDate = new Date(startDate.getTime() + newDuration * 60000);
@@ -881,7 +889,8 @@ export default function ExamCreation() {
                   />
                 </div>
 
-                {/* Exam Mode Selection */}
+                {/* Exam Mode Selection - Removed as per user request, now auto-selected from Pattern */}
+                {/* 
                 <div className="col-span-2 mt-4 pt-6 border-t border-slate-100">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
@@ -893,142 +902,16 @@ export default function ExamCreation() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-                    {/* Online Mode */}
-                    <button
-                      type="button"
-                      onClick={() => handleInputChange('exam_mode', 'online')}
-                      className={`p-4 rounded-lg border-2 text-left transition-all ${formData.exam_mode === 'online'
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className={`w-3 h-3 rounded-full ${formData.exam_mode === 'online' ? 'bg-blue-500' : 'bg-slate-300'}`} />
-                        <span className="font-medium text-slate-900">Online</span>
-                      </div>
-                      <p className="text-xs text-slate-600">Students take the exam on web/app with auto-grading</p>
-                    </button>
-
-                    {/* Offline OMR Mode */}
-                    {/* 
-                    <button
-                      type="button"
-                      onClick={() => handleInputChange('exam_mode', 'offline_omr')}
-                      className={`p-4 rounded-lg border-2 text-left transition-all ${formData.exam_mode === 'offline_omr'
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className={`w-3 h-3 rounded-full ${formData.exam_mode === 'offline_omr' ? 'bg-green-500' : 'bg-slate-300'}`} />
-                        <span className="font-medium text-slate-900">Offline - OMR</span>
-                      </div>
-                      <p className="text-xs text-slate-600">Generate OMR sheets, scan and auto-evaluate</p>
-                    </button>
-                    */}
-
-                    {/* Offline Subjective Mode */}
-                    {/* 
-                    <button
-                      type="button"
-                      onClick={() => handleInputChange('exam_mode', 'offline_subjective')}
-                      className={`p-4 rounded-lg border-2 text-left transition-all ${formData.exam_mode === 'offline_subjective'
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className={`w-3 h-3 rounded-full ${formData.exam_mode === 'offline_subjective' ? 'bg-purple-500' : 'bg-slate-300'}`} />
-                        <span className="font-medium text-slate-900">Offline - Subjective</span>
-                      </div>
-                      <p className="text-xs text-slate-600">Upload answer sheets for AI-powered grading</p>
-                    </button>
-                    */}
-
-                    {/* Hybrid Mode */}
-                    {/* 
-                    <button
-                      type="button"
-                      onClick={() => handleInputChange('exam_mode', 'hybrid')}
-                      className={`p-4 rounded-lg border-2 text-left transition-all ${formData.exam_mode === 'hybrid'
-                        ? 'border-orange-500 bg-orange-50'
-                        : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className={`w-3 h-3 rounded-full ${formData.exam_mode === 'hybrid' ? 'bg-orange-500' : 'bg-slate-300'}`} />
-                        <span className="font-medium text-slate-900">Hybrid</span>
-                      </div>
-                      <p className="text-xs text-slate-600">Combine online & offline modes for flexibility</p>
-                    </button>
-                    */}
-                  </div>
-
-                  {/* AI Evaluation Settings - For offline_subjective and hybrid modes */}
-                  {(formData.exam_mode === 'offline_subjective' || formData.exam_mode === 'hybrid') && (
-                    <div className="mt-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <span className="text-sm font-medium text-slate-900">AI-Powered Evaluation</span>
-                          <p className="text-xs text-slate-600">Enable automatic grading using AI</p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={formData.ai_evaluation_enabled}
-                            onChange={(e) => handleInputChange('ai_evaluation_enabled', e.target.checked)}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                        </label>
-                      </div>
-
-                      {formData.ai_evaluation_enabled && (
-                        <div className="mt-3">
-                          <label className="block text-xs font-medium text-slate-700 mb-2">Marking Strictness</label>
-                          <div className="grid grid-cols-3 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleInputChange('marking_strictness', 'lenient')}
-                              className={`px-3 py-2 text-xs rounded-lg transition-all ${formData.marking_strictness === 'lenient'
-                                ? 'bg-green-500 text-white'
-                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-                                }`}
-                            >
-                              Lenient
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleInputChange('marking_strictness', 'moderate')}
-                              className={`px-3 py-2 text-xs rounded-lg transition-all ${formData.marking_strictness === 'moderate'
-                                ? 'bg-yellow-500 text-white'
-                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-                                }`}
-                            >
-                              Moderate
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleInputChange('marking_strictness', 'strict')}
-                              className={`px-3 py-2 text-xs rounded-lg transition-all ${formData.marking_strictness === 'strict'
-                                ? 'bg-red-500 text-white'
-                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-                                }`}
-                            >
-                              Strict
-                            </button>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-2">
-                            {formData.marking_strictness === 'lenient' && 'Give benefit of doubt to students'}
-                            {formData.marking_strictness === 'moderate' && 'Balance between strictness and leniency'}
-                            {formData.marking_strictness === 'strict' && 'Mark exactly according to rubric'}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                 <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Current Mode:</strong> {formData.exam_mode === 'online' ? 'Online' : (formData.exam_mode === 'offline_omr' ? 'Offline OMR' : 'Offline Subjective')}
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      (Determined by the selected pattern)
+                    </p>
+                 </div>
                 </div>
+                */}
 
                 {/* Exam Pattern & Content - Moved Up & Redesigned */}
                 <div className="col-span-2 mt-4 pt-6 border-t border-slate-100">

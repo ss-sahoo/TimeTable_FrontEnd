@@ -31,6 +31,7 @@ import {
 import { useAuthContext } from '../contexts/AuthContext';
 import { useOnboardingTour } from '../contexts/OnboardingTourContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTimetableCenter } from '../contexts/TimetableCenterContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -53,6 +54,7 @@ export default function Layout({ children }: LayoutProps) {
   const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
   const { user, logout } = useAuthContext();
   const { theme, setTheme, actualTheme } = useTheme();
+  const { selectedCenterId, selectedCenterName, centers, setSelectedCenter } = useTimetableCenter();
 
   // Domain-aware branding
   const isTimetableDomain = typeof window !== 'undefined' && window.location.hostname === 'timetable.dashoapp.com';
@@ -114,16 +116,40 @@ export default function Layout({ children }: LayoutProps) {
   const getNavigation = (): NavigationItem[] => {
     // For timetable domain, show timetable-specific navigation
     if (isTimetableDomain) {
+      const userRole = user?.role?.toUpperCase();
+
+      // Student gets restricted navigation
+      if (userRole === 'STUDENT') {
+        return [
+          { name: 'Home', href: '/timetable', icon: Home },
+          { name: 'My Timetable', href: '/timetable-interface', icon: CalendarDays },
+          { name: 'My Batches', href: '/batches', icon: GraduationCap },
+        ];
+      }
+
+      // Teacher gets limited navigation (no Centers)
+      if (userRole === 'TEACHER') {
+        return [
+          { name: 'Home', href: '/timetable', icon: Home },
+          { name: 'My Timetable', href: '/timetable-interface', icon: CalendarDays },
+          { name: 'Batches', href: '/batches', icon: GraduationCap },
+          { name: 'Users', href: '/users', icon: Users },
+          { name: 'Settings', href: '/settings', icon: Settings },
+        ];
+      }
+
+      // Admin / Super Admin full navigation
       const items = [
         { name: 'Home', href: '/timetable', icon: Home },
+        { name: 'Time Table', href: '/timetable-interface', icon: CalendarDays },
         { name: 'Batches', href: '/batches', icon: GraduationCap },
         { name: 'Users', href: '/users', icon: Users },
         { name: 'Settings', href: '/settings', icon: Settings },
       ];
 
       // Add Centers for Super Admin on timetable domain
-      if (user?.role?.toUpperCase() === 'SUPER_ADMIN') {
-        items.splice(3, 0, { name: 'Centers', href: '/centers', icon: MapPin });
+      if (userRole === 'SUPER_ADMIN') {
+        items.splice(4, 0, { name: 'Centers', href: '/centers', icon: MapPin });
       }
 
       return items;
@@ -555,6 +581,38 @@ export default function Layout({ children }: LayoutProps) {
 
 
             <div className="flex items-center gap-2 sm:gap-3">
+              {/* Global Center Selector for Timetable Domain */}
+              {isTimetableDomain && user?.role?.toUpperCase() === 'SUPER_ADMIN' && (
+                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl mr-2">
+                  <Building2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <select
+                    className="bg-transparent text-sm font-medium text-purple-900 dark:text-purple-100 focus:outline-none cursor-pointer max-w-[200px]"
+                    value={selectedCenterId || ""}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      const center = centers.find(c => c.id.toString() === id);
+                      setSelectedCenter(id || null, center?.name || null);
+                    }}
+                  >
+                    <option value="" className="dark:bg-gray-800">Select Center</option>
+                    {centers.map(center => (
+                      <option key={center.id} value={center.id} className="dark:bg-gray-800">
+                        {center.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {/* Static Center Label for Admin users */}
+              {isTimetableDomain && ['ADMIN', 'INSTITUTE_ADMIN'].includes(user?.role?.toUpperCase() || '') && selectedCenterName && (
+                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl mr-2">
+                  <Building2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  <span className="text-sm font-medium text-green-900 dark:text-green-100 max-w-[200px] truncate">
+                    {selectedCenterName}
+                  </span>
+                </div>
+              )}
+
               {/* Onboarding CTA */}
               <motion.button
                 whileHover={{ scale: 1.02 }}

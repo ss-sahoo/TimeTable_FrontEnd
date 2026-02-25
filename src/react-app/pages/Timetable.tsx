@@ -11,6 +11,7 @@ import Users from "./Users";
 import { fetchAllTimetables, updateFreeClassesCount, cleanTimetableId } from "../AllApi";
 import { useAuthContext } from "../contexts/AuthContext";
 import { api, API_BASE_URL } from "../hooks/useApi";
+import { useTimetableCenter } from "../contexts/TimetableCenterContext";
 import { JSX } from "react";
 
 
@@ -38,37 +39,23 @@ interface TableData {
 ================================ */
 const Timetable: React.FC = () => {
   const { user } = useAuthContext();
+  const { selectedCenterId, selectedCenterName, centers, loading: loadingCenters } = useTimetableCenter();
   const [activeTab, setActiveTab] = useState<TabType>("instructions");
   const [timetables, setTimetables] = useState<any[]>([]);
   const [loadingTimetables, setLoadingTimetables] = useState(false);
   const [selectedTimetableId, setSelectedTimetableId] = useState<string | null>(null);
-  const [centerName, setCenterName] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0); // Key to trigger timetable list refresh
 
-  // Get center name from user profile API
-  useEffect(() => {
-    const getCenterName = async () => {
-      try {
-        const response = await api.get('/auth/profile/');
-        // The API response may have center_name or center.name
-        const name = response.data?.center_name || response.data?.center?.name || null;
-        if (name) {
-          setCenterName(name);
-        }
-      } catch (error) {
-        console.error("Failed to fetch center name:", error);
-      }
-    };
+  const isStudent = user?.role?.toUpperCase() === 'STUDENT';
+  const isTeacher = user?.role?.toUpperCase() === 'TEACHER';
+  const isReadOnly = isStudent || isTeacher;
 
-    getCenterName();
-  }, [user]);
-
-  // Load timetables when center name is available or refreshKey changes
+  // Load timetables when selected center name is available or refreshKey changes
   useEffect(() => {
     const loadTimetables = async () => {
       setLoadingTimetables(true);
       try {
-        const data = await fetchAllTimetables(centerName || undefined);
+        const data = await fetchAllTimetables(selectedCenterName || undefined);
         // Handle different response formats: { timetables: [...] }, { results: [...] }, or direct array
         const timetableList = data.timetables || data.results || (Array.isArray(data) ? data : []);
         setTimetables(timetableList);
@@ -78,6 +65,12 @@ const Timetable: React.FC = () => {
         if (storedId) {
           setSelectedTimetableId(JSON.parse(storedId));
         }
+        // Auto-select first timetable for students/teachers
+        if (isReadOnly && timetableList.length > 0 && !storedId) {
+          const firstId = timetableList[0].id || timetableList[0].timetable_id;
+          setSelectedTimetableId(firstId);
+          localStorage.setItem("timetable_id", JSON.stringify(firstId));
+        }
       } catch (error) {
         console.error("Failed to fetch timetables:", error);
       } finally {
@@ -86,7 +79,7 @@ const Timetable: React.FC = () => {
     };
 
     loadTimetables();
-  }, [centerName, refreshKey]);
+  }, [selectedCenterName, refreshKey]);
 
   // Callback to refresh timetable list after creation
   const handleTimetableCreated = (newTimetableId: string) => {
@@ -100,8 +93,8 @@ const Timetable: React.FC = () => {
     setSelectedTimetableId(timetableId);
   };
 
-  // Tabs configuration
-  const tabs: { key: TabType; label: string }[] = [
+  // Tabs configuration - students only see Timetable tab
+  const allTabs: { key: TabType; label: string }[] = [
     { key: "instructions", label: "Instructions" },
     { key: "slots", label: "Slots" },
     { key: "batches", label: "Batches" },
@@ -110,6 +103,22 @@ const Timetable: React.FC = () => {
     { key: "feasibility", label: "Generate" },
     { key: "generate", label: "Timetable" },
   ];
+
+  const tabs = isStudent
+    ? [{ key: "generate" as TabType, label: "My Timetable" }]
+    : isTeacher
+      ? [
+        { key: "generate" as TabType, label: "Timetable" },
+        { key: "batches" as TabType, label: "Batches" },
+      ]
+      : allTabs;
+
+  // Auto-switch students to the generate tab
+  useEffect(() => {
+    if (isStudent && activeTab !== 'generate') {
+      setActiveTab('generate');
+    }
+  }, [isStudent]);
 
   // Get selected timetable info
   const selectedTimetable = timetables.find(t => t.id === selectedTimetableId || t.timetable_id === selectedTimetableId);
@@ -121,9 +130,47 @@ const Timetable: React.FC = () => {
     return `${tt.name || 'Timetable'} (${dateRange}) - ${slots} slots`;
   };
 
+  // Student/Teacher: No timetables available
+  if (isReadOnly && !loadingTimetables && timetables.length === 0) {
+    return (
+      <div style={styles.page}>
+        <h2 style={styles.title}>{isStudent ? 'My Timetable' : 'Timetable'}</h2>
+        <div style={{
+          textAlign: 'center',
+          padding: '60px 24px',
+          background: '#f8fafc',
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          marginTop: '24px',
+        }}>
+          <div style={{
+            fontSize: '48px',
+            marginBottom: '16px',
+          }}>📅</div>
+          <h3 style={{
+            fontSize: '20px',
+            fontWeight: '600',
+            color: '#1e293b',
+            marginBottom: '8px',
+          }}>No Timetable Available</h3>
+          <p style={{
+            color: '#64748b',
+            fontSize: '14px',
+            maxWidth: '400px',
+            margin: '0 auto',
+          }}>
+            {isStudent
+              ? 'No timetable has been generated for your batch yet. Please check back later or contact your admin.'
+              : 'No timetable has been generated for your center yet. Please contact the administrator.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.page}>
-      <h2 style={styles.title}>Institute Timetable</h2>
+      <h2 style={styles.title}>{isStudent ? 'My Timetable' : 'Institute Timetable'}</h2>
 
       <div style={styles.timetableSelector}>
         <div style={styles.selectorRow}>
@@ -134,8 +181,8 @@ const Timetable: React.FC = () => {
             <select
               style={styles.timetableDropdown}
               value={selectedTimetableId || ""}
-
               onChange={(e) => handleSelectTimetable(e.target.value)}
+              disabled={user?.role?.toUpperCase() === 'SUPER_ADMIN' && !selectedCenterId}
             >
               <option value="">-- Select a timetable --</option>
               {timetables.map((tt) => {
@@ -174,10 +221,14 @@ const Timetable: React.FC = () => {
 
       {/* Tab Content */}
       <div style={styles.contentArea}>
-        {activeTab === "instructions" && (
+        {activeTab === "instructions" && !isReadOnly && (
           <>
-            <Instructions onTimetableCreated={handleTimetableCreated} />
-            {selectedTimetable && (
+            <Instructions
+              onTimetableCreated={handleTimetableCreated}
+              selectedCenterId={selectedCenterId}
+              selectedCenterName={selectedCenterName}
+            />
+            {/* {selectedTimetable && (
               <div style={{ marginTop: "24px", padding: "16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
                 <h3 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "12px", color: "#1e293b" }}>Center Details</h3>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
@@ -195,22 +246,25 @@ const Timetable: React.FC = () => {
                   </div>
                 </div>
               </div>
-            )}
-            <div style={{ marginTop: "24px" }}>
-              <TeacherManagement />
+            )} */}
+            {/* <div style={{ marginTop: "24px" }}>
+              <TeacherManagement
+                selectedCenterId={selectedCenterId}
+                selectedCenterName={selectedCenterName}
+              />
             </div>
             <div style={{ marginTop: "24px" }}>
-              <Users />
-            </div>
+              <Users selectedCenterId={selectedCenterId} />
+            </div> */}
           </>
         )}
-        {activeTab === "slots" && <Slots key={selectedTimetableId || 'new'} />}
+        {activeTab === "slots" && !isReadOnly && <Slots key={selectedTimetableId || 'new'} />}
         {activeTab === "batches" && <Batches />}
-        {activeTab === "teachers" && <TeachersWrapper />}
-        {activeTab === "fixedSlots" && <FixedSlots />}
-        {activeTab === "feasibility" && <Feasibility />}
+        {activeTab === "teachers" && !isReadOnly && <TeachersWrapper />}
+        {activeTab === "fixedSlots" && !isReadOnly && <FixedSlots />}
+        {activeTab === "feasibility" && !isReadOnly && <Feasibility />}
         {activeTab === "generate" && <GeneratedTimetable />}
-        {activeTab === "UpdateSlots" && <UpdateSlots />}
+        {activeTab === "UpdateSlots" && !isReadOnly && <UpdateSlots />}
       </div>
     </div>
   );
@@ -221,7 +275,16 @@ const Timetable: React.FC = () => {
 ================================ */
 
 // Instructions Tab
-const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string) => void }) => {
+const Instructions = ({
+  onTimetableCreated,
+  selectedCenterId,
+  selectedCenterName
+}: {
+  onTimetableCreated: (id: string) => void,
+  selectedCenterId: string | null,
+  selectedCenterName: string | null
+}) => {
+  const { user } = useAuthContext();
   const [freeClassesCount, setFreeClassesCount] = useState<number>(0);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -314,6 +377,11 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
       return;
     }
 
+    if (user?.role?.toUpperCase() === 'SUPER_ADMIN' && !selectedCenterId) {
+      setCreateMessage({ type: 'error', text: 'Please select a center before creating a timetable' });
+      return;
+    }
+
     setCreatingTimetable(true);
     setCreateMessage(null);
 
@@ -324,7 +392,7 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
       }
 
       // Only call create API - no update needed
-      const createPayload = {
+      const createPayload: any = {
         name: timetableName.trim(),
         from_date: calendarRange.startDate,
         to_date: calendarRange.endDate,
@@ -332,6 +400,11 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
         weekly_slots: {},
         holidays: [],
       };
+
+      if (user?.role?.toUpperCase() === 'SUPER_ADMIN') {
+        createPayload.center_id = selectedCenterId;
+        createPayload.center_name = selectedCenterName;
+      }
 
       const createResponse = await fetch(
         `${API_BASE_URL}/timetable/admin/timetables/create/`,
@@ -437,10 +510,17 @@ const Instructions = ({ onTimetableCreated }: { onTimetableCreated: (id: string)
           Start by creating a new timetable with a name and date range. You'll add specific slots and batches after creation.
         </p>
         <button
-          style={styles.saveConfigBtn}
+          style={{
+            ...styles.saveConfigBtn,
+            opacity: (user?.role?.toUpperCase() === 'SUPER_ADMIN' && !selectedCenterId) ? 0.5 : 1,
+            cursor: (user?.role?.toUpperCase() === 'SUPER_ADMIN' && !selectedCenterId) ? 'not-allowed' : 'pointer'
+          }}
           onClick={() => setShowCreateModal(true)}
+          disabled={user?.role?.toUpperCase() === 'SUPER_ADMIN' && !selectedCenterId}
         >
-          + Create New Timetable
+          {user?.role?.toUpperCase() === 'SUPER_ADMIN' && !selectedCenterId
+            ? 'Select Center to Create'
+            : '+ Create New Timetable'}
         </button>
       </div>
 

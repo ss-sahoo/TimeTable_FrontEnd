@@ -66,6 +66,7 @@ import BulkImportPage from "@/react-app/pages/BulkImportPage";
 import NewSuperAdminDashboard from "@/react-app/pages/NewSuperAdminDashboard";
 import CenterAdminDashboard from "@/react-app/pages/CenterAdminDashboard";
 import Timetable from "@/react-app/pages/Timetable";
+import TimetableDashboard from "@/react-app/pages/TimetableDashboard";
 import Batches from "@/react-app/pages/Batches";
 import ExamHub from "@/react-app/pages/ExamHub";
 import SuperAdminLayout from "@/react-app/components/superadmin/SuperAdminLayout";
@@ -256,6 +257,8 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
   return isAuthenticated ? <Navigate to={getDashboardRoute(user?.role)} replace /> : children;
 }
+
+import { TimetableCenterProvider } from "@/react-app/contexts/TimetableCenterContext";
 
 // Login Route Component (show domain-specific login page)
 function LoginRoute() {
@@ -477,6 +480,11 @@ function AppRoutes() {
       <Route path="/manager/dashboard" element={<Navigate to="/manager" replace />} />
 
       <Route path="/timetable" element={
+        <ProtectedRoute>
+          <TimetableDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/timetable-interface" element={
         <ProtectedRoute>
           <Timetable />
         </ProtectedRoute>
@@ -832,11 +840,13 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <Router>
-          <OnboardingTourProvider>
-            <AppRoutes />
-          </OnboardingTourProvider>
-        </Router>
+        <TimetableCenterProvider>
+          <Router>
+            <OnboardingTourProvider>
+              <AppRoutes />
+            </OnboardingTourProvider>
+          </Router>
+        </TimetableCenterProvider>
       </AuthProvider>
     </ThemeProvider>
   );

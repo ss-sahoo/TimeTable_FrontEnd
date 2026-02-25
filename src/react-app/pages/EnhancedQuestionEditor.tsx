@@ -127,6 +127,8 @@ export default function EnhancedQuestionEditor() {
       const dataToSave = {
         ...formData,
         options: formData.question_type === 'Single Correct MCQ' ? options.filter(opt => opt.trim()) : undefined,
+        solution: formData.solution || '',
+        correct_answer: formData.correct_answer || '',
       };
 
       if (existingQuestion) {
@@ -453,19 +455,6 @@ export default function EnhancedQuestionEditor() {
                       <p className="text-sm">No diagrams uploaded yet</p>
                     </div>
                   )}
-                  <input
-                    type="text"
-                    value={formData.correct_answer}
-                    onChange={(e) => handleInputChange('correct_answer', e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={
-                      formData.question_type === 'Single Correct MCQ'
-                        ? "e.g., A, B, C, D"
-                        : formData.question_type === 'Numerical'
-                          ? "e.g., 42, 3.14"
-                          : "Enter the correct answer or key points"
-                    }
-                  />
                 </div>
 
                 {/* Solution */}
@@ -502,7 +491,30 @@ export default function EnhancedQuestionEditor() {
 
           {/* AI Panel */}
           <div className="lg:col-span-1">
-            <AIImageToText />
+            <AIImageToText
+              onExtractedText={(text) => {
+                // If question text is empty, fill it; otherwise treat as answer
+                if (!formData.text || formData.text.trim() === '') {
+                  handleInputChange('text', text);
+                }
+              }}
+              onExtractedQuestion={(data) => {
+                // Auto-populate fields from AI extraction
+                if (data.question_text && (!formData.text || formData.text.trim() === '')) {
+                  handleInputChange('text', data.question_text);
+                }
+                if (data.correct_answer) {
+                  handleInputChange('correct_answer', data.correct_answer);
+                }
+                if (data.solution) {
+                  handleInputChange('solution', data.solution);
+                }
+                if (data.options && data.options.length > 0) {
+                  setOptions(data.options);
+                  handleInputChange('options', data.options);
+                }
+              }}
+            />
           </div>
         </div>
       </div>
