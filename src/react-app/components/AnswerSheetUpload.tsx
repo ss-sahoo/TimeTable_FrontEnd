@@ -70,6 +70,7 @@ export default function AnswerSheetUpload({ examId, examTitle }: AnswerSheetUplo
     const [expandedSubmission, setExpandedSubmission] = useState<number | null>(null);
     const [dragActive, setDragActive] = useState(false);
     const [reviewSubmission, setReviewSubmission] = useState<AnswerSheetSubmission | null>(null);
+    const [missingAnswers, setMissingAnswers] = useState<Array<{ question_number: number; question_type: string; subject: string }>>([]);
 
     useEffect(() => {
         fetchData();
@@ -129,6 +130,7 @@ export default function AnswerSheetUpload({ examId, examTitle }: AnswerSheetUplo
 
         setUploading(true);
         setError(null);
+        setMissingAnswers([]);
 
         let successCount = 0;
         let errorCount = 0;
@@ -146,6 +148,16 @@ export default function AnswerSheetUpload({ examId, examTitle }: AnswerSheetUplo
                 successCount++;
             } catch (err: any) {
                 console.error(`Failed to upload ${file.name}:`, err);
+
+                // Check for MISSING_ANSWERS specific error
+                const responseData = err.response?.data;
+                if (responseData?.code === 'MISSING_ANSWERS' && responseData?.missing_answers) {
+                    setMissingAnswers(responseData.missing_answers);
+                    setError(responseData.error || 'Some questions are missing answers. Please add answers before evaluation.');
+                    // Stop processing more files — this is a blocking error
+                    break;
+                }
+
                 errorCount++;
             }
         }
@@ -153,7 +165,7 @@ export default function AnswerSheetUpload({ examId, examTitle }: AnswerSheetUplo
         if (successCount > 0) {
             setSuccess(`Successfully uploaded ${successCount} answer sheet(s)${errorCount > 0 ? `, ${errorCount} failed` : ''}`);
         }
-        if (errorCount > 0 && successCount === 0) {
+        if (errorCount > 0 && successCount === 0 && missingAnswers.length === 0) {
             setError(`Failed to upload ${errorCount} file(s)`);
         }
 
@@ -161,10 +173,13 @@ export default function AnswerSheetUpload({ examId, examTitle }: AnswerSheetUplo
         setUploading(false);
         await fetchData();
 
-        setTimeout(() => {
-            setSuccess(null);
-            setError(null);
-        }, 5000);
+        // Only auto-clear non-missing-answer errors 
+        if (missingAnswers.length === 0) {
+            setTimeout(() => {
+                setSuccess(null);
+                setError(null);
+            }, 5000);
+        }
     };
 
     const getStatusBadge = (status: string) => {
@@ -302,6 +317,38 @@ export default function AnswerSheetUpload({ examId, examTitle }: AnswerSheetUplo
                 <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700 text-sm">
                     <CheckCircle className="w-4 h-4 flex-shrink-0" />
                     {success}
+                </div>
+            )}
+
+            {/* Missing Answers Warning */}
+            {missingAnswers.length > 0 && (
+                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                        <span className="text-sm font-semibold text-amber-800">
+                            {missingAnswers.length} Question(s) Missing Answers
+                        </span>
+                    </div>
+                    <p className="text-xs text-amber-700 mb-3">
+                        The following questions do not have answers or solutions. AI evaluation requires all questions to have reference answers.
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                        {missingAnswers.map((m, idx) => (
+                            <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full border border-amber-200">
+                                Q{m.question_number}
+                                <span className="text-amber-500">({m.question_type})</span>
+                            </span>
+                        ))}
+                    </div>
+                    <p className="text-xs text-amber-600">
+                        Please go to the Question Editor and add answers for these questions, then try again.
+                    </p>
+                    <button
+                        onClick={() => { setMissingAnswers([]); setError(null); }}
+                        className="mt-2 text-xs text-amber-700 underline hover:text-amber-900"
+                    >
+                        Dismiss
+                    </button>
                 </div>
             )}
 

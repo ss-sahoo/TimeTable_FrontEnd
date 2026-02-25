@@ -337,13 +337,53 @@ const QuestionPreview: React.FC<QuestionPreviewProps> = ({
               <div className="pl-9">
                 {editingId === question.id ? (
                   <div className="space-y-4">
-                    <textarea
-                      value={editForm.question_text || ''}
-                      onChange={e => setEditForm({ ...editForm, question_text: e.target.value })}
-                      className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 min-h-[100px]"
-                    />
-                    <div className="flex space-x-3">
-                      <button onClick={saveEdit} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Save Changes</button>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">Question Text</label>
+                      <textarea
+                        value={editForm.question_text || ''}
+                        onChange={e => setEditForm({ ...editForm, question_text: e.target.value })}
+                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 min-h-[100px]"
+                        placeholder="Enter question text..."
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Correct Answer / Key</label>
+                        <input
+                          type="text"
+                          value={editForm.correct_answer || ''}
+                          onChange={e => setEditForm({ ...editForm, correct_answer: e.target.value })}
+                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                          placeholder="e.g., A, or explicit answer"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Difficulty</label>
+                        <select
+                          value={editForm.difficulty || 'medium'}
+                          onChange={e => setEditForm({ ...editForm, difficulty: e.target.value })}
+                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        >
+                          <option value="easy">Easy</option>
+                          <option value="medium">Medium</option>
+                          <option value="hard">Hard</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">Model Answer / Detailed Solution</label>
+                      <textarea
+                        value={editForm.solution || ''}
+                        onChange={e => setEditForm({ ...editForm, solution: e.target.value })}
+                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 min-h-[80px]"
+                        placeholder="Enter detailed step-by-step solution..."
+                      />
+                    </div>
+
+                    <div className="flex space-x-3 pt-2">
+                      <button onClick={saveEdit} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm">Save Changes</button>
                       <button onClick={cancelEdit} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Cancel</button>
                     </div>
                   </div>

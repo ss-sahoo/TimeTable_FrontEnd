@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { removeBatchFromTimetable, removeTeacherFromBatch } from "../AllApi";
 import { API_BASE_URL } from "../hooks/useApi";
+import { useTimetableCenter } from "../contexts/TimetableCenterContext";
 
 /* ================= TYPES ================= */
 interface Teacher {
@@ -28,7 +29,7 @@ interface Batch {
   name: string;
   start_date: string;
   end_date: string;
-  program: Program;
+  program: Program | null;
   student_count: number;
   teacher_count: number;
   created_at: string;
@@ -56,9 +57,10 @@ const BatchSchedule: React.FC = () => {
   // Debug logging
   console.log("BatchSchedule loading... LocalStorage:", localStorage.getItem("batchTeacherAssignments"));
 
-  // State for center ID
-  const [centerId, setCenterId] = useState<string>("bb67db93-5d47-4639-aa05-7ddb80d106a1");
-  const [centerName, setCenterName] = useState<string>("Center Test");
+  // Get center from context instead of hardcoding
+  const { selectedCenterId, selectedCenterName } = useTimetableCenter();
+  const centerId = selectedCenterId || '';
+  const centerName = selectedCenterName || '';
   const [timetableId, setTimetableId] = useState<string>("");
 
   // State for batches from API
@@ -560,7 +562,6 @@ const BatchSchedule: React.FC = () => {
       }));
 
       setAllBatchesFromAPI(formattedAllBatches);
-      setCenterName(allBatchesData.center_name || "Center Test");
 
       // Now fetch assigned batches for the current timetable
       if (timetableId) {
@@ -1292,7 +1293,7 @@ const BatchSchedule: React.FC = () => {
                         <option value="">-- Select Batch --</option>
                         {availableBatches.map(batch => (
                           <option key={batch.id} value={batch.id}>
-                            {batch.name} ({batch.code}) - {batch.program.name}
+                            {batch.name} ({batch.code}) - {batch.program?.name || 'No Program'}
                           </option>
                         ))}
                       </select>
@@ -1314,7 +1315,7 @@ const BatchSchedule: React.FC = () => {
                           <div style={styles.batchInfoRow}>
                             <span style={styles.batchInfoLabel}>Program:</span>
                             <span style={styles.batchInfoValue}>
-                              {availableBatches.find(b => b.id === selectedBatchToAdd)?.program.name}
+                              {availableBatches.find(b => b.id === selectedBatchToAdd)?.program?.name || '-'}
                             </span>
                           </div>
                         </div>
@@ -1504,7 +1505,7 @@ const BatchSchedule: React.FC = () => {
                     >
                       {availableBatches.map(batch => (
                         <option key={batch.id} value={batch.id}>
-                          {batch.name} ({batch.code}) - {batch.program.name}
+                          {batch.name} ({batch.code}) - {batch.program?.name || 'No Program'}
                         </option>
                       ))}
                     </select>
@@ -1527,7 +1528,7 @@ const BatchSchedule: React.FC = () => {
                           <div style={styles.batchInfoRow}>
                             <span style={styles.batchInfoLabel}>Program:</span>
                             <span style={styles.batchInfoValue}>
-                              {availableBatches.find(b => b.id === selectedBatchToAdd)?.program.name}
+                              {availableBatches.find(b => b.id === selectedBatchToAdd)?.program?.name || '-'}
                             </span>
                           </div>
                           <div style={styles.batchInfoRow}>
@@ -1587,7 +1588,7 @@ const BatchSchedule: React.FC = () => {
                       <div style={styles.batchMeta}>
                         <span style={styles.batchCode}>{batch.code}</span>
                         <span style={styles.separator}>•</span>
-                        <span style={styles.batchProgram}>{batch.program.name}</span>
+                        <span style={styles.batchProgram}>{batch.program?.name || '-'}</span>
                       </div>
                     </div>
                   </div>
@@ -1619,7 +1620,7 @@ const BatchSchedule: React.FC = () => {
               <div style={styles.batchDetails}>
                 <span><strong>Code:</strong> {activeBatchObj.code}</span>
                 <span>•</span>
-                <span><strong>Program:</strong> {activeBatchObj.program.name}</span>
+                <span><strong>Program:</strong> {activeBatchObj.program?.name || '-'}</span>
                 <span>•</span>
                 <span><strong>Dates:</strong> {formatDate(activeBatchObj.start_date)} to {formatDate(activeBatchObj.end_date)}</span>
                 <span>•</span>

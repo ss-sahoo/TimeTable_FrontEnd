@@ -574,6 +574,7 @@ const UsersContent = () => {
     // Handle admin role variations
     if (activeTab === "admin") {
       const userRole = user.role.toLowerCase();
+      // Keep institute_admin visible under admin tab just in case existing users have it
       return matchesSearch && (userRole === 'admin' || userRole === 'institute_admin');
     }
 
@@ -590,10 +591,7 @@ const UsersContent = () => {
     return {
       all: users.length,
       super_admin: users.filter(u => u.role.toLowerCase() === 'super_admin').length,
-      admin: users.filter(u => {
-        const role = u.role.toLowerCase();
-        return role === 'admin' || role === 'institute_admin';
-      }).length,
+      admin: users.filter(u => u.role.toLowerCase() === 'admin').length,
       student: users.filter(u => u.role.toLowerCase() === 'student').length,
       teacher: users.filter(u => u.role.toLowerCase() === 'teacher').length,
       staff: users.filter(u => u.role.toLowerCase() === 'staff').length,
@@ -609,7 +607,6 @@ const UsersContent = () => {
       case 'super_admin':
         return 'bg-purple-50 text-purple-700 ring-purple-700/10';
       case 'admin':
-      case 'institute_admin':
         return 'bg-indigo-50 text-indigo-700 ring-indigo-700/10';
       case 'manager':
         return 'bg-blue-50 text-blue-700 ring-blue-700/10';

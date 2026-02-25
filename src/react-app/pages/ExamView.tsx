@@ -182,13 +182,47 @@ export default function ExamView() {
 
   const handlePublishExam = async () => {
     if (!exam) return;
-    if (!confirm('Are you sure you want to publish this exam? This will make it visible to eligible students.')) return;
 
+    // 1. Validate Exam Questions (Check for missing answers)
     try {
       setLoading(true);
+      const validationRes = await api.get(`/questions/exam-validate/${exam.id}/`);
+      const { valid, missing_answers } = validationRes.data;
+
+      if (!valid && missing_answers.length > 0) {
+        const missingList = missing_answers.map((q: any) => `Q${q.question_number}`).join(', ');
+        alert(`Cannot Publish Exam:\n\nThe following questions are missing answers or solutions:\n${missingList}\n\nPlease add answers to these questions before publishing to ensure accurate evaluation.`);
+        setLoading(false);
+        return;
+      }
+    } catch (err) {
+      console.error('Validation failed:', err);
+      // We might want to allow publishing if validation check itself fails (network error), 
+      // or block it. For now, let's warn but allow proceeding if user confirms.
+      if (!confirm('Validation check failed. Do you want to proceed with publishing anyway?')) {
+        setLoading(false);
+        return;
+      }
+    }
+
+    if (!confirm('Are you sure you want to publish this exam? This will make it visible to eligible students.')) {
+      setLoading(false);
+      return;
+    }
+
+    try {
       await api.patch(`/exams/exams/${exam.id}/`, { status: 'published' });
+
+      // Update local state immediately to hide the button
+      setExam(prev => prev ? { ...prev, status: 'published', is_published: true } : null);
+
       await fetchExam(); // Refresh data to show published status and generated OMR
-      alert('Exam published successfully! OMR sheet is being generated.');
+
+      if (effectiveExamMode === 'offline_omr') {
+        alert('Exam published successfully! OMR sheet is being generated.');
+      } else {
+        alert('Exam published successfully!');
+      }
     } catch (err: any) {
       console.error('Failed to publish exam:', err);
       const msg = err.response?.data?.error || err.response?.data?.detail || 'Failed to publish exam.';
@@ -490,7 +524,7 @@ export default function ExamView() {
                   Bulk Import
                 </button>
               )}
-              {exam.status === 'draft' && (
+              {exam.status === 'draft' && !exam.is_published && (
                 <button
                   onClick={handlePublishExam}
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm animate-pulse"

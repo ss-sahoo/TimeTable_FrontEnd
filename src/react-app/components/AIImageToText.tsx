@@ -178,6 +178,18 @@ export default function AIImageToText({
     }
   };
 
+  const useAsAnswer = () => {
+    // Only populate answer/solution fields, NOT question text
+    if (onExtractedQuestion) {
+      const answerData: ExtractedQuestionData = {
+        question_text: '', // Don't overwrite question
+        correct_answer: parsedStructure?.correct_answer || '',
+        solution: parsedStructure?.solution || parsedStructure?.explanation || extractedText,
+      };
+      onExtractedQuestion(answerData);
+    }
+  };
+
   const resetUpload = () => {
     setUploadedImage(null);
     setExtractedText('');
@@ -295,6 +307,25 @@ export default function AIImageToText({
                 </button>
               </div>
 
+              {/* Extracted Answer/Solution inline display */}
+              {parsedStructure && (parsedStructure.correct_answer || parsedStructure.solution) && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-2">
+                  {parsedStructure.correct_answer && (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                      <span className="text-xs font-semibold text-green-800">Answer:</span>
+                      <span className="text-sm text-green-900">{parsedStructure.correct_answer}</span>
+                    </div>
+                  )}
+                  {parsedStructure.solution && (
+                    <div>
+                      <span className="text-xs font-semibold text-green-800">Solution:</span>
+                      <p className="text-sm text-green-900 mt-1 line-clamp-3">{parsedStructure.solution}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Action buttons */}
               <div className="flex gap-2">
                 <button
@@ -304,10 +335,20 @@ export default function AIImageToText({
                   <Sparkles className="w-4 h-4" />
                   Use as Question
                 </button>
+                <button
+                  onClick={useAsAnswer}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all text-sm font-medium"
+                  title="Only fill answer/solution fields, not question text"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Use as Answer
+                </button>
+              </div>
+              <div className="flex gap-2">
                 {parsedStructure && (
                   <button
                     onClick={() => setShowPreview(true)}
-                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm flex items-center gap-2"
+                    className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm flex items-center justify-center gap-2"
                   >
                     <Eye className="w-4 h-4" />
                     Preview
@@ -322,7 +363,7 @@ export default function AIImageToText({
               </div>
 
               <p className="text-xs text-slate-500">
-                Click "Use as Question" to auto-fill the question form, or copy and paste manually.
+                "Use as Question" fills all fields. "Use as Answer" only fills the answer/solution.
               </p>
             </div>
           ) : null}
