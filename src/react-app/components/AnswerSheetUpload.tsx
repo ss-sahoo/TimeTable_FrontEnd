@@ -70,6 +70,7 @@ export default function AnswerSheetUpload({ examId, examTitle }: AnswerSheetUplo
     const [expandedSubmission, setExpandedSubmission] = useState<number | null>(null);
     const [dragActive, setDragActive] = useState(false);
     const [reviewSubmission, setReviewSubmission] = useState<AnswerSheetSubmission | null>(null);
+    const [viewOnlyMode, setViewOnlyMode] = useState(false);
     const [missingAnswers, setMissingAnswers] = useState<Array<{ question_number: number; question_type: string; subject: string }>>([]);
 
     useEffect(() => {
@@ -487,13 +488,20 @@ export default function AnswerSheetUpload({ examId, examTitle }: AnswerSheetUplo
                                         )}
                                         {getStatusBadge(submission.status)}
                                         <button
-                                            onClick={() => setReviewSubmission(submission)}
+                                            onClick={() => {
+                                                setReviewSubmission(submission);
+                                                setViewOnlyMode(false);
+                                            }}
                                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                             title="Review & Edit Marks"
                                         >
                                             <Edit className="w-4 h-4" />
                                         </button>
                                         <button
+                                            onClick={() => {
+                                                setReviewSubmission(submission);
+                                                setViewOnlyMode(true);
+                                            }}
                                             className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                                             title="View Details"
                                         >
@@ -551,9 +559,13 @@ export default function AnswerSheetUpload({ examId, examTitle }: AnswerSheetUplo
             {reviewSubmission && (
                 <EvaluationReviewModal
                     submission={reviewSubmission}
-                    onClose={() => setReviewSubmission(null)}
+                    onClose={() => {
+                        setReviewSubmission(null);
+                        setViewOnlyMode(false);
+                    }}
                     onUpdate={fetchData}
                     examId={examId}
+                    viewOnly={viewOnlyMode}
                 />
             )}
         </div>
@@ -565,10 +577,13 @@ interface EvaluationReviewModalProps {
     onClose: () => void;
     onUpdate: () => void;
     examId: number;
+    viewOnly?: boolean;
 }
 
-function EvaluationReviewModal({ submission, onClose, onUpdate, examId }: EvaluationReviewModalProps) {
+function EvaluationReviewModal({ submission, onClose, onUpdate, examId, viewOnly = false }: EvaluationReviewModalProps) {
     const [grades, setGrades] = useState(submission.evaluation_result?.grades || []);
+    const [totalScore, setTotalScore] = useState(submission.evaluation_result?.total_score || 0);
+    const [percentage, setPercentage] = useState(submission.evaluation_result?.percentage || 0);
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [editForm, setEditForm] = useState({ mark: 0, reasoning: '' });
     const [saving, setSaving] = useState(false);
@@ -589,22 +604,44 @@ function EvaluationReviewModal({ submission, onClose, onUpdate, examId }: Evalua
             const grade = grades[index];
 
             const response = await api.post(`/ai-evaluation/${examId}/submissions/${submission.id}/update-mark/`, {
-                question_no: grade.question_no,
-                part_no: (grade as any).part_no || null,
+                question_no: (grade as any)['Q.No.'] || grade.question_no,
+                part_no: (grade as any)['Part.No.'] || (grade as any).part_no || null,
                 mark: editForm.mark,
                 reasoning: editForm.reasoning
             });
 
             if (response.data.success) {
-                const newGrades = [...grades];
-                newGrades[index] = {
-                    ...newGrades[index],
-                    mark: editForm.mark,
-                    reasoning: editForm.reasoning
-                };
-                setGrades(newGrades);
+                // Use the grades from the response if available, otherwise update manually
+                if (response.data.grades && Array.isArray(response.data.grades)) {
+                    setGrades(response.data.grades);
+                } else {
+                    const newGrades = [...grades];
+                    newGrades[index] = {
+                        ...newGrades[index],
+                        mark: editForm.mark,
+                        reasoning: editForm.reasoning
+                    };
+                    setGrades(newGrades);
+                }
+                
+                // Update total score and percentage from response
+                if (response.data.total_score !== undefined) {
+                    setTotalScore(response.data.total_score);
+                }
+                if (response.data.percentage !== undefined) {
+                    setPercentage(response.data.percentage);
+                }
+                
                 setEditingIndex(null);
-                onUpdate();
+                setError(null);
+                
+                // Refresh parent data
+                await onUpdate();
+                
+                // Close modal after successful update to show refreshed data
+                setTimeout(() => {
+                    onClose();
+                }, 500);
             }
         } catch (err: any) {
             console.error('Failed to update mark:', err);
@@ -614,9 +651,8 @@ function EvaluationReviewModal({ submission, onClose, onUpdate, examId }: Evalua
         }
     };
 
-    // Construct PDF URL
-    // file_path is likely a relative path from media root
-    const pdfUrl = submission.file_path ? `/api/media/${submission.file_path}` : '';
+    // Construct PDF URL - use localhost instead of 0.0.0.0
+    const pdfUrl = submission.file_path ? `http://localhost:8000/media/${submission.file_path}` : '';
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
@@ -632,8 +668,8 @@ function EvaluationReviewModal({ submission, onClose, onUpdate, examId }: Evalua
                                 Reviewing: {submission.evaluation_result?.student_name || 'Student Submission'}
                             </h3>
                             <p className="text-xs text-slate-500">
-                                Total Score: <span className="font-bold text-slate-900">{submission.evaluation_result?.total_score}/{submission.evaluation_result?.max_score}</span>
-                                ({submission.evaluation_result?.percentage.toFixed(1)}%)
+                                Total Score: <span className="font-bold text-slate-900">{totalScore}/{submission.evaluation_result?.max_score}</span>
+                                ({percentage.toFixed(1)}%)
                             </p>
                         </div>
                     </div>
@@ -663,16 +699,33 @@ function EvaluationReviewModal({ submission, onClose, onUpdate, examId }: Evalua
                                 </a>
                             </div>
                         </div>
-                        <div className="flex-1 relative">
+                        <div className="flex-1 relative bg-slate-800 flex flex-col overflow-hidden">
                             {pdfUrl ? (
-                                <iframe
-                                    src={`${pdfUrl}#toolbar=0`}
-                                    className="w-full h-full border-none"
-                                    title="Student Answer Sheet"
-                                />
+                                <>
+                                    <embed
+                                        src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
+                                        type="application/pdf"
+                                        className="w-full h-full"
+                                        style={{ minHeight: '100%' }}
+                                    />
+                                    {/* Always show open in new tab button for better UX */}
+                                    <div className="absolute top-4 right-4 z-10">
+                                        <a
+                                            href={pdfUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 px-3 py-2 bg-white/90 backdrop-blur text-slate-700 rounded-lg hover:bg-white shadow-lg text-xs font-medium border border-slate-200"
+                                            title="Open PDF in new tab for better viewing"
+                                        >
+                                            <Maximize2 className="w-3 h-3" />
+                                            Open Full PDF
+                                        </a>
+                                    </div>
+                                </>
                             ) : (
-                                <div className="absolute inset-0 flex items-center justify-center text-slate-400">
-                                    PDF not available
+                                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+                                    <FileText className="w-16 h-16 mb-4 text-slate-500" />
+                                    <p className="text-sm">PDF not available</p>
                                 </div>
                             )}
                         </div>
@@ -697,10 +750,10 @@ function EvaluationReviewModal({ submission, onClose, onUpdate, examId }: Evalua
                                     <div className="flex items-start justify-between mb-2">
                                         <div className="flex items-center gap-2">
                                             <span className="bg-white px-2 py-0.5 rounded border border-slate-200 text-sm font-bold text-slate-700">
-                                                Q{grade.question_no}
+                                                Q{(grade as any)['Q.No.'] || grade.question_no}
                                             </span>
-                                            {(grade as any).part_no && (
-                                                <span className="text-xs text-slate-500">Part {(grade as any).part_no}</span>
+                                            {((grade as any)['Part.No.'] || (grade as any).part_no) && (
+                                                <span className="text-xs text-slate-500">Part {(grade as any)['Part.No.'] || (grade as any).part_no}</span>
                                             )}
                                         </div>
 
@@ -721,13 +774,15 @@ function EvaluationReviewModal({ submission, onClose, onUpdate, examId }: Evalua
                                             <div className="flex items-center gap-2">
                                                 <span className="text-lg font-bold text-slate-900">{grade.mark}</span>
                                                 <span className="text-xs font-medium text-slate-400">/ {grade.max_mark}</span>
-                                                <button
-                                                    onClick={() => handleEdit(idx)}
-                                                    className="p-1 px-2 text-xs font-medium text-purple-600 hover:bg-purple-50 rounded transition-colors flex items-center gap-1"
-                                                >
-                                                    <Edit2 className="w-3 h-3" />
-                                                    Edit
-                                                </button>
+                                                {!viewOnly && (
+                                                    <button
+                                                        onClick={() => handleEdit(idx)}
+                                                        className="p-1 px-2 text-xs font-medium text-purple-600 hover:bg-purple-50 rounded transition-colors flex items-center gap-1"
+                                                    >
+                                                        <Edit2 className="w-3 h-3" />
+                                                        Edit
+                                                    </button>
+                                                )}
                                             </div>
                                         )}
                                     </div>
