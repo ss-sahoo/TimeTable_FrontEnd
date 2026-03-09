@@ -30,6 +30,91 @@ interface AIImageToTextProps {
   onExtractedQuestion?: (data: ExtractedQuestionData) => void;
 }
 
+const parseQuestionFallbackFromText = (rawText: string): ExtractedQuestionData => {
+  const source = (rawText || '').trim();
+  if (!source) {
+    return {
+      question_text: '',
+      options: [],
+      correct_answer: '',
+      solution: '',
+      explanation: '',
+    };
+  }
+
+  const lines = source
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const optionPattern = /^\(?([A-Ha-h0-9]+)\)?[\.\):\-]\s*(.+)$/;
+  const answerPattern = /^(?:correct\s*answer|answer|ans)\s*[:\-]\s*(.+)$/i;
+  const solutionStartPattern = /^(?:solution|explanation)\s*[:\-]?/i;
+
+  const optionEntries: Array<{ label: string; text: string }> = [];
+  let answerText = '';
+  let questionLines: string[] = [];
+  let solutionLines: string[] = [];
+  let inSolution = false;
+
+  for (const line of lines) {
+    if (!inSolution && answerPattern.test(line)) {
+      const match = line.match(answerPattern);
+      answerText = (match?.[1] || '').trim();
+      continue;
+    }
+
+    if (solutionStartPattern.test(line)) {
+      inSolution = true;
+      solutionLines.push(line.replace(solutionStartPattern, '').trim());
+      continue;
+    }
+
+    if (inSolution) {
+      solutionLines.push(line);
+      continue;
+    }
+
+    const optionMatch = line.match(optionPattern);
+    if (optionMatch) {
+      optionEntries.push({
+        label: optionMatch[1].toUpperCase(),
+        text: optionMatch[2].trim(),
+      });
+    } else {
+      questionLines.push(line);
+    }
+  }
+
+  const options = optionEntries.map((entry) => entry.text).filter(Boolean);
+  const questionText = questionLines.join(' ').trim() || source;
+  const solution = solutionLines.join('\n').trim();
+  let mappedAnswer = answerText;
+
+  if (mappedAnswer && options.length > 0) {
+    const normalized = mappedAnswer.replace(/[()\s]/g, '').toUpperCase();
+    if (/^[A-H]$/.test(normalized)) {
+      const idx = normalized.charCodeAt(0) - 65;
+      if (idx >= 0 && idx < options.length) {
+        mappedAnswer = options[idx];
+      }
+    } else if (/^\d+$/.test(normalized)) {
+      const idx = Number(normalized) - 1;
+      if (idx >= 0 && idx < options.length) {
+        mappedAnswer = options[idx];
+      }
+    }
+  }
+
+  return {
+    question_text: questionText,
+    options,
+    correct_answer: mappedAnswer,
+    solution,
+    explanation: solution,
+  };
+};
+
 export default function AIImageToText({
   className = "",
   onExtractedText,
@@ -44,6 +129,9 @@ export default function AIImageToText({
   const [hasLatex, setHasLatex] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const hasMathLikeContent =
+    hasLatex ||
+    /\$[^$]+\$|\\\(|\\\[|\\frac|\\sqrt|\\sum|\\int|\\alpha|\\beta|\\theta|\\pi/i.test(extractedText);
 
   const handleImageUpload = (file: File) => {
     setError(null);
@@ -162,18 +250,26 @@ export default function AIImageToText({
     if (onExtractedText) {
       onExtractedText(extractedText);
     }
-    // Use parsed structure from API if available, otherwise just use text
+
+    const fallbackParsed = parseQuestionFallbackFromText(extractedText);
+
+    // Use parsed structure from API if available, with fallback merge from raw text parser
     if (onExtractedQuestion) {
       if (parsedStructure) {
-        onExtractedQuestion(parsedStructure);
-      } else {
-        // Fallback: create basic structure from text
         onExtractedQuestion({
-          question_text: extractedText,
-          options: [],
-          correct_answer: '',
-          solution: '',
+          ...fallbackParsed,
+          ...parsedStructure,
+          question_text: parsedStructure.question_text || fallbackParsed.question_text,
+          options:
+            parsedStructure.options && parsedStructure.options.length > 0
+              ? parsedStructure.options
+              : fallbackParsed.options,
+          correct_answer: parsedStructure.correct_answer || fallbackParsed.correct_answer,
+          solution: parsedStructure.solution || fallbackParsed.solution,
+          explanation: parsedStructure.explanation || fallbackParsed.explanation,
         });
+      } else {
+        onExtractedQuestion(fallbackParsed);
       }
     }
   };
@@ -269,7 +365,7 @@ export default function AIImageToText({
               <div className="flex items-center justify-between">
                 <label className="block text-sm font-medium text-slate-700">
                   Extracted Text
-                  {hasLatex && (
+                  {hasMathLikeContent && (
                     <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
                       Contains LaTeX
                     </span>
@@ -277,10 +373,12 @@ export default function AIImageToText({
                 </label>
               </div>
 
-              {/* LaTeX Preview */}
-              {hasLatex && extractedText && (
+              {/* Rendered Preview (supports normal + math by default) */}
+              {extractedText && (
                 <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-3">
-                  <div className="text-xs font-medium text-slate-600 mb-2">LaTeX Preview:</div>
+                  <div className="text-xs font-medium text-slate-600 mb-2">
+                    Rendered Preview {hasMathLikeContent ? '(Math + Normal)' : '(Normal Text)'}:
+                  </div>
                   <div className="text-sm text-slate-800 max-h-32 overflow-y-auto">
                     <LaTeXRenderer content={extractedText} />
                   </div>
@@ -329,6 +427,7 @@ export default function AIImageToText({
               {/* Action buttons */}
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={useAsQuestion}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-lg hover:from-purple-600 hover:to-blue-700 transition-all text-sm font-medium"
                 >
@@ -336,6 +435,7 @@ export default function AIImageToText({
                   Use as Question
                 </button>
                 <button
+                  type="button"
                   onClick={useAsAnswer}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all text-sm font-medium"
                   title="Only fill answer/solution fields, not question text"
@@ -347,6 +447,7 @@ export default function AIImageToText({
               <div className="flex gap-2">
                 {parsedStructure && (
                   <button
+                    type="button"
                     onClick={() => setShowPreview(true)}
                     className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm flex items-center justify-center gap-2"
                   >
@@ -392,10 +493,11 @@ export default function AIImageToText({
                   <p className="text-xs text-slate-500">Full parsed structure with LaTeX rendering</p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowPreview(false)}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-              >
+                <button
+                  type="button"
+                  onClick={() => setShowPreview(false)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -545,12 +647,14 @@ export default function AIImageToText({
             {/* Modal Footer */}
             <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-200 bg-slate-50">
               <button
+                type="button"
                 onClick={() => setShowPreview(false)}
                 className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-white transition-colors text-sm"
               >
                 Close
               </button>
               <button
+                type="button"
                 onClick={() => {
                   useAsQuestion();
                   setShowPreview(false);

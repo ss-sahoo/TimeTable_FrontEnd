@@ -174,6 +174,113 @@ const stripOptionContent = (value?: string | null) =>
 const normalizeOptionValue = (value?: string | null) =>
   stripOptionContent(value).toLowerCase();
 
+const normalizeLatexText = (value?: string | null) =>
+  (value || '')
+    .replace(/```json|```/gi, ' ')
+    .replace(/\\\\/g, '\\')
+    .replace(/\\"/g, '"')
+    .replace(/^\s*["'`]+|["'`]+\s*$/g, '')
+    .replace(/^\$+|\$+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+const extractAnswerText = (raw: unknown): string => {
+  const text = String(raw ?? '').trim();
+  if (!text) return '';
+
+  // If AI returns a JSON string instead of just the answer, extract "correct_answer".
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed && typeof parsed.correct_answer !== 'undefined') {
+        return String(parsed.correct_answer).trim();
+      }
+    } catch {
+      // ignore parse errors; continue with raw text
+    }
+  }
+  return text;
+};
+
+const sanitizeHumanReadableText = (raw: unknown): string => {
+  if (raw === null || raw === undefined) return '';
+  let text = String(raw);
+
+  text = text
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\"/g, '"')
+    .replace(/\\\\/g, '\\')
+    .trim();
+
+  return text;
+};
+
+const extractJsonObjectFromText = (raw: unknown): Record<string, unknown> | null => {
+  const text = String(raw ?? '').trim();
+  if (!text) return null;
+
+  // Try direct parse first
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    // continue
+  }
+
+  // Fallback: parse first object-looking block
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[0]);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+};
+
+const resolveOptionIndexFromAnswer = (answer: unknown, options: string[]): number => {
+  const raw = extractAnswerText(answer);
+  if (!raw) return -1;
+
+  // A / B / C / D style
+  const letterMatch = raw.match(/(?:^|\b)([A-Z])(?:\)|:|\.|\b)/i);
+  if (letterMatch) {
+    const idx = letterMatch[1].toUpperCase().charCodeAt(0) - 65;
+    if (idx >= 0 && idx < options.length && safeOptionString(options[idx]).trim()) return idx;
+  }
+
+  // 1 / 2 / 3 / 4 style
+  const numberMatch = raw.match(/^\s*\(?(\d+)\)?\s*$/);
+  if (numberMatch) {
+    const idx = Number(numberMatch[1]) - 1;
+    if (idx >= 0 && idx < options.length && safeOptionString(options[idx]).trim()) return idx;
+  }
+
+  const normalizedAnswer = normalizeLatexText(raw);
+  if (!normalizedAnswer) return -1;
+
+  for (let i = 0; i < options.length; i += 1) {
+    const normalizedOption = normalizeLatexText(safeOptionString(options[i]));
+    if (!normalizedOption) continue;
+
+    if (
+      normalizedAnswer === normalizedOption ||
+      normalizedAnswer.includes(normalizedOption) ||
+      normalizedOption.includes(normalizedAnswer)
+    ) {
+      return i;
+    }
+  }
+
+  return -1;
+};
+
 /**
  * Normalize options array to ensure all items are strings.
  * Handles both string arrays and object arrays (e.g., {text: 'option'} or {value: 'option'}).
@@ -1903,10 +2010,17 @@ export default function EnhancedQuestionEditor() {
         subject: formData.subject || currentSection?.subject,
       });
 
-      const { correct_answer, solution, explanation } = response.data;
+      const data = response.data || {};
+      const parsedFromSolution = extractJsonObjectFromText(data.solution);
+      const parsedFromExplanation = extractJsonObjectFromText(data.explanation);
+      const embedded = parsedFromSolution || parsedFromExplanation || {};
+
+      const rawCorrectAnswer = data.correct_answer ?? embedded.correct_answer ?? '';
+      const rawSolution = data.solution ?? embedded.solution ?? '';
+      const rawExplanation = data.explanation ?? embedded.explanation ?? '';
 
       // Extract raw result
-      let finalCorrectAnswer = correct_answer || '';
+      let finalCorrectAnswer = rawCorrectAnswer || '';
       const currentOptions = formData.options || [];
       const questionType = formData.question_type.toLowerCase();
 
@@ -1915,25 +2029,11 @@ export default function EnhancedQuestionEditor() {
 
       if (isMCQ && finalCorrectAnswer) {
         const mapValue = (val: any): string => {
-          const textVal = String(val).trim();
+          const textVal = extractAnswerText(val);
           if (!textVal) return '';
 
-          // 1. Check if it's already an exact match with an option
-          if (currentOptions.includes(textVal)) return textVal;
-
-          // 2. Check if it's a single letter (A, B, C, D)
-          const letterMatch = textVal.match(/^([A-Z])(?:\)|:|\.)?\s*$/i);
-          if (letterMatch) {
-            const idx = letterMatch[1].toUpperCase().charCodeAt(0) - 65;
-            return currentOptions[idx] || textVal;
-          }
-
-          // 3. Check for "Option A", "Choice A", etc.
-          const wordMatch = textVal.match(/^(?:Option|Choice|Answer)\s+([A-Z])/i);
-          if (wordMatch) {
-            const idx = wordMatch[1].toUpperCase().charCodeAt(0) - 65;
-            return currentOptions[idx] || textVal;
-          }
+          const idx = resolveOptionIndexFromAnswer(textVal, currentOptions);
+          if (idx >= 0 && currentOptions[idx]) return currentOptions[idx];
 
           return textVal;
         };
@@ -1948,11 +2048,18 @@ export default function EnhancedQuestionEditor() {
         }
       }
 
+      const finalSolution = sanitizeHumanReadableText(
+        rawSolution || (typeof embedded.solution === 'string' ? embedded.solution : '')
+      );
+      const finalExplanation = sanitizeHumanReadableText(
+        rawExplanation || (typeof embedded.explanation === 'string' ? embedded.explanation : '')
+      );
+
       setFormData(prev => ({
         ...prev,
         correct_answer: finalCorrectAnswer || prev.correct_answer,
-        solution: solution || prev.solution,
-        explanation: explanation || prev.explanation
+        solution: finalSolution || prev.solution,
+        explanation: finalExplanation || finalSolution || prev.explanation
       }));
 
       setAiSuccess('AI has solved the question successfully.');
@@ -2478,15 +2585,11 @@ export default function EnhancedQuestionEditor() {
                     {(formData.question_type === 'single_mcq' || formData.question_type === 'mcq') ? (
                       <select
                         value={
-                          formData.correct_answer
-                            ? String(
-                              formData.options.findIndex(
-                                (opt) =>
-                                  normalizeOptionValue(opt) ===
-                                  normalizeOptionValue(formData.correct_answer),
-                              ),
-                            )
-                            : ''
+                          (() => {
+                            if (!formData.correct_answer) return '';
+                            const idx = resolveOptionIndexFromAnswer(formData.correct_answer, formData.options);
+                            return idx >= 0 ? String(idx) : '';
+                          })()
                         }
                         onChange={(e) => {
                           if (e.target.value === '') {
