@@ -16,6 +16,16 @@ import '../styles/landing-mobile.css';
 export default function LandingPageEnhanced() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const scrollToSection = (id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      const offset = 72; // nav height
+      const top = el.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top, behavior: 'smooth' });
+    }
+    setMobileMenuOpen(false);
+  };
+
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden">
       {/* NAVIGATION - Exact Vivid-Canvas Style */}
@@ -24,7 +34,7 @@ export default function LandingPageEnhanced() {
           
           <div className="flex items-center gap-12">
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2.5 group">
+            <Link to="/" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="flex items-center gap-2.5 group">
               <div className="relative flex items-center justify-center w-8 h-8 bg-blue-600 rounded-lg shadow-lg shadow-blue-600/20 group-hover:shadow-blue-600/30 transition-all group-hover:scale-105">
                 <Zap className="text-white text-lg" fill="currentColor" />
                 <div className="absolute inset-0 rounded-lg bg-gradient-to-tr from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -34,12 +44,13 @@ export default function LandingPageEnhanced() {
               </span>
             </Link>
             
+            
             {/* Desktop Nav */}
             <div className="hidden md:flex items-center gap-8 text-[13px] font-bold text-gray-600">
-              <a href="#features" className="hover:text-blue-600 transition-colors">Features</a>
-              <a href="#process" className="hover:text-blue-600 transition-colors">Process</a>
-              <a href="#security" className="hover:text-blue-600 transition-colors">Security</a>
-              <a href="#platform" className="hover:text-blue-600 transition-colors">Platform</a>
+              <button onClick={() => scrollToSection('features')} className="hover:text-blue-600 transition-colors cursor-pointer bg-transparent border-none p-0">Features</button>
+              <button onClick={() => scrollToSection('process')} className="hover:text-blue-600 transition-colors cursor-pointer bg-transparent border-none p-0">Process</button>
+              <button onClick={() => scrollToSection('security')} className="hover:text-blue-600 transition-colors cursor-pointer bg-transparent border-none p-0">Security</button>
+              <button onClick={() => scrollToSection('platform')} className="hover:text-blue-600 transition-colors cursor-pointer bg-transparent border-none p-0">Platform</button>
             </div>
           </div>
 
@@ -53,7 +64,7 @@ export default function LandingPageEnhanced() {
                 to="/register"
                 className="bg-blue-600 text-white px-5 py-2 rounded-lg text-[13px] font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 hover:shadow-blue-600/30 cursor-pointer hover:scale-105 active:scale-95"
               >
-                Contact Sales
+                Sign up 
               </Link>
             </div>
 
@@ -71,10 +82,10 @@ export default function LandingPageEnhanced() {
         {mobileMenuOpen && (
           <div className="md:hidden bg-white border-b border-gray-100 px-6 py-4 space-y-4 shadow-lg absolute w-full left-0 top-16 overflow-hidden">
             <div className="space-y-2 text-sm font-bold text-gray-600">
-              <a href="#features" className="block py-2 border-b border-gray-50" onClick={() => setMobileMenuOpen(false)}>Features</a>
-              <a href="#process" className="block py-2 border-b border-gray-50" onClick={() => setMobileMenuOpen(false)}>Process</a>
-              <a href="#security" className="block py-2 border-b border-gray-50" onClick={() => setMobileMenuOpen(false)}>Security</a>
-              <a href="#platform" className="block py-2" onClick={() => setMobileMenuOpen(false)}>Platform</a>
+              <button onClick={() => scrollToSection('features')} className="block w-full text-left py-2 border-b border-gray-50 bg-transparent border-x-0 border-t-0 cursor-pointer hover:text-blue-600 transition-colors">Features</button>
+              <button onClick={() => scrollToSection('process')} className="block w-full text-left py-2 border-b border-gray-50 bg-transparent border-x-0 border-t-0 cursor-pointer hover:text-blue-600 transition-colors">Process</button>
+              <button onClick={() => scrollToSection('security')} className="block w-full text-left py-2 border-b border-gray-50 bg-transparent border-x-0 border-t-0 cursor-pointer hover:text-blue-600 transition-colors">Security</button>
+              <button onClick={() => scrollToSection('platform')} className="block w-full text-left py-2 bg-transparent border-none cursor-pointer hover:text-blue-600 transition-colors">Platform</button>
             </div>
             <div className="pt-4 flex flex-col gap-3">
               <Link 

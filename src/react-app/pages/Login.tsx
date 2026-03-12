@@ -235,9 +235,9 @@ export default function Login() {
                 className="w-10 h-10 rounded-full border-2 border-white/20"
               />
               <div>
-                <p className="font-bold text-sm">Dr. Sarah Chen</p>
+                <p className="font-bold text-sm">Prof. Ipsit Panda</p>
                 <p className="text-xs text-indigo-200 uppercase tracking-wider font-semibold">
-                  Dean of Technology, Stanford
+                  Physics HOD, DiracAI Coaching
                 </p>
               </div>
             </div>
