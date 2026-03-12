@@ -66,6 +66,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [addUserModalOpen, setAddUserModalOpen] = useState(false);
   const [addUserForm, setAddUserForm] = useState({
+    username: '',
     first_name: '',
     last_name: '',
     email: '',
@@ -144,6 +145,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
 
   const openAddUserModal = () => {
     setAddUserForm({
+      username: '',
       first_name: '',
       last_name: '',
       email: '',
@@ -337,6 +339,17 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
 
         response = await api.post(endpoint, payload);
 
+      } else if (addUserForm.role === 'staff') {
+        const endpoint = '/timetable/superadmin/staff/create/';
+        const payload = {
+          center_id: effectiveCenterId || user?.center_id || (user as any)?.center?.id,
+          center_name: selectedCenterName || user?.center_name || (user as any)?.center?.name,
+          name: name,
+          email: addUserForm.email || undefined,
+          phone_number: addUserForm.phone || undefined,
+        };
+        response = await api.post(endpoint, payload);
+
       } else if (addUserForm.role === 'admin') {
         // Specialized Admin Creation
         if (!selectedCenterId) {
@@ -381,6 +394,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
 
         // Reset form
         setAddUserForm({
+          username: '',
           first_name: '',
           last_name: '',
           email: '',
@@ -550,7 +564,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
               <p className="text-base" style={{ color: '#6b6b6b' }}>Manage access, track roles, and update user details across your organization.</p>
             </div>
             <div className="flex items-center gap-3">
-              {user?.role !== 'teacher' && user?.role !== 'TEACHER' && (
+              {user?.role?.toLowerCase() !== 'teacher' && user?.role?.toLowerCase() !== 'student' && (
                 <>
                   <button
                     className="inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-lg transition-colors"
@@ -827,7 +841,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {user?.role !== 'teacher' && user?.role !== 'TEACHER' && (
+                        {user?.role?.toLowerCase() !== 'teacher' && user?.role?.toLowerCase() !== 'student' && (
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => openEditModal(userData.id)}
@@ -890,11 +904,20 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
 
               {addUserModalOpen && (
                 <form onSubmit={handleAddUserSubmit} className="p-6 space-y-4">
-                  <h2 className="text-xl font-semibold text-slate-900">Add New User</h2>
+                  <h2 className="text-xl font-semibold text-slate-900">Add New {addUserForm.role.charAt(0).toUpperCase() + addUserForm.role.slice(1)}</h2>
                   {actionError && <p className="text-sm text-red-600">{actionError}</p>}
                   {actionMessage && <p className="text-sm text-green-600">{actionMessage}</p>}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <label className="flex flex-col gap-1 md:col-span-2">
+                      <span className="font-medium text-slate-600">Username <span className="text-xs text-gray-500 font-normal">(Optional - auto-generated if blank)</span></span>
+                      <input
+                        value={addUserForm.username}
+                        onChange={(e) => setAddUserForm(prev => ({ ...prev, username: e.target.value }))}
+                        className="border rounded-lg px-3 py-2"
+                        placeholder="Leave empty for auto-generation"
+                      />
+                    </label>
                     <label className="flex flex-col gap-1">
                       <span className="font-medium text-slate-600">First Name *</span>
                       <input
@@ -1211,7 +1234,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                 <CheckCircle className="w-6 h-6" />
-                <h2 className="text-xl font-semibold text-slate-900 dark:text-white">User Created</h2>
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-white">🎉 User Created</h2>
               </div>
               <button onClick={() => setCredentialModalOpen(false)} className="text-slate-400 hover:text-slate-500">
                 <X className="w-5 h-5" />
