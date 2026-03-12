@@ -72,6 +72,7 @@ interface ExamFormData {
   visibility_scope: 'institute' | 'centers' | 'batches';
   center_ids: string[];
   batch_ids: string[];
+  show_result_after_exam_end: boolean;
 }
 
 export default function ExamCreation() {
@@ -143,6 +144,7 @@ export default function ExamCreation() {
     visibility_scope: 'institute',
     center_ids: [],
     batch_ids: [],
+    show_result_after_exam_end: true,
   });
 
 
@@ -239,6 +241,7 @@ export default function ExamCreation() {
         visibility_scope: exam.visibility_scope || 'institute',
         center_ids: exam.center_ids || [],
         batch_ids: exam.batch_ids || [],
+        show_result_after_exam_end: exam.show_result_after_exam_end ?? true,
       });
 
 
@@ -1102,6 +1105,22 @@ export default function ExamCreation() {
                       type="checkbox"
                       checked={formData.disable_right_click}
                       onChange={(e) => handleInputChange('disable_right_click', e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-7 h-4 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-medium text-slate-700">Delay Results Display</label>
+                    <p className="text-xs text-slate-500">Show results only after exam ends</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.show_result_after_exam_end}
+                      onChange={(e) => handleInputChange('show_result_after_exam_end', e.target.checked)}
                       className="sr-only peer"
                     />
                     <div className="w-7 h-4 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>

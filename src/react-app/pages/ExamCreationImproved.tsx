@@ -60,6 +60,9 @@ interface ExamFormData {
   allow_tab_switching: boolean;
   exam_mode: 'online' | 'offline_omr' | 'offline_subjective';
   omr_config: any;
+  program_id: number | string | null;
+  center_id: number | string | null;
+  show_result_after_exam_end: boolean;
 }
 
 export default function ExamCreationImproved() {
@@ -115,14 +118,50 @@ export default function ExamCreationImproved() {
     allow_tab_switching: false,
     exam_mode: 'online',
     omr_config: {},
+    program_id: null,
+    center_id: null,
+    show_result_after_exam_end: true,
   });
+
+  const [centers, setCenters] = useState<any[]>([]);
+  const [allPrograms, setAllPrograms] = useState<any[]>([]);
+  const [filteredPrograms, setFilteredPrograms] = useState<any[]>([]);
 
   useEffect(() => {
     fetchPatterns();
+    fetchCenters();
+    fetchPrograms();
     if (isEditing && examId) {
       fetchExam();
     }
   }, [isEditing, examId]);
+
+  useEffect(() => {
+    if (formData.center_id) {
+      const filtered = allPrograms.filter(p => String(p.center_id) === String(formData.center_id));
+      setFilteredPrograms(filtered);
+    } else {
+      setFilteredPrograms(allPrograms);
+    }
+  }, [formData.center_id, allPrograms]);
+
+  const fetchCenters = async () => {
+    try {
+      const response = await api.get('/timetable/centers/');
+      setCenters(response.data.centers || response.data);
+    } catch (error) {
+      console.error('Failed to fetch centers:', error);
+    }
+  };
+
+  const fetchPrograms = async () => {
+    try {
+      const response = await api.get('/timetable/programs/');
+      setAllPrograms(response.data.programs || response.data);
+    } catch (error) {
+      console.error('Failed to fetch programs:', error);
+    }
+  };
 
   const fetchPatterns = async () => {
     try {
@@ -159,6 +198,9 @@ export default function ExamCreationImproved() {
         allow_tab_switching: exam.allow_tab_switching,
         exam_mode: exam.exam_mode || 'online',
         omr_config: exam.omr_config || {},
+        program_id: exam.program?.id || exam.program || null,
+        center_id: exam.center?.id || exam.center || null,
+        show_result_after_exam_end: exam.show_result_after_exam_end ?? true,
       });
 
       // Find and set the selected pattern
@@ -373,6 +415,40 @@ export default function ExamCreationImproved() {
                         <AlertCircle className="w-4 h-4" /> {errors.pattern}
                       </p>
                     )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Center (Optional)</label>
+                      <select
+                        value={formData.center_id || ''}
+                        onChange={(e) => handleInputChange('center_id', e.target.value || null)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      >
+                        <option value="">All Centers</option>
+                        {centers.map((center) => (
+                          <option key={center.id} value={center.id}>
+                            {center.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Program (Optional)</label>
+                      <select
+                        value={formData.program_id || ''}
+                        onChange={(e) => handleInputChange('program_id', e.target.value || null)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      >
+                        <option value="">All Programs</option>
+                        {filteredPrograms.map((program) => (
+                          <option key={program.id} value={program.id}>
+                            {program.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -772,6 +848,27 @@ export default function ExamCreationImproved() {
                         type="checkbox"
                         checked={formData.enable_webcam_proctoring}
                         onChange={(e) => handleInputChange('enable_webcam_proctoring', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-blue-50/50 rounded-lg border border-blue-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 text-blue-600">
+                        <Clock className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-slate-700">Delay Results Display</label>
+                        <p className="text-xs text-slate-500">Show results ONLY after exam end time (Recommended for formal exams)</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.show_result_after_exam_end}
+                        onChange={(e) => handleInputChange('show_result_after_exam_end', e.target.checked)}
                         className="sr-only peer"
                       />
                       <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>

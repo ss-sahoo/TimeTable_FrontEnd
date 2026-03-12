@@ -407,6 +407,63 @@ const ExamResults: React.FC = () => {
     );
   }
 
+  // Handle hidden results (enforced on backend)
+  if ((result as any).status === 'hidden') {
+    const hiddenData = result as any;
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8 max-w-lg w-full text-center">
+          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Clock className="w-10 h-10 text-blue-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-3">Results Pending</h2>
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
+            <p className="text-blue-800 font-medium">
+              {hiddenData.message}
+            </p>
+          </div>
+          <div className="space-y-4 text-left mb-8">
+            <div className="flex items-start gap-3">
+              <div className="mt-1 p-1 bg-green-100 rounded-full">
+                <CheckCircle2 className="w-3 h-3 text-green-600" />
+              </div>
+              <p className="text-sm text-slate-600">Your exam has been successfully submitted and stored.</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="mt-1 p-1 bg-green-100 rounded-full">
+                <CheckCircle2 className="w-3 h-3 text-green-600" />
+              </div>
+              <p className="text-sm text-slate-600">Answers are being evaluated and rank will be calculated once all students finish.</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="mt-1 p-1 bg-blue-100 rounded-full">
+                <Calendar className="w-3 h-3 text-blue-600" />
+              </div>
+              <p className="text-sm text-slate-600">
+                Scheduled Release: <span className="font-semibold text-slate-900">{new Date(hiddenData.available_at).toLocaleString()}</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => navigate(`${basePath}/student-dashboard`)}
+              className="flex-1 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
+            >
+              Go to Dashboard
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-colors"
+            >
+              <RefreshCw className="w-4 h-4 inline mr-2" />
+              Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const { attempt } = result;
 
   return (

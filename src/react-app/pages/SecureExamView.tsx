@@ -55,6 +55,11 @@ interface ExamAttempt {
     enable_webcam_proctoring: boolean;
     allow_tab_switching: boolean;
     end_date: string;
+    shuffle_questions: boolean;
+    shuffle_sections: boolean;
+    shuffle_subjects: boolean;
+    shuffle_options: boolean;
+    shuffle_seed_per_student: boolean;
     pattern: {
       sections: Array<{
         id: number;
@@ -99,7 +104,8 @@ const SecureExamView: React.FC = () => {
   const [currentToastViolation, setCurrentToastViolation] = useState<any>(null);
   const [cameraStatusInfo, setCameraStatusInfo] = useState<CameraStatusPayload>({ status: 'idle' });
   const [cameraIncidents, setCameraIncidents] = useState<ProctoringIncidentPayload[]>([]);
-  const webcamRequired = examAttempt?.exam.enable_webcam_proctoring ?? false;
+  // Webcam is disabled for now as per user request
+  const webcamRequired = false;
 
   // Exam started state - auto-start when component loads
   const [examStarted, setExamStarted] = useState(false);
@@ -203,6 +209,14 @@ const SecureExamView: React.FC = () => {
       }
     }
   }, [violations]);
+
+  // Handle auto-submission on disqualification
+  useEffect(() => {
+    if (isDisqualified && !isSubmitting) {
+      console.log('🚫 DISQUALIFIED: Initiating auto-submit');
+      handleAutoSubmit();
+    }
+  }, [isDisqualified]);
 
   const handleCloseToast = useCallback(() => {
     setCurrentToastViolation(null);
@@ -359,13 +373,22 @@ const SecureExamView: React.FC = () => {
       }
 
       console.log('🎯 FINAL MAPPED QUESTIONS COUNT:', mappedQuestions.length);
-      console.log('🎯 FINAL MAPPED QUESTIONS:', JSON.stringify(mappedQuestions, null, 2));
+      console.log('🎯 FINAL MAPPED QUESTIONS COUNT:', mappedQuestions.length);
 
-      mappedQuestions.sort((a, b) => {
-        const numA = a.question_number_in_pattern ?? a.question_number ?? 0;
-        const numB = b.question_number_in_pattern ?? b.question_number ?? 0;
-        return numA - numB;
-      });
+      const isShuffleEnabled = attemptData.exam.shuffle_questions ||
+        attemptData.exam.shuffle_sections ||
+        attemptData.exam.shuffle_subjects;
+
+      if (!isShuffleEnabled) {
+        console.log('Sorting questions by pattern order...');
+        mappedQuestions.sort((a, b) => {
+          const numA = a.question_number_in_pattern ?? a.question_number ?? 0;
+          const numB = b.question_number_in_pattern ?? b.question_number ?? 0;
+          return numA - numB;
+        });
+      } else {
+        console.log('Skipping sort: Shuffling is enabled, respecting backend order.');
+      }
 
       setQuestions(mappedQuestions);
 
@@ -1084,10 +1107,10 @@ const SecureExamView: React.FC = () => {
       <ViolationToast
         violation={currentToastViolation}
         onClose={handleCloseToast}
+        remainingViolations={examAttempt ? (examAttempt.max_violations_allowed - violationCount) : undefined}
       />
     </div>
   );
 };
 
 export default SecureExamView;
-

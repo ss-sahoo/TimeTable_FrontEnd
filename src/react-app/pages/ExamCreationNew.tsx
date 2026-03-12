@@ -155,7 +155,7 @@ interface ExamFormData {
   shuffle_subjects: boolean;
   shuffle_options: boolean;
   shuffle_seed_per_student: boolean;
-  show_results_immediately: boolean;
+  show_result_after_exam_end: boolean;
   instructions: string;
 
   // Missing fields from Exam model
@@ -181,9 +181,10 @@ interface ExamFormData {
   public_allow_multiple_devices: boolean;
   institute?: number | null;
   // Visibility scope fields
-  visibility_scope: 'institute' | 'centers' | 'batches';
+  visibility_scope: 'institute' | 'centers' | 'batches' | 'program';
   center_ids: string[];
   batch_ids: string[];
+  program_id: string | number | null;
   copy_from_exam_id: number | null;
 }
 
@@ -206,7 +207,7 @@ const getDefaultFormData = (): ExamFormData => ({
   shuffle_subjects: false,
   shuffle_options: false,
   shuffle_seed_per_student: true,
-  show_results_immediately: true,
+  show_result_after_exam_end: true,
   instructions: '',
 
   // Exam mode defaults
@@ -239,6 +240,7 @@ const getDefaultFormData = (): ExamFormData => ({
   visibility_scope: 'institute',
   center_ids: [],
   batch_ids: [],
+  program_id: null,
   copy_from_exam_id: null,
 });
 
@@ -267,6 +269,7 @@ export default function ExamCreation() {
   // Centers and batches for visibility scope
   const [centers, setCenters] = useState<any[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
+  const [programs, setPrograms] = useState<any[]>([]);
 
   const [creationSuccess, setCreationSuccess] = useState<{
     examId: number;
@@ -287,6 +290,7 @@ export default function ExamCreation() {
       fetchExamsForCopy();
       fetchCenters();
       fetchBatches();
+      fetchPrograms();
       if (isEditMode && examId) {
         await fetchExamData(fetchedPatterns);
       }
@@ -335,6 +339,16 @@ export default function ExamCreation() {
       setBatches(Array.isArray(batchesData) ? batchesData : []);
     } catch (error) {
       console.error('Failed to fetch batches:', error);
+    }
+  };
+
+  const fetchPrograms = async () => {
+    try {
+      const response = await api.get('/timetable/programs/');
+      const programsData = response.data.programs || response.data.results || response.data || [];
+      setPrograms(Array.isArray(programsData) ? programsData : []);
+    } catch (error) {
+      console.error('Failed to fetch programs:', error);
     }
   };
 
@@ -393,7 +407,7 @@ export default function ExamCreation() {
         shuffle_subjects: exam.shuffle_subjects ?? false,
         shuffle_options: exam.shuffle_options ?? false,
         shuffle_seed_per_student: exam.shuffle_seed_per_student ?? true,
-        show_results_immediately: exam.show_results_immediately ?? true,
+        show_result_after_exam_end: exam.show_result_after_exam_end ?? true,
         instructions: exam.instructions || '',
         // Exam mode settings
         exam_mode: exam.exam_mode || 'online',
@@ -424,6 +438,7 @@ export default function ExamCreation() {
         visibility_scope: exam.visibility_scope || 'institute',
         center_ids: exam.allowed_centers_data ? exam.allowed_centers_data.map((c: any) => String(c.id)) : [],
         batch_ids: exam.allowed_batches_data ? exam.allowed_batches_data.map((b: any) => String(b.id)) : [],
+        program_id: exam.program?.id || exam.program || null,
         copy_from_exam_id: null,
       });
 
@@ -609,6 +624,10 @@ export default function ExamCreation() {
       newErrors.visibility_scope = 'Please select at least one batch';
     }
 
+    if (formData.visibility_scope === 'program' && !formData.program_id) {
+      newErrors.visibility_scope = 'Please select a program';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -655,6 +674,7 @@ export default function ExamCreation() {
         visibility_scope: formData.visibility_scope,
         center_ids: formData.visibility_scope === 'centers' ? formData.center_ids : [],
         batch_ids: formData.visibility_scope === 'batches' ? formData.batch_ids : [],
+        program_id: formData.visibility_scope === 'program' ? formData.program_id : null,
       };
 
 
@@ -1277,6 +1297,20 @@ export default function ExamCreation() {
                     </div>
                     <p className="text-[10px] text-slate-500">Only students in selected batches can take this exam.</p>
                   </label>
+
+                  <label className={`flex flex-col p-3 border rounded-xl cursor-pointer transition-all ${formData.visibility_scope === 'program' ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold text-slate-900">Specific Program</span>
+                      <input
+                        type="radio"
+                        name="visibility_scope"
+                        checked={formData.visibility_scope === 'program'}
+                        onChange={() => handleInputChange('visibility_scope', 'program')}
+                        className="w-4 h-4 text-indigo-600"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500">Only students in the selected program can take this exam.</p>
+                  </label>
                 </div>
 
                 {/* Center Selection (shown when centers scope is selected) */}
@@ -1347,6 +1381,41 @@ export default function ExamCreation() {
                       </div>
                     )}
                     {errors.visibility_scope && formData.visibility_scope === 'batches' && (
+                      <p className="text-red-600 text-[10px] mt-2 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> {errors.visibility_scope}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Program Selection (shown when program scope is selected) */}
+                {formData.visibility_scope === 'program' && (
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <p className="text-xs font-medium text-slate-700 mb-2">Select Program:</p>
+                    {programs.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic">No programs available</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                        {programs.map((program) => (
+                          <label key={program.id} className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-all ${String(formData.program_id) === String(program.id) ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 bg-white hover:bg-slate-50'}`}>
+                            <input
+                              type="radio"
+                              name="program_selection"
+                              checked={String(formData.program_id) === String(program.id)}
+                              onChange={() => handleInputChange('program_id', program.id)}
+                              className="w-3 h-3 text-indigo-600"
+                            />
+                            <div>
+                              <span className="text-xs font-medium text-slate-700">{program.name}</span>
+                              {program.category && (
+                                <span className="text-[10px] text-slate-400 ml-1">({program.category})</span>
+                              )}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {errors.visibility_scope && formData.visibility_scope === 'program' && (
                       <p className="text-red-600 text-[10px] mt-2 flex items-center gap-1">
                         <AlertCircle className="w-3 h-3" /> {errors.visibility_scope}
                       </p>
@@ -1757,14 +1826,14 @@ export default function ExamCreation() {
 
                     <div className="flex items-center justify-between">
                       <div>
-                        <label className="text-xs font-medium text-slate-700">Show Results Immediately</label>
-                        <p className="text-xs text-slate-500">Display results after submission</p>
+                        <label className="text-xs font-medium text-slate-700">Delay Results Display</label>
+                        <p className="text-xs text-slate-500">Only show scores after the exam ends</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={formData.show_results_immediately}
-                          onChange={(e) => handleInputChange('show_results_immediately', e.target.checked)}
+                          checked={formData.show_result_after_exam_end}
+                          onChange={(e) => handleInputChange('show_result_after_exam_end', e.target.checked)}
                           className="sr-only peer"
                         />
                         <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>

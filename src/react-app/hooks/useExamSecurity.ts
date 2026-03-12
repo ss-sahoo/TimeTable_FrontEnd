@@ -122,6 +122,14 @@ const useExamSecurity = (
     }
   }, [config.maxViolations, logViolationToBackend]);
 
+  // Check for disqualification
+  useEffect(() => {
+    if (violationCount >= config.maxViolations) {
+      console.log('🔴 DISQUALIFICATION LIMIT REACHED');
+      setIsDisqualified(true);
+    }
+  }, [violationCount, config.maxViolations]);
+
   // Clear violations
   const clearViolations = useCallback(() => {
     setViolations([]);

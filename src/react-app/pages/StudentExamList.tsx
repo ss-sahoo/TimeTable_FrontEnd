@@ -54,6 +54,8 @@ interface Exam {
   latest_percentage?: number;
   submitted_at?: string;
   violations_count?: number;
+  results_hidden?: boolean;
+  results_available_at?: string;
 }
 
 type ExamStatus = 'all' | 'available' | 'scheduled' | 'ongoing' | 'completed';
@@ -513,8 +515,8 @@ export default function StudentExamList() {
                     )}
                   </div>
 
-                  {/* Score Display for Completed */}
-                  {exam.status === 'completed' && exam.latest_percentage !== undefined && exam.latest_percentage !== null && (
+                  {/* Score Display for Completed (Visible) */}
+                  {exam.status === 'completed' && !exam.results_hidden && exam.latest_percentage !== undefined && exam.latest_percentage !== null && (
                     <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-slate-700">Your Score:</span>
@@ -534,8 +536,27 @@ export default function StudentExamList() {
                     </div>
                   )}
 
-                  {/* Score Display for Disqualified */}
-                  {exam.status === 'disqualified' && exam.latest_percentage !== undefined && exam.latest_percentage !== null && (
+                  {/* Pending Results Message for Completed */}
+                  {exam.status === 'completed' && exam.results_hidden && (
+                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock className="w-4 h-4 text-amber-600" />
+                        <span className="text-sm font-medium text-amber-700">Results Pending</span>
+                      </div>
+                      <p className="text-xs text-amber-600 mb-2">
+                        Results will be available after the exam period ends.
+                      </p>
+                      {exam.results_available_at && (
+                        <div className="flex items-center gap-2 text-xs text-slate-600 pt-2 border-t border-amber-200 font-medium">
+                          <Calendar className="w-3 h-3" />
+                          <span>Release: {formatDate(exam.results_available_at)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Score Display for Disqualified (Visible) */}
+                  {exam.status === 'disqualified' && !exam.results_hidden && exam.latest_percentage !== undefined && exam.latest_percentage !== null && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
                         <Shield className="w-4 h-4 text-red-600" />
@@ -559,6 +580,19 @@ export default function StudentExamList() {
                           <span>{exam.violations_count} violation{exam.violations_count !== 1 ? 's' : ''} detected</span>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* Pending Results Message for Disqualified */}
+                  {exam.status === 'disqualified' && exam.results_hidden && (
+                    <div className="mb-4 p-3 bg-red-50/50 border border-red-200 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="w-4 h-4 text-red-600" />
+                        <span className="text-sm font-medium text-red-700">Attempt Terminated</span>
+                      </div>
+                      <p className="text-xs text-red-600 mb-1 font-medium italic">
+                        Evaluation restricted until after exam end.
+                      </p>
                     </div>
                   )}
 

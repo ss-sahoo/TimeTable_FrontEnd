@@ -510,7 +510,7 @@ export default function AdminBatchesContent() {
                                         </div>
                                         <h4 className="text-sm font-black text-slate-800 mb-1">{program.name}</h4>
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
-                                            {program.category || 'Academic Track'}
+                                            {program.category || 'Academic Track'} {program.center && `• ${program.center}`}
                                         </p>
                                         <div className="flex items-center justify-between pt-4 border-t border-slate-50">
                                             <div className="flex items-center gap-1.5">
