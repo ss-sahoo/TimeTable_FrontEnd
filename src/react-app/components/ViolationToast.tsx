@@ -13,9 +13,10 @@ interface ViolationToastProps {
     };
   } | null;
   onClose: () => void;
+  remainingViolations?: number;
 }
 
-const ViolationToast: React.FC<ViolationToastProps> = ({ violation, onClose }) => {
+const ViolationToast: React.FC<ViolationToastProps> = ({ violation, onClose, remainingViolations }) => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -108,6 +109,21 @@ const ViolationToast: React.FC<ViolationToastProps> = ({ violation, onClose }) =
               <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">
                 {details.message}
               </p>
+
+              {remainingViolations !== undefined && (
+                <div className="mt-2 py-1.5 px-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800/50">
+                  <p className="text-[11px] font-bold text-red-600 dark:text-red-400 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3 h-3" />
+                    {remainingViolations <= 0
+                      ? "LIMIT EXCEEDED! SUBMITTING EXAM..."
+                      : remainingViolations === 1
+                        ? "LAST WARNING! 1 violation left before auto-submit."
+                        : `${remainingViolations} violations left before auto-submit.`
+                    }
+                  </p>
+                </div>
+              )}
+
               <div className="mt-3 flex items-center justify-between">
                 <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                   Incident Logged
