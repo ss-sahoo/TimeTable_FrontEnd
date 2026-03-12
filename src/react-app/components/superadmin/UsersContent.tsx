@@ -45,6 +45,9 @@ interface NewUserData {
   first_name: string;
   last_name: string;
   role: string;
+  phone_number: string;
+  employee_id: string;
+  subjects: string;
 }
 
 const UsersContent = () => {
@@ -76,7 +79,10 @@ const UsersContent = () => {
     password_confirm: "",
     first_name: "",
     last_name: "",
-    role: "student"
+    role: "student",
+    phone_number: "",
+    employee_id: "",
+    subjects: "General"
   });
   const [error, setError] = useState<string>("");
   const itemsPerPage = 10;
@@ -297,9 +303,9 @@ const UsersContent = () => {
             center_id: selectedCenterId || undefined,
             name: fullName,
             email: newUser.email,
-            phone_number: newUser.username || '',
-            employee_id: newUser.username || '',
-            subjects: 'General',
+            phone_number: newUser.phone_number || '',
+            employee_id: newUser.employee_id || '',
+            subjects: newUser.subjects || 'General',
           });
           break;
 
@@ -307,9 +313,10 @@ const UsersContent = () => {
           endpoint = '/timetable/superadmin/staff/create/';
           response = await api.post(endpoint, {
             center_name: selectedCenterId || undefined,
+            center_id: selectedCenterId || undefined,
             name: fullName,
             email: newUser.email,
-            phone_number: newUser.username || '',
+            phone_number: newUser.phone_number || '',
           });
           break;
 
@@ -381,7 +388,10 @@ const UsersContent = () => {
         password_confirm: "",
         first_name: "",
         last_name: "",
-        role: "student"
+        role: "student",
+        phone_number: "",
+        employee_id: "",
+        subjects: "General"
       });
       setSelectedCenterId("");
       setCurrentPage(1);
@@ -682,38 +692,40 @@ const UsersContent = () => {
             Manage access, track roles, and update user details across your organization.
           </p>
         </div>
-        <div className="mt-4 flex md:ml-4 md:mt-0 gap-3">
-          <button
-            type="button"
-            onClick={handleExport}
-            className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-          >
-            <Download className="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400" />
-            Export
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setShowImportModal(true);
-              fetchCenters();
-            }}
-            className="inline-flex items-center rounded-md bg-purple-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-500"
-          >
-            <FileSpreadsheet className="-ml-0.5 mr-1.5 h-5 w-5" />
-            Import Excel
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setShowAddUserModal(true);
-              fetchCenters();
-            }}
-            className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-          >
-            <UserPlus className="-ml-0.5 mr-1.5 h-5 w-5" />
-            Add User
-          </button>
-        </div>
+        {(currentUser?.role?.toLowerCase() !== 'teacher' && currentUser?.role?.toLowerCase() !== 'student') && (
+          <div className="mt-4 flex md:ml-4 md:mt-0 gap-3">
+            <button
+              type="button"
+              onClick={handleExport}
+              className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+            >
+              <Download className="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400" />
+              Export
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowImportModal(true);
+                fetchCenters();
+              }}
+              className="inline-flex items-center rounded-md bg-purple-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-500"
+            >
+              <FileSpreadsheet className="-ml-0.5 mr-1.5 h-5 w-5" />
+              Import Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddUserModal(true);
+                fetchCenters();
+              }}
+              className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            >
+              <UserPlus className="-ml-0.5 mr-1.5 h-5 w-5" />
+              Add User
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Content Card */}
@@ -900,21 +912,23 @@ const UsersContent = () => {
                         {getRoleDisplayName(user.role)}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm">
-                      {user.center || user.center_name ? (
-                        <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-gray-400" />
-                          <span className="text-gray-700">
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                      {(user.center || user.center_name) ? (
+                        <div className="flex items-center gap-x-2">
+                          <Building2 className="h-4 w-4 text-gray-400" />
+                          <span className="text-gray-900">
                             {user.center?.name || user.center_name}
                           </span>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => openAssignCenterModal(user)}
-                          className="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                        >
-                          Assign Center
-                        </button>
+                        (currentUser?.role?.toLowerCase() !== 'teacher' && currentUser?.role?.toLowerCase() !== 'student') && (
+                          <button
+                            onClick={() => openAssignCenterModal(user)}
+                            className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                          >
+                            Assign Center
+                          </button>
+                        )
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
@@ -926,20 +940,22 @@ const UsersContent = () => {
                         <span className="text-gray-700">{user.is_active ? 'Active' : 'Offline'}</span>
                       </div>
                     </td>
-                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                      <button
-                        onClick={() => openEditModal(user)}
-                        className="text-gray-400 hover:text-blue-600 mr-3"
-                      >
-                        <Edit2 className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="text-gray-400 hover:text-red-600"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </td>
+                    {(currentUser?.role?.toLowerCase() !== 'teacher' && currentUser?.role?.toLowerCase() !== 'student') && (
+                      <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                        <button
+                          onClick={() => openEditModal(user)}
+                          className="text-gray-400 hover:text-blue-600 mr-3"
+                        >
+                          <Edit2 className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="text-gray-400 hover:text-red-600"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -1440,6 +1456,19 @@ const UsersContent = () => {
                   </div>
 
                   <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Phone Number <span className="text-xs text-gray-500">(Optional- will be auto-generated if left blank)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={newUser.phone_number}
+                      onChange={(e) => setNewUser({ ...newUser, phone_number: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                      placeholder="9876543210"
+                    />
+                  </div>
+
+                  <div>
                     <label className="block text-sm font-medium text-gray-700">Email *</label>
                     <input
                       type="email"
@@ -1483,7 +1512,7 @@ const UsersContent = () => {
                       onChange={(e) => {
                         setNewUser({ ...newUser, role: e.target.value });
                         // Fetch centers when admin or teacher is selected
-                        if (e.target.value === 'admin' || e.target.value === 'teacher' || e.target.value === 'student') {
+                        if (e.target.value === 'admin' || e.target.value === 'teacher' || e.target.value === 'student' || e.target.value === 'staff') {
                           fetchCenters();
                         }
                       }}
@@ -1497,8 +1526,33 @@ const UsersContent = () => {
                     </select>
                   </div>
 
-                  {/* Center Selection - Only for Student, Admin and Teacher */}
-                  {(newUser.role === 'admin' || newUser.role === 'teacher' || newUser.role === 'student') && (
+                  {newUser.role === 'teacher' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Employee ID</label>
+                        <input
+                          type="text"
+                          value={newUser.employee_id}
+                          onChange={(e) => setNewUser({ ...newUser, employee_id: e.target.value })}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                          placeholder="EMP-001"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Subjects</label>
+                        <input
+                          type="text"
+                          value={newUser.subjects}
+                          onChange={(e) => setNewUser({ ...newUser, subjects: e.target.value })}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                          placeholder="Physics, Chemistry"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Center Selection - For Admin, Teacher, Student, and Staff */}
+                  {(newUser.role === 'admin' || newUser.role === 'teacher' || newUser.role === 'student' || newUser.role === 'staff') && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
                         Center <span className="text-xs text-gray-500">(Optional - can be assigned later)</span>
@@ -1559,7 +1613,7 @@ const UsersContent = () => {
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-white">
-                        User Created Successfully!
+                        🎉 User Created Successfully!
                       </h3>
                       <p className="text-xs text-green-100">
                         Save these credentials securely
