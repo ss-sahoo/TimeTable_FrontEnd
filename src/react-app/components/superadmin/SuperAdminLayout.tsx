@@ -260,11 +260,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
                                     {!sidebarCollapsed && (
                                         <>
                                             {item.label}
-                                            {item.badge && (
-                                                <span className="ml-auto bg-slate-100 text-slate-500 py-0.5 px-2 rounded-full text-[10px] font-bold border border-slate-200">
-                                                    14
-                                                </span>
-                                            )}
+                                            
                                         </>
                                     )}
                                 </Link>

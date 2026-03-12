@@ -1,8 +1,7 @@
 import { motion } from "framer-motion";
 
 const partners = [
-  "MIT", "Stanford", "Harvard", "Cambridge", 
-  "Oxford", "Princeton", "Yale", "Columbia"
+  "Aveti Learning", "KT Global", "DiracAI Coaching"
 ];
 
 export default function Stats() {
@@ -10,7 +9,7 @@ export default function Stats() {
     <section className="py-12 bg-white border-b border-gray-100 overflow-hidden">
       <div className="max-w-7xl mx-auto px-6 flex flex-col items-center">
         <p className="text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-8">
-          Trusted by world-class institutions
+          Trusted by best institutions
         </p>
         
         {/* Simple Marquee Effect Container */}
