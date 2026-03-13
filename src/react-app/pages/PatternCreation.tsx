@@ -559,37 +559,8 @@ export default function PatternCreation() {
 
       updatedSections[index] = currentSection;
 
-      // Auto-update subsequent sections' start_question when end_question changes
-      // Only update sections within the same subject
-      if (field === 'end_question') {
-        const currentSubject = currentSection.subject;
-        let currentEndQuestion = typeof value === 'string' ? parseInt(value) || 0 : value;
-
-        for (let i = index + 1; i < updatedSections.length; i++) {
-          // Skip sections from different subjects
-          if (updatedSections[i].subject !== currentSubject) {
-            continue;
-          }
-
-          const nextStartQuestion = currentEndQuestion + 1;
-          updatedSections[i] = {
-            ...updatedSections[i],
-            start_question: nextStartQuestion
-          };
-          // Update end_question to maintain the same number of questions
-          const currentStartQ = typeof updatedSections[i].start_question === 'string' ? parseInt(updatedSections[i].start_question as string) || 0 : updatedSections[i].start_question;
-          const currentEndQ = typeof updatedSections[i].end_question === 'string' ? parseInt(updatedSections[i].end_question as string) || 0 : updatedSections[i].end_question;
-          const questionsInSection = (currentEndQ as number) - (currentStartQ as number) + 1;
-          const newEndQuestion = nextStartQuestion + questionsInSection - 1;
-          const totalInSection = Math.max(newEndQuestion - nextStartQuestion + 1, 1);
-          updatedSections[i] = {
-            ...updatedSections[i],
-            end_question: newEndQuestion,
-            min_questions_to_attempt: totalInSection,
-          };
-          currentEndQuestion = newEndQuestion;
-        }
-      }
+      // REMOVED: Auto-update subsequent sections' start_question when end_question changes
+      // This was causing automatic calculation - users should manually set end_question values
 
       return {
         ...prev,
@@ -1540,7 +1511,17 @@ export default function PatternCreation() {
                                   <input
                                     type="number"
                                     value={section.start_question}
-                                    onChange={(e) => updateSection(globalIndex, 'start_question', e.target.value === '' ? '' : parseInt(e.target.value) || '')}
+                                    onChange={(e) => {
+                                      const inputValue = e.target.value;
+                                      if (inputValue === '') {
+                                        updateSection(globalIndex, 'start_question', '');
+                                      } else {
+                                        const numValue = parseInt(inputValue, 10);
+                                        if (!isNaN(numValue) && numValue > 0) {
+                                          updateSection(globalIndex, 'start_question', numValue);
+                                        }
+                                      }
+                                    }}
                                     className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${sectionErrors[globalIndex]?.start_question ? 'border-red-300' : 'border-slate-300'
                                       }`}
                                     min="1"
@@ -1558,7 +1539,17 @@ export default function PatternCreation() {
                                   <input
                                     type="number"
                                     value={section.end_question}
-                                    onChange={(e) => updateSection(globalIndex, 'end_question', e.target.value === '' ? '' : parseInt(e.target.value) || '')}
+                                    onChange={(e) => {
+                                      const inputValue = e.target.value;
+                                      if (inputValue === '') {
+                                        updateSection(globalIndex, 'end_question', '');
+                                      } else {
+                                        const numValue = parseInt(inputValue, 10);
+                                        if (!isNaN(numValue) && numValue > 0) {
+                                          updateSection(globalIndex, 'end_question', numValue);
+                                        }
+                                      }
+                                    }}
                                     className={`w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${sectionErrors[globalIndex]?.end_question ? 'border-red-300' : 'border-slate-300'
                                       }`}
                                     min="1"

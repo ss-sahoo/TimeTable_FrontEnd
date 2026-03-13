@@ -14,9 +14,10 @@ interface ViolationToastProps {
   } | null;
   onClose: () => void;
   remainingViolations?: number;
+  violationCount?: number;
 }
 
-const ViolationToast: React.FC<ViolationToastProps> = ({ violation, onClose, remainingViolations }) => {
+const ViolationToast: React.FC<ViolationToastProps> = ({ violation, onClose, remainingViolations, violationCount }) => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -110,16 +111,20 @@ const ViolationToast: React.FC<ViolationToastProps> = ({ violation, onClose, rem
                 {details.message}
               </p>
 
-              {remainingViolations !== undefined && (
+              {(remainingViolations !== undefined || violationCount !== undefined) && (
                 <div className="mt-2 py-1.5 px-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800/50">
                   <p className="text-[11px] font-bold text-red-600 dark:text-red-400 flex items-center gap-1.5">
                     <AlertTriangle className="w-3 h-3" />
-                    {remainingViolations <= 0
-                      ? "LIMIT EXCEEDED! SUBMITTING EXAM..."
-                      : remainingViolations === 1
-                        ? "LAST WARNING! 1 violation left before auto-submit."
-                        : `${remainingViolations} violations left before auto-submit.`
-                    }
+                    {(() => {
+                      const remaining = remainingViolations !== undefined ? remainingViolations : (5 - (violationCount || 0));
+                      if (remaining <= 0) {
+                        return "LIMIT EXCEEDED! SUBMITTING EXAM...";
+                      } else if (remaining === 1) {
+                        return "LAST WARNING! 1 left before auto-submit.";
+                      } else {
+                        return `${remaining} left before auto-submit.`;
+                      }
+                    })()}
                   </p>
                 </div>
               )}

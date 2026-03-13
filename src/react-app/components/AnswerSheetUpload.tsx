@@ -651,8 +651,18 @@ function EvaluationReviewModal({ submission, onClose, onUpdate, examId, viewOnly
         }
     };
 
-    // Construct PDF URL - use localhost instead of 0.0.0.0
-    const pdfUrl = submission.file_path ? `http://localhost:8000/media/${submission.file_path}` : '';
+    // Construct PDF URL - use the API base URL
+    const getMediaUrl = () => {
+        if (submission.file_path) {
+            // Get the API base URL from the current request
+            const apiBaseUrl = window.location.hostname === 'localhost' 
+                ? 'http://localhost:8000'
+                : `${window.location.protocol}//${window.location.hostname}`;
+            return `${apiBaseUrl}/media/${submission.file_path}`;
+        }
+        return '';
+    };
+    const pdfUrl = getMediaUrl();
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
