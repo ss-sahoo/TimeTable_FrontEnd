@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronRight, ChevronDown, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { api } from '../../hooks/useApi';
+import { toast } from "react-toastify";
 
 interface PatternMappingStepProps {
   examId: number;
@@ -48,7 +49,7 @@ export default function PatternMappingStep({
     } catch (error: any) {
       console.error('Error loading pattern structure:', error);
       console.error('Error details:', error.response?.data);
-      alert(`Failed to load pattern structure: ${error.response?.data?.error || error.message}`);
+      toast.error(`Failed to load pattern structure: ${error.response?.data?.error || error.message}`);
     } finally {
       setLoading(false);
     }

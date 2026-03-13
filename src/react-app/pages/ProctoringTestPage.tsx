@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, AlertTriangle, CheckCircle, Eye, EyeOff, Users, Activity, Zap } from 'lucide-react';
 import { API_BASE_URL } from '../hooks/useApi';
+import { toast } from "react-toastify";
 
 interface ViolationLog {
   timestamp: string;
@@ -72,7 +73,7 @@ const ProctoringTestPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to start camera:', error);
-      alert('Failed to access camera. Please grant camera permissions.');
+      toast.error('Failed to access camera. Please grant camera permissions.');
     }
   };
 

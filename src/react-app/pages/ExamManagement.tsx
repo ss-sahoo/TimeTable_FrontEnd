@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
+import { toast } from "react-toastify";
 import {
   Plus,
   Search,
@@ -218,7 +219,7 @@ export default function ExamManagement() {
         setExams(exams.filter(exam => exam.id !== examId));
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        alert('Failed to delete exam: ' + errorMessage);
+        toast.error('Failed to delete exam: ' + errorMessage);
       }
     }
   };
@@ -257,13 +258,13 @@ export default function ExamManagement() {
         setExams(exams.filter(exam => !selectedExams.includes(exam.id)));
         setSelectedExams([]);
         setShowSelectionMode(false);
-        alert(`Successfully deleted ${response.data.deleted_count} exam(s)`);
+        toast.error(`Successfully deleted ${response.data.deleted_count} exam(s)`);
       } else {
-        alert('Failed to delete exams: ' + (response.data.error || 'Unknown error'));
+        toast.error('Failed to delete exams: ' + (response.data.error || 'Unknown error'));
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      alert('Failed to delete exams: ' + errorMessage);
+      toast.error('Failed to delete exams: ' + errorMessage);
     } finally {
       setIsDeleting(false);
     }

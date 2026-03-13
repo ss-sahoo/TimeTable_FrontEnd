@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { api } from "../../hooks/useApi";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { useTimetableCenter } from "../../contexts/TimetableCenterContext";
+import { toast } from "react-toastify";
 import {
   Building2,
   Upload,
@@ -134,7 +135,7 @@ const CentersContent = () => {
       setNewCenter({ name: "", city: "", address: "" });
       fetchCenters();
       refreshCenters(); // Update global context
-      alert("Center updated successfully!");
+      toast.error("Center updated successfully!");
     } catch (error: any) {
       console.error("Error updating center:", error);
       setError(error.response?.data?.detail || "Failed to update center");
@@ -173,11 +174,11 @@ const CentersContent = () => {
       setSelectedCenter(null);
       fetchCenters();
       refreshCenters(); // Update global context
-      alert("Center deleted successfully!");
+      toast.error("Center deleted successfully!");
     } catch (error: any) {
       console.error("Error deleting center:", error);
       setError(error.response?.data?.detail || "Failed to delete center");
-      alert(error.response?.data?.detail || "Failed to delete center");
+      toast.error(error.response?.data?.detail || "Failed to delete center");
     } finally {
       setLoading(false);
     }
@@ -285,7 +286,7 @@ const CentersContent = () => {
       setNewCenter({ name: "", city: "", address: "" });
       fetchCenters();
       refreshCenters(); // Update global context
-      alert("Center created successfully!");
+      toast.error("Center created successfully!");
     } catch (error: any) {
       console.error("Error creating center:", error);
       setError(error.response?.data?.detail || "Failed to create center");

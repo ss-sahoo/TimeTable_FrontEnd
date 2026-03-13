@@ -5,6 +5,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { api } from '../../hooks/useApi';
+import { toast } from "react-toastify";
 import {
   Edit2,
   Trash2,
@@ -132,7 +133,7 @@ const QuestionPreview: React.FC<QuestionPreviewProps> = ({
       setEditForm({});
     } catch (err) {
       console.error('Failed to update question:', err);
-      alert('Failed to update question');
+      toast.error('Failed to update question');
     }
   };
 
@@ -157,7 +158,7 @@ const QuestionPreview: React.FC<QuestionPreviewProps> = ({
       setStructureForm(null);
     } catch (err) {
       console.error('Failed to update structure:', err);
-      alert('Failed to update structure');
+      toast.error('Failed to update structure');
     }
   };
 
@@ -174,7 +175,7 @@ const QuestionPreview: React.FC<QuestionPreviewProps> = ({
       onSelectionChange(Array.from(newSelected));
     } catch (err) {
       console.error('Failed to delete question:', err);
-      alert('Failed to delete question');
+      toast.error('Failed to delete question');
     }
   };
 

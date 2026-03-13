@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Fetch } from "../usefetch";
 import { cleanTimetableId } from "../AllApi";
+import { toast } from "react-toastify";
 
 /* ================= TYPES ================= */
 interface TeacherInfo {
@@ -638,7 +639,7 @@ const GeneratedTimetable: React.FC = () => {
       }
     } catch (err: any) {
       console.error("Toggle activation error:", err);
-      alert(err.message || `Failed to ${isActive ? 'deactivate' : 'activate'} timetable`);
+      toast.error(err.message || `Failed to ${isActive ? 'deactivate' : 'activate'} timetable`);
     } finally {
       setTogglingActive(false);
     }

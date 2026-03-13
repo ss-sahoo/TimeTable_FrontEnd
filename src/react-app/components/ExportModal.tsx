@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '@/react-app/hooks/useApi';
 import { Download, FileText, FileSpreadsheet, File } from 'lucide-react';
+import { toast } from "react-toastify";
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -39,7 +40,7 @@ export default function ExportModal({ isOpen, onClose, examId, examTitle }: Expo
       const errorMessage = error && typeof error === 'object' && 'response' in error
         ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
         : undefined;
-      alert(`Export failed: ${errorMessage || 'Unknown error'}`);
+      toast.error(`Export failed: ${errorMessage || 'Unknown error'}`);
     } finally {
       setExporting(null);
     }

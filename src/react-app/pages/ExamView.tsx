@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router';
+import { toast } from "react-toastify";
 import {
   ArrowLeft,
   Eye,
@@ -176,7 +177,7 @@ export default function ExamView() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Failed to download question paper:', err);
-      alert('Failed to download question paper. Please try again.');
+      toast.error('Failed to download question paper. Please try again.');
     }
   };
 
@@ -191,7 +192,7 @@ export default function ExamView() {
 
       if (!valid && missing_answers.length > 0) {
         const missingList = missing_answers.map((q: any) => `Q${q.question_number}`).join(', ');
-        alert(`Cannot Publish Exam:\n\nThe following questions are missing answers or solutions:\n${missingList}\n\nPlease add answers to these questions before publishing to ensure accurate evaluation.`);
+        toast.error(`Cannot Publish Exam:\n\nThe following questions are missing answers or solutions:\n${missingList}\n\nPlease add answers to these questions before publishing to ensure accurate evaluation.`);
         setLoading(false);
         return;
       }
@@ -219,14 +220,14 @@ export default function ExamView() {
       await fetchExam(); // Refresh data to show published status and generated OMR
 
       if (effectiveExamMode === 'offline_omr') {
-        alert('Exam published successfully! OMR sheet is being generated.');
+        toast.error('Exam published successfully! OMR sheet is being generated.');
       } else {
-        alert('Exam published successfully!');
+        toast.error('Exam published successfully!');
       }
     } catch (err: any) {
       console.error('Failed to publish exam:', err);
       const msg = err.response?.data?.error || err.response?.data?.detail || 'Failed to publish exam.';
-      alert(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -237,12 +238,12 @@ export default function ExamView() {
     try {
       setGeneratingOMR(true);
       await api.post(`/omr/sheets/generate/${exam.id}/`);
-      alert('OMR sheet generation started!');
+      toast.error('OMR sheet generation started!');
       await fetchExam(); // Refresh to get the file link
     } catch (err: any) {
       console.error('Failed to generate OMR:', err);
       const msg = err.response?.data?.error || 'Failed to generate OMR sheet.';
-      alert(msg);
+      toast.error(msg);
     } finally {
       setGeneratingOMR(false);
     }
@@ -261,11 +262,11 @@ export default function ExamView() {
 
       // Close modal
       setSectionToDelete(null);
-      alert(`Section "${sectionToDelete.name}" deleted successfully!`);
+      toast.error(`Section "${sectionToDelete.name}" deleted successfully!`);
     } catch (err: any) {
       console.error('Failed to delete section:', err);
       const msg = err.response?.data?.error || err.response?.data?.detail || 'Failed to delete section.';
-      alert(msg);
+      toast.error(msg);
     } finally {
       setDeletingSection(false);
     }

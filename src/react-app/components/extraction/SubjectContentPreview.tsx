@@ -5,6 +5,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { api } from '../../hooks/useApi';
+import { toast } from "react-toastify";
 import {
   Download,
   FileText,
@@ -107,7 +108,7 @@ const SubjectContentPreview: React.FC<SubjectContentPreviewProps> = ({
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Download failed:', err);
-      alert('Failed to download file');
+      toast.error('Failed to download file');
     } finally {
       setDownloading(null);
     }

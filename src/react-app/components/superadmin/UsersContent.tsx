@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../../hooks/useApi";
 import { useAuthContext } from "../../contexts/AuthContext";
+import { toast } from "react-toastify";
 import {
   UserPlus,
   Upload,
@@ -137,7 +138,7 @@ const UsersContent = () => {
       setSelectedUser(null);
       setSelectedCenterId("");
 
-      alert(`Successfully assigned center to ${selectedUser.email}`);
+      toast.error(`Successfully assigned center to ${selectedUser.email}`);
       fetchUsers();
     } catch (error: any) {
       console.error("Error assigning center:", error);
@@ -180,7 +181,7 @@ const UsersContent = () => {
       setEditingUser(null);
       setSelectedCenterId("");
 
-      alert(`User ${editingUser.email} updated successfully`);
+      toast.error(`User ${editingUser.email} updated successfully`);
       fetchUsers();
     } catch (error: any) {
       console.error("Error updating user:", error);
@@ -395,7 +396,7 @@ const UsersContent = () => {
         });
         setShowCredentialsModal(true);
       } else {
-        alert("User added successfully!");
+        toast.error("User added successfully!");
       }
     } catch (error: any) {
       console.error("Error adding user:", error);
@@ -551,7 +552,7 @@ const UsersContent = () => {
 
       const successCount = response.data.success || response.data.created_count || 0;
       const totalCount = response.data.total || 0;
-      alert(`Successfully imported ${successCount} out of ${totalCount} users!`);
+      toast.error(`Successfully imported ${successCount} out of ${totalCount} users!`);
 
       fetchUsers();
     } catch (error: any) {
