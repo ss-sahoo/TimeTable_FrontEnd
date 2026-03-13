@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router';
+import { toast } from "react-toastify";
 import {
   Plus,
   Search,
@@ -121,7 +122,7 @@ export default function PatternManagement() {
       setDeleteConfirm(null);
     } catch (error) {
       console.error('Failed to delete pattern:', error);
-      alert('Failed to delete pattern. Please try again.');
+      toast.error('Failed to delete pattern. Please try again.');
     } finally {
       setDeleting(null);
     }
@@ -206,7 +207,7 @@ export default function PatternManagement() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-black">Pattern Management</h1>
-            <p className="text-base" style={{ color: '#6b6b6b' }}>Manage and organize your exam patterns</p>
+            <p className="text-base" style={{ color: '#6b6b6b' }}>Manage and organize your exam pattern</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="inline-flex items-center rounded-lg border border-slate-300 overflow-hidden">
@@ -373,31 +374,29 @@ export default function PatternManagement() {
               </div>
 
               <div className={`mb-4 ${viewMode === 'list' ? 'grid grid-cols-2 md:grid-cols-4 gap-2' : 'space-y-2'}`}>
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1">
-                    <BookOpen className="w-3 h-3 text-slate-400" />
-                    <span className="text-slate-600 dark:text-gray-400">Questions</span>
-                  </div>
+                <div className="flex items-center text-xs gap-1">
+                  <BookOpen className="w-3 h-3 text-slate-400" />
+                  <span className="text-slate-600 dark:text-gray-400">Questions :</span>
                   <span className="text-slate-900 dark:text-gray-100">{pattern.total_questions}</span>
                 </div>
-                <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center text-xs gap-1">
                   <div className="flex items-center gap-1">
                     <Calculator className="w-3 h-3 text-slate-400" />
-                    <span className="text-slate-600 dark:text-gray-400">Marks</span>
+                    <span className="text-slate-600 dark:text-gray-400">Marks :</span>
                   </div>
                   <span className="text-slate-900 dark:text-gray-100">{pattern.total_marks}</span>
                 </div>
-                <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center text-xs gap-1">
                   <div className="flex items-center gap-1">
                     <Clock className="w-3 h-3 text-slate-400" />
-                    <span className="text-slate-600 dark:text-gray-400">Duration</span>
+                    <span className="text-slate-600 dark:text-gray-400">Duration :</span>
                   </div>
                   <span className="text-slate-900 dark:text-gray-100">{pattern.total_duration} min</span>
                 </div>
-                <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center text-xs gap-1">
                   <div className="flex items-center gap-1">
                     <Zap className="w-3 h-3 text-slate-400" />
-                    <span className="text-slate-600 dark:text-gray-400">Sections</span>
+                    <span className="text-slate-600 dark:text-gray-400">Sections :</span>
                   </div>
                   <span className="text-slate-900 dark:text-gray-100">{pattern.sections.length}</span>
                 </div>
@@ -424,7 +423,7 @@ export default function PatternManagement() {
                             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                             <h5 className="font-medium text-slate-800 text-xs">{subject}</h5>
                             <span className="text-xs text-slate-500">
-                              (Q{sections[0].start_question}-{sections[sections.length - 1].end_question})
+                              (Question : {sections[0].start_question}-{sections[sections.length - 1].end_question})
                             </span>
                           </div>
                           {/* Horizontal sections layout */}
@@ -440,10 +439,10 @@ export default function PatternManagement() {
                                   {section.question_type.replace('_', ' ').toUpperCase()}
                                 </span>
                                 <span className="text-slate-500">
-                                  Q{section.start_question}-{section.end_question}
+                                  Question : {section.start_question}-{section.end_question}
                                 </span>
                                 <span className="text-slate-500">•</span>
-                                <span className="text-slate-500">{section.marks_per_question}m</span>
+                                <span className="text-slate-500">{section.marks_per_question} Marks </span>
                               </div>
                             ))}
                           </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router';
 import { api } from '../hooks/useApi';
+import { toast } from "react-toastify";
 import {
   ArrowLeft,
   CheckCircle,
@@ -261,10 +262,10 @@ const ExamReview: React.FC = () => {
       console.log('Saving feedback:', feedback);
       console.log('Saving marks:', marks);
       // For now, just show success message
-      alert('Feedback saved successfully!');
+      toast.error('Feedback saved successfully!');
     } catch (error) {
       console.error('Error saving feedback:', error);
-      alert('Failed to save feedback');
+      toast.error('Failed to save feedback');
     } finally {
       setSaving(false);
     }

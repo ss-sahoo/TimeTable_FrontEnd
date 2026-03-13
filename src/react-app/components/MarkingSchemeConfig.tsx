@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { 
-  Calculator, 
-  CheckCircle, 
-  AlertCircle, 
-  Info, 
+import {
+  Calculator,
+  CheckCircle,
+  AlertCircle,
+  Info,
   Settings,
   HelpCircle
 } from 'lucide-react';
@@ -16,11 +16,11 @@ interface MarkingSchemeConfigProps {
   disabled?: boolean;
 }
 
-export default function MarkingSchemeConfig({ 
-  questionType, 
-  markingScheme, 
-  onChange, 
-  disabled = false 
+export default function MarkingSchemeConfig({
+  questionType,
+  markingScheme,
+  onChange,
+  disabled = false
 }: MarkingSchemeConfigProps) {
   const [showHelp, setShowHelp] = useState(false);
 
@@ -313,10 +313,12 @@ export default function MarkingSchemeConfig({
             <span>Max Marks:</span>
             <span className="font-medium">{markingScheme.max_marks}</span>
           </div>
-          <div className="flex justify-between">
-            <span>Negative Marking:</span>
-            <span className="font-medium">-{markingScheme.negative_marks || 0} marks</span>
-          </div>
+          {(markingScheme.negative_marks ?? 0) > 0 && (
+            <div className="flex justify-between">
+              <span>Negative Marking:</span>
+              <span className="font-medium text-red-600">-{markingScheme.negative_marks} marks</span>
+            </div>
+          )}
           {questionType === 'Multiple Correct MCQ' && markingScheme.partial_marking && (
             <div className="flex justify-between">
               <span>Per Correct Option:</span>

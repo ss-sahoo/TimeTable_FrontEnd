@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from "react-toastify";
 import {
   Upload, X, FileSpreadsheet, CheckCircle, AlertCircle, Download,
   Users, Loader2, Eye, EyeOff, Copy, Check, GraduationCap, Briefcase, UserCog,
@@ -103,7 +104,7 @@ export default function BulkUserUpload({ isOpen, onClose, onSuccess, centerId, d
         setFile(selectedFile);
         setResult(null);
       } else {
-        alert('Please upload an Excel (.xlsx) or CSV file');
+        toast.error('Please upload an Excel (.xlsx) or CSV file');
       }
     }
   };

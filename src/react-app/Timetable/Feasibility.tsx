@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Fetch } from "../usefetch";
 import { cleanTimetableId } from "../AllApi";
+import { toast } from "react-toastify";
 
 /* ================= TYPES ================= */
 interface FeasibilityResult {
@@ -387,7 +388,7 @@ const Feasibility: React.FC = () => {
             
             // Show success message
             const entriesCreated = data.result?.entries_created || 'Unknown';
-            alert(`Timetable generated successfully! ${entriesCreated} entries created.`);
+            toast.error(`Timetable generated successfully! ${entriesCreated} entries created.`);
           } else if (data.status === 'FAILURE') {
             // Clear polling
             if (pollingIntervalRef.current) {
@@ -442,7 +443,7 @@ const Feasibility: React.FC = () => {
 
       const saveData = await saveResponse.json();
       console.log("Save result:", saveData);
-      alert("Timetable saved successfully!");
+      toast.error("Timetable saved successfully!");
     } catch (err: any) {
       console.error("Save error:", err);
       setError(err.message || "Failed to save timetable");
@@ -530,7 +531,7 @@ const Feasibility: React.FC = () => {
             
             // Show success message
             const entriesUpdated = data.result?.entries_updated || 'Unknown';
-            alert(`Timetable regenerated successfully from slot ${savedStopSlot}! ${entriesUpdated} entries updated.`);
+            toast.error(`Timetable regenerated successfully from slot ${savedStopSlot}! ${entriesUpdated} entries updated.`);
             
             // Refresh the slots check
             checkExistingSlots();
@@ -580,7 +581,7 @@ const Feasibility: React.FC = () => {
   const handleApplySettings = () => {
     // Settings are automatically applied when generating
     setShowSettings(false);
-    alert("Settings saved. They will be used in the next generation.");
+    toast.error("Settings saved. They will be used in the next generation.");
   };
 
   const handleNumberArrayChange = (index: number, value: string) => {

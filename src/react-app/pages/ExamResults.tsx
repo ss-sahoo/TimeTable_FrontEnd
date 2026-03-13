@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
 import { api } from '../hooks/useApi';
 import { useAuthContext } from '../contexts/AuthContext';
+import { toast } from "react-toastify";
 import {
   CheckCircle,
   Clock,
@@ -373,7 +374,7 @@ const ExamResults: React.FC = () => {
       pdf.save(`exam-results-${safeTitle}-attempt-${attempt.id}.pdf`);
     } catch (err) {
       console.error('Failed to generate PDF:', err);
-      alert('Unable to generate PDF. Please try again.');
+      toast.error('Unable to generate PDF. Please try again.');
     } finally {
       setDownloading(false);
     }

@@ -94,6 +94,9 @@ import ManagerDashboard from "./pages/ManagerDashboard";
 import ExtractionV3Page from "@/react-app/pages/ExtractionV3";
 import ExtractionReviewPage from "@/react-app/pages/ExtractionV3/Review";
 import ExtractionV2Page from "@/react-app/pages/ExtractionNew/ExtractionV2Page";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -845,6 +848,7 @@ export default function App() {
             <OnboardingTourProvider>
               <AppRoutes />
             </OnboardingTourProvider>
+              <ToastContainer position="top-right" autoClose={3000} />
           </Router>
         </TimetableCenterProvider>
       </AuthProvider>

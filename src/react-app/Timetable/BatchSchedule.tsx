@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { removeBatchFromTimetable, removeTeacherFromBatch } from "../AllApi";
 import { API_BASE_URL } from "../hooks/useApi";
 import { useTimetableCenter } from "../contexts/TimetableCenterContext";
+import { toast } from "react-toastify";
 
 /* ================= TYPES ================= */
 interface Teacher {
@@ -508,7 +509,7 @@ const BatchSchedule: React.FC = () => {
 
     } catch (error: any) {
       console.error("Error fetching all batches:", error);
-      alert(`Failed to fetch batches: ${error.message}`);
+      toast.error(`Failed to fetch batches: ${error.message}`);
     } finally {
       setLoadingAllBatches(false);
     }
@@ -671,25 +672,25 @@ const BatchSchedule: React.FC = () => {
   // Function to add a batch to the current view (calls assign-batch API)
   const addBatchToView = async () => {
     if (!selectedBatchToAdd) {
-      alert("Please select a batch to add");
+      toast.error("Please select a batch to add");
       return;
     }
 
     if (!timetableId) {
-      alert("Please select a timetable first");
+      toast.error("Please select a timetable first");
       return;
     }
 
     const batchToAdd = allBatchesFromAPI.find(batch => batch.id === selectedBatchToAdd);
 
     if (!batchToAdd) {
-      alert("Selected batch not found");
+      toast.error("Selected batch not found");
       return;
     }
 
     // Check if batch is already added
     if (batches.some(batch => batch.id === batchToAdd.id)) {
-      alert("This batch is already assigned to this timetable");
+      toast.error("This batch is already assigned to this timetable");
       return;
     }
 
@@ -714,10 +715,10 @@ const BatchSchedule: React.FC = () => {
       setShowBatchSelector(false);
       setSelectedBatchToAdd("");
 
-      alert(`Batch "${newBatch.name}" assigned successfully!`);
+      toast.error(`Batch "${newBatch.name}" assigned successfully!`);
 
     } catch (error: any) {
-      alert(`Failed to assign batch: ${error.message}`);
+      toast.error(`Failed to assign batch: ${error.message}`);
     }
   };
 
@@ -843,18 +844,18 @@ const BatchSchedule: React.FC = () => {
     const currentTeachers = getBatchAssignments(activeBatch);
     // Check if teacher already exists in this batch
     if (currentTeachers.some(t => t.id === teacher.id)) {
-      alert("This teacher is already assigned to this batch!");
+      toast.error("This teacher is already assigned to this batch!");
       return;
     }
 
     const activeBatchObj = getActiveBatch();
     if (!activeBatchObj) {
-      alert("No active batch selected");
+      toast.error("No active batch selected");
       return;
     }
 
     if (!timetableId) {
-      alert("Please select a timetable first");
+      toast.error("Please select a timetable first");
       return;
     }
 
@@ -913,7 +914,7 @@ const BatchSchedule: React.FC = () => {
 
     } catch (error: any) {
       console.error("Failed to assign teacher:", error);
-      alert(`Failed to assign teacher: ${error.message}`);
+      toast.error(`Failed to assign teacher: ${error.message}`);
     }
   };
 
@@ -999,13 +1000,13 @@ const BatchSchedule: React.FC = () => {
   // Function to save assignments to backend
   const saveAssignmentsToBackend = async () => {
     if (!timetableId) {
-      alert("Please select a timetable first");
+      toast.error("Please select a timetable first");
       return;
     }
 
     const activeBatchObj = getActiveBatch();
     if (!activeBatchObj) {
-      alert("No active batch found");
+      toast.error("No active batch found");
       return;
     }
 
@@ -1038,7 +1039,7 @@ const BatchSchedule: React.FC = () => {
     } catch (error: any) {
       console.error("Failed to save assignments:", error);
       setSaveStatus("error");
-      alert(`Failed to save assignments: ${error.message}`);
+      toast.error(`Failed to save assignments: ${error.message}`);
       setTimeout(() => setSaveStatus("idle"), 3000);
     }
   };
@@ -1050,7 +1051,7 @@ const BatchSchedule: React.FC = () => {
   const handleSaveAndNext = () => {
     saveAssignmentsToBackend();
     // You can add navigation to next page here
-    alert("Saved! Next page would open here.");
+    toast.error("Saved! Next page would open here.");
   };
 
   const refreshBatches = () => {

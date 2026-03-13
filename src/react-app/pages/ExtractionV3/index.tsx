@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from "react-toastify";
 import {
     Upload, CheckCircle, AlertCircle, Loader2, Cpu,
     BookOpen, X, FileText, Database, Zap,
@@ -158,7 +159,7 @@ export default function ExtractionV3Page() {
     const handleStartExtraction = async () => {
         if (!file || !exam || !pattern) return;
         if (selectedSubjects.length === 0) {
-            alert("Please select at least one subject to extract.");
+            toast.error("Please select at least one subject to extract.");
             return;
         }
 
@@ -204,11 +205,11 @@ export default function ExtractionV3Page() {
                 mappings
             });
 
-            alert('Questions imported successfully!');
+            toast.error('Questions imported successfully!');
             navigate(`/exams/${examId}`);
         } catch (err: any) {
             console.error("Import failed:", err);
-            alert(`Failed to import: ${err.response?.data?.error || err.message}`);
+            toast.error(`Failed to import: ${err.response?.data?.error || err.message}`);
         } finally {
             setImporting(false);
         }

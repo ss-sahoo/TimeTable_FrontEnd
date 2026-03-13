@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
+import { toast } from "react-toastify";
 import {
   ArrowLeft,
   ChevronLeft,
@@ -1616,21 +1617,21 @@ export default function EnhancedQuestionEditor() {
 
     // Validate correct_answer for true/false questions
     if (formData.question_type === 'true_false' && !formData.correct_answer) {
-      alert('Please select the correct answer (True or False)');
+      toast.error('Please select the correct answer (True or False)');
       setSaveStatus('error');
       return;
     }
 
     // Validate correct_answer for fill_blank questions
     if (formData.question_type === 'fill_blank' && !formData.correct_answer.trim()) {
-      alert('Please enter the correct answer(s) for fill in the blank');
+      toast.error('Please enter the correct answer(s) for fill in the blank');
       setSaveStatus('error');
       return;
     }
 
     // Validate correct_answer for single/mcq questions
     if ((formData.question_type === 'single_mcq' || formData.question_type === 'mcq') && !formData.correct_answer.trim()) {
-      alert('Please choose the correct option for this question.');
+      toast.error('Please choose the correct option for this question.');
       setSaveStatus('error');
       return;
     }

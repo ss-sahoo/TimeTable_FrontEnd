@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from "react-toastify";
 import {
     CheckCircle, AlertCircle, Loader2, Cpu,
     ArrowLeft, ChevronRight, FileText, Database,
@@ -95,7 +96,7 @@ export default function ExtractionReviewPage() {
             navigate(`/exams/${examId}`);
         } catch (err) {
             console.error("Import failed", err);
-            alert("Failed to import questions. Please check if the pattern capacity is full.");
+            toast.error("Failed to import questions. Please check if the pattern capacity is full.");
         } finally {
             setImporting(false);
         }

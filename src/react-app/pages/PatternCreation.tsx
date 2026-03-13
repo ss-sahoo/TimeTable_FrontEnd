@@ -32,6 +32,8 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { api, useApi } from '../hooks/useApi';
 import { MarkingScheme } from '../../shared/types';
 import MarkingSchemeConfig from '../components/MarkingSchemeConfig';
+import { toast } from "react-toastify";
+
 
 interface Subject {
   id: number;
@@ -317,7 +319,7 @@ export default function PatternCreation() {
       console.log('Subject removed successfully');
     } catch (error: any) {
       console.error('Failed to remove subject:', error);
-      alert(error.response?.data?.error || 'Failed to remove subject. Please try again.');
+      toast.error(error.response?.data?.error || 'Failed to remove subject. Please try again.');
     }
   };
 
@@ -769,11 +771,10 @@ export default function PatternCreation() {
     console.log('📋 Current errors:', errors);
     console.log('📋 Section errors:', sectionErrors);
 
-    if (!isValid) {
-      alert('Please fix all validation errors before saving.');
-      return;
-    }
-
+  if (!isValid) {
+  toast.error("Please fix all validation errors before saving.");
+  return;
+}
     setSaving(true);
     try {
       const patternData = {
@@ -793,7 +794,7 @@ export default function PatternCreation() {
         console.log('✅ Create response:', response.data);
       }
 
-      alert('Pattern saved successfully!');
+      toast.error('Pattern saved successfully!');
       navigate(`${basePath}/patterns`);
     } catch (error: any) {
       console.error('❌ Failed to save pattern:', error);
@@ -813,7 +814,7 @@ export default function PatternCreation() {
         errorMessage += error.message || 'Unknown error';
       }
 
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -824,7 +825,7 @@ export default function PatternCreation() {
     const isValid = validateForm();
 
     if (!isValid) {
-      alert('Please fix all validation errors before publishing.');
+      toast.error('Please fix all validation errors before publishing.');
       return;
     }
 
@@ -848,7 +849,7 @@ export default function PatternCreation() {
         console.log('✅ Create response:', response.data);
       }
 
-      alert('Pattern published successfully!');
+      toast.error('Pattern published successfully!');
       navigate(`${basePath}/patterns`);
     } catch (error: any) {
       console.error('❌ Failed to publish pattern:', error);
@@ -868,7 +869,7 @@ export default function PatternCreation() {
         errorMessage += error.message || 'Unknown error';
       }
 
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -920,7 +921,7 @@ export default function PatternCreation() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 pb-20">
       <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6">
         {/* Header */}
         <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
@@ -1535,7 +1536,7 @@ export default function PatternCreation() {
                                 </div>
 
                                 <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Start Q</label>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">Start Question</label>
                                   <input
                                     type="number"
                                     value={section.start_question}
@@ -1553,7 +1554,7 @@ export default function PatternCreation() {
                                 </div>
 
                                 <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">End Q</label>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">End Question</label>
                                   <input
                                     type="number"
                                     value={section.end_question}
@@ -1715,10 +1716,10 @@ export default function PatternCreation() {
             <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-xl">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                  <Layout className="w-4 h-4 text-blue-600" />
+                  <Layout className="w-4 h-4 text-[14px] text-blue-600" />
                   Live Skeleton
                 </h3>
-                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-full uppercase tracking-tighter">
+                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[12px] font-bold rounded-full uppercase tracking-tighter">
                   Real-time
                 </span>
               </div>
@@ -1747,11 +1748,11 @@ export default function PatternCreation() {
 
                         <div className="flex items-center gap-2 mb-2">
                           <div className={`w-2 h-2 rounded-full ${colorScheme.dot}`}></div>
-                          <span className="text-[11px] font-black uppercase text-slate-800 tracking-tight truncate max-w-[120px]">
+                          <span className="text-[12px] font-black uppercase text-slate-800 tracking-tight truncate max-w-[120px]">
                             {subject.name}
                           </span>
-                          <span className="ml-auto text-[10px] font-bold text-slate-400">
-                            {totalQs} Qs
+                          <span className="ml-auto text-[12px] font-bold text-slate-400">
+                            {totalQs} Questions
                           </span>
                         </div>
 
@@ -1766,16 +1767,16 @@ export default function PatternCreation() {
                               className="group cursor-pointer flex items-center justify-between p-2 bg-slate-50 border border-slate-100 rounded-lg hover:border-blue-300 hover:bg-white transition-all duration-300"
                             >
                               <div className="flex flex-col">
-                                <span className="text-[10px] font-bold text-slate-700 truncate max-w-[100px]">
+                                <span className="text-[12px] font-bold text-slate-700 truncate max-w-[100px]">
                                   {section.name || `Section ${secIdx + 1}`}
                                 </span>
-                                <span className="text-[9px] text-slate-400 font-medium">
+                                <span className="text-[12px] text-slate-400 font-medium">
                                   {section.question_type}
                                 </span>
                               </div>
                               <div className="flex items-center gap-1">
-                                <span className="text-[9px] font-black text-slate-500 tracking-tighter">
-                                  Q{section.start_question}-{section.end_question}
+                                <span className="text-[12px] font-black text-slate-500 tracking-tighter">
+                                  Question : {section.start_question}-{section.end_question}
                                 </span>
                               </div>
                             </div>
@@ -1828,7 +1829,7 @@ export default function PatternCreation() {
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1.5">
                   <BookOpen className="w-3 h-3 text-blue-500" />
-                  <span className="text-sm font-bold text-slate-800">{pattern.total_questions || 0} Qs</span>
+                  <span className="text-sm font-bold text-slate-800">{pattern.total_questions || 0} Questions</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Zap className="w-3 h-3 text-purple-500" />

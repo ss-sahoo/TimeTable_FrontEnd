@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../../hooks/useApi";
 import { useAuthContext } from "../../contexts/AuthContext";
+import { toast } from "react-toastify";
 import {
     UserPlus,
     Search,
@@ -271,7 +272,7 @@ const AdminPeopleContent = () => {
                 });
                 setShowCredentialsModal(true);
             } else {
-                alert("User added successfully!");
+                toast.error("User added successfully!");
             }
         } catch (error: any) {
             console.error("Error adding user:", error);
@@ -420,7 +421,7 @@ const AdminPeopleContent = () => {
 
             const successCount = response.data.success || response.data.created_count || 0;
             const totalCount = response.data.total || 0;
-            alert(`Successfully imported ${successCount} out of ${totalCount} users!`);
+            toast.error(`Successfully imported ${successCount} out of ${totalCount} users!`);
 
             fetchUsers();
         } catch (error: any) {

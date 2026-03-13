@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router';
+import { toast } from "react-toastify";
 import {
   Plus,
   Search,
@@ -212,7 +213,7 @@ export default function ExamManagement() {
       setDeleteConfirm(null);
     } catch (error) {
       console.error('Failed to delete exam:', error);
-      alert('Failed to delete exam. Please try again.');
+      toast.error('Failed to delete exam. Please try again.');
     } finally {
       setDeleting(null);
     }
@@ -251,13 +252,13 @@ export default function ExamManagement() {
         setExams(exams.filter(exam => !selectedExams.includes(exam.id)));
         setSelectedExams([]);
         setShowSelectionMode(false);
-        alert(`Successfully deleted ${response.data.deleted_count} exam(s)`);
+        toast.error(`Successfully deleted ${response.data.deleted_count} exam(s)`);
       } else {
-        alert('Failed to delete exams: ' + (response.data.error || 'Unknown error'));
+        toast.error('Failed to delete exams: ' + (response.data.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Failed to bulk delete exams:', error);
-      alert('Failed to delete exams. Please try again.');
+      toast.error('Failed to delete exams. Please try again.');
     } finally {
       setIsBulkDeleting(false);
     }
@@ -284,7 +285,7 @@ export default function ExamManagement() {
       const errorMessage = error.response?.data?.status?.[0] ||
         error.response?.data?.non_field_errors?.[0] ||
         'Failed to publish exam. Please ensure all questions are added.';
-      alert(errorMessage);
+      toast.error(errorMessage);
     }
   };
 

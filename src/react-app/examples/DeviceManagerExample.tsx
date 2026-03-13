@@ -11,6 +11,7 @@
 import { useState, useEffect } from 'react';
 import { deviceManager, ConflictInfo } from '../services/DeviceManager';
 import DeviceConflictModal from '../components/DeviceConflictModal';
+import { toast } from "react-toastify";
 
 /**
  * Example component showing how to use DeviceManager in a login flow
@@ -41,11 +42,11 @@ export default function DeviceManagerExample() {
         setShowConflictModal(true);
       } else {
         console.log('No device conflict. User can proceed.');
-        alert('No device conflict detected. Login successful!');
+        toast.error('No device conflict detected. Login successful!');
       }
     } catch (error) {
       console.error('Error checking device conflict:', error);
-      alert('Error checking device conflict. Please try again.');
+      toast.error('Error checking device conflict. Please try again.');
     }
   };
 
@@ -67,7 +68,7 @@ export default function DeviceManagerExample() {
       console.log('Device switched successfully:', response);
       setShowConflictModal(false);
       setConflictInfo(null);
-      alert('Device switched successfully! You can now proceed.');
+      toast.error('Device switched successfully! You can now proceed.');
     } catch (error) {
       console.error('Error switching device:', error);
       throw error; // Let the modal handle the error display
@@ -84,7 +85,7 @@ export default function DeviceManagerExample() {
     console.log('Device switch cancelled. Existing session preserved.');
     setShowConflictModal(false);
     setConflictInfo(null);
-    alert('Login cancelled. Your existing session on the other device is still active.');
+    toast.error('Login cancelled. Your existing session on the other device is still active.');
   };
 
   return (

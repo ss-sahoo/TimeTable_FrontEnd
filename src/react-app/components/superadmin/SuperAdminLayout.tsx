@@ -189,19 +189,24 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
                     <div className="h-16 flex items-center px-4 border-b border-slate-100">
                         {!sidebarCollapsed ? (
                             <div className="flex items-center gap-3 w-full hover:bg-slate-50 cursor-pointer transition-colors py-2 px-2 rounded-md -mx-2">
-                                <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-violet-700 rounded-lg flex items-center justify-center text-white shadow-sm">
-                                    <Zap className="w-4 h-4" />
-                                </div>
+                                <img
+                                    src="/examlogo.png"
+                                    alt="Exam Logo"
+                                    className="w-8 h-8 object-contain flex-shrink-0 rounded-md"
+                                />
                                 <div className="flex-1 overflow-hidden">
-                                    <h1 className="font-bold text-sm text-slate-900 leading-tight">
+                                    <h1 className="font-bold text-md text-slate-900 leading-tight">
                                         {user?.institute?.name || user?.institute_name || "DashoExams"}
                                     </h1>
-                                    <p className="text-[10px] text-slate-500 font-medium tracking-wide">ENTERPRISE PLAN</p>
                                 </div>
                             </div>
                         ) : (
-                            <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-violet-700 rounded-lg flex items-center justify-center text-white shadow-sm mx-auto">
-                                <Zap className="w-4 h-4" />
+                            <div className="w-8 h-8 flex items-center justify-center mx-auto">
+                                <img
+                                    src="/examlogo.png"
+                                    alt="Exam Logo"
+                                    className="w-8 h-8 object-contain rounded-md"
+                                />
                             </div>
                         )}
                     </div>
@@ -260,7 +265,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
                                     {!sidebarCollapsed && (
                                         <>
                                             {item.label}
-                                            
+
                                         </>
                                     )}
                                 </Link>
@@ -362,11 +367,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
                                         <X className="w-3 h-3" />
                                     </button>
                                 )}
-                                <div className="absolute inset-y-0 right-0 flex items-center pr-3 z-10">
-                                    <kbd className="hidden sm:inline-flex items-center border border-slate-200 rounded px-2 text-[10px] font-sans font-medium text-slate-400 bg-white">
-                                        ⌘K
-                                    </kbd>
-                                </div>
+
 
                                 {showSearchResults && searchResults.length > 0 && (
                                     <div className="absolute top-full mt-2 w-full bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden z-50">
@@ -414,11 +415,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
                             <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                                 <HelpCircle className="w-5 h-5" />
                             </button>
-                            <div className="h-6 w-px bg-slate-200 mx-1"></div>
-                            <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                <span className="text-xs font-medium text-slate-600">System Operational</span>
-                            </div>
+
                         </div>
                     </header>
                 )}
