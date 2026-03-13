@@ -33,6 +33,7 @@ interface UserData {
         city?: string;
     };
     center_name?: string;
+    center_id?: string;
     is_active: boolean;
 }
 
@@ -44,6 +45,9 @@ interface NewUserData {
     first_name: string;
     last_name: string;
     role: string;
+    phone_number: string;
+    employee_id: string;
+    subjects: string;
 }
 
 const AdminPeopleContent = () => {
@@ -68,28 +72,49 @@ const AdminPeopleContent = () => {
         password_confirm: "",
         first_name: "",
         last_name: "",
-        role: "student"
+        role: "student",
+        phone_number: "",
+        employee_id: "",
+        subjects: "General"
     });
     const [error, setError] = useState<string>("");
     const [centerId, setCenterId] = useState<string | null>(null);
     const itemsPerPage = 10;
 
-    // Get admin's center ID - with fallback to profile API
+    // Get admin's center ID - with fallback to profile API and centers API
     useEffect(() => {
         const getCenterId = async () => {
+            // 1. Try from current user context
             if (currentUser?.center_id) {
                 setCenterId(currentUser.center_id);
-            } else {
-                // Fallback: fetch from profile API
-                try {
-                    const res = await api.get('/auth/profile/');
-                    if (res.data?.center_id) {
-                        setCenterId(res.data.center_id);
-                    }
-                } catch (err) {
-                    console.error('Failed to fetch center from profile:', err);
-                }
+                return;
             }
+
+            // 2. Fallback: fetch from profile API
+            try {
+                const res = await api.get('/auth/profile/');
+                if (res.data?.center_id) {
+                    setCenterId(res.data.center_id);
+                    return;
+                }
+            } catch (err) {
+                console.error('Failed to fetch center from profile:', err);
+            }
+
+            // 3. Fallback: try to get centers from timetable API
+            try {
+                const res = await api.get('/timetable/centers/');
+                const centers = res.data?.results || res.data || [];
+                if (Array.isArray(centers) && centers.length > 0) {
+                    setCenterId(centers[0].id);
+                    return;
+                }
+            } catch (err) {
+                console.error('Failed to fetch centers:', err);
+            }
+
+            // 4. If we still don't have a center_id, we'll fetch by institute instead
+            setCenterId('__no_center__');
         };
         getCenterId();
     }, [currentUser]);
@@ -104,13 +129,30 @@ const AdminPeopleContent = () => {
         if (!centerId) return;
         setLoading(true);
         try {
-            const response = await api.get(`/auth/people/?center_id=${centerId}`);
-            const data = response.data.users || response.data.results || response.data;
-            // Filter to only include teacher, student, staff roles
-            const filteredData = Array.isArray(data)
-                ? data.filter((u: UserData) => ['teacher', 'student', 'staff'].includes(u.role.toLowerCase()))
-                : [];
-            setUsers(filteredData);
+            let response;
+            if (centerId === '__no_center__') {
+                // No center found, fetch all users by institute
+                const instituteId = currentUser?.institute_id || currentUser?.institute?.id;
+                if (instituteId) {
+                    response = await api.get(`/auth/people/?institute_id=${instituteId}`);
+                } else {
+                    response = await api.get('/auth/people/');
+                }
+            } else {
+                response = await api.get(`/auth/people/?center_id=${centerId}`);
+            }
+            // Handle response - users could be in .users, .results, or directly on data
+            let data;
+            if (response.data && Array.isArray(response.data.users)) {
+                data = response.data.users;
+            } else if (response.data && Array.isArray(response.data.results)) {
+                data = response.data.results;
+            } else if (Array.isArray(response.data)) {
+                data = response.data;
+            } else {
+                data = [];
+            }
+            setUsers(data);
         } catch (error) {
             console.error("Error fetching users:", error);
             setError("Failed to fetch users");
@@ -120,8 +162,8 @@ const AdminPeopleContent = () => {
     };
 
     const handleAddUser = async () => {
-        if (!centerId) {
-            setError("Center ID is required");
+        if (!centerId || centerId === '__no_center__') {
+            setError("Center ID is required. Please ensure your account is assigned to a center.");
             return;
         }
 
@@ -143,24 +185,28 @@ const AdminPeopleContent = () => {
 
             switch (roleLower) {
                 case 'teacher':
-                    endpoint = '/timetable/superadmin/teachers/create/';
+                    endpoint = currentUser?.role === 'super_admin' || currentUser?.role === 'SUPER_ADMIN'
+                        ? '/timetable/superadmin/teachers/create/'
+                        : '/timetable/admin/teachers/create/';
                     response = await api.post(endpoint, {
                         center_id: centerId,
                         name: fullName,
                         email: newUser.email,
-                        phone_number: newUser.username || '',
-                        employee_id: newUser.username || '',
-                        subjects: 'General',
+                        phone_number: newUser.phone_number || '',
+                        employee_id: newUser.employee_id || '',
+                        subjects: newUser.subjects || 'General',
                     });
                     break;
 
                 case 'staff':
-                    endpoint = '/timetable/superadmin/staff/create/';
+                    endpoint = currentUser?.role === 'super_admin' || currentUser?.role === 'SUPER_ADMIN'
+                        ? '/timetable/superadmin/staff/create/'
+                        : '/timetable/admin/staff/create/';
                     response = await api.post(endpoint, {
                         center_id: centerId,
                         name: fullName,
                         email: newUser.email,
-                        phone_number: newUser.username || '',
+                        phone_number: newUser.phone_number || '',
                     });
                     break;
 
@@ -211,7 +257,10 @@ const AdminPeopleContent = () => {
                 password_confirm: "",
                 first_name: "",
                 last_name: "",
-                role: "student"
+                role: "student",
+                phone_number: "",
+                employee_id: "",
+                subjects: "General"
             });
             setCurrentPage(1);
             await fetchUsers();
@@ -482,32 +531,34 @@ const AdminPeopleContent = () => {
                         Manage teachers, students, and staff in your center.
                     </p>
                 </div>
-                <div className="mt-4 flex md:ml-4 md:mt-0 gap-3">
-                    <button
-                        type="button"
-                        onClick={handleExport}
-                        className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                    >
-                        <Download className="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400" />
-                        Export
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setShowImportModal(true)}
-                        className="inline-flex items-center rounded-md bg-purple-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-500"
-                    >
-                        <FileSpreadsheet className="-ml-0.5 mr-1.5 h-5 w-5" />
-                        Import Excel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setShowAddUserModal(true)}
-                        className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                    >
-                        <UserPlus className="-ml-0.5 mr-1.5 h-5 w-5" />
-                        Add User
-                    </button>
-                </div>
+                {(currentUser?.role?.toLowerCase() !== 'teacher' && currentUser?.role?.toLowerCase() !== 'student') && (
+                    <div className="mt-4 flex md:ml-4 md:mt-0 gap-3">
+                        <button
+                            type="button"
+                            onClick={handleExport}
+                            className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                        >
+                            <Download className="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400" />
+                            Export
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowImportModal(true)}
+                            className="inline-flex items-center rounded-md bg-purple-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-500"
+                        >
+                            <FileSpreadsheet className="-ml-0.5 mr-1.5 h-5 w-5" />
+                            Import Excel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowAddUserModal(true)}
+                            className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                        >
+                            <UserPlus className="-ml-0.5 mr-1.5 h-5 w-5" />
+                            Add User
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Main Content Card */}
@@ -668,6 +719,11 @@ const AdminPeopleContent = () => {
                                                 <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${getRoleBadgeStyle(user.role)}`}>
                                                     {getRoleDisplayName(user.role)}
                                                 </span>
+                                                {!user.center_id && !user.center && (
+                                                    <span className="ml-2 inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
+                                                        Unassigned
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="whitespace-nowrap px-3 py-4">
                                                 <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${user.is_active
@@ -677,19 +733,21 @@ const AdminPeopleContent = () => {
                                                     {user.is_active ? "Active" : "Inactive"}
                                                 </span>
                                             </td>
-                                            <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button className="text-gray-400 hover:text-blue-600 transition-colors">
-                                                        <Edit2 className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteUser(user.id)}
-                                                        className="text-gray-400 hover:text-red-600 transition-colors"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
+                                            {(currentUser?.role?.toLowerCase() !== 'teacher' && currentUser?.role?.toLowerCase() !== 'student') && (
+                                                <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <button className="text-gray-400 hover:text-blue-600 transition-colors">
+                                                            <Edit2 className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteUser(user.id)}
+                                                            className="text-gray-400 hover:text-red-600 transition-colors"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            )}
                                         </tr>
                                     ))
                                 )}
@@ -820,11 +878,22 @@ const AdminPeopleContent = () => {
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone / Employee ID</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Username <span className="text-xs text-gray-500">(Optional - auto-generated if blank)</span></label>
                                         <input
                                             type="text"
                                             value={newUser.username}
                                             onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+                                            className="block w-full rounded-md border-0 py-2 px-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                                            placeholder="Leave empty for auto-generation"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number <span className="text-xs text-gray-500">(Optional)</span></label>
+                                        <input
+                                            type="tel"
+                                            value={newUser.phone_number}
+                                            onChange={(e) => setNewUser({ ...newUser, phone_number: e.target.value })}
                                             className="block w-full rounded-md border-0 py-2 px-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
                                             placeholder="9876543210"
                                         />
@@ -842,6 +911,31 @@ const AdminPeopleContent = () => {
                                             <option value="staff">Staff</option>
                                         </select>
                                     </div>
+
+                                    {newUser.role === 'teacher' && (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
+                                                <input
+                                                    type="text"
+                                                    value={newUser.employee_id}
+                                                    onChange={(e) => setNewUser({ ...newUser, employee_id: e.target.value })}
+                                                    className="block w-full rounded-md border-0 py-2 px-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                                                    placeholder="EMP-001"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Subjects</label>
+                                                <input
+                                                    type="text"
+                                                    value={newUser.subjects}
+                                                    onChange={(e) => setNewUser({ ...newUser, subjects: e.target.value })}
+                                                    className="block w-full rounded-md border-0 py-2 px-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                                                    placeholder="Physics, Chemistry"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-3">
@@ -957,7 +1051,7 @@ const AdminPeopleContent = () => {
                                         <CheckCircle className="h-6 w-6 text-green-600" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold text-gray-900">User Created Successfully</h3>
+                                        <h3 className="text-lg font-semibold text-gray-900">🎉 User Created Successfully</h3>
                                         <p className="text-sm text-gray-500">Please save these credentials securely</p>
                                     </div>
                                 </div>
