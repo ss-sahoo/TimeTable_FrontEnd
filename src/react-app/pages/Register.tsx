@@ -81,11 +81,11 @@ export default function Register() {
       };
 
       const response = await api.post('/auth/register/', userData);
-      
+
       // Store tokens
       localStorage.setItem('access_token', response.data.access);
       localStorage.setItem('refresh_token', response.data.refresh);
-      
+
       // Set user in context and localStorage
       const userInfo = response.data.user;
       localStorage.setItem('user_data', JSON.stringify(userInfo));
@@ -97,7 +97,7 @@ export default function Register() {
       // Handle various error response formats
       const errorData = err.response?.data;
       let errorMessage = 'Registration failed. Please try again.';
-      
+
       if (errorData) {
         if (errorData.password?.[0]) {
           errorMessage = `Password: ${errorData.password[0]}`;
@@ -113,7 +113,7 @@ export default function Register() {
       } else if (err.message) {
         errorMessage = err.message;
       }
-      
+
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -124,7 +124,7 @@ export default function Register() {
   const getPasswordStrength = () => {
     const password = formData.password;
     if (!password) return { strength: 0, label: '', color: '' };
-    
+
     let strength = 0;
     if (password.length >= 8) strength++;
     if (/[A-Z]/.test(password)) strength++;
@@ -180,9 +180,15 @@ export default function Register() {
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: 'spring', duration: 0.8 }}
-              className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center shadow-lg shadow-violet-500/30"
+              className="w-10 h-10 rounded-2xl bg-gradient-to-br flex items-center justify-center shadow-lg "
             >
-              <Zap className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 flex items-center justify-center mx-auto">
+                <img
+                  src="/examlogo.png"
+                  alt="Exam Logo"
+                  className="w-8 h-8 object-contain rounded-md"
+                />
+              </div>
             </motion.div>
             <span className="text-2xl font-bold text-white">DashoExams</span>
           </div>
@@ -202,7 +208,7 @@ export default function Register() {
                 </span>
               </h1>
               <p className="text-lg text-slate-300 mb-10 leading-relaxed">
-                Join thousands of institutions already using DashoExams to streamline 
+                Join thousands of institutions already using DashoExams to streamline
                 their examination process.
               </p>
             </motion.div>
@@ -245,9 +251,15 @@ export default function Register() {
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 mb-4 shadow-lg shadow-violet-500/30"
+              className="w-10 h-10 rounded-2xl bg-gradient-to-br flex items-center justify-center shadow-lg "
             >
-              <Zap className="w-7 h-7 text-white" />
+              <div className="w-12 h-12 flex items-center justify-center mx-auto">
+                <img
+                  src="/examlogo.png"
+                  alt="Exam Logo"
+                  className="w-8 h-8 object-contain rounded-md"
+                />
+              </div>
             </motion.div>
             <h2 className="text-xl font-bold text-slate-900">DashoExams</h2>
           </div>
@@ -429,9 +441,8 @@ export default function Register() {
                       {[1, 2, 3, 4, 5].map((level) => (
                         <div
                           key={level}
-                          className={`h-1 flex-1 rounded-full transition-colors ${
-                            level <= passwordStrength.strength ? passwordStrength.color : 'bg-slate-200'
-                          }`}
+                          className={`h-1 flex-1 rounded-full transition-colors ${level <= passwordStrength.strength ? passwordStrength.color : 'bg-slate-200'
+                            }`}
                         />
                       ))}
                     </div>
