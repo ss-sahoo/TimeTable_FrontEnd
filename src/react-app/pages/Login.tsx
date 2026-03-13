@@ -196,9 +196,12 @@ export default function Login() {
           transition={{ duration: 0.5 }}
           className="relative z-10 flex items-center gap-3"
         >
-          <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-sm border border-white/10">
-            <Zap className="w-5 h-5 text-yellow-400" fill="currentColor" />
-          </div>
+          <div className="w-10 h-10 flex items-center justify-center border border-white/10">
+            <img
+              src="/examlogo.png"
+              alt="Exam Logo"
+              className="w-8 h-8 object-contain mx-auto"
+            />          </div>
           <span className="font-bold text-xl tracking-tight">DashoExams</span>
         </motion.div>
 
@@ -417,11 +420,7 @@ export default function Login() {
                   Remember me
                 </label>
               </div>
-              <div className="text-sm">
-                <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors">
-                  Forgot password?
-                </a>
-              </div>
+              
             </div>
 
             {/* Submit Button */}
@@ -459,7 +458,7 @@ export default function Login() {
         {/* Footer Links */}
         <div className="mt-8 text-center">
           <div className="flex justify-center gap-6 text-xs text-slate-400">
-            <a href="#" className="hover:text-slate-600 transition-colors">Privacy Policy</a>
+            <a href="https://www.termsfeed.com/live/d118fde1-02b7-4e48-bcfe-2bb352516ff7" className="hover:text-slate-600 transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-slate-600 transition-colors">Terms of Service</a>
             <a href="#" className="hover:text-slate-600 transition-colors">Help Center</a>
           </div>

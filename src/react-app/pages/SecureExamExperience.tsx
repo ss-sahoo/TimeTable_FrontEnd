@@ -78,6 +78,7 @@ interface ExamAttempt {
   status: string;
   started_at: string;
   time_spent: number;
+  time_remaining?: number;
   max_violations_allowed: number;
   violations_count: number;
 }
@@ -88,6 +89,139 @@ interface Answer {
   is_flagged: boolean;
   time_spent: number;
 }
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+const isAttemptSubmitted = (attempt: ExamAttempt | null) =>
+  attempt?.status === 'submitted' || attempt?.status === 'auto_submitted';
+
+/**
+ * Compute a stable deadline (ms since epoch) from the attempt data.
+ * Priority:
+ *  1. started_at + duration_minutes   (most reliable)
+ *  2. end_date from exam
+ *  3. time_remaining (fallback)
+ */
+const computeDeadline = (attempt: ExamAttempt): number | null => {
+  if (attempt.started_at && attempt.exam.duration_minutes) {
+    const startMs = new Date(attempt.started_at).getTime();
+    if (!isNaN(startMs)) {
+      return startMs + attempt.exam.duration_minutes * 60 * 1000;
+    }
+  }
+  if (attempt.exam.end_date) {
+    const endMs = new Date(attempt.exam.end_date).getTime();
+    if (!isNaN(endMs)) return endMs;
+  }
+  if (attempt.time_remaining !== undefined && attempt.time_remaining > 0) {
+    return Date.now() + attempt.time_remaining * 1000;
+  }
+  return null;
+};
+
+// ─── Confirmation Modal ───────────────────────────────────────────────────────
+
+interface ConfirmSubmitModalProps {
+  isOpen: boolean;
+  answeredCount: number;
+  totalCount: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isSubmitting: boolean;
+}
+
+const ConfirmSubmitModal: React.FC<ConfirmSubmitModalProps> = ({
+  isOpen,
+  answeredCount,
+  totalCount,
+  onConfirm,
+  onCancel,
+  isSubmitting
+}) => {
+  if (!isOpen) return null;
+
+  const unanswered = totalCount - answeredCount;
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.92, y: 20 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            className="bg-white dark:bg-slate-900 rounded-[28px] shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md p-8"
+          >
+            {/* Icon */}
+            <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/40 flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle className="w-8 h-8 text-amber-500" />
+            </div>
+
+            {/* Title */}
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white text-center mb-2">
+              Finish Exam?
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6">
+              Are you sure you want to finish the exam? This action cannot be undone.
+            </p>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/40 rounded-2xl p-4 text-center">
+                <p className="text-2xl font-bold text-emerald-600">{answeredCount}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600/70 mt-1">Answered</p>
+              </div>
+              <div className={`${unanswered > 0 ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800/40' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700'} border rounded-2xl p-4 text-center`}>
+                <p className={`text-2xl font-bold ${unanswered > 0 ? 'text-red-600' : 'text-slate-400'}`}>{unanswered}</p>
+                <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${unanswered > 0 ? 'text-red-600/70' : 'text-slate-400'}`}>Unanswered</p>
+              </div>
+            </div>
+
+            {unanswered > 0 && (
+              <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 rounded-2xl p-4 mb-6">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                  You have <strong>{unanswered}</strong> unanswered question{unanswered > 1 ? 's' : ''}. Unanswered questions will receive no marks.
+                </p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={onCancel}
+                disabled={isSubmitting}
+                className="flex-1 px-6 py-3 rounded-2xl border-2 border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all disabled:opacity-50"
+              >
+                No, Resume
+              </button>
+              <button
+                onClick={onConfirm}
+                disabled={isSubmitting}
+                className="flex-1 px-6 py-3 rounded-2xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isSubmitting ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <CheckCircle className="w-4 h-4" />
+                )}
+                Yes, Finish
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 const SecureExamExperience: React.FC = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
@@ -108,13 +242,21 @@ const SecureExamExperience: React.FC = () => {
   const [showViolationsPanel, setShowViolationsPanel] = useState(false);
   const [currentToastViolation, setCurrentToastViolation] = useState<any>(null);
   const [activeSubject, setActiveSubject] = useState<string>('All');
-  const [isPaused, setIsPaused] = useState(false);
   const [isWebcamMinimized, setIsWebcamMinimized] = useState(false);
+
+  // Confirmation modal state
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Pre-exam flow states
   const [examStarted, setExamStarted] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
-  const timerBaselineRef = useRef<{ serverTime: number, localTime: number } | null>(null);
+
+  // Deadline-based timer: absolute ms timestamp when exam ends
+  const deadlineRef = useRef<number | null>(null);
+  // Guard so auto-submit fires only once
+  const autoSubmitFiredRef = useRef(false);
+  // Resync interval ref
+  const resyncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Security hook
   const {
@@ -134,82 +276,150 @@ const SecureExamExperience: React.FC = () => {
     initialViolationCount: examAttempt?.violations_count || 0
   });
 
-  // Load exam data
+  // Load exam data on mount
   useEffect(() => {
     loadExamData();
   }, [attemptId]);
 
-  // Auto-start exam
+  // Auto-start exam when data is ready
   useEffect(() => {
     if (examAttempt && questions.length > 0 && !examStarted) {
-      const timer = setTimeout(() => {
-        setExamStarted(true);
-      }, 500);
+      const timer = setTimeout(() => setExamStarted(true), 500);
       return () => clearTimeout(timer);
     }
   }, [examAttempt, questions.length, examStarted]);
 
-  // Timer effect
+  // ── Timer: tick every second against the fixed deadline ──────────────────
   useEffect(() => {
-    if (!examAttempt || isPaused || !timerBaselineRef.current) return;
+    if (!examAttempt || !deadlineRef.current) return;
 
-    const interval = setInterval(() => {
-      const elapsedLocal = (Date.now() - timerBaselineRef.current!.localTime) / 1000;
-      const currentRemaining = Math.max(0, timerBaselineRef.current!.serverTime - elapsedLocal);
+    const tick = () => {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.round((deadlineRef.current! - now) / 1000));
+      setTimeRemaining(remaining);
 
-      if (currentRemaining <= 0) {
-        setTimeRemaining(0);
+      if (remaining <= 0 && !autoSubmitFiredRef.current) {
+        autoSubmitFiredRef.current = true;
         handleAutoSubmit();
-        clearInterval(interval);
-      } else {
-        setTimeRemaining(currentRemaining);
       }
-    }, 1000);
+    };
 
+    tick(); // immediate first tick
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [examAttempt, isPaused]);
+  }, [examAttempt, deadlineRef.current]);
 
-  // Auto-save effect
+  // ── Periodic resync with server every 30s ────────────────────────────────
   useEffect(() => {
-    const interval = setInterval(() => {
-      autoSaveAnswers();
-    }, 30000);
+    if (!attemptId || !examAttempt) return;
 
+    const resync = async () => {
+      try {
+        const response = await api.get(`/exams/attempts/${attemptId}/`);
+        const refreshed = response.data as ExamAttempt;
+
+        // If already submitted, redirect
+        if (isAttemptSubmitted(refreshed)) {
+          navigate(`/exam-results/${attemptId}`, { replace: true });
+          return;
+        }
+
+        // Recompute deadline from fresh server data
+        const newDeadline = computeDeadline(refreshed);
+        if (newDeadline && newDeadline > Date.now()) {
+          deadlineRef.current = newDeadline;
+        }
+
+        setExamAttempt(prev => prev ? { ...prev, ...refreshed } : refreshed);
+      } catch (err) {
+        console.error('Timer resync failed:', err);
+      }
+    };
+
+    resyncIntervalRef.current = setInterval(resync, 30_000);
+    return () => {
+      if (resyncIntervalRef.current) clearInterval(resyncIntervalRef.current);
+    };
+  }, [attemptId, examAttempt, navigate]);
+
+  // ── Auto-save every 30s ───────────────────────────────────────────────────
+  useEffect(() => {
+    const interval = setInterval(() => autoSaveAnswers(), 30_000);
     return () => clearInterval(interval);
   }, [answers]);
 
-  // Listen for new violations and show toast
+  // ── Back-button / page-show guard ─────────────────────────────────────────
+  useEffect(() => {
+    if (!attemptId) return;
+
+    const verifyAttemptStatus = async () => {
+      try {
+        const response = await api.get(`/exams/attempts/${attemptId}/`);
+        const latest = response.data as ExamAttempt;
+        if (isAttemptSubmitted(latest)) {
+          navigate(`/exam-results/${attemptId}`, { replace: true });
+        }
+      } catch (err) {
+        console.error('Failed to verify exam attempt status:', err);
+      }
+    };
+
+    const handlePageShow = (e: PageTransitionEvent) => {
+      // persisted = true means page was restored from bfcache
+      void verifyAttemptStatus();
+    };
+
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, [attemptId, navigate]);
+
+  // ── Violations toast ──────────────────────────────────────────────────────
   const lastViolationTimeShown = useRef<number>(0);
   useEffect(() => {
     if (violations.length > 0) {
-      const latestViolation = violations[violations.length - 1];
-      const timestamp = latestViolation.timestamp.getTime();
-
-      if (timestamp > lastViolationTimeShown.current) {
-        lastViolationTimeShown.current = timestamp;
-        setCurrentToastViolation(latestViolation);
+      const latest = violations[violations.length - 1];
+      const ts = latest.timestamp.getTime();
+      if (ts > lastViolationTimeShown.current) {
+        lastViolationTimeShown.current = ts;
+        setCurrentToastViolation(latest);
       }
     }
   }, [violations]);
 
-  const handleCloseToast = useCallback(() => {
-    setCurrentToastViolation(null);
-  }, []);
+  const handleCloseToast = useCallback(() => setCurrentToastViolation(null), []);
 
+  // ── Load exam data ────────────────────────────────────────────────────────
   const loadExamData = async () => {
     try {
-      const attemptEndpoint = `/exams/attempts/${attemptId}/`;
-      const attemptResponse = await api.get(attemptEndpoint);
-      const attemptData = attemptResponse.data;
+      const attemptResponse = await api.get(`/exams/attempts/${attemptId}/`);
+      const attemptData: ExamAttempt = attemptResponse.data;
+
+      // Redirect immediately if already submitted
+      if (isAttemptSubmitted(attemptData)) {
+        navigate(`/exam-results/${attemptId}`, { replace: true });
+        return;
+      }
+
       setExamAttempt(attemptData);
+
+      // Compute and store deadline
+      const deadline = computeDeadline(attemptData);
+      if (deadline !== null) {
+        const remaining = Math.round((deadline - Date.now()) / 1000);
+        if (remaining <= 0) {
+          setIsExpired(true);
+          setLoading(false);
+          return;
+        }
+        deadlineRef.current = deadline;
+        setTimeRemaining(remaining);
+      }
 
       const examId = attemptData.exam.id;
       let mappedQuestions: Question[] = [];
 
       try {
-        const questionsEndpoint = `/questions/exams/${examId}/questions/`;
-        const questionsResponse = await api.get(questionsEndpoint);
-
+        const questionsResponse = await api.get(`/questions/exams/${examId}/questions/`);
         const examQuestions = Array.isArray(questionsResponse.data)
           ? questionsResponse.data
           : (questionsResponse.data?.results ?? []);
@@ -238,36 +448,37 @@ const SecureExamExperience: React.FC = () => {
                 structure: q.structure ?? {},
               };
             })
-            .filter((question: Question) => Boolean(question.question_text));
+            .filter((q: Question) => Boolean(q.question_text));
         }
       } catch (err) {
-        console.error('Failed to load questions:', err);
+        console.error('Failed to load questions from primary endpoint:', err);
       }
 
-      // Fallback logic
+      // Fallback
       if (mappedQuestions.length === 0) {
-        const params = { exam: examId, page_size: 1000 };
-        const questionsResponse = await api.get('/questions/questions/', { params });
+        const questionsResponse = await api.get('/questions/questions/', { params: { exam: examId, page_size: 1000 } });
         const rawQuestions = Array.isArray(questionsResponse.data)
           ? questionsResponse.data
           : (questionsResponse.data?.results ?? questionsResponse.data ?? []);
 
-        mappedQuestions = rawQuestions.map((item: any) => ({
-          id: item.id,
-          question_text: item.question_text ?? '',
-          question_type: item.question_type ?? 'mcq',
-          options: Array.isArray(item.options) ? item.options : [],
-          correct_answer: item.correct_answer ?? '',
-          explanation: item.explanation ?? '',
-          marks: item.marks ?? 0,
-          subject: item.subject ?? '',
-          pattern_section: item.pattern_section ?? null,
-          question_number: item.question_number ?? null,
-          question_number_in_pattern: item.question_number_in_pattern ?? null,
-          section_name: item.pattern_section_name ?? '',
-          negative_marks: item.negative_marks ?? null,
-          structure: item.structure ?? {},
-        })).filter((q: Question) => Boolean(q.question_text));
+        mappedQuestions = rawQuestions
+          .map((item: any) => ({
+            id: item.id,
+            question_text: item.question_text ?? '',
+            question_type: item.question_type ?? 'mcq',
+            options: Array.isArray(item.options) ? item.options : [],
+            correct_answer: item.correct_answer ?? '',
+            explanation: item.explanation ?? '',
+            marks: item.marks ?? 0,
+            subject: item.subject ?? '',
+            pattern_section: item.pattern_section ?? null,
+            question_number: item.question_number ?? null,
+            question_number_in_pattern: item.question_number_in_pattern ?? null,
+            section_name: item.pattern_section_name ?? '',
+            negative_marks: item.negative_marks ?? null,
+            structure: item.structure ?? {},
+          }))
+          .filter((q: Question) => Boolean(q.question_text));
       }
 
       mappedQuestions.sort((a, b) => {
@@ -279,24 +490,11 @@ const SecureExamExperience: React.FC = () => {
       setQuestions(mappedQuestions);
 
       if (attemptData.answers) {
-        const existingAnswers = new Map();
+        const existingAnswers = new Map<number, Answer>();
         Object.entries(attemptData.answers).forEach(([questionId, answer]: [string, any]) => {
           existingAnswers.set(parseInt(questionId, 10), answer);
         });
         setAnswers(existingAnswers);
-      }
-
-      // Initialize stable timer baseline
-      if (attemptData.time_remaining !== undefined) {
-        if (attemptData.time_remaining <= 0) {
-          setIsExpired(true);
-        } else {
-          timerBaselineRef.current = {
-            serverTime: attemptData.time_remaining,
-            localTime: Date.now()
-          };
-          setTimeRemaining(attemptData.time_remaining);
-        }
       }
 
       setLoading(false);
@@ -306,52 +504,44 @@ const SecureExamExperience: React.FC = () => {
     }
   };
 
+  // ── Auto-save ─────────────────────────────────────────────────────────────
   const autoSaveAnswers = async () => {
     if (answers.size === 0) return;
     setAutoSaveStatus('saving');
     try {
-      const answersObject = Object.fromEntries(answers);
       await api.post(`/exams/attempts/${attemptId}/auto-save/`, {
-        answers: answersObject
+        answers: Object.fromEntries(answers)
       });
       setAutoSaveStatus('saved');
-    } catch (error: any) {
+    } catch {
       setAutoSaveStatus('error');
     }
   };
 
+  // ── Answer handlers ───────────────────────────────────────────────────────
   const handleAnswerChange = (questionId: number, answer: string | string[]) => {
-    const currentAnswer = answers.get(questionId) || {
+    const current = answers.get(questionId) || {
       question_id: questionId,
       answer: '',
       is_flagged: false,
       time_spent: 0
     };
-
-    const newAnswer = { ...currentAnswer, answer };
-    setAnswers(prev => new Map(prev.set(questionId, newAnswer)));
+    setAnswers(prev => new Map(prev.set(questionId, { ...current, answer })));
   };
 
   const handleFlagToggle = (questionId: number) => {
-    const currentAnswer = answers.get(questionId) || {
+    const current = answers.get(questionId) || {
       question_id: questionId,
       answer: '',
       is_flagged: false,
       time_spent: 0
     };
-
-    setAnswers(prev => new Map(prev.set(questionId, {
-      ...currentAnswer,
-      is_flagged: !currentAnswer.is_flagged
-    })));
+    setAnswers(prev => new Map(prev.set(questionId, { ...current, is_flagged: !current.is_flagged })));
   };
 
-  const handleQuestionNavigation = (index: number) => {
-    setCurrentQuestionIndex(index);
-  };
+  const handleQuestionNavigation = (index: number) => setCurrentQuestionIndex(index);
 
   const handleViolationDetected = (violation: any) => {
-    // We log it via the security hook which handles cooldowns and state
     logViolation(violation.type, {
       message: violation.message,
       confidence: violation.confidence,
@@ -364,6 +554,7 @@ const SecureExamExperience: React.FC = () => {
     setCurrentViolation(null);
   };
 
+  // ── Submit (called after confirmation) ───────────────────────────────────
   const handleSubmit = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -373,28 +564,58 @@ const SecureExamExperience: React.FC = () => {
         answers: Object.fromEntries(answers)
       };
       await api.post('/exams/submit-exam/', submissionData);
-      navigate(`/exam-results/${attemptId}`);
+      // Use replace so exam page is removed from history stack
+      navigate(`/exam-results/${attemptId}`, { replace: true });
     } catch (error: any) {
       setError(error.response?.data?.error || 'Failed to submit exam');
-    } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Auto-submit (timer expiry) — no confirmation prompt
   const handleAutoSubmit = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const submissionData = {
+        attempt_id: parseInt(attemptId!),
+        answers: Object.fromEntries(answers)
+      };
+      await api.post('/exams/submit-exam/', submissionData);
+      navigate(`/exam-results/${attemptId}`, { replace: true });
+    } catch (error: any) {
+      setError(error.response?.data?.error || 'Failed to auto-submit exam');
+      setIsSubmitting(false);
+    }
+  };
+
+  // Open confirmation modal (for manual submit buttons)
+  const handleSubmitRequest = () => {
+    if (isSubmitting) return;
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    setShowConfirmModal(false);
     await handleSubmit();
   };
 
+  const handleCancelSubmit = () => {
+    setShowConfirmModal(false);
+  };
+
+  // ── Formatting ────────────────────────────────────────────────────────────
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
+    const s = Math.floor(seconds % 60);
     return `${h > 0 ? h.toString().padStart(2, '0') + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  // ── Derived stats ─────────────────────────────────────────────────────────
   const questionStats = useMemo(() => {
     const stats = { answered: 0, flagged: 0, notVisited: 0 };
-    questions.forEach((q) => {
+    questions.forEach(q => {
       const ans = answers.get(q.id);
       if (!ans || !ans.answer) stats.notVisited++;
       else {
@@ -426,6 +647,8 @@ const SecureExamExperience: React.FC = () => {
   const currentQuestion = questions[currentQuestionIndex];
   const currentAnswer = answers.get(currentQuestion?.id);
 
+  // ── Render states ─────────────────────────────────────────────────────────
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center">
@@ -435,7 +658,6 @@ const SecureExamExperience: React.FC = () => {
     );
   }
 
-  // Frontend disqualification screen removed per user request
   if (isExpired) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
@@ -456,7 +678,7 @@ const SecureExamExperience: React.FC = () => {
     );
   }
 
-  // if (isDisqualified) return <ViolationWarning isOpen={true} violation={{ type: 'disqualified', ... }} ... />;
+  // ── Main UI ───────────────────────────────────────────────────────────────
 
   return (
     <div className="h-screen flex flex-col bg-slate-100 dark:bg-slate-950 select-none">
@@ -503,28 +725,26 @@ const SecureExamExperience: React.FC = () => {
             </div>
           </div>
 
+          {/* Timer — no pause button (server controls time) */}
           <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-            <div className={`flex items-center gap-3 px-4 py-1.5 rounded-lg bg-white dark:bg-slate-900 shadow-sm border border-slate-200 dark:border-slate-700 min-w-[120px] justify-center`}>
+            <div className="flex items-center gap-3 px-4 py-1.5 rounded-lg bg-white dark:bg-slate-900 shadow-sm border border-slate-200 dark:border-slate-700 min-w-[120px] justify-center">
               <Clock className={`w-4 h-4 ${timeRemaining < 300 ? 'text-red-500 animate-pulse' : 'text-blue-600'}`} />
               <span className={`text-lg font-mono font-bold leading-none ${timeRemaining < 300 ? 'text-red-600' : 'text-slate-900 dark:text-white'}`}>
                 {formatTime(timeRemaining)}
               </span>
             </div>
-            <button
-              onClick={() => setIsPaused(!isPaused)}
-              className="p-2 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-400 transition-all"
-              title="Temporary Pause"
-            >
-              <Pause className="w-4 h-4" />
-            </button>
           </div>
 
+          {/* Final Submit button → opens confirmation modal */}
           <button
-            onClick={handleSubmit}
+            onClick={handleSubmitRequest}
             disabled={isSubmitting}
             className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
           >
-            {isSubmitting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="w-4 h-4" />}
+            {isSubmitting
+              ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              : <Send className="w-4 h-4" />
+            }
             Final Submit
           </button>
         </div>
@@ -573,7 +793,7 @@ const SecureExamExperience: React.FC = () => {
                 <div className="text-lg md:text-xl font-medium text-slate-800 dark:text-slate-100 leading-relaxed bg-slate-50/50 dark:bg-slate-800/30 p-8 rounded-[24px] border border-slate-100 dark:border-slate-800">
                   <LaTeXRenderer content={currentQuestion?.question_text || ''} />
 
-                  {/* Structured Question Content (Internal Choice or Multi-part) */}
+                  {/* Structured Question Content */}
                   {currentQuestion?.structure?.is_nested && (
                     <div className="mt-8 space-y-6">
                       <div className="h-[1px] bg-slate-200 dark:bg-slate-700 w-full" />
@@ -592,7 +812,6 @@ const SecureExamExperience: React.FC = () => {
                                   <LaTeXRenderer content={part.question_text || ''} />
                                 </div>
 
-                                {/* Sub-parts within a choice */}
                                 {(part.parts || []).map((subPart: any, spIdx: number) => (
                                   <div key={spIdx} className="mt-4 pl-4 border-l-2 border-slate-100 dark:border-slate-700">
                                     <div className="flex items-center gap-2 mb-1">
@@ -605,36 +824,27 @@ const SecureExamExperience: React.FC = () => {
                                   </div>
                                 ))}
 
-                                {/* Choice Selection UI */}
                                 <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                                   <p className="text-xs text-slate-500 font-medium">Answer this choice?</p>
                                   <button
                                     onClick={() => {
                                       let currentAns: any = {};
-                                      try {
-                                        currentAns = JSON.parse(currentAnswer?.answer as string || '{}');
-                                      } catch (e) {
-                                        currentAns = { text: currentAnswer?.answer };
-                                      }
+                                      try { currentAns = JSON.parse(currentAnswer?.answer as string || '{}'); } catch (e) { currentAns = { text: currentAnswer?.answer }; }
                                       currentAns.selected_choice = part.label || `Choice ${String.fromCharCode(65 + idx)}`;
                                       handleAnswerChange(currentQuestion.id, JSON.stringify(currentAns));
                                     }}
                                     className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${(function () {
                                       let sel = '';
-                                      try {
-                                        sel = JSON.parse(currentAnswer?.answer as string || '{}').selected_choice;
-                                      } catch (e) { }
+                                      try { sel = JSON.parse(currentAnswer?.answer as string || '{}').selected_choice; } catch (e) { }
                                       return sel === (part.label || `Choice ${String.fromCharCode(65 + idx)}`);
                                     })()
                                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
                                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                      }`}
+                                    }`}
                                   >
                                     {(function () {
                                       let sel = '';
-                                      try {
-                                        sel = JSON.parse(currentAnswer?.answer as string || '{}').selected_choice;
-                                      } catch (e) { }
+                                      try { sel = JSON.parse(currentAnswer?.answer as string || '{}').selected_choice; } catch (e) { }
                                       return sel === (part.label || `Choice ${String.fromCharCode(65 + idx)}`);
                                     })() ? 'Selected' : 'Select Choice'}
                                   </button>
@@ -717,9 +927,7 @@ const SecureExamExperience: React.FC = () => {
                         <div className="space-y-6">
                           {(function () {
                             let selected = '';
-                            try {
-                              selected = JSON.parse(currentAnswer?.answer as string || '{}').selected_choice;
-                            } catch (e) { }
+                            try { selected = JSON.parse(currentAnswer?.answer as string || '{}').selected_choice; } catch (e) { }
 
                             if (!selected) {
                               return (
@@ -731,7 +939,6 @@ const SecureExamExperience: React.FC = () => {
                               );
                             }
 
-                            // Find the selected part
                             const parts = currentQuestion.structure.parts || [];
                             const nestedType = currentQuestion.structure.nested_type;
 
@@ -826,7 +1033,6 @@ const SecureExamExperience: React.FC = () => {
 
               {/* Navigation Bar */}
               <div className="px-8 py-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
-                {/* Left side - Autosave status */}
                 <div className="hidden sm:flex items-center gap-2 px-4 py-2 border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 rounded-xl">
                   <div className={`w-2 h-2 rounded-full ${autoSaveStatus === 'saving' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
                   <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
@@ -834,7 +1040,6 @@ const SecureExamExperience: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Right side - Navigation buttons */}
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => handleQuestionNavigation(Math.max(0, currentQuestionIndex - 1))}
@@ -852,10 +1057,13 @@ const SecureExamExperience: React.FC = () => {
                     Save & Next
                     <ChevronRight className="w-4 h-4" />
                   </button>
+
+                  {/* Finish Assessment → opens confirmation modal */}
                   {currentQuestionIndex === questions.length - 1 && (
                     <button
-                      onClick={handleSubmit}
-                      className="flex items-center gap-2 px-8 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                      onClick={handleSubmitRequest}
+                      disabled={isSubmitting}
+                      className="flex items-center gap-2 px-8 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all disabled:opacity-50"
                     >
                       Finish Assessment
                     </button>
@@ -905,10 +1113,13 @@ const SecureExamExperience: React.FC = () => {
                     <button
                       key={q.id}
                       onClick={() => handleQuestionNavigation(idx)}
-                      className={`h-11 rounded-xl text-xs font-bold transition-all border-2 flex items-center justify-center relative ${isCurrent ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-inner' :
-                        isFlagged ? 'border-amber-400 bg-amber-50 text-amber-700' :
-                          isAnswered ? 'border-emerald-500 bg-emerald-50 text-emerald-700' :
-                            'border-slate-100 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-800/50'
+                      className={`h-11 rounded-xl text-xs font-bold transition-all border-2 flex items-center justify-center relative ${isCurrent
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-inner'
+                        : isFlagged
+                          ? 'border-amber-400 bg-amber-50 text-amber-700'
+                          : isAnswered
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                            : 'border-slate-100 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-800/50'
                         }`}
                     >
                       {idx + 1}
@@ -948,14 +1159,10 @@ const SecureExamExperience: React.FC = () => {
         </aside>
       </main>
 
-      {/* Proctoring & Violation UI */}
+      {/* Webcam proctoring */}
       {examAttempt?.exam.enable_webcam_proctoring && (
-        <div className={`fixed z-50 transition-all duration-300 ${isWebcamMinimized
-          ? 'bottom-4 left-1/2 -translate-x-1/2'
-          : 'bottom-6 left-6'
-          }`}>
+        <div className={`fixed z-50 transition-all duration-300 ${isWebcamMinimized ? 'bottom-4 left-1/2 -translate-x-1/2' : 'bottom-6 left-6'}`}>
           {isWebcamMinimized ? (
-            // Minimized View - Compact Bar
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -975,7 +1182,6 @@ const SecureExamExperience: React.FC = () => {
               </button>
             </motion.div>
           ) : (
-            // Maximized View - Full Camera
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -989,7 +1195,6 @@ const SecureExamExperience: React.FC = () => {
                 autoStart={true}
                 className="w-48 shadow-2xl rounded-xl border-2 border-white dark:border-slate-800 overflow-hidden"
               />
-              {/* Minimize Button Overlay */}
               <button
                 onClick={() => setIsWebcamMinimized(true)}
                 className="absolute top-2 right-2 p-1.5 bg-slate-900/80 hover:bg-slate-900 rounded-lg transition-all shadow-lg z-10"
@@ -1002,15 +1207,15 @@ const SecureExamExperience: React.FC = () => {
         </div>
       )}
 
-      {/* Modal disabled as per user request */}
-      {/* <ViolationWarning
-        isOpen={showViolationWarning}
-        violation={currentViolation}
-        violationCount={violationCount}
-        maxViolations={examAttempt?.max_violations_allowed || 10}
-        onAcknowledge={handleViolationAcknowledged}
-        onClose={handleViolationAcknowledged}
-      /> */}
+      {/* Confirm Submit Modal */}
+      <ConfirmSubmitModal
+        isOpen={showConfirmModal}
+        answeredCount={questionStats.answered}
+        totalCount={questions.length}
+        onConfirm={handleConfirmSubmit}
+        onCancel={handleCancelSubmit}
+        isSubmitting={isSubmitting}
+      />
 
       <ViolationToast
         violation={currentToastViolation}

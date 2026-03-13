@@ -75,8 +75,12 @@ export default function TeacherLayout({ children }: TeacherLayoutProps) {
                     {/* Logo / Context Switcher */}
                     <div className="h-16 flex items-center px-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
                         <div className="flex items-center gap-3 w-full">
-                            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg flex items-center justify-center text-white shadow-sm flex-shrink-0">
-                                <Zap className="w-4 h-4" />
+                            <div className="w-8 h-8 flex items-center justify-center mx-auto">
+                                <img
+                                    src="/examlogo.png"
+                                    alt="Exam Logo"
+                                    className="w-8 h-8 object-contain rounded-md"
+                                />
                             </div>
                             {!sidebarCollapsed && (
                                 <>

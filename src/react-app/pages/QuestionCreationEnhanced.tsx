@@ -2852,7 +2852,7 @@ export default function EnhancedQuestionEditor() {
 
                 <div className="pt-2 flex items-center gap-3 text-xs text-slate-600">
                   <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-300 inline-block"></span> Added</span>
-                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-200 inline-block"></span> Current</span>
+                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-600 inline-block"></span> Current</span>
                 </div>
               </div>
             )}

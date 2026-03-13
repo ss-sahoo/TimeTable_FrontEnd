@@ -515,7 +515,7 @@ export default function ExamCreation() {
                     onBlur={(e) => {
                       e.target.style.borderColor = errors.title ? '#ef4444' : '#e5e7eb';
                     }}
-                    placeholder="Enter exam title..."
+                    placeholder="Enter exam title"
                   />
                   {errors.title && (
                     <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
@@ -950,7 +950,7 @@ export default function ExamCreation() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Max Attempts *</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Max Attempt *</label>
                   <input
                     type="number"
                     value={formData.max_attempts}
@@ -1165,7 +1165,7 @@ export default function ExamCreation() {
                   onChange={(e) => handleInputChange('instructions', e.target.value)}
                   rows={3}
                   className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:outline-none transition-colors resize-none"
-                  placeholder="Enter exam instructions for students..."
+                  placeholder="Enter exam instructions for students"
                 />
               </div>
             </div>
