@@ -102,13 +102,21 @@ const SecureExamView: React.FC = () => {
   const [showQuestionPalette, setShowQuestionPalette] = useState(true);
   const [showViolationsPanel, setShowViolationsPanel] = useState(false);
   const [currentToastViolation, setCurrentToastViolation] = useState<any>(null);
-  const [cameraStatusInfo, setCameraStatusInfo] = useState<CameraStatusPayload>({ status: 'idle' });
-  const [cameraIncidents, setCameraIncidents] = useState<ProctoringIncidentPayload[]>([]);
-  // Webcam is disabled for now as per user request
+  // Webcam is completely disabled
   const webcamRequired = false;
+  const isCameraRequired = false;
 
   // Exam started state - auto-start when component loads
   const [examStarted, setExamStarted] = useState(false);
+
+  // Shuffled questions state
+  const [shuffledQuestions, setShuffledQuestions] = useState<Question[]>([]);
+  const [sectionWiseQuestions, setSectionWiseQuestions] = useState<{[key: string]: Question[]}>({});
+  const [currentSection, setCurrentSection] = useState<string>('');
+  const [sections, setSections] = useState<string[]>([]);
+
+  // Violation countdown display
+  const [violationCountdown, setViolationCountdown] = useState<number | null>(null);
 
   // Security hook - configured based on exam settings
   const {
@@ -119,7 +127,7 @@ const SecureExamView: React.FC = () => {
     isFullscreen,
     requestFullscreen
   } = useExamSecurity(parseInt(attemptId!), {
-    maxViolations: examAttempt?.max_violations_allowed || 5,
+    maxViolations: 5, // Fixed to 5 as per requirement
     enableTabMonitoring: examAttempt ? !examAttempt.exam.allow_tab_switching : true,
     enableFullscreenEnforcement: examAttempt?.exam.require_fullscreen || false,
     enableCopyPasteBlocking: examAttempt?.exam.disable_copy_paste || false,
@@ -133,16 +141,38 @@ const SecureExamView: React.FC = () => {
     loadExamData();
   }, [attemptId]);
 
+  // Shuffle questions when loaded
+  useEffect(() => {
+    if (questions.length > 0 && examAttempt) {
+      shuffleQuestionsForStudent();
+    }
+  }, [questions, examAttempt]);
+
   // Auto-start exam once data is loaded
   useEffect(() => {
-    if (examAttempt && questions.length > 0 && !examStarted) {
+    if (examAttempt && shuffledQuestions.length > 0 && !examStarted) {
       // Small delay to ensure everything is ready, then start exam
       const timer = setTimeout(() => {
         setExamStarted(true);
       }, 1000); // 1 second delay for smooth transition
       return () => clearTimeout(timer);
     }
-  }, [examAttempt, questions.length, examStarted]);
+  }, [examAttempt, shuffledQuestions.length, examStarted]);
+
+  // Violation countdown effect
+  useEffect(() => {
+    if (violationCount > 0) {
+      const remaining = 5 - violationCount;
+      setViolationCountdown(remaining);
+      
+      // Show countdown for 3 seconds
+      const timer = setTimeout(() => {
+        setViolationCountdown(null);
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [violationCount]);
 
   // Timer effect
   useEffect(() => {
@@ -221,6 +251,66 @@ const SecureExamView: React.FC = () => {
   const handleCloseToast = useCallback(() => {
     setCurrentToastViolation(null);
   }, []);
+
+  // Shuffle questions for student based on exam settings
+  const shuffleQuestionsForStudent = useCallback(() => {
+    if (!examAttempt || questions.length === 0) return;
+
+    const { exam } = examAttempt;
+    let processedQuestions = [...questions];
+
+    // Group questions by section
+    const questionsBySection: {[key: string]: Question[]} = {};
+    processedQuestions.forEach(q => {
+      const sectionName = q.section_name || 'General';
+      if (!questionsBySection[sectionName]) {
+        questionsBySection[sectionName] = [];
+      }
+      questionsBySection[sectionName].push(q);
+    });
+
+    // Shuffle options within each question if enabled
+    if (exam.shuffle_options) {
+      processedQuestions = processedQuestions.map(q => ({
+        ...q,
+        options: Array.isArray(q.options) ? shuffleArray([...q.options]) : q.options
+      }));
+    }
+
+    // Shuffle questions within each section if enabled
+    if (exam.shuffle_questions || exam.shuffle_within_sections) {
+      Object.keys(questionsBySection).forEach(sectionName => {
+        questionsBySection[sectionName] = shuffleArray(questionsBySection[sectionName]);
+      });
+    }
+
+    // Get section names and shuffle them if enabled
+    let sectionNames = Object.keys(questionsBySection);
+    if (exam.shuffle_sections) {
+      sectionNames = shuffleArray(sectionNames);
+    }
+
+    // Flatten questions back maintaining section order
+    const finalQuestions: Question[] = [];
+    sectionNames.forEach(sectionName => {
+      finalQuestions.push(...questionsBySection[sectionName]);
+    });
+
+    setShuffledQuestions(finalQuestions);
+    setSectionWiseQuestions(questionsBySection);
+    setSections(sectionNames);
+    setCurrentSection(sectionNames[0] || '');
+  }, [examAttempt, questions]);
+
+  // Utility function to shuffle array using Fisher-Yates algorithm
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
 
   const loadExamData = async () => {
     try {
@@ -476,26 +566,12 @@ const SecureExamView: React.FC = () => {
   };
 
   const handleViolationDetected = (violation: any) => {
-    // We log it via the security hook which handles cooldowns and state
-    logViolation(violation.type, {
-      message: violation.message,
-      confidence: violation.confidence,
-      ...violation.analysis
-    }, true);
+    // Webcam violations disabled - no action taken
   };
 
   const handleCameraStatusChange = useCallback((payload: CameraStatusPayload) => {
-    setCameraStatusInfo(payload);
-    if (payload.incident) {
-      setCameraIncidents(prev => [payload.incident!, ...prev].slice(0, 10));
-    }
-
-    if (webcamRequired && payload.status === 'error' && payload.error) {
-      logViolation('no_face', {
-        source: 'camera_monitor',
-        reason: payload.error
-      });
-    }
+    // Camera status changes disabled - no action taken
+  }, []);
   }, [logViolation, webcamRequired]);
 
   const handleViolationAcknowledged = () => {
@@ -673,9 +749,8 @@ const SecureExamView: React.FC = () => {
     );
   }
 
-  const currentQuestion = questions[currentQuestionIndex];
+  const currentQuestion = shuffledQuestions[currentQuestionIndex];
   const currentAnswer = answers.get(currentQuestion?.id);
-  const isCameraRequired = webcamRequired;
   const cameraHealthy = !isCameraRequired || cameraStatusInfo.status === 'active';
   const latestCameraIncident = cameraIncidents[0];
   const cameraStatusLabel = (cameraStatusInfo.status || 'idle').toUpperCase();
@@ -716,8 +791,16 @@ const SecureExamView: React.FC = () => {
               </span>
             </div>
 
-            {/* Violation count - Always visible */}
+            {/* Violation count with countdown display */}
             <div className="flex items-center gap-2">
+              {violationCountdown !== null && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-100 border border-red-300 text-red-700 animate-pulse">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span className="text-sm font-bold">
+                    {violationCountdown} left
+                  </span>
+                </div>
+              )}
               <button
                 onClick={() => setShowViolationsPanel(true)}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all hover:shadow-md active:scale-95 ${violationCount > 3
@@ -761,49 +844,69 @@ const SecureExamView: React.FC = () => {
         </div>
       </div>
 
-      {isCameraRequired && (
-        <div
-          className={`mx-4 mt-4 mb-2 rounded-lg border p-4 ${cameraHealthy
-            ? 'bg-green-50 border-green-200 text-green-800'
-            : 'bg-yellow-50 border-yellow-200 text-yellow-800'
-            }`}
-        >
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-semibold">Webcam monitoring required</p>
-              <p className="text-xs opacity-80">{cameraStatusMessage}</p>
-              {!cameraHealthy && latestCameraIncident && (
-                <p className="text-xs mt-2 opacity-80">
-                  Last incident: <span className="font-semibold">{latestCameraIncident.event_type}</span> at{' '}
-                  {formatIncidentTime(latestCameraIncident.timestamp)}
-                </p>
-              )}
-            </div>
-            <div className="text-xs font-bold tracking-wide uppercase">
-              Status: {cameraStatusLabel}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Webcam monitoring completely disabled */}
 
       <div className="flex h-[calc(100vh-80px)]">
         {/* Question Area */}
         <div className="flex-1 p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900">
           {currentQuestion && (
             <div className="max-w-4xl mx-auto">
-              {/* Question Header */}
+              {/* Question Header with Section Info */}
               <div className="mb-6">
+                {/* Section Navigation */}
+                {sections.length > 1 && (
+                  <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200">
+                        Section: {currentQuestion?.section_name || currentSection}
+                      </h3>
+                      <span className="text-xs text-blue-600 dark:text-blue-400">
+                        {sections.indexOf(currentQuestion?.section_name || currentSection) + 1} of {sections.length}
+                      </span>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {sections.map((section, index) => (
+                        <button
+                          key={section}
+                          onClick={() => {
+                            const sectionQuestions = sectionWiseQuestions[section];
+                            if (sectionQuestions && sectionQuestions.length > 0) {
+                              const firstQuestionIndex = shuffledQuestions.findIndex(q => q.section_name === section);
+                              if (firstQuestionIndex !== -1) {
+                                setCurrentQuestionIndex(firstQuestionIndex);
+                                setCurrentSection(section);
+                              }
+                            }
+                          }}
+                          className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                            (currentQuestion?.section_name || currentSection) === section
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-700'
+                          }`}
+                        >
+                          {section} ({sectionWiseQuestions[section]?.length || 0})
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-4">
                     <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                      Question {currentQuestionIndex + 1} of {questions.length}
+                      Question {currentQuestionIndex + 1} of {shuffledQuestions.length}
                     </span>
                     <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
-                      {(currentQuestion as any).subject || 'General'}
+                      {(currentQuestion as any)?.subject || 'General'}
                     </span>
                     <span className="text-sm text-green-600 dark:text-green-400 font-medium">
-                      {currentQuestion.marks} mark{currentQuestion.marks !== 1 ? 's' : ''}
+                      {currentQuestion?.marks} mark{currentQuestion?.marks !== 1 ? 's' : ''}
                     </span>
+                    {currentQuestion?.negative_marks && (
+                      <span className="text-sm text-red-600 dark:text-red-400 font-medium">
+                        -{currentQuestion.negative_marks} for wrong
+                      </span>
+                    )}
                   </div>
 
                   <button
@@ -938,15 +1041,52 @@ const SecureExamView: React.FC = () => {
               })()}
 
               {currentQuestion.question_type === 'numerical' && (
-                <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
-                  <input
-                    type="number"
-                    value={currentAnswer?.answer || ''}
-                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-white text-lg"
-                    placeholder="Enter your numerical answer"
-                    step="0.01"
-                  />
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Numerical Answer
+                    </label>
+                    <input
+                      type="number"
+                      value={currentAnswer?.answer || ''}
+                      onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-white text-lg font-mono text-center"
+                      placeholder="Enter your numerical answer (e.g., 3.14, 42, -5.67)"
+                      step="any"
+                      autoComplete="off"
+                    />
+                  </div>
+                  
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center mt-0.5">
+                        <span className="text-white text-xs font-bold">i</span>
+                      </div>
+                      <div className="text-sm text-blue-800 dark:text-blue-200">
+                        <p className="font-medium mb-1">Instructions for Numerical Questions:</p>
+                        <ul className="space-y-1 text-xs">
+                          <li>• Enter only the numerical value (no units unless specified)</li>
+                          <li>• Use decimal point (.) for decimal numbers (e.g., 3.14)</li>
+                          <li>• Use negative sign (-) for negative numbers (e.g., -5)</li>
+                          <li>• Do not use commas or spaces in your answer</li>
+                          <li>• Answers are evaluated with a tolerance of ±1% or ±0.01</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {currentAnswer?.answer && (
+                    <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                        <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                          Your answer: <span className="font-mono">{currentAnswer.answer}</span>
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -996,19 +1136,97 @@ const SecureExamView: React.FC = () => {
               )}
 
               {currentQuestion.question_type === 'fill_blank' && (
-                <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
-                  <input
-                    type="text"
-                    value={currentAnswer?.answer || ''}
-                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-white text-lg"
-                    placeholder="Fill in the blank..."
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    Type your answer in the blank space provided
-                  </p>
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Fill in the Blank
+                    </label>
+                    <input
+                      type="text"
+                      value={currentAnswer?.answer || ''}
+                      onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-white text-lg"
+                      placeholder="Type your answer here..."
+                      autoComplete="off"
+                    />
+                  </div>
+                  
+                  <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center mt-0.5">
+                        <span className="text-white text-xs font-bold">!</span>
+                      </div>
+                      <div className="text-sm text-amber-800 dark:text-amber-200">
+                        <p className="font-medium mb-1">Instructions for Fill-in-the-Blank:</p>
+                        <ul className="space-y-1 text-xs">
+                          <li>• Type the exact word or phrase that fits in the blank</li>
+                          <li>• Check spelling and capitalization carefully</li>
+                          <li>• Do not include extra spaces or punctuation</li>
+                          <li>• If multiple words, separate with single spaces</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {currentAnswer?.answer && (
+                    <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                        <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                          Your answer: <span className="font-mono">"{currentAnswer.answer}"</span>
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
+
+              {/* Navigation Buttons */}
+              <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={() => {
+                    if (currentQuestionIndex > 0) {
+                      setCurrentQuestionIndex(currentQuestionIndex - 1);
+                    }
+                  }}
+                  disabled={currentQuestionIndex === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  ← Previous
+                </button>
+
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {currentQuestionIndex + 1} of {shuffledQuestions.length}
+                  </span>
+                  <button
+                    onClick={() => handleFlagToggle(currentQuestion?.id)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                      currentAnswer?.is_flagged
+                        ? 'bg-yellow-500 text-white shadow-lg'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    }`}
+                    title="Flag for review"
+                  >
+                    <Flag className="w-4 h-4" />
+                    {currentAnswer?.is_flagged ? 'Flagged' : 'Flag'}
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (currentQuestionIndex < shuffledQuestions.length - 1) {
+                      setCurrentQuestionIndex(currentQuestionIndex + 1);
+                    }
+                  }}
+                  disabled={currentQuestionIndex === shuffledQuestions.length - 1}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next →
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -1027,7 +1245,7 @@ const SecureExamView: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              {Array.isArray(questions) && questions.map((question, index) => {
+              {Array.isArray(shuffledQuestions) && shuffledQuestions.map((question, index) => {
                 const status = getQuestionStatus(index);
                 return (
                   <button
@@ -1046,6 +1264,11 @@ const SecureExamView: React.FC = () => {
                     </div>
                     <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                       {(question as any).subject || 'General'} • {question.marks}m
+                      {question.section_name && (
+                        <span className="block text-blue-600 dark:text-blue-400">
+                          {question.section_name}
+                        </span>
+                      )}
                     </div>
                   </button>
                 );
@@ -1084,18 +1307,7 @@ const SecureExamView: React.FC = () => {
         )}
       </div>
 
-      {/* Webcam Monitor */}
-      {isCameraRequired && (
-        <WebcamMonitor
-          attemptId={parseInt(attemptId!)}
-          onViolationDetected={handleViolationDetected}
-          captureInterval={30}
-          showPreview={false}
-          autoStart={webcamRequired}
-          onStatusChange={handleCameraStatusChange}
-          className="hidden"
-        />
-      )}
+      {/* Webcam monitoring completely disabled */}
 
       <ViolationsPanel
         attemptId={parseInt(attemptId || '0')}
@@ -1107,7 +1319,8 @@ const SecureExamView: React.FC = () => {
       <ViolationToast
         violation={currentToastViolation}
         onClose={handleCloseToast}
-        remainingViolations={examAttempt ? (examAttempt.max_violations_allowed - violationCount) : undefined}
+        violationCount={violationCount}
+        remainingViolations={5 - violationCount}
       />
     </div>
   );
