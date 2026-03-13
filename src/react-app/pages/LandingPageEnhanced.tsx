@@ -35,10 +35,13 @@ export default function LandingPageEnhanced() {
           <div className="flex items-center gap-12">
             {/* Logo */}
             <Link to="/" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="flex items-center gap-2.5 group">
-              <div className="relative flex items-center justify-center w-8 h-8 bg-blue-600 rounded-lg shadow-lg shadow-blue-600/20 group-hover:shadow-blue-600/30 transition-all group-hover:scale-105">
-                <Zap className="text-white text-lg" fill="currentColor" />
-                <div className="absolute inset-0 rounded-lg bg-gradient-to-tr from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              </div>
+              <div className="w-8 h-8 flex items-center justify-center mx-auto">
+                                <img
+                                    src="/examlogo.png"
+                                    alt="Exam Logo"
+                                    className="w-8 h-8 object-contain rounded-md"
+                                />
+                            </div>
               <span className="font-bold text-xl tracking-tighter text-gray-900 group-hover:text-blue-600 transition-colors">
                 DashoExams
               </span>
@@ -64,7 +67,7 @@ export default function LandingPageEnhanced() {
                 to="/register"
                 className="bg-blue-600 text-white px-5 py-2 rounded-lg text-[13px] font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 hover:shadow-blue-600/30 cursor-pointer hover:scale-105 active:scale-95"
               >
-                Sign up 
+                Sign up
               </Link>
             </div>
 
