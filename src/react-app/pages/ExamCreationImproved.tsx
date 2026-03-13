@@ -711,7 +711,7 @@ export default function ExamCreationImproved() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Max Attempts *</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Max Attempt *</label>
                     <input
                       type="number"
                       value={formData.max_attempts}

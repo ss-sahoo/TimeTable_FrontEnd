@@ -195,7 +195,7 @@ const getDefaultFormData = (): ExamFormData => ({
   start_date: '',
   end_date: '',
   duration_minutes: 60,
-  max_attempts: 1000,
+  max_attempts: 2,
   passing_marks: 50,
   is_published: false,
   allow_negative_marking: false,
@@ -396,7 +396,7 @@ export default function ExamCreation() {
         start_date: formatDateTimeLocal(exam.start_date, resolvedTimezone),
         end_date: formatDateTimeLocal(exam.end_date, resolvedTimezone),
         duration_minutes: exam.duration_minutes || 60,
-        max_attempts: exam.max_attempts || 1000,
+        max_attempts: exam.max_attempts || 2,
         passing_marks: exam.passing_marks || 50,
         is_published: exam.is_published || false,
         allow_negative_marking: exam.allow_negative_marking || false,
@@ -725,7 +725,6 @@ export default function ExamCreation() {
       console.error('Copy failed:', err);
       setCreationCopyMessage('Copy failed. Please copy the link manually.');
     }
-
     setTimeout(() => setCreationCopyMessage(null), 2000);
   };
 
@@ -872,7 +871,7 @@ export default function ExamCreation() {
                     onChange={(e) => handleInputChange('title', e.target.value)}
                     className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.title ? 'border-red-300' : 'border-slate-300'
                       }`}
-                    placeholder="Enter exam title..."
+                    placeholder="Enter exam title"
                   />
                   {errors.title && (
                     <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
@@ -889,7 +888,7 @@ export default function ExamCreation() {
                     rows={3}
                     className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${errors.description ? 'border-red-300' : 'border-slate-300'
                       }`}
-                    placeholder="Describe the exam..."
+                    placeholder="Describe the exam"
                   />
                   {errors.description && (
                     <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
@@ -905,7 +904,7 @@ export default function ExamCreation() {
                     onChange={(e) => handleInputChange('instructions', e.target.value)}
                     rows={4}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none"
-                    placeholder="Enter exam instructions for students..."
+                    placeholder="Enter exam instructions for students"
                   />
                 </div>
 
@@ -1064,7 +1063,7 @@ export default function ExamCreation() {
                         disabled={!!formData.copy_from_exam_id}
                         className={`w-full px-4 py-2.5 text-sm border-2 rounded-xl appearance-none bg-white focus:ring-4 transition-all ${errors.pattern ? 'border-red-300 focus:ring-red-50' : 'border-slate-200 focus:ring-blue-50 focus:border-blue-500'}`}
                       >
-                        <option value="">Select a pattern structure...</option>
+                        <option value="">Select a pattern structure</option>
                         {patterns.map((pattern) => (
                           <option key={pattern.id} value={pattern.id}>
                             {pattern.name} ({pattern.total_questions} Q, {pattern.total_duration}m)
@@ -1442,22 +1441,7 @@ export default function ExamCreation() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Max Attempts *</label>
-                  <input
-                    type="number"
-                    value={formData.max_attempts}
-                    onChange={(e) => handleInputChange('max_attempts', parseInt(e.target.value) || 1)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.max_attempts ? 'border-red-300' : 'border-slate-300'
-                      }`}
-                    min="1"
-                  />
-                  {errors.max_attempts && (
-                    <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" /> {errors.max_attempts}
-                    </p>
-                  )}
-                </div>
+              
 
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Passing Marks (%) *</label>
