@@ -35,6 +35,7 @@ import ExamAccess from "@/react-app/pages/ExamAccess";
 import ExamSetup from "@/react-app/pages/ExamSetup";
 import SecureExamExperience from "@/react-app/pages/SecureExamExperience";
 import ExamResults from "@/react-app/pages/ExamResults";
+import AdminExamResults from "@/react-app/pages/AdminExamResults";
 import ExamResultsByExamId from "@/react-app/pages/ExamResultsByExamId";
 import TestResults from "@/react-app/pages/TestResults";
 import ViolationDashboard from "@/react-app/pages/ViolationDashboard";
@@ -405,6 +406,7 @@ function AppRoutes() {
               </Route>
               <Route path="exams/:examId/evaluation" element={<TeacherEvaluationDashboard />} />
               <Route path="exam-results/:attemptId" element={<ExamResults />} />
+              <Route path="exams/:examId/results" element={<AdminExamResults />} />
               <Route path="exam-review/:attemptId" element={<ExamReview />} />
               <Route path="proctoring-snapshots/:attemptId" element={<ProctoringSnapshotsView />} />
               <Route path="violation-dashboard" element={<ViolationDashboard />} />
@@ -454,6 +456,7 @@ function AppRoutes() {
               </Route>
               <Route path="exams/:examId/evaluation" element={<TeacherEvaluationDashboard />} />
               <Route path="exam-results/:attemptId" element={<ExamResults />} />
+              <Route path="exams/:examId/results" element={<AdminExamResults />} />
               <Route path="exam-review/:attemptId" element={<ExamReview />} />
               <Route path="proctoring-snapshots/:attemptId" element={<ProctoringSnapshotsView />} />
               <Route path="people" element={<AdminPeopleContent />} />
@@ -522,6 +525,7 @@ function AppRoutes() {
               <Route path="exams/create" element={<ExamCreation />} />
               <Route path="exams/:examId/edit" element={<ExamCreation />} />
               <Route path="exams/:examId" element={<ExamView />} />
+              <Route path="exams/:examId/results" element={<AdminExamResults />} />
               <Route path="evaluation" element={<TeacherAnalytics />} /> {/* Placeholder to match nav */}
               <Route path="batches" element={<AdminBatchesContent />} />
               <Route path="attendance" element={<AdminPeopleContent />} /> {/* Placeholder to match nav */}

@@ -499,6 +499,13 @@ export default function ExamView() {
                 <FileText className="w-3.5 h-3.5" />
                 Analytics
               </Link>
+              <Link
+                to={`${basePath}/exams/${exam.id}/results`}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+              >
+                <Users className="w-3.5 h-3.5" />
+                All Results
+              </Link>
               <button
                 onClick={() => isOfflineMode ? setActiveTab('evaluation') : navigate(`${basePath}/exams/${exam.id}/evaluation`)}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"

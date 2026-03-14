@@ -195,7 +195,7 @@ const SecureExamView: React.FC = () => {
 
       if (remaining <= 0) {
         setTimeRemaining(0);
-        handleAutoSubmit();
+        handleTimerExpiry(); // Timer naturally expired - show results immediately
         return false; // Should stop the interval
       }
 
@@ -579,24 +579,15 @@ const SecureExamView: React.FC = () => {
     setCurrentViolation(null);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (isEarlySubmission = true) => {
     if (isSubmitting) return;
-    if (webcamRequired && cameraStatusInfo.status !== 'active') {
-      setCurrentToastViolation({
-        type: 'camera_error',
-        timestamp: new Date(),
-        metadata: {
-          action: 'Enable webcam monitoring before submitting'
-        }
-      });
-      return;
-    }
 
     setIsSubmitting(true);
     try {
       const submissionData = {
         attempt_id: parseInt(attemptId!),
-        answers: Object.fromEntries(answers)
+        answers: Object.fromEntries(answers),
+        is_early_submission: isEarlySubmission
       };
 
       const submitEndpoint = '/exams/submit-exam/';
@@ -604,6 +595,7 @@ const SecureExamView: React.FC = () => {
       console.log('📤 Submission payload:', {
         attemptId: attemptId,
         totalAnswers: answers.size,
+        isEarlySubmission: isEarlySubmission,
         submissionData: submissionData
       });
 
@@ -612,7 +604,8 @@ const SecureExamView: React.FC = () => {
       console.log('✅ Submission successful!');
       console.log('📥 Submission response:', JSON.stringify(response.data, null, 2));
 
-      navigate(`/exam-results/${attemptId}`);
+      // Navigate to results with submission type info
+      navigate(`/exam-results/${attemptId}?early=${isEarlySubmission}`);
     } catch (error: any) {
       console.error('❌ Submission failed:', error);
       console.error('Error response:', error.response?.data);
@@ -623,7 +616,13 @@ const SecureExamView: React.FC = () => {
   };
 
   const handleAutoSubmit = async () => {
-    await handleSubmit();
+    // Auto-submit due to violations is an early submission (exam time not completed)
+    await handleSubmit(true);
+  };
+
+  const handleTimerExpiry = async () => {
+    // Timer expiry means exam time naturally completed - NOT an early submission
+    await handleSubmit(false);
   };
 
   const formatTime = (seconds: number) => {
@@ -829,7 +828,7 @@ const SecureExamView: React.FC = () => {
 
             {/* Submit button */}
             <button
-              onClick={handleSubmit}
+              onClick={() => handleSubmit(true)} // Early submission
               disabled={isSubmitting}
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-600 transition-colors flex items-center gap-2"
             >

@@ -74,6 +74,9 @@ interface ExamResult {
     time_spent: number;
     submitted_at: string;
     violations_count: number;
+    exam_end_date: string;
+    started_at: string;
+    exam_duration_minutes: number;
   };
   overall_score: number;
   total_questions: number;
@@ -153,6 +156,25 @@ const ExamResults: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Check if this is an early submission from URL params
+  const urlParams = new URLSearchParams(location.search);
+  const isEarlySubmission = urlParams.get('early') === 'true';
+
+  // Check if exam time has completed
+  const isExamTimeCompleted = () => {
+    if (!result?.attempt) return false;
+    
+    const now = new Date();
+    const examEndTime = new Date(result.attempt.exam_end_date);
+    const attemptStartTime = new Date(result.attempt.started_at);
+    const examDurationMs = result.attempt.exam_duration_minutes * 60 * 1000;
+    const attemptEndTime = new Date(attemptStartTime.getTime() + examDurationMs);
+    
+    // Exam time is completed if either the global exam end time has passed
+    // OR the individual attempt duration has elapsed
+    return now >= examEndTime || now >= attemptEndTime;
   };
 
   const parseAnswerSheetPayload = (payload?: any): AnswerSheetInfo | null => {
@@ -403,6 +425,98 @@ const ExamResults: React.FC = () => {
           >
             Back to Dashboard
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle early submission - show success message but no results until exam time completes
+  if (result && isEarlySubmission && !isExamTimeCompleted()) {
+    const examEndTime = new Date(result.attempt.exam_end_date);
+    const attemptStartTime = new Date(result.attempt.started_at);
+    const examDurationMs = result.attempt.exam_duration_minutes * 60 * 1000;
+    const attemptEndTime = new Date(attemptStartTime.getTime() + examDurationMs);
+    
+    // Use the earlier of the two end times
+    const actualEndTime = examEndTime < attemptEndTime ? examEndTime : attemptEndTime;
+    
+    // Check if this was a violation-based submission
+    const isViolationSubmission = result.attempt.violations_count >= 5;
+    
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8 max-w-lg w-full text-center">
+          <div className={`w-20 h-20 ${isViolationSubmission ? 'bg-red-100' : 'bg-green-100'} rounded-full flex items-center justify-center mx-auto mb-6`}>
+            {isViolationSubmission ? (
+              <AlertTriangle className="w-10 h-10 text-red-600" />
+            ) : (
+              <CheckCircle2 className="w-10 h-10 text-green-600" />
+            )}
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-3">
+            {isViolationSubmission ? 'Exam Auto-Submitted Due to Violations' : 'Exam Submitted Successfully!'}
+          </h2>
+          <div className={`${isViolationSubmission ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'} border rounded-xl p-4 mb-6`}>
+            <p className={`${isViolationSubmission ? 'text-red-800' : 'text-green-800'} font-medium`}>
+              {isViolationSubmission 
+                ? `Your exam was automatically submitted due to ${result.attempt.violations_count} security violations.`
+                : 'Your exam has been submitted and saved successfully.'
+              }
+            </p>
+          </div>
+          <div className="space-y-4 text-left mb-8">
+            <div className="flex items-start gap-3">
+              <div className="mt-1 p-1 bg-green-100 rounded-full">
+                <CheckCircle2 className="w-3 h-3 text-green-600" />
+              </div>
+              <p className="text-sm text-slate-600">Your answers have been recorded and will be evaluated.</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="mt-1 p-1 bg-blue-100 rounded-full">
+                <Clock className="w-3 h-3 text-blue-600" />
+              </div>
+              <p className="text-sm text-slate-600">
+                Results will be available after the exam time completes: <br/>
+                <span className="font-semibold text-slate-900">{actualEndTime.toLocaleString()}</span>
+              </p>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="mt-1 p-1 bg-yellow-100 rounded-full">
+                <AlertTriangle className="w-3 h-3 text-yellow-600" />
+              </div>
+              <p className="text-sm text-slate-600">
+                {isViolationSubmission 
+                  ? 'Results are withheld until all students complete the exam to maintain fairness.'
+                  : 'Early submissions do not show results immediately to maintain exam integrity.'
+                }
+              </p>
+            </div>
+            {isViolationSubmission && (
+              <div className="flex items-start gap-3">
+                <div className="mt-1 p-1 bg-red-100 rounded-full">
+                  <AlertTriangle className="w-3 h-3 text-red-600" />
+                </div>
+                <p className="text-sm text-slate-600">
+                  <strong>Security violations detected:</strong> {result.attempt.violations_count} violations were recorded during your exam.
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => navigate(`${basePath}/student-dashboard`)}
+              className="flex-1 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
+            >
+              Go to Dashboard
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-colors"
+            >
+              <RefreshCw className="w-4 h-4 inline mr-2" />
+              Check Again
+            </button>
+          </div>
         </div>
       </div>
     );
