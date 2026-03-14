@@ -97,9 +97,31 @@ const UsersContent = () => {
     if (!instituteId) return;
     setLoading(true);
     try {
-      const response = await api.get(`/auth/people/?institute_id=${instituteId}`);
-      const data = response.data.users || response.data.results || response.data;
-      setUsers(Array.isArray(data) ? data : []);
+      // Request all users by setting a high page_size (backend max is 100, so we'll make multiple requests if needed)
+      const response = await api.get(`/auth/people/?institute_id=${instituteId}&page_size=100`);
+      let allUsers = response.data.users || response.data.results || response.data;
+      
+      // If there are more pages, fetch them all
+      const totalPages = response.data.total_pages || 1;
+      if (totalPages > 1) {
+        const additionalRequests = [];
+        for (let page = 2; page <= totalPages; page++) {
+          additionalRequests.push(
+            api.get(`/auth/people/?institute_id=${instituteId}&page_size=100&page=${page}`)
+          );
+        }
+        
+        const additionalResponses = await Promise.all(additionalRequests);
+        additionalResponses.forEach(res => {
+          const pageData = res.data.users || res.data.results || res.data;
+          if (Array.isArray(pageData)) {
+            allUsers = [...allUsers, ...pageData];
+          }
+        });
+      }
+      
+      setUsers(Array.isArray(allUsers) ? allUsers : []);
+      console.log(`Fetched ${Array.isArray(allUsers) ? allUsers.length : 0} users total`);
     } catch (error) {
       console.error("Error fetching users:", error);
       setError("Failed to fetch users");
@@ -972,6 +994,10 @@ const UsersContent = () => {
                 Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
                 <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredUsers.length)}</span> of{' '}
                 <span className="font-medium">{filteredUsers.length}</span> results
+                {/* Debug info */}
+                <span className="text-xs text-gray-500 ml-2">
+                  (Total users: {users.length}, Filtered: {filteredUsers.length}, Pages: {totalPages})
+                </span>
               </p>
             </div>
             <div>
