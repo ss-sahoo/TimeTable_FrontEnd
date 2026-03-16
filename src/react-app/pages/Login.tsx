@@ -406,22 +406,28 @@ export default function Login() {
             </div>
 
             {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded cursor-pointer"
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600 cursor-pointer">
-                  Remember me
-                </label>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded cursor-pointer"
+                  />
+                  <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600 cursor-pointer">
+                    Remember me
+                  </label>
+                </div>
+                
+                <Link 
+                  to="/forgot-password" 
+                  className="text-sm font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
+                >
+                  Forgot password?
+                </Link>
               </div>
-              
-            </div>
 
             {/* Submit Button */}
             <div>

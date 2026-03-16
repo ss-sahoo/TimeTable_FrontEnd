@@ -5,6 +5,8 @@ import { OnboardingTourProvider } from "@/react-app/contexts/OnboardingTourConte
 import Layout from "@/react-app/components/Layout";
 import Login from "@/react-app/pages/Login";
 import Register from "@/react-app/pages/Register";
+import ForgotPassword from "@/react-app/pages/ForgotPassword";
+import ResetPassword from "@/react-app/pages/ResetPassword";
 import Onboarding from "@/react-app/pages/Onboarding";
 import SmartDashboard from "@/react-app/components/SmartDashboard";
 import ExamSetupDetails from "@/react-app/pages/ExamSetupDetails";
@@ -358,6 +360,8 @@ function AppRoutes() {
       {/* Public Routes */}
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/register" element={<RegisterRoute />} />
+      <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+      <Route path="/reset-password/:uid/:token" element={<PublicRoute><ResetPassword /></PublicRoute>} />
 
       {/* Onboarding Route - Semi-protected (logged in but no institute) */}
       <Route path="/onboarding" element={<Onboarding />} />

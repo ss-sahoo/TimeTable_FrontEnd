@@ -65,6 +65,9 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [addUserModalOpen, setAddUserModalOpen] = useState(false);
+  const [bulkImportModalOpen, setBulkImportModalOpen] = useState(false);
+  const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
+  const [bulkImportResults, setBulkImportResults] = useState<any>(null);
   const [addUserForm, setAddUserForm] = useState({
     username: '',
     first_name: '',
@@ -159,6 +162,83 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
     setAddUserModalOpen(true);
   };
 
+  const openBulkImportModal = () => {
+    setBulkImportFile(null);
+    setBulkImportResults(null);
+    setActionError(null);
+    setActionMessage(null);
+    setBulkImportModalOpen(true);
+  };
+
+  const downloadTemplate = async () => {
+    try {
+      // Create a simple CSV template
+      const csvContent = 'name,email,phone_number,role\nJohn Doe,john@example.com,9876543210,student\nJane Smith,jane@example.com,9876543211,teacher';
+      
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'bulk_user_import_template.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to download template:', error);
+      setActionError('Failed to download template');
+    }
+  };
+
+  const handleBulkImport = async () => {
+    if (!bulkImportFile) {
+      setActionError('Please select a file to import');
+      return;
+    }
+
+    setFormSubmitting(true);
+    setActionError(null);
+    setBulkImportResults(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', bulkImportFile);
+
+      // Use the existing timetable bulk import endpoints
+      let endpoint = '';
+      const fileName = bulkImportFile.name.toLowerCase();
+      
+      if (fileName.includes('student')) {
+        endpoint = '/timetable/superadmin/students/bulk_create/';
+      } else if (fileName.includes('teacher')) {
+        endpoint = '/timetable/superadmin/teachers/bulk_create/';
+      } else {
+        // Default to student bulk import
+        endpoint = '/timetable/superadmin/students/bulk_create/';
+      }
+
+      const response = await api.post(endpoint, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      setBulkImportResults(response.data);
+      await fetchUsers(); // Refresh the user list
+      
+      if (response.data.errors && response.data.errors.length > 0) {
+        setActionError(`Import completed with ${response.data.errors.length} errors. See details below.`);
+      } else {
+        setActionMessage(`Successfully imported ${response.data.success} users!`);
+      }
+    } catch (error: any) {
+      console.error('Bulk import failed:', error);
+      setActionError(error.response?.data?.error || error.response?.data?.detail || 'Failed to import users.');
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
+
   const openViewModal = async (userId: number) => {
     try {
       setActionError(null);
@@ -205,8 +285,11 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
     setDeleteModalOpen(false);
     setInviteModalOpen(false);
     setAddUserModalOpen(false);
+    setBulkImportModalOpen(false);
     setSelectedUser(null);
     setFormSubmitting(false);
+    setBulkImportFile(null);
+    setBulkImportResults(null);
   };
 
   const roles = [
@@ -579,6 +662,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
                     style={{ backgroundColor: '#7c3aed' }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#6d28d9'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#7c3aed'}
+                    onClick={openBulkImportModal}
                   >
                     Import Excel
                   </button>
@@ -891,7 +975,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
 
       {/* Modals */}
       {
-        (viewModalOpen || editModalOpen || deleteModalOpen || inviteModalOpen || addUserModalOpen) && (
+        (viewModalOpen || editModalOpen || deleteModalOpen || inviteModalOpen || addUserModalOpen || bulkImportModalOpen) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
             <div className="relative w-full max-w-lg rounded-xl bg-white shadow-xl">
               <button
@@ -1222,6 +1306,96 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
                     </button>
                   </div>
                 </form>
+              )}
+
+              {bulkImportModalOpen && (
+                <div className="p-6 space-y-4">
+                  <h2 className="text-xl font-semibold text-slate-900">Bulk Import Users</h2>
+                  {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+                  {actionMessage && <p className="text-sm text-green-600">{actionMessage}</p>}
+                  
+                  {!bulkImportResults ? (
+                    <div className="space-y-4">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h3 className="font-medium text-blue-900 mb-2">📋 Instructions</h3>
+                        <ul className="text-sm text-blue-800 space-y-1">
+                          <li>• Upload a CSV or Excel file with user data</li>
+                          <li>• Required columns: name, email, role</li>
+                          <li>• Optional columns: phone_number, batch_code (for students)</li>
+                          <li>• Each user will get a unique password and email notification</li>
+                        </ul>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <label className="flex flex-col gap-2">
+                          <span className="font-medium text-slate-600">Upload File</span>
+                          <input
+                            type="file"
+                            accept=".csv,.xlsx,.xls"
+                            onChange={(e) => setBulkImportFile(e.target.files?.[0] || null)}
+                            className="border rounded-lg px-3 py-2 text-sm"
+                          />
+                        </label>
+                        
+                        <button
+                          type="button"
+                          onClick={downloadTemplate}
+                          className="text-sm text-blue-600 hover:text-blue-700 underline"
+                        >
+                          Download CSV template
+                        </button>
+                      </div>
+                      
+                      <div className="flex justify-end gap-2">
+                        <button type="button" onClick={closeModals} className="px-4 py-2 text-sm rounded-lg border">
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleBulkImport}
+                          disabled={!bulkImportFile || formSubmitting}
+                          className="px-4 py-2 text-sm rounded-lg text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-60 flex items-center gap-2"
+                        >
+                          {formSubmitting ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Importing...
+                            </>
+                          ) : (
+                            'Import Users'
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <h3 className="font-medium text-green-900 mb-2">✅ Import Results</h3>
+                        <div className="text-sm text-green-800">
+                          <p>Total processed: {bulkImportResults.total}</p>
+                          <p>Successfully created: {bulkImportResults.success}</p>
+                          <p>Failed: {bulkImportResults.failed}</p>
+                        </div>
+                      </div>
+                      
+                      {bulkImportResults.errors && bulkImportResults.errors.length > 0 && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-h-40 overflow-y-auto">
+                          <h4 className="font-medium text-red-900 mb-2">Errors:</h4>
+                          <ul className="text-sm text-red-800 space-y-1">
+                            {bulkImportResults.errors.map((error: any, index: number) => (
+                              <li key={index}>Row {error.row}: {error.error}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-end">
+                        <button onClick={closeModals} className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
