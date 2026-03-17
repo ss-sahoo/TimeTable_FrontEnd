@@ -125,12 +125,36 @@ const ExamResults: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'detailed' | 'sections'>('overview');
   const [detailFilter, setDetailFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
   const [downloading, setDownloading] = useState(false);
+  const [resultsNowAvailable, setResultsNowAvailable] = useState(false);
   const answerSheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Load exam result for the attempt ID
     loadExamResult();
   }, [attemptId, navigate]);
+
+  // Auto-refresh when hidden results become available
+  useEffect(() => {
+    const hiddenResult = result as any;
+    if (hiddenResult?.status === 'hidden' && hiddenResult?.available_at) {
+      const availableAt = new Date(hiddenResult.available_at).getTime();
+      const now = Date.now();
+      const delay = availableAt - now;
+
+      if (delay <= 0) {
+        setResultsNowAvailable(true);
+        return;
+      }
+
+      setResultsNowAvailable(false);
+      const timer = setTimeout(() => {
+        setResultsNowAvailable(true);
+      }, delay);
+      return () => clearTimeout(timer);
+    } else {
+      setResultsNowAvailable(false);
+    }
+  }, [result]);
 
   const loadExamResult = async () => {
     try {
@@ -304,10 +328,10 @@ const ExamResults: React.FC = () => {
   }, [result, detailFilter]);
   const accuracy = useMemo(() => {
     if (!result || totalMarks === 0) return 0;
-    return ((result.attempt.score || 0) / totalMarks) * 100;
+    return ((result.attempt?.score || 0) / totalMarks) * 100;
   }, [result, totalMarks]);
   const attemptPercentageValue = useMemo(() => {
-    const raw = result?.attempt.percentage;
+    const raw = result?.attempt?.percentage;
     const numeric = Number(raw);
     if (Number.isFinite(numeric)) {
       return numeric;
@@ -528,52 +552,82 @@ const ExamResults: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8 max-w-lg w-full text-center">
-          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Clock className="w-10 h-10 text-blue-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-3">Results Pending</h2>
-          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
-            <p className="text-blue-800 font-medium">
-              {hiddenData.message}
-            </p>
-          </div>
-          <div className="space-y-4 text-left mb-8">
-            <div className="flex items-start gap-3">
-              <div className="mt-1 p-1 bg-green-100 rounded-full">
-                <CheckCircle2 className="w-3 h-3 text-green-600" />
+          {resultsNowAvailable ? (
+            <>
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="w-10 h-10 text-green-600" />
               </div>
-              <p className="text-sm text-slate-600">Your exam has been successfully submitted and stored.</p>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="mt-1 p-1 bg-green-100 rounded-full">
-                <CheckCircle2 className="w-3 h-3 text-green-600" />
+              <h2 className="text-2xl font-bold text-slate-900 mb-3">Results Are Now Available!</h2>
+              <div className="bg-green-50 border border-green-100 rounded-xl p-4 mb-6">
+                <p className="text-green-800 font-medium">
+                  The exam period has ended. Your results are ready to view.
+                </p>
               </div>
-              <p className="text-sm text-slate-600">Answers are being evaluated and rank will be calculated once all students finish.</p>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="mt-1 p-1 bg-blue-100 rounded-full">
-                <Calendar className="w-3 h-3 text-blue-600" />
+              <button
+                onClick={() => {
+                  setResultsNowAvailable(false);
+                  setLoading(true);
+                  loadExamResult();
+                }}
+                className="w-full px-6 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-colors shadow-lg shadow-green-200"
+              >
+                <Eye className="w-4 h-4 inline mr-2" />
+                View Results
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Clock className="w-10 h-10 text-blue-600" />
               </div>
-              <p className="text-sm text-slate-600">
-                Scheduled Release: <span className="font-semibold text-slate-900">{new Date(hiddenData.available_at).toLocaleString()}</span>
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={() => navigate(`${basePath}/student-dashboard`)}
-              className="flex-1 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
-            >
-              Go to Dashboard
-            </button>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-6 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-colors"
-            >
-              <RefreshCw className="w-4 h-4 inline mr-2" />
-              Refresh
-            </button>
-          </div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-3">Results Pending</h2>
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
+                <p className="text-blue-800 font-medium">
+                  {hiddenData.message}
+                </p>
+              </div>
+              <div className="space-y-4 text-left mb-8">
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 p-1 bg-green-100 rounded-full">
+                    <CheckCircle2 className="w-3 h-3 text-green-600" />
+                  </div>
+                  <p className="text-sm text-slate-600">Your exam has been successfully submitted and stored.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 p-1 bg-green-100 rounded-full">
+                    <CheckCircle2 className="w-3 h-3 text-green-600" />
+                  </div>
+                  <p className="text-sm text-slate-600">Answers are being evaluated and rank will be calculated once all students finish.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 p-1 bg-blue-100 rounded-full">
+                    <Calendar className="w-3 h-3 text-blue-600" />
+                  </div>
+                  <p className="text-sm text-slate-600">
+                    Scheduled Release: <span className="font-semibold text-slate-900">{new Date(hiddenData.available_at).toLocaleString()}</span>
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => navigate(`${basePath}/student-dashboard`)}
+                  className="flex-1 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
+                >
+                  Go to Dashboard
+                </button>
+                <button
+                  onClick={() => {
+                    setLoading(true);
+                    loadExamResult();
+                  }}
+                  className="px-6 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4 inline mr-2" />
+                  Refresh
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );

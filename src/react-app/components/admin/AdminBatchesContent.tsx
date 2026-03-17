@@ -17,8 +17,10 @@ import {
     ChevronRight,
     BookOpen,
     Layers,
+    Trash2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-toastify';
 import { api } from '../../hooks/useApi';
 import { useAuthContext } from '../../contexts/AuthContext';
 
@@ -81,6 +83,10 @@ export default function AdminBatchesContent() {
         description: '',
         category: '',
     });
+
+    // Delete Program State
+    const [programToDelete, setProgramToDelete] = useState<Program | null>(null);
+    const [deletingProgram, setDeletingProgram] = useState(false);
 
     // Get admin's center ID - with fallback to profile API
     useEffect(() => {
@@ -198,6 +204,23 @@ export default function AdminBatchesContent() {
             setProgramError(err.response?.data?.detail || 'Failed to create program');
         } finally {
             setCreatingProgram(false);
+        }
+    };
+
+    const handleDeleteProgram = async () => {
+        if (!programToDelete) return;
+        try {
+            setDeletingProgram(true);
+            await api.delete(`/timetable/superadmin/programs/${programToDelete.id}/delete/`);
+            toast.success(`Program "${programToDelete.name}" deleted successfully`);
+            setProgramToDelete(null);
+            await fetchPrograms();
+        } catch (err: any) {
+            console.error('Failed to delete program:', err);
+            const msg = err.response?.data?.detail || 'Failed to delete program';
+            toast.error(msg);
+        } finally {
+            setDeletingProgram(false);
         }
     };
 
@@ -504,9 +527,18 @@ export default function AdminBatchesContent() {
                                             <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
                                                 <BookOpen className="w-5 h-5 text-slate-400 group-hover:text-indigo-600" />
                                             </div>
-                                            <button className="p-2 text-slate-300 hover:text-indigo-600 transition-colors">
-                                                <ArrowUpRight className="w-4 h-4" />
-                                            </button>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => setProgramToDelete(program)}
+                                                    className="p-2 text-slate-300 hover:text-red-600 transition-colors"
+                                                    title="Delete program"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                                <button className="p-2 text-slate-300 hover:text-indigo-600 transition-colors">
+                                                    <ArrowUpRight className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </div>
                                         <h4 className="text-sm font-black text-slate-800 mb-1">{program.name}</h4>
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
@@ -650,6 +682,46 @@ export default function AdminBatchesContent() {
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Program Confirmation Modal */}
+            {programToDelete && (
+                <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="delete-modal" role="dialog" aria-modal="true">
+                    <div className="flex items-center justify-center min-h-screen p-4 text-center sm:p-0">
+                        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => !deletingProgram && setProgramToDelete(null)}></div>
+                        <div className="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md">
+                            <div className="p-8 text-center">
+                                <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                                    <Trash2 className="w-8 h-8 text-red-600" />
+                                </div>
+                                <h3 className="text-lg font-black text-slate-900 mb-2">Delete Program</h3>
+                                <p className="text-sm text-slate-500 mb-1">
+                                    Are you sure you want to delete
+                                </p>
+                                <p className="text-sm font-black text-slate-700 mb-6">"{programToDelete.name}"?</p>
+                                <div className="flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setProgramToDelete(null)}
+                                        disabled={deletingProgram}
+                                        className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-2xl text-sm font-black hover:bg-slate-200 transition-all uppercase tracking-widest disabled:opacity-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleDeleteProgram}
+                                        disabled={deletingProgram}
+                                        className="flex-1 py-3 bg-red-600 text-white rounded-2xl text-sm font-black shadow-lg shadow-red-200 hover:bg-red-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-widest"
+                                    >
+                                        {deletingProgram ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                        {deletingProgram ? 'Deleting...' : 'Delete'}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
