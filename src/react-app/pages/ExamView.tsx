@@ -522,16 +522,7 @@ export default function ExamView() {
                 <Download className="w-3.5 h-3.5" />
                 Download PDF
               </button>
-              {exam && (
-                <button
-                  onClick={() => navigate(`/exams/${exam.id}/extraction-v3`)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors shadow-sm"
-                  title="AI Bulk Import Questions"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  Bulk Import
-                </button>
-              )}
+              {/* Bulk Import button hidden - use Smart Extract V3 instead */}
               {exam.status === 'draft' && !exam.is_published && (
                 <button
                   onClick={handlePublishExam}
@@ -695,13 +686,7 @@ export default function ExamView() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => navigate(`${basePath}/exam/${exam.id}/pattern/${exam.pattern.id}/bulk-import`)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors"
-                  >
-                    <Upload className="w-3 h-3" />
-                    AI Bulk Import
-                  </button>
+                  {/* AI Bulk Import button hidden - use Smart Extract V3 instead */}
                   <button
                     onClick={() => navigate(`/exams/${exam.id}/extraction-v3`)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm"

@@ -346,7 +346,9 @@ const UsersContent = () => {
         case 'student':
           // For students, use registration endpoint with auto-generated username
           const autoUsername = newUser.username || `STU-${newUser.email.split('@')[0]}`;
-          const autoPassword = newUser.password || `Student@${new Date().getFullYear()}`;
+          // Always generate a unique random password for students
+          const randomSuffix = Math.random().toString(36).slice(-6).toUpperCase();
+          const autoPassword = `Stu@${randomSuffix}${new Date().getFullYear().toString().slice(-2)}`;
 
           // Build payload with center_id if selected
           const studentPayload: any = {
