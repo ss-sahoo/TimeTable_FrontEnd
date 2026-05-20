@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { CreateExam } from '@/shared/types';
 import { api } from '@/react-app/hooks/useApi';
+import DateTimeInput from '@/react-app/components/common/DateTimeInput';
 
 interface CreateExamModalProps {
   isOpen: boolean;
@@ -119,11 +120,10 @@ export default function CreateExamModal({ isOpen, onClose, onSuccess }: CreateEx
               <label className="block text-sm font-medium text-slate-700 mb-1.5 sm:mb-2">
                 Start Date & Time *
               </label>
-              <input
-                type="datetime-local"
+              <DateTimeInput
                 value={formData.start_date}
-                onChange={(e) => handleInputChange('start_date', e.target.value)}
-                className="w-full px-3 py-2 sm:py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
+                onChange={(v) => handleInputChange('start_date', v)}
+                className="px-3 py-2 sm:py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
               />
             </div>
 
@@ -131,11 +131,10 @@ export default function CreateExamModal({ isOpen, onClose, onSuccess }: CreateEx
               <label className="block text-sm font-medium text-slate-700 mb-1.5 sm:mb-2">
                 End Date & Time *
               </label>
-              <input
-                type="datetime-local"
+              <DateTimeInput
                 value={formData.end_date}
-                onChange={(e) => handleInputChange('end_date', e.target.value)}
-                className="w-full px-3 py-2 sm:py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
+                onChange={(v) => handleInputChange('end_date', v)}
+                className="px-3 py-2 sm:py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
               />
             </div>
           </div>

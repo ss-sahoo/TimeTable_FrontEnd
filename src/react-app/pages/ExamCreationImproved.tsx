@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
+import DateTimeInput from '../components/common/DateTimeInput';
 
 interface ExamPattern {
   id: number;
@@ -643,11 +644,10 @@ export default function ExamCreationImproved() {
                         Select both date and time when the exam will begin
                       </span>
                     </label>
-                    <input
-                      type="datetime-local"
+                    <DateTimeInput
                       value={formData.start_date}
-                      onChange={(e) => handleInputChange('start_date', e.target.value)}
-                      className={`w-full px-3 py-3 text-sm border-2 rounded-lg focus:ring-2 focus:outline-none transition-colors ${errors.start_date ? 'border-red-300' : 'border-blue-300'
+                      onChange={(v) => handleInputChange('start_date', v)}
+                      className={`px-3 py-3 text-sm border-2 rounded-lg focus:ring-2 focus:outline-none transition-colors ${errors.start_date ? 'border-red-300' : 'border-blue-300'
                         }`}
                       style={{
                         borderColor: errors.start_date ? '#ef4444' : '#93c5fd',
@@ -680,11 +680,10 @@ export default function ExamCreationImproved() {
                         Select both date and time when the exam will end
                       </span>
                     </label>
-                    <input
-                      type="datetime-local"
+                    <DateTimeInput
                       value={formData.end_date}
-                      onChange={(e) => handleInputChange('end_date', e.target.value)}
-                      className={`w-full px-3 py-3 text-sm border-2 rounded-lg focus:ring-2 focus:outline-none transition-colors ${errors.end_date ? 'border-red-300' : 'border-blue-300'
+                      onChange={(v) => handleInputChange('end_date', v)}
+                      className={`px-3 py-3 text-sm border-2 rounded-lg focus:ring-2 focus:outline-none transition-colors ${errors.end_date ? 'border-red-300' : 'border-blue-300'
                         }`}
                       style={{
                         borderColor: errors.end_date ? '#ef4444' : '#93c5fd',

@@ -24,6 +24,7 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
 import { getPublicExamLink, normalizeShareUrl } from '../utils/urlUtils';
 import timezones from '@/shared/timezones';
+import DateTimeInput from '../components/common/DateTimeInput';
 
 const userDefaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
 
@@ -1115,11 +1116,9 @@ export default function ExamCreation() {
                       ({formData.timezone || userDefaultTimezone})
                     </span>
                   </label>
-                  <input
-                    type="datetime-local"
+                  <DateTimeInput
                     value={formData.start_date}
-                    onChange={(e) => {
-                      const newStartDate = e.target.value;
+                    onChange={(newStartDate) => {
                       setFormData(prev => {
                         const newData = { ...prev, start_date: newStartDate };
                         if (!isFlexibleWindow && newStartDate && prev.duration_minutes) {
@@ -1130,7 +1129,7 @@ export default function ExamCreation() {
                         return newData;
                       });
                     }}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.start_date ? 'border-red-300' : 'border-slate-300'
+                    className={`px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.start_date ? 'border-red-300' : 'border-slate-300'
                       }`}
                   />
                   {errors.start_date && (
@@ -1204,11 +1203,10 @@ export default function ExamCreation() {
                           ({formData.timezone || userDefaultTimezone})
                         </span>
                       </label>
-                      <input
-                        type="datetime-local"
+                      <DateTimeInput
                         value={formData.end_date}
-                        onChange={(e) => handleInputChange('end_date', e.target.value)}
-                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.end_date ? 'border-red-300' : 'border-slate-300'
+                        onChange={(v) => handleInputChange('end_date', v)}
+                        className={`px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.end_date ? 'border-red-300' : 'border-slate-300'
                           }`}
                       />
                       {errors.end_date && (
@@ -1876,11 +1874,10 @@ export default function ExamCreation() {
 
                           <div>
                             <label className="block text-xs font-medium text-slate-600 mb-1">Link Expiry</label>
-                            <input
-                              type="datetime-local"
+                            <DateTimeInput
                               value={formData.public_token_expires_at}
-                              onChange={(e) => handleInputChange('public_token_expires_at', e.target.value)}
-                              className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                              onChange={(v) => handleInputChange('public_token_expires_at', v)}
+                              className="px-3 py-2 text-sm border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                             />
                             <p className="text-xs text-slate-500 mt-1">Leave blank for no expiration.</p>
                           </div>

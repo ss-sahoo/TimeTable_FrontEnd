@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
+import DateTimeInput from '../components/common/DateTimeInput';
 
 interface ExamPattern {
   id: number;
@@ -574,11 +575,10 @@ export default function ExamCreation() {
 
                 <div className="col-span-1">
                   <label className="block text-xs font-medium mb-1" style={{ color: '#6b6b6b' }}>Start Date & Time *</label>
-                  <input
-                    type="datetime-local"
+                  <DateTimeInput
                     value={formData.start_date}
-                    onChange={(e) => handleInputChange('start_date', e.target.value)}
-                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${errors.start_date ? 'border-red-300' : ''
+                    onChange={(v) => handleInputChange('start_date', v)}
+                    className={`px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${errors.start_date ? 'border-red-300' : ''
                       }`}
                     style={{
                       borderColor: errors.start_date ? '#ef4444' : '#e5e7eb',
@@ -602,11 +602,10 @@ export default function ExamCreation() {
 
                 <div className="col-span-1">
                   <label className="block text-xs font-medium mb-1" style={{ color: '#6b6b6b' }}>End Date & Time *</label>
-                  <input
-                    type="datetime-local"
+                  <DateTimeInput
                     value={formData.end_date}
-                    onChange={(e) => handleInputChange('end_date', e.target.value)}
-                    className={`w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${errors.end_date ? 'border-red-300' : ''
+                    onChange={(v) => handleInputChange('end_date', v)}
+                    className={`px-2 py-1.5 text-xs border rounded focus:ring-1 focus:outline-none transition-colors ${errors.end_date ? 'border-red-300' : ''
                       }`}
                     style={{
                       borderColor: errors.end_date ? '#ef4444' : '#e5e7eb',
