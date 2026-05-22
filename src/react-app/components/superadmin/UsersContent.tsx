@@ -4,7 +4,6 @@ import { useAuthContext } from "../../contexts/AuthContext";
 import { toast } from "react-toastify";
 import {
   UserPlus,
-  Upload,
   Search,
   Filter,
   Edit2,

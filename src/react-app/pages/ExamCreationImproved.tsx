@@ -13,10 +13,8 @@ import {
   FileSpreadsheet,
   UserCheck,
   CheckCircle,
-  Plus,
   Trash2,
   Edit,
-  FileText
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';

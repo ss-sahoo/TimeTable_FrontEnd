@@ -4,18 +4,13 @@ import {
     Home,
     FileText,
     BarChart3,
-    Settings,
     LogOut,
     Zap,
     Bell,
-    User,
-    ChevronDown,
     Menu,
     X,
     ChevronLeft,
-    Shield,
     BookOpen,
-    HelpCircle
 } from "lucide-react";
 import { useAuthContext } from "../../contexts/AuthContext";
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { toast } from "react-toastify";
 import {
   Plus,
@@ -8,27 +8,18 @@ import {
   MoreVertical,
   Eye,
   Edit,
-  Copy,
   Trash2,
-  Users,
   BarChart3,
   Calendar,
   Clock,
   BookOpen,
   CheckCircle,
-  AlertCircle,
   Play,
   Pause,
-  Settings,
-  Download,
-  Upload,
-  Mail,
-  Share2,
   CheckSquare,
   Square,
   X
 } from 'lucide-react';
-import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
 
 interface Exam {
@@ -61,8 +52,6 @@ interface Exam {
 }
 
 export default function ExamManagement() {
-  const navigate = useNavigate();
-  const { user } = useAuthContext();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   

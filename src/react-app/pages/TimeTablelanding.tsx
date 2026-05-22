@@ -15,8 +15,7 @@ import {
   Play,
   Menu,
   X,
-  ChevronRight,
-  Zap
+  ChevronRight
 } from 'lucide-react';
 
 // Floating shapes component

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router';
 import { motion } from 'framer-motion';
-import { Grid3X3, TrendingUp, TrendingDown, Users, BookOpen } from 'lucide-react';
+import { Grid3X3, BookOpen } from 'lucide-react';
 import { api } from '@/react-app/hooks/useApi';
 import GlassCard from '@/react-app/components/analytics/GlassCard';
 import ModernChartContainer from '@/react-app/components/analytics/ModernChartContainer';

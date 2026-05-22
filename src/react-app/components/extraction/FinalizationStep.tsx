@@ -19,7 +19,7 @@ export default function FinalizationStep({
   onComplete,
 }: FinalizationStepProps) {
   const [summary, setSummary] = useState<any>(null);
-  const [questions, setQuestions] = useState<any[]>([]);
+  const [, setQuestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);

@@ -9,7 +9,6 @@ import {
   Camera,
   Monitor,
   Shield,
-  ArrowRight,
   Loader2,
   Download,
   Upload,
@@ -251,7 +250,7 @@ const ExamAccess: React.FC = () => {
       } else {
         setError(data.error || 'Invalid access code');
       }
-    } catch (error) {
+    } catch {
       setError('Failed to validate access code');
     } finally {
       setLoading(false);

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowLeft, User, Mail, Phone, Clock, Award, AlertTriangle, 
+import {
+  ArrowLeft, Mail, Phone, Clock, Award, AlertTriangle,
   CheckCircle, XCircle, MinusCircle, BarChart3, FileText, Calendar,
   Shield, TrendingUp
 } from 'lucide-react';

@@ -1,25 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router';
-import { 
-  Search, 
-  Download, 
-  BarChart3, 
-  TrendingUp, 
-  Users, 
-  Clock, 
-  Award,
-  Filter,
-  ArrowUpDown,
-  Eye,
+import { useParams } from 'react-router';
+import {
+  Search,
+  Download,
+  BarChart3,
+  TrendingUp,
   FileText,
   Target,
-  BookOpen,
-  Calculator,
   Activity,
   PieChart,
   TrendingDown
 } from 'lucide-react';
-import { useApi, api } from '@/react-app/hooks/useApi';
+import { api } from '@/react-app/hooks/useApi';
 import ExportModal from '../components/ExportModal';
 
 interface StudentResult {
@@ -110,8 +102,7 @@ interface AnalyticsData {
 
 export default function ExamResultsAnalytics() {
   const { examId } = useParams<{ examId: string }>();
-  const navigate = useNavigate();
-  
+
   // State for Results section
   const [resultsData, setResultsData] = useState<ResultsData | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -172,15 +163,6 @@ export default function ExamResultsAnalytics() {
       console.error('Error loading analytics:', error);
     } finally {
       setLoadingAnalytics(false);
-    }
-  };
-
-  const handleSort = (field: string) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('desc');
     }
   };
 

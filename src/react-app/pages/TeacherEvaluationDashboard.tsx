@@ -4,38 +4,16 @@ import {
   ArrowLeft,
   CheckCircle,
   Clock,
-  AlertCircle,
   Brain,
   User,
-  FileText,
   BarChart3,
   Settings,
   RefreshCw,
-  Filter,
   Search,
   Eye,
   Edit,
   Save,
   X,
-  Play,
-  Pause,
-  RotateCcw,
-  TrendingUp,
-  Target,
-  Award,
-  BookOpen,
-  Zap,
-  Users,
-  Calendar,
-  Timer,
-  Star,
-  ThumbsUp,
-  ThumbsDown,
-  MessageSquare,
-  Download,
-  Upload,
-  MoreVertical,
-  Cpu
 } from 'lucide-react';
 import { useApi, api } from '../hooks/useApi';
 import AnswerSheetUpload from '../components/AnswerSheetUpload';
@@ -115,7 +93,7 @@ export default function TeacherEvaluationDashboard() {
     `/evaluation/exams/${examId}/progress/`
   );
 
-  const { data: pendingEvaluations, loading: pendingLoading, refetch: refetchPending } = useApi<PendingEvaluationsResponse>(
+  const { data: pendingEvaluations, refetch: refetchPending } = useApi<PendingEvaluationsResponse>(
     `/evaluation/exams/${examId}/pending/`
   );
 

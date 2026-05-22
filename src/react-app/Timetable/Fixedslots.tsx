@@ -693,7 +693,6 @@ const FixedSlots: React.FC = () => {
                               // Use | as separator to avoid conflicts with batch_code containing -
                               const dropdownKey = `${activeBatchCode}|${slot.slot_code}`;
                               const isUpdating = updatingSlot === dropdownKey;
-                              const isAssigned = slot.is_assigned;
                               const isFixed = slot.is_fixed;
 
                               return (

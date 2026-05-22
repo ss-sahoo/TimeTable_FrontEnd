@@ -79,7 +79,7 @@ const useExamSecurity = (
 
       const data = response.data;
       return data;
-    } catch (error) {
+    } catch {
       // Quiet error logging
     }
   }, [attemptId]);

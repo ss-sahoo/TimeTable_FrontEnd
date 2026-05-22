@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, X, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, X, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ViolationToastProps {

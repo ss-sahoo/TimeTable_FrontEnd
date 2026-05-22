@@ -9,8 +9,6 @@ import {
     ChevronDown,
     Zap,
     LogOut,
-    Users as UsersIcon,
-    Settings as SettingsIcon,
     Layers,
     Award,
     ClipboardCheck,

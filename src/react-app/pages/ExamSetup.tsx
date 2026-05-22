@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
 import {
   CheckCircle,
@@ -10,11 +10,9 @@ import {
   Play,
   Loader2,
   Sparkles,
-  Shield,
   ShieldCheck,
   ShieldAlert,
   Clock,
-  AlertCircle,
   Target,
   BookOpen
 } from 'lucide-react';

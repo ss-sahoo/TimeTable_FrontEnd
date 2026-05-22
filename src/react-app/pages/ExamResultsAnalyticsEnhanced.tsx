@@ -4,7 +4,6 @@ import {
   Activity,
   ArrowLeft,
   BarChart3,
-  Calendar,
   CheckCircle,
   Clock,
   Download,
@@ -107,7 +106,7 @@ export default function ExamResultsAnalyticsEnhanced() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'submitted_at' | 'score' | 'percentage' | 'time_spent'>('submitted_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [sortOrder] = useState<'asc' | 'desc'>('desc');
   const [statusFilter, setStatusFilter] = useState('all');
   const [activeAnalyticsView, setActiveAnalyticsView] = useState<AnalyticsView>('statistics');
 

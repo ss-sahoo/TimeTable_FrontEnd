@@ -8,10 +8,8 @@ import {
   Filter,
   Search,
   Download,
-  CheckCircle,
   XCircle,
   Flag,
-  Camera,
   Monitor,
   Smartphone,
   MousePointer

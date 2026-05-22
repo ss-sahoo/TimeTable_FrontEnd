@@ -411,32 +411,6 @@ export default function ExamCreation() {
     }
   };
 
-  const getQuestionTypeIcon = (type: string) => {
-    switch (type) {
-      case 'mcq':
-        return <CheckCircle className="w-3 h-3 text-blue-600" />;
-      case 'numerical':
-        return <CheckCircle className="w-3 h-3 text-green-600" />;
-      case 'subjective':
-        return <CheckCircle className="w-3 h-3 text-purple-600" />;
-      default:
-        return <CheckCircle className="w-3 h-3 text-slate-600" />;
-    }
-  };
-
-  const getQuestionTypeColor = (type: string) => {
-    switch (type) {
-      case 'mcq':
-        return 'bg-blue-100 text-blue-700';
-      case 'numerical':
-        return 'bg-green-100 text-green-700';
-      case 'subjective':
-        return 'bg-purple-100 text-purple-700';
-      default:
-        return 'bg-slate-100 text-slate-700';
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#f9fafb' }}>

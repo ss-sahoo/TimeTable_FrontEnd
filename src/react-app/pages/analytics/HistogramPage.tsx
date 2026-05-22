@@ -54,7 +54,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function HistogramPage() {
-  const { examId, queryParams, examData } = useOutletContext<{
+  const { examId, queryParams } = useOutletContext<{
     examId: string;
     queryParams: string;
     examData: any;

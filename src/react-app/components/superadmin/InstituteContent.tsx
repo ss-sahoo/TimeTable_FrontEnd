@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { api } from "../../hooks/useApi";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { Building2, Users, MapPin, Globe, Mail, Phone, Calendar, Shield, Activity, TrendingUp, BookOpen, GraduationCap, Edit } from "lucide-react";
-import { motion } from "framer-motion";
-
 const InstituteContent = () => {
   const { user } = useAuthContext();
   const [institute, setInstitute] = useState<any>(null);

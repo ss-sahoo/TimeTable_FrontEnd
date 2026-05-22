@@ -13,12 +13,8 @@ import {
   X,
   ArrowLeft,
   Users,
-  Clock,
   Award,
-  Calendar,
-  BookOpen,
   Target,
-  CheckCircle,
 } from 'lucide-react';
 import { api } from '@/react-app/hooks/useApi';
 import FilterPanel, { AnalyticsFilters } from '@/react-app/components/analytics/FilterPanel';
@@ -141,17 +137,6 @@ export default function ExamAnalyticsDashboard() {
     if (filters.subject) params.append('subject', filters.subject);
     if (filters.violationsOnly) params.append('violations_only', 'true');
     return params.toString();
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   };
 
   if (loading) {

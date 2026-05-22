@@ -161,7 +161,7 @@ class FaceDetectionService {
       
       // For now, we'll use a simplified approach
       // In a real implementation, you'd use a proper object detection model
-      const mobileObjects = detections.filter(detection => {
+      const mobileObjects = detections.filter(() => {
         // This is a placeholder - you'd need to train a model to detect mobile phones
         // or use a pre-trained model like COCO-SSD
         return false; // Placeholder

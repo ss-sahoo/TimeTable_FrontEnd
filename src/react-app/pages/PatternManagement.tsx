@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { toast } from "react-toastify";
 import {
   Plus,
@@ -8,12 +8,9 @@ import {
   MoreVertical,
   Eye,
   Edit,
-  Copy,
   Trash2,
   BookOpen,
   Clock,
-  Users,
-  Settings,
   CheckCircle,
   CheckSquare,
   AlertCircle,
@@ -24,7 +21,6 @@ import {
   Type,
   Monitor
 } from 'lucide-react';
-import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
 
 interface PatternSection {
@@ -58,12 +54,10 @@ interface ExamPattern {
 }
 
 export default function PatternManagement() {
-  const navigate = useNavigate();
   const location = useLocation();
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
   const isCenterAdminPath = location.pathname.startsWith('/center-admin');
   const basePath = isSuperAdminPath ? '/superadmin' : isCenterAdminPath ? '/center-admin' : '';
-  const { user } = useAuthContext();
   const [patterns, setPatterns] = useState<ExamPattern[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

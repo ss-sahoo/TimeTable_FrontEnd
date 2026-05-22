@@ -1,23 +1,17 @@
-import { useState, useEffect } from 'react';
-import { 
-  Settings as SettingsIcon, 
-  User, 
-  Bell, 
-  Shield, 
+import { useState } from 'react';
+import {
+  Settings as SettingsIcon,
+  User,
+  Bell,
+  Shield,
   Palette,
   Save,
   Eye,
   EyeOff,
   Key,
-  Mail,
-  Phone,
   Building2,
-  Globe,
-  Lock,
-  Unlock,
   CheckCircle,
   AlertCircle,
-  Info
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
@@ -58,9 +52,8 @@ interface UserSettings {
 }
 
 export default function Settings() {
-  const { user, logout } = useAuthContext();
+  const { user } = useAuthContext();
   const [activeTab, setActiveTab] = useState('profile');
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});

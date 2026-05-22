@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/react-app/hooks/useApi';
-import { Clock, Globe, Calendar, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Globe, Calendar, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import DateTimeInput from '@/react-app/components/common/DateTimeInput';
 
 interface Timezone {

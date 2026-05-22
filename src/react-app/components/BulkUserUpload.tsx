@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from "react-toastify";
 import {
   Upload, X, FileSpreadsheet, CheckCircle, AlertCircle, Download,
-  Users, Loader2, Eye, EyeOff, Copy, Check, GraduationCap, Briefcase, UserCog,
+  Loader2, Eye, EyeOff, Copy, Check, GraduationCap, Briefcase, UserCog,
 } from 'lucide-react';
 import { api } from '../hooks/useApi';
 

@@ -6,13 +6,10 @@
  * - POST /api/questions/section-import-preview/
  * - POST /api/questions/confirm-section-import/
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { api } from '../../hooks/useApi';
 import {
-  Download,
   FileText,
-  ChevronDown,
-  ChevronUp,
   CheckCircle,
   XCircle,
   AlertTriangle,

@@ -1,32 +1,24 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Eye, 
-  Edit, 
-  Copy, 
-  Trash2, 
-  BookOpen, 
+import {
+  Plus,
+  Search,
+  MoreVertical,
+  Eye,
+  Edit,
+  Copy,
+  Trash2,
+  BookOpen,
   CheckCircle,
-  AlertCircle,
   Calculator,
   FileText,
   Type,
   Hash,
   Upload,
-  Download,
   Star,
-  Clock,
   User,
   Tag,
-  Image,
-  Code,
-  Brain
 } from 'lucide-react';
-import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
 
 interface Question {
@@ -80,7 +72,6 @@ interface QuestionBank {
 
 export default function QuestionBank() {
   const navigate = useNavigate();
-  const { user } = useAuthContext();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [questionBanks, setQuestionBanks] = useState<QuestionBank[]>([]);
   const [loading, setLoading] = useState(true);

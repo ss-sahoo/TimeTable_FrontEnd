@@ -16,11 +16,9 @@ import {
   Type,
   Hash,
   Zap,
-  Eye,
   ChevronDown,
   ChevronUp,
   X,
-  Target,
   Layers,
   Layout,
   Settings,
@@ -28,7 +26,6 @@ import {
   List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuthContext } from '../contexts/AuthContext';
 import { api, useApi } from '../hooks/useApi';
 import { MarkingScheme } from '../../shared/types';
 import MarkingSchemeConfig from '../components/MarkingSchemeConfig';
@@ -118,7 +115,6 @@ export default function PatternCreation() {
   const isCenterAdminPath = location.pathname.startsWith('/center-admin');
   const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
   const { id } = useParams();
-  const { user } = useAuthContext();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -266,16 +262,6 @@ export default function PatternCreation() {
     addSectionToSubject(subjectName);
   };
 
-  // Calculate total marks from all sections
-  const calculateTotalSectionMarks = () => {
-    return pattern.sections.reduce((total, section) => {
-      const startQ = typeof section.start_question === 'string' ? parseInt(section.start_question) || 0 : section.start_question;
-      const endQ = typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question;
-      const questionsInSection = endQ - startQ + 1;
-      const sectionMarks = questionsInSection * section.marking_scheme.max_marks;
-      return total + sectionMarks;
-    }, 0);
-  };
 
   // Calculate next available question number WITHIN A SPECIFIC SUBJECT
   const getNextQuestionNumberForSubject = (subjectName: string) => {
@@ -384,7 +370,7 @@ export default function PatternCreation() {
       setAddingSubject(true);
       setSubjectError('');
 
-      const response = await api.post('/patterns/subjects/', {
+      await api.post('/patterns/subjects/', {
         name: newSubjectName.trim(),
         description: `Subject for ${newSubjectName.trim()}`,
         is_active: true

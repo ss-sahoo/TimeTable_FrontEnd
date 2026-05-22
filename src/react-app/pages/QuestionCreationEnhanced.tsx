@@ -18,9 +18,7 @@ import {
   Sparkles,
   Zap,
   BookOpen,
-  RefreshCw,
   Loader2,
-  MessageSquare,
   X,
   Maximize2,
   Minimize2
@@ -416,7 +414,7 @@ export default function EnhancedQuestionEditor() {
   const [existingNumbers, setExistingNumbers] = useState<Set<number>>(new Set());
   const [existingNumbersBySection, setExistingNumbersBySection] = useState<Record<number, Set<number>>>({});
   const [existingQuestionsBySection, setExistingQuestionsBySection] = useState<Record<number, Map<number, QuestionData>>>({});
-  const [sectionAbsoluteRanges, setSectionAbsoluteRanges] = useState<Record<number, { start: number; end: number; length: number }>>({});
+  const [, setSectionAbsoluteRanges] = useState<Record<number, { start: number; end: number; length: number }>>({});
   const [bulkDataLoaded, setBulkDataLoaded] = useState(false);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(true); // Default to true as per user request
@@ -2247,9 +2245,6 @@ export default function EnhancedQuestionEditor() {
         const selectedAnswers = correct_answer
           ? correct_answer.split('|').filter(Boolean)
           : [];
-        const normalizedSelectedAnswers = selectedAnswers.map((answer) =>
-          normalizeOptionValue(answer),
-        );
         return (
           <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-2xl p-5 shadow-lg">
             <div className="flex items-center gap-3 mb-4">

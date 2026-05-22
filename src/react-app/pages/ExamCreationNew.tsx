@@ -3,16 +3,11 @@ import { useNavigate, useParams, useLocation } from 'react-router';
 import {
   ArrowLeft,
   Save,
-  Eye,
-  Calendar,
   Clock,
   Users,
   BookOpen,
   Settings,
   Plus,
-  Trash2,
-  Edit,
-  Copy,
   CheckCircle,
   AlertCircle,
   Info,
@@ -260,8 +255,8 @@ export default function ExamCreation() {
 
   const [patterns, setPatterns] = useState<ExamPattern[]>([]);
   const [selectedPattern, setSelectedPattern] = useState<ExamPattern | null>(null);
-  const [patternOption, setPatternOption] = useState<'template' | null>('template');
-  const [patternQuestions, setPatternQuestions] = useState<any[]>([]);
+  const [, setPatternOption] = useState<'template' | null>('template');
+  const [, setPatternQuestions] = useState<any[]>([]);
   const [publicLinkInfo, setPublicLinkInfo] = useState<PublicLinkInfo | null>(null);
   const [publicLinkLoading, setPublicLinkLoading] = useState(false);
   const [publicLinkError, setPublicLinkError] = useState<string | null>(null);
@@ -272,12 +267,7 @@ export default function ExamCreation() {
   const [batches, setBatches] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
 
-  const [creationSuccess, setCreationSuccess] = useState<{
-    examId: number;
-    shareUrl?: string | null;
-    token?: string | null;
-  } | null>(null);
-  const [creationCopyMessage, setCreationCopyMessage] = useState<string | null>(null);
+  const [, setCreationCopyMessage] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
@@ -515,16 +505,6 @@ export default function ExamCreation() {
     setPatternQuestions([]);
   };
 
-  const fetchPatternQuestions = async (patternId: number) => {
-    try {
-      const response = await api.get(`/patterns/patterns/${patternId}/questions/`);
-      setPatternQuestions(response.data.sections_with_questions || []);
-    } catch (error) {
-      console.error('Failed to fetch pattern questions:', error);
-      setPatternQuestions([]);
-    }
-  };
-
   const parseAllowedIpText = (value: string) => {
     if (!value) return [] as string[];
     return value
@@ -711,24 +691,6 @@ export default function ExamCreation() {
     }
   };
 
-  const handleCopyCreatedLink = async () => {
-    if (!creationSuccess) return;
-    const link = normalizeShareUrl(
-      creationSuccess.shareUrl ||
-      (creationSuccess.token ? getPublicExamLink(creationSuccess.token) : '')
-    );
-    if (!link) return;
-
-    try {
-      await navigator.clipboard.writeText(link);
-      setCreationCopyMessage('Link copied to clipboard.');
-    } catch (err) {
-      console.error('Copy failed:', err);
-      setCreationCopyMessage('Copy failed. Please copy the link manually.');
-    }
-    setTimeout(() => setCreationCopyMessage(null), 2000);
-  };
-
   const handleCopyPublicLink = async () => {
     const link = normalizeShareUrl(
       publicLinkInfo?.share_url ||
@@ -790,32 +752,6 @@ export default function ExamCreation() {
     } finally {
       setPublicLinkLoading(false);
       setTimeout(() => setPublicLinkCopyMessage(null), 2000);
-    }
-  };
-
-  const getQuestionTypeIcon = (type: string) => {
-    switch (type) {
-      case 'mcq':
-        return <CheckCircle className="w-3 h-3 text-blue-600" />;
-      case 'numerical':
-        return <CheckCircle className="w-3 h-3 text-green-600" />;
-      case 'subjective':
-        return <CheckCircle className="w-3 h-3 text-purple-600" />;
-      default:
-        return <CheckCircle className="w-3 h-3 text-slate-600" />;
-    }
-  };
-
-  const getQuestionTypeColor = (type: string) => {
-    switch (type) {
-      case 'mcq':
-        return 'bg-blue-100 text-blue-700';
-      case 'numerical':
-        return 'bg-green-100 text-green-700';
-      case 'subjective':
-        return 'bg-purple-100 text-purple-700';
-      default:
-        return 'bg-slate-100 text-slate-700';
     }
   };
 

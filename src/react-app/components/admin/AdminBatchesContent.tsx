@@ -3,7 +3,6 @@ import {
     GraduationCap,
     Search,
     Plus,
-    Calendar,
     Users,
     X,
     Loader2,
@@ -11,7 +10,6 @@ import {
     Filter,
     Clock,
     CheckCircle,
-    TrendingUp,
     ArrowUpRight,
     PlusCircle,
     ChevronRight,
@@ -55,7 +53,7 @@ export default function AdminBatchesContent() {
     const [batches, setBatches] = useState<Batch[]>([]);
     const [programs, setPrograms] = useState<Program[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [programFilter, setProgramFilter] = useState('all');
 

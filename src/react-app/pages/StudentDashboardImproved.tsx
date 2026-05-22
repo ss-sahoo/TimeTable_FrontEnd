@@ -25,12 +25,10 @@ import {
   Timer,
   Percent,
   History,
-  Info,
   MapPin,
   Building2,
   GraduationCap,
   Target,
-  TrendingDown,
   Users
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';

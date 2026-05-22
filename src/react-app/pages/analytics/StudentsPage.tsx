@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, Mail, Phone, Clock, Award, AlertTriangle, ChevronRight, 
-  User, TrendingUp, TrendingDown, Users, Filter, SortAsc
+import {
+  Search, Mail, Clock, Award, AlertTriangle, ChevronRight,
+  User, TrendingUp, Users, Filter, SortAsc
 } from 'lucide-react';
 import { api } from '@/react-app/hooks/useApi';
 import GlassCard from '@/react-app/components/analytics/GlassCard';
@@ -49,7 +49,7 @@ const statusConfig: Record<string, { bg: string; text: string; border: string }>
 };
 
 export default function StudentsPage() {
-  const { examId, queryParams, examData } = useOutletContext<{
+  const { examId, examData } = useOutletContext<{
     examId: string;
     queryParams: string;
     examData: any;
@@ -62,7 +62,7 @@ export default function StudentsPage() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'submitted_at' | 'score' | 'percentage' | 'time_spent'>('score');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [sortOrder] = useState<'asc' | 'desc'>('desc');
   const [statusFilter, setStatusFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 

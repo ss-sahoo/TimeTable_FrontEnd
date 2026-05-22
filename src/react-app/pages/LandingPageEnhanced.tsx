@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { Zap, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import Hero from '../components/landing/Hero';
 import Stats from '../components/landing/Stats';
 import ValueProps from '../components/landing/ValueProps';

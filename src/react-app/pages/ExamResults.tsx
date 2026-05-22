@@ -1,31 +1,21 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
 import { api } from '../hooks/useApi';
-import { useAuthContext } from '../contexts/AuthContext';
 import { toast } from "react-toastify";
 import {
   CheckCircle,
   Clock,
-  Award,
   BarChart3,
   Eye,
   AlertTriangle,
   Trophy,
-  Target,
-  TrendingUp,
   Calendar,
-  User,
   BookOpen,
   ArrowLeft,
-  Star,
-  Percent,
-  Timer,
   CheckCircle2,
-  XCircle,
   RefreshCw,
   Download,
   Share2,
-  Zap,
   Filter,
   FileText,
   Printer,
@@ -117,7 +107,6 @@ const ExamResults: React.FC = () => {
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
   const isCenterAdminPath = location.pathname.startsWith('/center-admin');
   const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
-  const { user } = useAuthContext();
 
   const [result, setResult] = useState<ExamResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -199,20 +188,6 @@ const ExamResults: React.FC = () => {
     // Exam time is completed if either the global exam end time has passed
     // OR the individual attempt duration has elapsed
     return now >= examEndTime || now >= attemptEndTime;
-  };
-
-  const parseAnswerSheetPayload = (payload?: any): AnswerSheetInfo | null => {
-    if (!payload) {
-      return null;
-    }
-    return {
-      url: payload.url ?? payload.pdf_url ?? null,
-      generated_at: payload.generated_at ?? null,
-      branding: payload.branding,
-      grading: payload.grading,
-      invigilator_placeholders: payload.invigilator_placeholders,
-      question_breakdown: payload.question_breakdown,
-    };
   };
 
   const formatTime = (seconds: number) => {
@@ -381,7 +356,7 @@ const ExamResults: React.FC = () => {
           );
         }
       }
-    } catch (e) {
+    } catch {
       // Not a JSON or not our structured format, fall back to LaTeX rendering
     }
 

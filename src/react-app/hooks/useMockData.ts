@@ -274,7 +274,7 @@ export function useMockApi<T>(url: string) {
         }
         
         setData(result);
-      } catch (err) {
+      } catch {
         setError('Failed to load data');
       } finally {
         setLoading(false);
@@ -287,7 +287,7 @@ export function useMockApi<T>(url: string) {
 
 // Mock API utilities
 export const mockApi = {
-  get: async <T>(_url: string): Promise<T> => {
+  get: async <T>(): Promise<T> => {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 300));
     throw new Error('Mock API - GET operations not implemented for demo');
@@ -340,7 +340,7 @@ export const mockApi = {
     return { message: 'Mock update completed' } as T;
   },
 
-  delete: async <T>(_url: string): Promise<T> => {
+  delete: async <T>(): Promise<T> => {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 300));
     return { message: 'Mock delete completed' } as T;

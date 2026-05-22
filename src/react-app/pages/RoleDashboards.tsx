@@ -1,6 +1,5 @@
 import {
   Users,
-  UserCog,
   GraduationCap,
   ClipboardList,
   CalendarDays,
@@ -361,50 +360,6 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between">
       <span className="text-slate-600 dark:text-gray-400">{label}</span>
       <span className="font-semibold text-slate-900 dark:text-gray-100">{value}</span>
-    </div>
-  );
-}
-
-function SimpleRolePage({
-  role,
-  headline,
-  description,
-  primaryItems,
-}: {
-  role: "Teacher" | "Staff" | "Student";
-  headline: string;
-  description: string;
-  primaryItems: { icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; title: string; value: string }[];
-}) {
-  return (
-    <div className="min-h-screen bg-slate-50 dark:bg-gray-900">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <Header title={`${role} Dashboard`} subtitle={description} />
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {primaryItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div
-                key={item.title}
-                className="bg-white dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 p-4 shadow-sm flex items-start gap-3"
-              >
-                <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center">
-                  <Icon className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-900 dark:text-gray-100">
-                    {item.title}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-600 dark:text-gray-400">{item.value}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <StaticFooterNote />
-      </div>
     </div>
   );
 }

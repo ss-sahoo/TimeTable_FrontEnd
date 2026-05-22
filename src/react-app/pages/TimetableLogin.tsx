@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import DeviceConflictModal from '../components/DeviceConflictModal';
-import { deviceManager } from '../services/DeviceManager';
 
 export default function TimetableLogin() {
   const [formData, setFormData] = useState({

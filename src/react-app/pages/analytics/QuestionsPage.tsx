@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileQuestion, TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, MinusCircle, Search, Filter } from 'lucide-react';
+import { FileQuestion, Clock, CheckCircle, XCircle, MinusCircle, Search, Filter } from 'lucide-react';
 import { api } from '@/react-app/hooks/useApi';
 import GlassCard from '@/react-app/components/analytics/GlassCard';
 import ModernChartContainer from '@/react-app/components/analytics/ModernChartContainer';
@@ -70,15 +70,6 @@ export default function QuestionsPage() {
 
   const handleExport = (format: 'csv' | 'excel' | 'pdf' | 'image') => {
     console.log('Export as', format);
-  };
-
-  const handleSort = (field: typeof sortBy) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('asc');
-    }
   };
 
   const filteredAndSortedData = data?.question_analytics

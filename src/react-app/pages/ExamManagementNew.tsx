@@ -1,16 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { toast } from "react-toastify";
 import {
   Plus,
   Search,
-  Filter,
   MoreVertical,
   Eye,
   Edit,
   Copy,
   Trash2,
-  Users,
   BarChart3,
   Calendar,
   Clock,
@@ -19,16 +17,11 @@ import {
   AlertCircle,
   Play,
   Pause,
-  Settings,
-  Download,
-  Upload,
-  Mail,
   Share2,
   CheckSquare,
   Square,
   X
 } from 'lucide-react';
-import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
 import { getPublicExamLink, normalizeShareUrl } from '../utils/urlUtils';
 
@@ -69,12 +62,10 @@ interface Exam {
 }
 
 export default function ExamManagement() {
-  const navigate = useNavigate();
   const location = useLocation();
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
   const isCenterAdminPath = location.pathname.startsWith('/center-admin');
   const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
-  const { user } = useAuthContext();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
 

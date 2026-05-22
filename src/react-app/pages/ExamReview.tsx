@@ -1,37 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link, useLocation } from 'react-router';
+import { useParams, useNavigate } from 'react-router';
 import { api } from '../hooks/useApi';
 import { toast } from "react-toastify";
 import {
   ArrowLeft,
   CheckCircle,
   Clock,
-  Award,
   BarChart3,
   Eye,
   AlertTriangle,
-  Trophy,
   Target,
-  TrendingUp,
   Calendar,
   User,
   BookOpen,
   FileText,
   MessageSquare,
-  ThumbsUp,
-  ThumbsDown,
   Save,
-  Send,
   Download,
   Printer,
   Flag,
-  Star,
-  Edit,
   X,
-  ChevronDown,
-  ChevronUp,
   Search,
-  Filter
 } from 'lucide-react';
 import LaTeXRenderer from '../components/LaTeXRenderer';
 
@@ -128,16 +117,11 @@ interface Violation {
 const ExamReview: React.FC = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
-  const isCenterAdminPath = location.pathname.startsWith('/center-admin');
-  const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
   const [reviewData, setReviewData] = useState<ExamReviewData | null>(null);
   const [violations, setViolations] = useState<Violation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'questions' | 'violations' | 'feedback'>('overview');
-  const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ [key: string]: string }>({});
   const [marks, setMarks] = useState<{ [key: string]: number }>({});
   const [saving, setSaving] = useState(false);

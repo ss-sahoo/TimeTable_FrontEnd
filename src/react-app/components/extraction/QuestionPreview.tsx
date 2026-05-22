@@ -13,9 +13,7 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronUp,
-  Calculator,
   Download,
-  FileText,
   Settings,
   X,
 } from 'lucide-react';
@@ -95,17 +93,6 @@ const QuestionPreview: React.FC<QuestionPreviewProps> = ({
     }
     setSelectedIds(newSelected);
     onSelectionChange(Array.from(newSelected));
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === questions.length) {
-      setSelectedIds(new Set());
-      onSelectionChange([]);
-    } else {
-      const allIds = new Set(questions.map(q => q.id));
-      setSelectedIds(allIds);
-      onSelectionChange(Array.from(allIds));
-    }
   };
 
   const startEdit = (question: ExtractedQuestion) => {

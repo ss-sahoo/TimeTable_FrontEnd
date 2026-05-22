@@ -7,7 +7,6 @@ import {
   Mail,
   Lock,
   User,
-  Zap,
   AlertCircle,
   CheckCircle,
   ArrowRight,

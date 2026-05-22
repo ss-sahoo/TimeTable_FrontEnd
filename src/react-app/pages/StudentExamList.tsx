@@ -7,8 +7,6 @@ import {
   Calendar,
   Clock,
   Search,
-  Filter,
-  RefreshCw,
   AlertCircle,
   CheckCircle,
   Play,
@@ -20,11 +18,8 @@ import {
   Unlock,
   Camera,
   Monitor,
-  ChevronRight,
-  TrendingUp,
   SlidersHorizontal,
   Upload,
-  FileText,
   BarChart3,
   Shield,
   X
@@ -68,7 +63,6 @@ export default function StudentExamList() {
   const [filteredExams, setFilteredExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -150,12 +144,6 @@ export default function StudentExamList() {
     });
 
     setFilteredExams(filtered);
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadExams();
-    setRefreshing(false);
   };
 
   const formatDate = (dateString: string) => {
@@ -281,14 +269,6 @@ export default function StudentExamList() {
       </div>
     );
   }
-
-  const stats = {
-    total: exams.length,
-    available: exams.filter(e => e.status === 'available').length,
-    scheduled: exams.filter(e => e.status === 'scheduled').length,
-    ongoing: exams.filter(e => e.status === 'ongoing').length,
-    completed: exams.filter(e => e.status === 'completed').length
-  };
 
   return (
     <div className="min-h-screen bg-slate-50">

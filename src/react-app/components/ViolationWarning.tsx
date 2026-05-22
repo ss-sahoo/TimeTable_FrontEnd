@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, X, ShieldAlert, Timer, ChevronRight, Info } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, Timer, ChevronRight, Info } from 'lucide-react';
 
 interface ViolationWarningProps {
   isOpen: boolean;
@@ -23,7 +23,6 @@ const ViolationWarning: React.FC<ViolationWarningProps> = ({
   violationCount,
   maxViolations,
   onAcknowledge,
-  onClose
 }) => {
   const [countdown, setCountdown] = useState(5); // Reduced to 5s for better UX, but keeping it mandatory
   const [canAcknowledge, setCanAcknowledge] = useState(false);

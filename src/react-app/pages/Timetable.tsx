@@ -6,13 +6,10 @@ import Teachers from "../Timetable/Teachers";
 import Feasibility from "../Timetable/Feasibility";
 import GeneratedTimetable from "../Timetable/GeneratedTimetable";
 import UpdateSlots from "../Timetable/UpdateSlots";
-import TeacherManagement from "../Timetable/TeacherManagement";
-import Users from "./Users";
 import { fetchAllTimetables, updateFreeClassesCount, cleanTimetableId } from "../AllApi";
 import { useAuthContext } from "../contexts/AuthContext";
-import { api, API_BASE_URL } from "../hooks/useApi";
+import { API_BASE_URL } from "../hooks/useApi";
 import { useTimetableCenter } from "../contexts/TimetableCenterContext";
-import { JSX } from "react";
 
 
 
@@ -29,17 +26,12 @@ type TabType =
   | "generate"
   | "UpdateSlots";
 
-interface TableData {
-  headers: string[];
-  rows: (string | JSX.Element)[][];
-}
-
 /* ================================
    MAIN COMPONENT
 ================================ */
 const Timetable: React.FC = () => {
   const { user } = useAuthContext();
-  const { selectedCenterId, selectedCenterName, centers, loading: loadingCenters } = useTimetableCenter();
+  const { selectedCenterId, selectedCenterName } = useTimetableCenter();
   const [activeTab, setActiveTab] = useState<TabType>("instructions");
   const [timetables, setTimetables] = useState<any[]>([]);
   const [loadingTimetables, setLoadingTimetables] = useState(false);
@@ -320,15 +312,6 @@ const Instructions = ({
     if (!startDate || !endDate) return [];
 
     const ALL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-    const DAY_ABBREVIATIONS: Record<string, string> = {
-      "Monday": "M",
-      "Tuesday": "TU",
-      "Wednesday": "WE",
-      "Thursday": "TH",
-      "Friday": "FR",
-      "Saturday": "SA",
-      "Sunday": "SU"
-    };
 
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -779,46 +762,6 @@ const FixedSlots = () => {
 //   );
 // };
 
-// Generate Tab
-const Generate = () => {
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  return (
-    <div style={styles.tabContent}>
-      <h3 style={styles.tabTitle}>Auto-Generate Timetable</h3>
-      <div style={styles.generateCard}>
-        <div style={styles.generateOptions}>
-          <label style={styles.checkboxLabel}>
-            <input type="checkbox" defaultChecked /> Consider teacher availability
-          </label>
-          <label style={styles.checkboxLabel}>
-            <input type="checkbox" defaultChecked /> Consider batch constraints
-          </label>
-          <label style={styles.checkboxLabel}>
-            <input type="checkbox" defaultChecked /> Avoid clashes
-          </label>
-          <label style={styles.checkboxLabel}>
-            <input type="checkbox" /> Include breaks
-          </label>
-        </div>
-        <button
-          style={styles.successBtn}
-          onClick={() => setIsGenerating(true)}
-          disabled={isGenerating}
-        >
-          {isGenerating ? "Generating..." : "Generate Timetable"}
-        </button>
-        {isGenerating && (
-          <div style={styles.progressContainer}>
-            <div style={styles.progressBar}></div>
-            <p style={styles.mutedText}>Processing constraints and generating timetable...</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
 // Update Slots Tab
 // const UpdateSlots = () => {
 //   return (
@@ -843,40 +786,6 @@ const Generate = () => {
 /* ================================
    REUSABLE COMPONENTS
 ================================ */
-
-const Table: React.FC<{ data: TableData }> = ({ data }) => (
-  <div style={styles.tableContainer}>
-    <table style={styles.table}>
-      <thead>
-        <tr>
-          {data.headers.map((header, index) => (
-            <th key={index} style={styles.tableHeader}>{header}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {data.rows.map((row, rowIndex) => (
-          <tr key={rowIndex} style={rowIndex % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd}>
-            {row.map((cell, cellIndex) => (
-              <td key={cellIndex} style={styles.tableCell}>{cell}</td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-);
-
-/* ================================
-   HELPER FUNCTIONS
-================================ */
-
-const renderActions = () => (
-  <div style={styles.actionButtons}>
-    <button style={styles.editBtn}>Edit</button>
-    <button style={styles.deleteBtn}>Delete</button>
-  </div>
-);
 
 /* ================================
    STYLES (Dashboard-like UI)

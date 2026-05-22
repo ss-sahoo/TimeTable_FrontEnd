@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import {
-  ArrowLeft,
   Users,
   BookOpen,
   Clock,
@@ -14,14 +13,12 @@ import {
   Search,
   Calendar,
   User,
-  TrendingUp,
   Target,
   FileText,
   X,
   Download,
   RefreshCw
 } from 'lucide-react';
-import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
 import { SkeletonTable, SkeletonStatsCard, SkeletonText } from '../components/SkeletonLoader';
 
@@ -64,7 +61,6 @@ interface ExamAttempt {
 }
 
 export default function Results() {
-  const { user } = useAuthContext();
   const navigate = useNavigate();
   const location = useLocation();
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
@@ -277,7 +273,6 @@ export default function Results() {
   // Calculate statistics
   const totalAttempts = attempts.length;
   const completedAttempts = attempts.filter(a => a.status === 'submitted' || a.status === 'auto_submitted').length;
-  const disqualifiedAttempts = attempts.filter(a => a.status === 'disqualified').length;
   const inProgressAttempts = attempts.filter(a => a.status === 'in_progress').length;
 
   const averageScore = attempts.length > 0

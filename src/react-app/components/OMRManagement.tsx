@@ -131,9 +131,7 @@ export default function OMRManagement({ examId, examTitle, patternId }: OMRManag
     const [uploading, setUploading] = useState(false);
     const [expandedSheet, setExpandedSheet] = useState<number | null>(null);
     const [activeTab, setActiveTab] = useState<'sheets' | 'submissions' | 'answer_key'>('sheets');
-    const [answerKey, setAnswerKey] = useState<AnswerKey | null>(null);
-    const [uploadingMaster, setUploadingMaster] = useState(false);
-    const [selectedMasterFile, setSelectedMasterFile] = useState<File | null>(null);
+    const [, setAnswerKey] = useState<AnswerKey | null>(null);
 
     // Exam questions state (for auto-populating answer key)
     const [examQuestions, setExamQuestions] = useState<ExamQuestionData[]>([]);
@@ -148,9 +146,6 @@ export default function OMRManagement({ examId, examTitle, patternId }: OMRManag
     const [savingAnswerKey, setSavingAnswerKey] = useState(false);
     const [defaultMarks, setDefaultMarks] = useState(4);
     const [defaultNegative, setDefaultNegative] = useState(1);
-
-    // Submission details view
-    const [selectedSubmission, setSelectedSubmission] = useState<OMRSubmission | null>(null);
 
     // Helper function to convert correct_answer to option letter (A, B, C, D)
     const getAnswerLetter = (question: ExamQuestionData['question']): string[] => {
@@ -308,30 +303,6 @@ export default function OMRManagement({ examId, examTitle, patternId }: OMRManag
         }
     };
 
-    const handleUploadMaster = async () => {
-        if (!selectedMasterFile) return;
-        try {
-            setUploadingMaster(true);
-            setError(null);
-            const formData = new FormData();
-            formData.append('file', selectedMasterFile);
-
-            const response = await api.post(`/omr/answer-keys/upload-master/${examId}/`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-
-            setSuccess('Answer key extracted successfully from master sheet!');
-            setAnswerKey(response.data.answer_key);
-            setSelectedMasterFile(null);
-            setTimeout(() => setSuccess(null), 3000);
-        } catch (err: any) {
-            console.error('Failed to upload master sheet:', err);
-            setError(err.response?.data?.error || 'Failed to extract answer key');
-        } finally {
-            setUploadingMaster(false);
-        }
-    };
-
     const handleEvaluate = async (submissionId: number) => {
         try {
             setError(null);
@@ -343,52 +314,6 @@ export default function OMRManagement({ examId, examTitle, patternId }: OMRManag
             console.error('Failed to evaluate submission:', err);
             setError(err.response?.data?.error || 'Failed to evaluate submission');
         }
-    };
-
-    // Toggle answer selection for a question
-    const handleAnswerToggle = (questionNum: number, option: string) => {
-        const qKey = `Q${questionNum}`;
-        setAnswerFormData(prev => {
-            const current = prev[qKey] || { correct: [], marks: defaultMarks, negative: defaultNegative };
-            const isSelected = current.correct.includes(option);
-
-            return {
-                ...prev,
-                [qKey]: {
-                    ...current,
-                    correct: isSelected
-                        ? current.correct.filter(o => o !== option)
-                        : [...current.correct, option]
-                }
-            };
-        });
-    };
-
-    // Set single answer (replace, not toggle)
-    const handleSetAnswer = (questionNum: number, option: string) => {
-        const qKey = `Q${questionNum}`;
-        setAnswerFormData(prev => ({
-            ...prev,
-            [qKey]: {
-                correct: [option],
-                marks: prev[qKey]?.marks ?? defaultMarks,
-                negative: prev[qKey]?.negative ?? defaultNegative
-            }
-        }));
-    };
-
-    // Update marks for a question
-    const handleMarksChange = (questionNum: number, marks: number, negative: number) => {
-        const qKey = `Q${questionNum}`;
-        setAnswerFormData(prev => ({
-            ...prev,
-            [qKey]: {
-                ...prev[qKey],
-                correct: prev[qKey]?.correct || [],
-                marks,
-                negative
-            }
-        }));
     };
 
     // Save answer key to backend
@@ -433,78 +358,6 @@ export default function OMRManagement({ examId, examTitle, patternId }: OMRManag
             setError(err.response?.data?.error || err.response?.data?.details?.join(', ') || 'Failed to save answer key');
         } finally {
             setSavingAnswerKey(false);
-        }
-    };
-
-    // Initialize all questions with default values
-    const handleInitializeQuestions = () => {
-        const initial: Record<string, { correct: string[]; marks: number; negative: number }> = {};
-        for (let i = 1; i <= totalQuestions; i++) {
-            initial[`Q${i}`] = answerFormData[`Q${i}`] || { correct: [], marks: defaultMarks, negative: defaultNegative };
-        }
-        setAnswerFormData(initial);
-    };
-
-    // Sync answer key from exam questions
-    const handleSyncFromExam = async () => {
-        if (examQuestions.length === 0) {
-            setError('No exam questions found to sync from.');
-            setTimeout(() => setError(null), 3000);
-            return;
-        }
-
-        const autoAnswerData: Record<string, { correct: string[]; marks: number; negative: number }> = {};
-
-        // Use database question_number for stable mapping between generator, key, and evaluator
-        examQuestions.forEach((eq: ExamQuestionData) => {
-            const qNum = eq.question_number;
-            const qKey = `Q${qNum}`;
-
-            const question = eq.question;
-
-            if (question) {
-                const answerLetters = getAnswerLetter(question);
-                const marks = eq.marks || question.marks || defaultMarks;
-                const negative = eq.negative_marks || question.negative_marks || defaultNegative;
-
-                autoAnswerData[qKey] = {
-                    correct: answerLetters,
-                    marks: typeof marks === 'number' ? marks : parseFloat(marks as any) || defaultMarks,
-                    negative: typeof negative === 'number' ? negative : parseFloat(negative as any) || defaultNegative
-                };
-            }
-        });
-
-        setAnswerFormData(autoAnswerData);
-        setTotalQuestions(examQuestions.length);
-
-        // Auto-save to database
-        const populatedCount = Object.values(autoAnswerData).filter(a => a.correct.length > 0).length;
-        if (populatedCount > 0) {
-            // Build payload for auto-save
-            // Build payload using actual question numbers present in the sync
-            const payload: Record<string, any> = {};
-            examQuestions.forEach((eq) => {
-                const qKey = `Q${eq.question_number}`;
-                if (autoAnswerData[qKey] && autoAnswerData[qKey].correct.length > 0) {
-                    payload[qKey] = {
-                        correct: autoAnswerData[qKey].correct,
-                        marks: autoAnswerData[qKey].marks,
-                        negative: autoAnswerData[qKey].negative
-                    };
-                }
-            });
-
-
-            try {
-                const saveRes = await api.post(`/omr/answer-keys/set-answers/${examId}/`, payload);
-                setAnswerKey(saveRes.data.answer_key);
-                setSuccess(`Synced and saved ${populatedCount} answers from exam questions!`);
-            } catch (saveErr) {
-                console.error('Failed to save answer key:', saveErr);
-                setSuccess(`Synced ${populatedCount} answers (save manually to persist)`);
-            }
-            setTimeout(() => setSuccess(null), 4000);
         }
     };
 

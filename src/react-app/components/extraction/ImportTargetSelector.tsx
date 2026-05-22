@@ -13,7 +13,6 @@ import {
   BookOpen,
   ChevronDown,
   AlertTriangle,
-  CheckCircle,
   Info,
   ArrowRight,
   Loader2,

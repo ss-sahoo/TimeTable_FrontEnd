@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router';
 import { motion } from 'framer-motion';
-import { 
-  BarChart3, TrendingUp, Target, TrendingDown, Clock, Users, Award, AlertTriangle,
+import {
+  BarChart3, TrendingUp, Target, TrendingDown, Clock, Users, AlertTriangle,
   Activity, Percent, Timer, UserCheck
 } from 'lucide-react';
 import { api } from '@/react-app/hooks/useApi';
@@ -57,7 +57,7 @@ interface StatisticsData {
 }
 
 export default function StatisticsPage() {
-  const { examId, filters, queryParams, examData } = useOutletContext<{
+  const { examId, queryParams } = useOutletContext<{
     examId: string;
     filters: any;
     queryParams: string;

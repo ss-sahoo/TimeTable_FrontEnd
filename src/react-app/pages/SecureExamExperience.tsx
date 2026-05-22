@@ -8,22 +8,16 @@ import {
   Flag,
   CheckCircle,
   AlertTriangle,
-  Save,
   Send,
-  Eye,
-  EyeOff,
   Maximize,
   Minimize,
   ChevronLeft,
   ChevronRight,
-  User,
   ShieldCheck,
-  Pause,
   Monitor
 } from 'lucide-react';
 import useExamSecurity from '../hooks/useExamSecurity';
 import WebcamMonitor from '../components/WebcamMonitor';
-import ViolationWarning from '../components/ViolationWarning';
 import ViolationToast from '../components/ViolationToast';
 import LaTeXRenderer from '../components/LaTeXRenderer';
 import ViolationsPanel from '../components/ViolationsPanel';

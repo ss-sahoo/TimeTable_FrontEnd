@@ -142,7 +142,7 @@ export default function EnhancedQuestionEditor() {
 
       // Clear saved status after 2 seconds
       setTimeout(() => setSaveStatus('idle'), 2000);
-    } catch (error) {
+    } catch {
       setSaveStatus('error');
     } finally {
       setLoading(false);

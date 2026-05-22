@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { motion } from 'framer-motion';
-import { BarChart3, Zap, BookOpen, FileText, Settings } from 'lucide-react';
+import { BarChart3, Zap, BookOpen, FileText } from 'lucide-react';
 
 // Import existing components
 import PatternManagement from '@/react-app/pages/PatternManagement';

@@ -3,7 +3,6 @@ import {
   GraduationCap,
   Search,
   Plus,
-  Calendar,
   Users,
   X,
   Loader2,
@@ -11,10 +10,7 @@ import {
   Filter,
   Clock,
   CheckCircle,
-  TrendingUp,
-  MapPin,
   ArrowUpRight,
-  FileText,
   PlusCircle,
   Building2,
   ChevronRight,
@@ -58,7 +54,7 @@ interface Program {
 
 export default function Batches() {
   const { user } = useAuthContext();
-  const { selectedCenterId, centers: contextCenters } = useTimetableCenter();
+  const { selectedCenterId } = useTimetableCenter();
   const isStudent = user?.role?.toUpperCase() === 'STUDENT';
   const isTeacher = user?.role?.toUpperCase() === 'TEACHER';
   const isReadOnly = isStudent || isTeacher;
@@ -67,7 +63,7 @@ export default function Batches() {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [centers, setCenters] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [programFilter, setProgramFilter] = useState('all');
   const [centerFilter, setCenterFilter] = useState('all');
