@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   Eye,
   Edit,
-  Copy,
   Trash2,
   Calendar,
   Clock,
@@ -14,21 +13,13 @@ import {
   CheckCircle,
   AlertCircle,
   Play,
-  Pause,
-  Settings,
   Download,
-  Upload,
   Mail,
-  Share2,
-  MoreVertical,
   BarChart3,
   FileText,
   Award,
-  Hash,
   Zap,
-  Building2,
   Globe,
-  UserCheck,
   Shield,
   Info,
   ExternalLink,
@@ -38,9 +29,9 @@ import {
   TrendingUp,
   Layers,
   Brain,
-  RefreshCw
+  RefreshCw,
+  KeyRound
 } from 'lucide-react';
-import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
 import QuestionBulkImport from '../components/extraction/QuestionBulkImport';
 import OMRManagement from '../components/OMRManagement';
@@ -118,7 +109,6 @@ export default function ExamView() {
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
   const isCenterAdminPath = location.pathname.startsWith('/center-admin');
   const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
-  const { user } = useAuthContext();
   const [exam, setExam] = useState<Exam | null>(null);
   const [sectionStats, setSectionStats] = useState<SectionQuestionStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -694,6 +684,14 @@ export default function ExamView() {
                   >
                     <Zap className="w-3 h-3" />
                     Smart Extract V3
+                  </button>
+                  <button
+                    onClick={() => navigate(`/exams/${exam.id}/answer-key`)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow-sm"
+                    title="Upload an answer-key PDF and apply correct answers in bulk"
+                  >
+                    <KeyRound className="w-3 h-3" />
+                    Upload Answer Key
                   </button>
                   <Link
                     to={`${basePath}/patterns/${exam.pattern.id}/view`}
