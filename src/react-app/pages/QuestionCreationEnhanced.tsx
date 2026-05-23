@@ -249,33 +249,55 @@ const resolveOptionIndexFromAnswer = (answer: unknown, options: string[]): numbe
   const raw = extractAnswerText(answer);
   if (!raw) return -1;
 
-  // A / B / C / D style
+  // 1. Exact Content Match (Highest Priority) - Both with and without HTML
+  const normalizedAnswer = normalizeLatexText(raw);
+  const strippedAnswer = stripOptionContent(raw).toLowerCase();
+
+  for (let i = 0; i < options.length; i += 1) {
+    const optionStr = safeOptionString(options[i]);
+    const normalizedOption = normalizeLatexText(optionStr);
+    const strippedOption = stripOptionContent(optionStr).toLowerCase();
+
+    // Check exact match with HTML
+    if (normalizedAnswer && normalizedAnswer === normalizedOption) {
+      return i;
+    }
+    // Check exact match without HTML
+    if (strippedAnswer && strippedAnswer === strippedOption) {
+      return i;
+    }
+  }
+
+  // 2. A / B / C / D style match
   const letterMatch = raw.match(/(?:^|\b)([A-Z])(?:\)|:|\.|\b)/i);
   if (letterMatch) {
     const idx = letterMatch[1].toUpperCase().charCodeAt(0) - 65;
-    if (idx >= 0 && idx < options.length && safeOptionString(options[idx]).trim()) return idx;
+    if (idx >= 0 && idx < options.length && stripOptionContent(safeOptionString(options[idx])).trim()) return idx;
   }
 
-  // 1 / 2 / 3 / 4 style
+  // 3. 1 / 2 / 3 / 4 style match
   const numberMatch = raw.match(/^\s*\(?(\d+)\)?\s*$/);
   if (numberMatch) {
     const idx = Number(numberMatch[1]) - 1;
-    if (idx >= 0 && idx < options.length && safeOptionString(options[idx]).trim()) return idx;
+    if (idx >= 0 && idx < options.length && stripOptionContent(safeOptionString(options[idx])).trim()) return idx;
   }
 
-  const normalizedAnswer = normalizeLatexText(raw);
-  if (!normalizedAnswer) return -1;
+  // 4. Fuzzy Match (Fallback - only if no exact match found)
+  if (normalizedAnswer) {
+    for (let i = 0; i < options.length; i += 1) {
+      const optionStr = safeOptionString(options[i]);
+      const normalizedOption = normalizeLatexText(optionStr);
+      if (!normalizedOption) continue;
 
-  for (let i = 0; i < options.length; i += 1) {
-    const normalizedOption = normalizeLatexText(safeOptionString(options[i]));
-    if (!normalizedOption) continue;
-
-    if (
-      normalizedAnswer === normalizedOption ||
-      normalizedAnswer.includes(normalizedOption) ||
-      normalizedOption.includes(normalizedAnswer)
-    ) {
-      return i;
+      if (
+        normalizedAnswer.includes(normalizedOption) ||
+        normalizedOption.includes(normalizedAnswer)
+      ) {
+        // Only return if the match is significantly long or very close in length
+        if (Math.abs(normalizedAnswer.length - normalizedOption.length) < 5) {
+          return i;
+        }
+      }
     }
   }
 
