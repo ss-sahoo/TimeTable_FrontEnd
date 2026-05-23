@@ -188,14 +188,20 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
                 <aside className={`${sidebarCollapsed ? 'w-20' : 'w-72'} bg-white border-r border-slate-200 flex flex-col z-30 transition-all duration-300`}>
                     <div className="h-16 flex items-center px-4 border-b border-slate-100">
                         {!sidebarCollapsed ? (
-                            <div className="flex items-center gap-3 w-full hover:bg-slate-50 cursor-pointer transition-colors py-2 px-2 rounded-md -mx-2">
+                            <div
+                                onClick={() => navigate('/superadmin/institutes')}
+                                className="flex items-center gap-3 w-full hover:bg-slate-100 cursor-pointer transition-colors py-2 px-2 rounded-md -mx-2 group"
+                            >
                                 <img
-                                    src="/examlogo.png"
-                                    alt="Exam Logo"
-                                    className="w-8 h-8 object-contain flex-shrink-0 rounded-md"
+                                    src={user?.institute?.logo || "/examlogo.png"}
+                                    alt="Institute Logo"
+                                    className="w-10 h-10 object-contain flex-shrink-0 rounded-md group-hover:scale-105 transition-transform"
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).src = "/examlogo.png";
+                                    }}
                                 />
                                 <div className="flex-1 overflow-hidden">
-                                    <h1 className="font-bold text-md text-slate-900 leading-tight">
+                                    <h1 className="font-bold text-md text-slate-900 leading-tight group-hover:text-violet-600 transition-colors">
                                         {user?.institute?.name || user?.institute_name || "DashoExams"}
                                     </h1>
                                 </div>
@@ -203,9 +209,12 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
                         ) : (
                             <div className="w-8 h-8 flex items-center justify-center mx-auto">
                                 <img
-                                    src="/examlogo.png"
-                                    alt="Exam Logo"
+                                    src={user?.institute?.logo || "/examlogo.png"}
+                                    alt="Institute Logo"
                                     className="w-8 h-8 object-contain rounded-md"
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).src = "/examlogo.png";
+                                    }}
                                 />
                             </div>
                         )}

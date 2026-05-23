@@ -42,7 +42,7 @@ export default function DeviceManagerExample() {
         setShowConflictModal(true);
       } else {
         console.log('No device conflict. User can proceed.');
-        toast.error('No device conflict detected. Login successful!');
+        toast.success('No device conflict detected. Login successful!');
       }
     } catch (error) {
       console.error('Error checking device conflict:', error);
@@ -68,7 +68,7 @@ export default function DeviceManagerExample() {
       console.log('Device switched successfully:', response);
       setShowConflictModal(false);
       setConflictInfo(null);
-      toast.error('Device switched successfully! You can now proceed.');
+      toast.success('Device switched successfully! You can now proceed.');
     } catch (error) {
       console.error('Error switching device:', error);
       throw error; // Let the modal handle the error display
@@ -85,7 +85,7 @@ export default function DeviceManagerExample() {
     console.log('Device switch cancelled. Existing session preserved.');
     setShowConflictModal(false);
     setConflictInfo(null);
-    toast.error('Login cancelled. Your existing session on the other device is still active.');
+    toast.info('Login cancelled. Your existing session on the other device is still active.');
   };
 
   return (
@@ -147,7 +147,7 @@ export default function DeviceManagerExample() {
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">Code Example</h2>
           <pre className="bg-slate-100 p-4 rounded text-xs overflow-auto">
-{`// In your login component:
+            {`// In your login component:
 import { deviceManager } from '@/react-app/services/DeviceManager';
 import DeviceConflictModal from '@/react-app/components/DeviceConflictModal';
 

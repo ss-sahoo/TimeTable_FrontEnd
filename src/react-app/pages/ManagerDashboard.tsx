@@ -58,10 +58,10 @@ type TabType = "dashboard" | "institutes" | "centers" | "users" | "all-users" | 
 export default function ManagerDashboard() {
   const { user, logout, isAuthenticated, loading: authLoading } = useAuthContext();
   const navigate = useNavigate();
-  
+
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  
+
   // Data states
   const [institutes, setInstitutes] = useState<Institute[]>([]);
   const [centers, setCenters] = useState<Center[]>([]);
@@ -75,8 +75,8 @@ export default function ManagerDashboard() {
   const [showCreateCenter, setShowCreateCenter] = useState(false);
   const [createdUser, setCreatedUser] = useState<CreatedUser | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{type: string; id: string | number; name: string} | null>(null);
-  
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: string; id: string | number; name: string } | null>(null);
+
   // Form states
   const [instituteForm, setInstituteForm] = useState({ name: "", domain: "", description: "" });
   const [centerForm, setCenterForm] = useState({ institute_id: "", name: "", city: "", address: "" });
@@ -198,14 +198,14 @@ export default function ManagerDashboard() {
     try {
       let endpoint = "";
       const payload: any = { name: userForm.name, email: userForm.email, phone_number: userForm.phone_number };
-      
+
       switch (userForm.role) {
         case "ADMIN": endpoint = "/timetable/superadmin/admins/create/"; payload.center_id = userForm.center_id; break;
         case "teacher": endpoint = "/timetable/superadmin/teachers/create/"; payload.center_id = userForm.center_id; payload.subjects = userForm.subjects; break;
         case "student": endpoint = "/timetable/superadmin/students/create/"; payload.batch_code = userForm.batch_code; break;
         case "STAFF": endpoint = "/timetable/superadmin/staff/create/"; payload.center_id = userForm.center_id; break;
       }
-      
+
       const response = await api.post(endpoint, payload);
       setCreatedUser({ username: response.data.username, password: response.data.password, role: userForm.role, center: response.data.center, batch: response.data.batch });
       setSuccess("User created successfully!");
@@ -248,7 +248,7 @@ export default function ManagerDashboard() {
     if (bulkUploadRole === "student" && !bulkUploadBatchCode) { setError("Please enter batch code"); return; }
 
     setLoading(true); setError(null); setBulkUploadResult(null);
-    
+
     const formData = new FormData();
     formData.append("file", bulkUploadFile);
     if (bulkUploadRole !== "student") {
@@ -482,7 +482,14 @@ export default function ManagerDashboard() {
                         <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{inst.name}</td>
                         <td className="px-6 py-4 text-slate-500">{inst.domain || "-"}</td>
                         <td className="px-6 py-4"><span className={`px-2 py-1 rounded-full text-xs font-medium ${inst.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>{inst.is_active ? "Active" : "Inactive"}</span></td>
-                        <td className="px-6 py-4 text-right"><button className="p-2 hover:bg-slate-100 rounded-lg"><Edit className="w-4 h-4 text-slate-500" /></button></td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={() => navigate(`/institute-profile/${inst.id}`)}
+                            className="p-2 hover:bg-slate-100 rounded-lg"
+                          >
+                            <Edit className="w-4 h-4 text-slate-500" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {institutes.length === 0 && <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-500">No institutes found</td></tr>}
@@ -517,7 +524,7 @@ export default function ManagerDashboard() {
                         <td className="px-6 py-4 text-slate-500">{center.institute?.name || "-"}</td>
                         <td className="px-6 py-4 text-right flex justify-end gap-2">
                           <button className="p-2 hover:bg-slate-100 rounded-lg"><Edit className="w-4 h-4 text-slate-500" /></button>
-                          <button onClick={() => setDeleteConfirm({type: "center", id: center.id, name: center.name})} className="p-2 hover:bg-red-100 rounded-lg"><Trash2 className="w-4 h-4 text-red-500" /></button>
+                          <button onClick={() => setDeleteConfirm({ type: "center", id: center.id, name: center.name })} className="p-2 hover:bg-red-100 rounded-lg"><Trash2 className="w-4 h-4 text-red-500" /></button>
                         </td>
                       </tr>
                     ))}
@@ -576,7 +583,7 @@ export default function ManagerDashboard() {
                           <td className="px-4 py-4 text-right">
                             <div className="flex justify-end gap-1">
                               <button className="p-2 hover:bg-slate-100 rounded-lg" title="Edit"><Edit className="w-4 h-4 text-slate-500" /></button>
-                              <button onClick={() => setDeleteConfirm({type: "user", id: u.id, name: u.username})} className="p-2 hover:bg-red-100 rounded-lg" title="Delete"><Trash2 className="w-4 h-4 text-red-500" /></button>
+                              <button onClick={() => setDeleteConfirm({ type: "user", id: u.id, name: u.username })} className="p-2 hover:bg-red-100 rounded-lg" title="Delete"><Trash2 className="w-4 h-4 text-red-500" /></button>
                             </div>
                           </td>
                         </tr>
@@ -691,7 +698,7 @@ export default function ManagerDashboard() {
               <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 p-6">
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Bulk Upload Users</h3>
                 <p className="text-slate-500 mb-6">Upload Excel (.xlsx) or CSV files to create multiple users at once.</p>
-                
+
                 {/* Role Selection */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-3">Select Role</label>
