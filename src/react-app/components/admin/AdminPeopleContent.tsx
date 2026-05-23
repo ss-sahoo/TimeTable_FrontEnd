@@ -272,7 +272,7 @@ const AdminPeopleContent = () => {
                 });
                 setShowCredentialsModal(true);
             } else {
-                toast.error("User added successfully!");
+                toast.success("User added successfully!");
             }
         } catch (error: any) {
             console.error("Error adding user:", error);
@@ -421,7 +421,7 @@ const AdminPeopleContent = () => {
 
             const successCount = response.data.success || response.data.created_count || 0;
             const totalCount = response.data.total || 0;
-            toast.error(`Successfully imported ${successCount} out of ${totalCount} users!`);
+            toast.success(`Successfully imported ${successCount} out of ${totalCount} users!`);
 
             fetchUsers();
         } catch (error: any) {

@@ -220,9 +220,9 @@ export default function ExamView() {
       await fetchExam(); // Refresh data to show published status and generated OMR
 
       if (effectiveExamMode === 'offline_omr') {
-        toast.error('Exam published successfully! OMR sheet is being generated.');
+        toast.success('Exam published successfully! OMR sheet is being generated.');
       } else {
-        toast.error('Exam published successfully!');
+        toast.success('Exam published successfully!');
       }
     } catch (err: any) {
       console.error('Failed to publish exam:', err);
@@ -238,7 +238,7 @@ export default function ExamView() {
     try {
       setGeneratingOMR(true);
       await api.post(`/omr/sheets/generate/${exam.id}/`);
-      toast.error('OMR sheet generation started!');
+      toast.info('OMR sheet generation started!');
       await fetchExam(); // Refresh to get the file link
     } catch (err: any) {
       console.error('Failed to generate OMR:', err);
@@ -262,7 +262,7 @@ export default function ExamView() {
 
       // Close modal
       setSectionToDelete(null);
-      toast.error(`Section "${sectionToDelete.name}" deleted successfully!`);
+      toast.success(`Section "${sectionToDelete.name}" deleted successfully!`);
     } catch (err: any) {
       console.error('Failed to delete section:', err);
       const msg = err.response?.data?.error || err.response?.data?.detail || 'Failed to delete section.';

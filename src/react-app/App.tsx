@@ -67,6 +67,7 @@ import ProctoringSnapshotsView from "@/react-app/pages/ProctoringSnapshotsView";
 import ProctoringTestPage from "@/react-app/pages/ProctoringTestPage";
 import BulkImportPage from "@/react-app/pages/BulkImportPage";
 import NewSuperAdminDashboard from "@/react-app/pages/NewSuperAdminDashboard";
+import InstituteAndCentersContent from "@/react-app/components/superadmin/InstituteAndCentersContent";
 import CenterAdminDashboard from "@/react-app/pages/CenterAdminDashboard";
 import Timetable from "@/react-app/pages/Timetable";
 import TimetableDashboard from "@/react-app/pages/TimetableDashboard";
@@ -390,7 +391,7 @@ function AppRoutes() {
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<NewSuperAdminDashboard />} />
               <Route path="users" element={<UsersContent />} />
-              <Route path="institutes" element={<CentersContent />} />
+              <Route path="institutes" element={<InstituteAndCentersContent />} />
               <Route path="exams" element={<ExamsContent />} />
               <Route path="exams/create" element={<ExamCreation />} />
               <Route path="exams/:examId/edit" element={<ExamCreation />} />
@@ -829,6 +830,11 @@ function AppRoutes() {
           <InstituteProfile />
         </ProtectedRoute>
       } />
+      <Route path="/institute-profile/:id" element={
+        <ProtectedRoute>
+          <InstituteProfile />
+        </ProtectedRoute>
+      } />
 
       {/* Landing Page */}
       <Route path="/" element={
@@ -856,7 +862,7 @@ export default function App() {
             <OnboardingTourProvider>
               <AppRoutes />
             </OnboardingTourProvider>
-              <ToastContainer position="top-right" autoClose={3000} />
+            <ToastContainer position="top-right" autoClose={3000} />
           </Router>
         </TimetableCenterProvider>
       </AuthProvider>

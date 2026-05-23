@@ -25,7 +25,7 @@ interface FeasibilityResult {
     RULE_1: string;
     RULE_2: string;
     RULE_3: string;
-    RULE_4: string; 
+    RULE_4: string;
     RULE_5: string;
     RULE_6: string;
   };
@@ -68,12 +68,12 @@ const Feasibility: React.FC = () => {
   const [brokenRules, setBrokenRules] = useState<string[]>([]);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [stopSlot, setStopSlot] = useState<string>("");
-  
+
   // Progress tracking for async optimization
   const [taskId, setTaskId] = useState<string | null>(null);
-  const [progress, setProgress] = useState<{ 
-    current: number; 
-    total: number; 
+  const [progress, setProgress] = useState<{
+    current: number;
+    total: number;
     fitness?: number;
     percent_complete?: number;
     elapsed_seconds?: number;
@@ -243,12 +243,12 @@ const Feasibility: React.FC = () => {
       const payloadResponse = await Fetch(`/api/timetable/timetables/${timetableId}/payload/`, {
         method: "GET",
       });
-      
+
       if (!payloadResponse.ok) {
         const errorData = await payloadResponse.json().catch(() => null);
         throw new Error(`Failed to fetch payload: ${payloadResponse.status} - ${parseErrorResponse(errorData)}`);
       }
-      
+
       const payloadData = await payloadResponse.json();
       console.log("Payload received:", payloadData);
       setPayload(payloadData);
@@ -330,7 +330,7 @@ const Feasibility: React.FC = () => {
 
     try {
       console.log("Generating timetable (optimize) with settings:", settings);
-      
+
       // Create optimization payload with settings
       const optimizationPayload = {
         max_retries: settings.max_retries,
@@ -379,23 +379,23 @@ const Feasibility: React.FC = () => {
               clearInterval(pollingIntervalRef.current);
               pollingIntervalRef.current = null;
             }
-            
+
             setGeneratedTimetable(data.result);
             setGenerating(false);
             setTaskId(null);
             setProgress(null);
             setProgressStatus("");
-            
+
             // Show success message
             const entriesCreated = data.result?.entries_created || 'Unknown';
-            toast.error(`Timetable generated successfully! ${entriesCreated} entries created.`);
+            toast.success(`Timetable generated successfully! ${entriesCreated} entries created.`);
           } else if (data.status === 'FAILURE') {
             // Clear polling
             if (pollingIntervalRef.current) {
               clearInterval(pollingIntervalRef.current);
               pollingIntervalRef.current = null;
             }
-            
+
             setGenerating(false);
             setTaskId(null);
             setProgress(null);
@@ -443,7 +443,7 @@ const Feasibility: React.FC = () => {
 
       const saveData = await saveResponse.json();
       console.log("Save result:", saveData);
-      toast.error("Timetable saved successfully!");
+      toast.success("Timetable saved successfully!");
     } catch (err: any) {
       console.error("Save error:", err);
       setError(err.message || "Failed to save timetable");
@@ -472,7 +472,7 @@ const Feasibility: React.FC = () => {
     setError(null);
     setProgress(null);
     setProgressStatus("Starting regeneration...");
-    
+
     try {
       console.log("Regenerating timetable from slot:", stopSlot);
       const payload = {
@@ -495,18 +495,18 @@ const Feasibility: React.FC = () => {
       console.log("Regeneration task started:", task_id);
       setTaskId(task_id);
       setProgressStatus("Regeneration in progress...");
-      
+
       // Close the update modal but keep progress modal
       setShowUpdateModal(false);
       const savedStopSlot = stopSlot.trim();
       setStopSlot("");
-      
+
       // Start polling for task status every 2.5 seconds
       pollingIntervalRef.current = setInterval(async () => {
         try {
           const data = await checkTaskStatus(task_id);
           console.log("Regeneration task status:", data);
-          
+
           if (data.status === 'PROGRESS') {
             setProgress({
               current: data.progress?.current || 0,
@@ -528,11 +528,11 @@ const Feasibility: React.FC = () => {
             setTaskId(null);
             setProgress(null);
             setProgressStatus("");
-            
+
             // Show success message
             const entriesUpdated = data.result?.entries_updated || 'Unknown';
-            toast.error(`Timetable regenerated successfully from slot ${savedStopSlot}! ${entriesUpdated} entries updated.`);
-            
+            toast.success(`Timetable regenerated successfully from slot ${savedStopSlot}! ${entriesUpdated} entries updated.`);
+
             // Refresh the slots check
             checkExistingSlots();
           } else if (data.status === 'FAILURE') {
@@ -554,7 +554,7 @@ const Feasibility: React.FC = () => {
           // Don't stop polling on transient errors, but log them
         }
       }, 2500); // Poll every 2.5 seconds
-      
+
     } catch (err: any) {
       console.error("Regenerate from slot error:", err);
       setError(err.message || "Failed to regenerate from slot");
@@ -581,7 +581,7 @@ const Feasibility: React.FC = () => {
   const handleApplySettings = () => {
     // Settings are automatically applied when generating
     setShowSettings(false);
-    toast.error("Settings saved. They will be used in the next generation.");
+    toast.success("Settings saved. They will be used in the next generation.");
   };
 
   const handleNumberArrayChange = (index: number, value: string) => {
@@ -612,7 +612,7 @@ const Feasibility: React.FC = () => {
           <div style={styles.modalContent}>
             <div style={styles.modalHeader}>
               <h3 style={styles.modalTitle}>Optimization Settings</h3>
-              <button 
+              <button
                 style={styles.modalCloseBtn}
                 onClick={() => setShowSettings(false)}
               >
@@ -719,7 +719,7 @@ const Feasibility: React.FC = () => {
             </div>
 
             <div style={styles.modalFooter}>
-              <button 
+              <button
                 style={styles.defaultBtn}
                 onClick={handleResetToDefault}
                 disabled={!settingsChanged}
@@ -727,13 +727,13 @@ const Feasibility: React.FC = () => {
                 Reset to Default
               </button>
               <div style={styles.modalActions}>
-                <button 
+                <button
                   style={styles.cancelBtn}
                   onClick={() => setShowSettings(false)}
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   style={styles.applyBtn}
                   onClick={handleApplySettings}
                 >
@@ -751,7 +751,7 @@ const Feasibility: React.FC = () => {
           <div style={styles.modalContent}>
             <div style={styles.modalHeader}>
               <h3 style={styles.modalTitle}>Update Old Slots</h3>
-              <button 
+              <button
                 style={styles.modalCloseBtn}
                 onClick={() => {
                   setShowUpdateModal(false);
@@ -763,7 +763,7 @@ const Feasibility: React.FC = () => {
             </div>
             <div style={styles.updateModalBody}>
               <p style={styles.updateModalDescription}>
-                Enter the slot code from which you want to regenerate the timetable. 
+                Enter the slot code from which you want to regenerate the timetable.
                 All slots from this point onwards will be regenerated.
               </p>
               <div style={styles.settingField}>
@@ -782,13 +782,13 @@ const Feasibility: React.FC = () => {
               <div style={styles.updateModalNote}>
                 <span style={styles.noteIcon}>ℹ️</span>
                 <span style={styles.noteText}>
-                  This will regenerate the timetable from the specified slot onwards. 
+                  This will regenerate the timetable from the specified slot onwards.
                   Make sure the slot code exists in your timetable configuration.
                 </span>
               </div>
             </div>
             <div style={styles.modalFooter}>
-              <button 
+              <button
                 style={styles.cancelBtn}
                 onClick={() => {
                   setShowUpdateModal(false);
@@ -797,7 +797,7 @@ const Feasibility: React.FC = () => {
               >
                 Cancel
               </button>
-              <button 
+              <button
                 style={{
                   ...styles.primaryBtn,
                   opacity: updatingSlots || !stopSlot.trim() ? 0.7 : 1,
@@ -833,18 +833,18 @@ const Feasibility: React.FC = () => {
               </h3>
               <p style={styles.progressSubtitle}>{progressStatus}</p>
             </div>
-            
+
             <div style={styles.progressBody}>
               {/* Progress Bar */}
               <div style={styles.progressBarContainer}>
                 <div style={styles.progressBarBackground}>
-                  <div 
+                  <div
                     style={{
                       ...styles.progressBarFill,
-                      width: progress?.percent_complete 
-                        ? `${Math.min(progress.percent_complete, 100)}%` 
-                        : progress 
-                          ? `${Math.min((progress.current / progress.total) * 100, 100)}%` 
+                      width: progress?.percent_complete
+                        ? `${Math.min(progress.percent_complete, 100)}%`
+                        : progress
+                          ? `${Math.min((progress.current / progress.total) * 100, 100)}%`
                           : '0%',
                     }}
                   ></div>
@@ -856,8 +856,8 @@ const Feasibility: React.FC = () => {
                         {progress.current} / {progress.total}
                       </span>
                       <span style={styles.progressPercent}>
-                        {progress.percent_complete 
-                          ? `${progress.percent_complete.toFixed(1)}%` 
+                        {progress.percent_complete
+                          ? `${progress.percent_complete.toFixed(1)}%`
                           : `${Math.round((progress.current / progress.total) * 100)}%`
                         }
                       </span>
@@ -875,7 +875,7 @@ const Feasibility: React.FC = () => {
                     <div style={styles.timeStat}>
                       <span style={styles.timeStatLabel}>⏱️ Elapsed:</span>
                       <span style={styles.timeStatValue}>
-                        {progress.elapsed_seconds < 60 
+                        {progress.elapsed_seconds < 60
                           ? `${Math.round(progress.elapsed_seconds)}s`
                           : `${Math.floor(progress.elapsed_seconds / 60)}m ${Math.round(progress.elapsed_seconds % 60)}s`
                         }
@@ -886,7 +886,7 @@ const Feasibility: React.FC = () => {
                     <div style={styles.timeStat}>
                       <span style={styles.timeStatLabel}>⏳ Remaining:</span>
                       <span style={styles.timeStatValue}>
-                        {progress.estimated_remaining_seconds < 60 
+                        {progress.estimated_remaining_seconds < 60
                           ? `~${Math.round(progress.estimated_remaining_seconds)}s`
                           : `~${Math.floor(progress.estimated_remaining_seconds / 60)}m ${Math.round(progress.estimated_remaining_seconds % 60)}s`
                         }
@@ -916,7 +916,7 @@ const Feasibility: React.FC = () => {
               <div style={styles.progressInfo}>
                 <span style={styles.progressInfoIcon}>💡</span>
                 <span style={styles.progressInfoText}>
-                  {updatingSlots 
+                  {updatingSlots
                     ? "The system is regenerating your timetable from the specified slot onwards. This may take a few minutes."
                     : "The optimization algorithm is finding the best timetable arrangement. This may take a few minutes depending on the complexity."
                   }
@@ -925,7 +925,7 @@ const Feasibility: React.FC = () => {
             </div>
 
             <div style={styles.progressFooter}>
-              <button 
+              <button
                 style={styles.cancelGenerationBtn}
                 onClick={handleCancelGeneration}
               >
@@ -941,16 +941,16 @@ const Feasibility: React.FC = () => {
         <div>
           <h3 style={styles.title}>Timetable Feasibility Check</h3>
           <p style={styles.subtitle}>
-            {hasExistingSlots 
+            {hasExistingSlots
               ? "Manage your existing timetable or generate a new one"
               : "Check whether timetable can be generated with current configuration"
             }
           </p>
         </div>
-        
+
         {/* Start Feasibility Button - Only show when no existing slots */}
         {!hasExistingSlots && (
-          <button 
+          <button
             style={{
               ...styles.startFeasibilityBtn,
               opacity: loading ? 0.7 : 1,
@@ -967,8 +967,8 @@ const Feasibility: React.FC = () => {
             ) : (
               <>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 10v4a1 1 0 001.555.832l3.197-2.132a.5.5 0 000-.832z" strokeWidth="2"/>
-                  <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="2"/>
+                  <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 10v4a1 1 0 001.555.832l3.197-2.132a.5.5 0 000-.832z" strokeWidth="2" />
+                  <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="2" />
                 </svg>
                 Start Feasibility Check
               </>
@@ -1072,7 +1072,7 @@ const Feasibility: React.FC = () => {
                   <div>
                     <h2 style={styles.resultTitle}>Timetable Can Be Generated</h2>
                     <p style={styles.resultText}>
-                      {result.summary.total_violations > 0 
+                      {result.summary.total_violations > 0
                         ? `${result.summary.total_violations} warning(s) found but you can still proceed to generate.`
                         : "All constraints are satisfied. You may proceed to generate the timetable."
                       }
@@ -1099,14 +1099,14 @@ const Feasibility: React.FC = () => {
               <h4 style={styles.sectionTitle}>
                 {result.feasible ? "Warnings" : "Rule Violations"}
               </h4>
-              
+
               {Object.entries(result.rules_explanation).map(([ruleKey, explanation]) => {
                 const violations = result.violations[ruleKey as keyof typeof result.violations] || [];
                 const hasViolations = violations.length > 0;
-                
+
                 // Only show rules that have violations
                 if (!hasViolations) return null;
-                
+
                 return (
                   <div key={ruleKey} style={{
                     ...styles.ruleCard,
@@ -1126,7 +1126,7 @@ const Feasibility: React.FC = () => {
                       </div>
                     </div>
                     <p style={styles.ruleExplanation}>{explanation}</p>
-                    
+
                     <div style={styles.violationsList}>
                       {violations.map((violation, idx) => (
                         <div key={idx} style={styles.violationItem}>
@@ -1153,38 +1153,38 @@ const Feasibility: React.FC = () => {
             <div style={styles.actionButtons}>
               <button style={styles.secondaryBtn} onClick={runFeasibilityCheck} disabled={loading}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 Run Again
               </button>
 
               {/* Only show Update Old Slots when slots exist */}
               {hasExistingSlots && (
-                <button 
+                <button
                   style={styles.updateSlotsBtn}
                   onClick={handleOpenUpdateModal}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   Update Old Slots
                 </button>
               )}
 
-              <button 
+              <button
                 style={styles.secondaryBtn}
                 onClick={() => setShowSettings(true)}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 Settings
               </button>
-              
+
               {/* Show Generate button based on feasibility and slot status */}
               {result.feasible && !generatedTimetable && (
-                <button 
+                <button
                   style={{
                     ...styles.primaryBtn,
                     opacity: generating ? 0.7 : 1,
@@ -1201,7 +1201,7 @@ const Feasibility: React.FC = () => {
                   ) : (
                     <>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M5 13l4 4L19 7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M5 13l4 4L19 7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                       {hasExistingSlots ? "Generate New Timetable" : "Proceed to Generate"}
                     </>
@@ -1210,7 +1210,7 @@ const Feasibility: React.FC = () => {
               )}
 
               {generatedTimetable && (
-                <button 
+                <button
                   style={{
                     ...styles.saveBtn,
                     opacity: saving ? 0.7 : 1,
@@ -1227,9 +1227,9 @@ const Feasibility: React.FC = () => {
                   ) : (
                     <>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <polyline points="17,21 17,13 7,13 7,21" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <polyline points="7,3 7,8 15,8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <polyline points="17,21 17,13 7,13 7,21" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <polyline points="7,3 7,8 15,8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                       Save Timetable
                     </>
@@ -1249,7 +1249,7 @@ const Feasibility: React.FC = () => {
             {hasExistingSlots ? "Timetable Has Existing Data" : "Ready to Check Feasibility"}
           </h3>
           <p style={styles.initialText}>
-            {hasExistingSlots 
+            {hasExistingSlots
               ? "This timetable already has generated slots. You can update existing slots or generate a new timetable."
               : "Click \"Start Feasibility Check\" to verify if your timetable configuration is valid and can be generated."
             }
@@ -1262,7 +1262,7 @@ const Feasibility: React.FC = () => {
                   <span style={styles.batchName}>{batch.batch_name}</span>
                   <span style={styles.batchProgram}>{batch.program}</span>
                   <span style={styles.batchSlotCount}>
-                    {Object.keys(batch.slots || {}).length > 0 
+                    {Object.keys(batch.slots || {}).length > 0
                       ? `${Object.values(batch.slots || {}).flat().length} slots`
                       : "No slots"
                     }
@@ -1271,20 +1271,20 @@ const Feasibility: React.FC = () => {
               ))}
             </div>
           )}
-          
+
           {/* Show action buttons when existing slots are detected */}
           {hasExistingSlots && (
             <div style={styles.existingSlotsActions}>
-              <button 
+              <button
                 style={styles.updateSlotsBtn}
                 onClick={handleOpenUpdateModal}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 Update Old Slots
               </button>
-              <button 
+              <button
                 style={{
                   ...styles.primaryBtn,
                   opacity: generating ? 0.7 : 1,
@@ -1301,7 +1301,7 @@ const Feasibility: React.FC = () => {
                 ) : (
                   <>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path d="M12 5v14M5 12h14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M12 5v14M5 12h14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     Generate New Timetable
                   </>
@@ -1334,7 +1334,7 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: "calc(100vh - 48px)",
     position: "relative",
   },
-  
+
   // Enhanced Error Styles
   errorAlert: {
     display: "flex",
@@ -1417,9 +1417,9 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     borderRadius: "4px",
   },
-  
+
   // ... (all other styles remain exactly the same) ...
-  
+
   warningAlert: {
     padding: "12px 16px",
     background: "#fffbeb",
@@ -1753,7 +1753,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: "wrap",
     justifyContent: "center",
   },
-  
+
   // Header
   header: {
     display: "flex",
@@ -1804,7 +1804,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "50%",
     animation: "spin 1s linear infinite",
   },
-  
+
   // Modal Styles
   modalOverlay: {
     position: "fixed",

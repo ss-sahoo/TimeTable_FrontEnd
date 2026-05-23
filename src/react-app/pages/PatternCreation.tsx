@@ -742,10 +742,10 @@ export default function PatternCreation() {
     console.log('📋 Current errors:', errors);
     console.log('📋 Section errors:', sectionErrors);
 
-  if (!isValid) {
-  toast.error("Please fix all validation errors before saving.");
-  return;
-}
+    if (!isValid) {
+      toast.error("Please fix all validation errors before saving.");
+      return;
+    }
     setSaving(true);
     try {
       const patternData = {
@@ -765,7 +765,7 @@ export default function PatternCreation() {
         console.log('✅ Create response:', response.data);
       }
 
-      toast.error('Pattern saved successfully!');
+      toast.success('Pattern saved successfully!');
       navigate(`${basePath}/patterns`);
     } catch (error: any) {
       console.error('❌ Failed to save pattern:', error);
@@ -820,7 +820,7 @@ export default function PatternCreation() {
         console.log('✅ Create response:', response.data);
       }
 
-      toast.error('Pattern published successfully!');
+      toast.success('Pattern published successfully!');
       navigate(`${basePath}/patterns`);
     } catch (error: any) {
       console.error('❌ Failed to publish pattern:', error);

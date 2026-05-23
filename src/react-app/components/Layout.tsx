@@ -270,10 +270,16 @@ export default function Layout({ children }: LayoutProps) {
                   <div className="flex items-center gap-3">
                     <motion.div
                       whileHover={{ scale: 1.05, rotate: 5 }}
-                      className={`relative w-11 h-11 rounded-2xl bg-gradient-to-br ${brandConfig.gradientFrom} via-blue-600 ${brandConfig.gradientTo} flex items-center justify-center shadow-lg ${brandConfig.shadowColor}`}
+                      className={`relative w-11 h-11 rounded-2xl bg-white flex items-center justify-center shadow-lg border border-slate-100 overflow-hidden`}
                     >
-                      <brandConfig.icon className="w-6 h-6 text-white" />
-                      <div className="absolute inset-0 rounded-2xl bg-white/20 opacity-0 hover:opacity-100 transition-opacity" />
+                      <img
+                        src={user?.institute?.logo || "/examlogo.png"}
+                        alt="Logo"
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/examlogo.png";
+                        }}
+                      />
                     </motion.div>
                     <div>
                       <span className="font-bold text-slate-900 dark:text-white text-lg tracking-tight">{brandConfig.name}</span>
@@ -383,10 +389,16 @@ export default function Layout({ children }: LayoutProps) {
               <motion.div
                 whileHover={{ scale: 1.05, rotate: 5 }}
                 whileTap={{ scale: 0.95 }}
-                className={`relative w-11 h-11 rounded-2xl bg-gradient-to-br ${brandConfig.gradientFrom} via-blue-600 ${brandConfig.gradientTo} flex items-center justify-center shadow-lg ${brandConfig.shadowColor} flex-shrink-0 cursor-pointer`}
+                className={`relative w-11 h-11 rounded-2xl bg-white flex items-center justify-center shadow-lg border border-slate-100 flex-shrink-0 cursor-pointer overflow-hidden`}
               >
-                <brandConfig.icon className="w-6 h-6 text-white" />
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-white/0 to-white/20" />
+                <img
+                  src={user?.institute?.logo || "/examlogo.png"}
+                  alt="Logo"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "/examlogo.png";
+                  }}
+                />
               </motion.div>
               <AnimatePresence>
                 {!sidebarCollapsed && (

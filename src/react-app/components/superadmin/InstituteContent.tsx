@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { api } from "../../hooks/useApi";
 import { useAuthContext } from "../../contexts/AuthContext";
-import { Building2, Users, MapPin, Globe, Mail, Phone, Calendar, Shield, Activity, TrendingUp, BookOpen, GraduationCap, Edit } from "lucide-react";
-import { motion } from "framer-motion";
+import { Building2, Users, MapPin, Globe, Mail, Phone, Calendar, Shield, Activity, TrendingUp, BookOpen, GraduationCap, Edit, Save, X, Camera, Upload } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "react-toastify";
 
 const InstituteContent = () => {
-  const { user } = useAuthContext();
+  const navigate = useNavigate();
+  const { user, setUser } = useAuthContext();
   const [institute, setInstitute] = useState<any>(null);
   const [stats, setStats] = useState({
     centers: 0,
@@ -14,6 +17,18 @@ const InstituteContent = () => {
     exams: 0
   });
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    contact_email: "",
+    contact_phone: "",
+    address: "",
+    website: ""
+  });
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchInstituteData = async () => {
@@ -28,11 +43,19 @@ const InstituteContent = () => {
       console.log("InstituteContent: Fetching data for institute_id:", instituteId);
       setLoading(true);
       try {
-        // Fetch institute details
         console.log(`InstituteContent: GET /auth/institutes/${instituteId}/`);
         const instRes = await api.get(`/auth/institutes/${instituteId}/`);
         console.log("InstituteContent: Institute details fetched:", instRes.data);
-        setInstitute(instRes.data);
+        const data = instRes.data;
+        setInstitute(data);
+        setFormData({
+          name: data.name || "",
+          description: data.description || "",
+          contact_email: data.contact_email || "",
+          contact_phone: data.contact_phone || "",
+          address: data.address || "",
+          website: data.website || ""
+        });
 
         // Fetch statistics
         console.log("InstituteContent: Fetching statistics...");
@@ -65,6 +88,71 @@ const InstituteContent = () => {
 
     fetchInstituteData();
   }, [user?.institute_id]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setLogoFile(file);
+      setLogoPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleSave = async () => {
+    const instituteId = user?.institute_id || user?.institute?.id;
+    if (!instituteId) return;
+
+    setSaving(true);
+    try {
+      const data = new FormData();
+      Object.keys(formData).forEach(key => {
+        data.append(key, (formData as any)[key]);
+      });
+
+      if (logoFile) {
+        data.append('logo', logoFile);
+      }
+
+      const response = await api.put(`/auth/institutes/${instituteId}/update/`, data, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      const updatedInstitute = response.data;
+      setInstitute(updatedInstitute);
+      setLogoPreview(null);
+      setLogoFile(null);
+
+      // Update global user state to refresh header name and logo
+      if (user) {
+        const updatedUser = {
+          ...user,
+          institute: {
+            ...user.institute,
+            ...updatedInstitute
+          },
+          institute_name: updatedInstitute.name
+        };
+        setUser(updatedUser);
+        localStorage.setItem('user_data', JSON.stringify(updatedUser));
+      }
+
+      setIsEditing(false);
+      toast.success("Institute updated successfully");
+    } catch (error: any) {
+      console.error("Error updating institute:", error);
+      toast.error(error.response?.data?.detail || "Failed to update institute");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isSuperAdmin = user?.role?.toLowerCase() === 'super_admin';
 
   if (loading) {
     return (
@@ -99,12 +187,36 @@ const InstituteContent = () => {
         <div className="px-6 pb-6">
           <div className="relative flex flex-col sm:flex-row justify-between items-end -mt-12 mb-6 gap-4">
             <div className="flex items-end gap-5">
-              <div className="w-24 h-24 bg-white dark:bg-gray-800 rounded-xl border-4 border-white dark:border-gray-800 shadow-md flex items-center justify-center text-blue-600 shrink-0">
-                <Building2 size={40} />
+              <div className="relative group">
+                <div className="w-24 h-24 bg-white dark:bg-gray-800 rounded-xl border-4 border-white dark:border-gray-800 shadow-md flex items-center justify-center text-blue-600 shrink-0 overflow-hidden">
+                  {logoPreview ? (
+                    <img src={logoPreview} alt="Preview" className="w-full h-full object-cover" />
+                  ) : institute.logo ? (
+                    <img src={institute.logo} alt={institute.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <Building2 size={40} />
+                  )}
+                </div>
+                {isEditing && (
+                  <label className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-xl opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                    <Camera size={24} />
+                    <input type="file" className="hidden" accept="image/*" onChange={handleLogoChange} />
+                  </label>
+                )}
               </div>
               <div className="mb-1">
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  {institute.name}
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      className="px-2 py-1 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 outline-none min-w-[200px]"
+                    />
+                  ) : (
+                    institute.name
+                  )}
                   {institute.is_verified && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase tracking-wider border border-blue-100 dark:border-blue-800">
                       Verified
@@ -125,25 +237,74 @@ const InstituteContent = () => {
               </div>
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
-              <button className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg text-xs font-bold text-slate-700 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-gray-600 transition-colors shadow-sm flex items-center justify-center gap-2">
-                <Edit size={14} />
-                Edit Profile
-              </button>
+              {isSuperAdmin && (
+                isEditing ? (
+                  <>
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 border border-blue-600 rounded-lg text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center gap-2"
+                    >
+                      {saving ? (
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <Save size={14} />
+                      )}
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setIsEditing(false)}
+                      className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg text-xs font-bold text-slate-700 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-gray-600 transition-colors shadow-sm flex items-center justify-center gap-2"
+                    >
+                      <X size={14} />
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg text-xs font-bold text-slate-700 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-gray-600 transition-colors shadow-sm flex items-center justify-center gap-2"
+                  >
+                    <Edit size={14} />
+                    Edit Profile
+                  </button>
+                )
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2">
               <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-2">About Institute</h3>
-              <p className="text-sm text-slate-600 dark:text-gray-300 leading-relaxed">
-                {institute.description || "No description provided for this institute."}
-              </p>
+              {isEditing ? (
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-gray-700 rounded-lg bg-slate-50 dark:bg-gray-900 text-sm text-slate-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="Tell us about the institute..."
+                />
+              ) : (
+                <p className="text-sm text-slate-600 dark:text-gray-300 leading-relaxed">
+                  {institute.description || "No description provided for this institute."}
+                </p>
+              )}
             </div>
             <div className="lg:col-span-1 flex flex-wrap gap-2 content-start">
               {/* Tags or Badges could go here */}
               <div className="px-3 py-1.5 bg-slate-50 dark:bg-gray-900 rounded-md border border-slate-100 dark:border-gray-700 text-xs font-medium text-slate-600 dark:text-gray-400 flex items-center gap-2">
                 <Globe size={14} />
-                {institute.website ? (
+                {isEditing ? (
+                  <input
+                    type="text"
+                    name="website"
+                    value={formData.website}
+                    onChange={handleInputChange}
+                    className="bg-transparent border-none outline-none text-blue-600 focus:ring-0 p-0 h-auto"
+                    placeholder="Website URL"
+                  />
+                ) : institute.website ? (
                   <a href={institute.website} target="_blank" rel="noreferrer" className="hover:text-blue-600 hover:underline">
                     {institute.website.replace(/^https?:\/\//, '')}
                   </a>
@@ -151,7 +312,18 @@ const InstituteContent = () => {
               </div>
               <div className="px-3 py-1.5 bg-slate-50 dark:bg-gray-900 rounded-md border border-slate-100 dark:border-gray-700 text-xs font-medium text-slate-600 dark:text-gray-400 flex items-center gap-2">
                 <Mail size={14} />
-                {institute.contact_email || 'No Email'}
+                {isEditing ? (
+                  <input
+                    type="email"
+                    name="contact_email"
+                    value={formData.contact_email}
+                    onChange={handleInputChange}
+                    className="bg-transparent border-none outline-none focus:ring-0 p-0 h-auto"
+                    placeholder="Contact Email"
+                  />
+                ) : (
+                  institute.contact_email || 'No Email'
+                )}
               </div>
             </div>
           </div>
@@ -195,9 +367,45 @@ const InstituteContent = () => {
               Contact Information
             </h3>
             <div className="space-y-4">
-              <CompactDetailRow icon={Mail} label="Email" value={institute.contact_email} />
-              <CompactDetailRow icon={Phone} label="Phone" value={institute.contact_phone} />
-              <CompactDetailRow icon={MapPin} label="Address" value={institute.address} />
+              <CompactDetailRow
+                icon={Mail}
+                label="Email"
+                value={isEditing ? (
+                  <input
+                    type="email"
+                    name="contact_email"
+                    value={formData.contact_email}
+                    onChange={handleInputChange}
+                    className="bg-transparent border-none outline-none focus:ring-0 p-0 h-auto w-full text-sm font-medium"
+                  />
+                ) : institute.contact_email}
+              />
+              <CompactDetailRow
+                icon={Phone}
+                label="Phone"
+                value={isEditing ? (
+                  <input
+                    type="text"
+                    name="contact_phone"
+                    value={formData.contact_phone}
+                    onChange={handleInputChange}
+                    className="bg-transparent border-none outline-none focus:ring-0 p-0 h-auto w-full text-sm font-medium"
+                  />
+                ) : institute.contact_phone}
+              />
+              <CompactDetailRow
+                icon={MapPin}
+                label="Address"
+                value={isEditing ? (
+                  <input
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    className="bg-transparent border-none outline-none focus:ring-0 p-0 h-auto w-full text-sm font-medium"
+                  />
+                ) : institute.address}
+              />
             </div>
           </div>
         </div>

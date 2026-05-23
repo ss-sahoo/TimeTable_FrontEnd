@@ -135,7 +135,7 @@ const CentersContent = () => {
       setNewCenter({ name: "", city: "", address: "" });
       fetchCenters();
       refreshCenters(); // Update global context
-      toast.error("Center updated successfully!");
+      toast.success("Center updated successfully!");
     } catch (error: any) {
       console.error("Error updating center:", error);
       setError(error.response?.data?.detail || "Failed to update center");
@@ -174,7 +174,7 @@ const CentersContent = () => {
       setSelectedCenter(null);
       fetchCenters();
       refreshCenters(); // Update global context
-      toast.error("Center deleted successfully!");
+      toast.success("Center deleted successfully!");
     } catch (error: any) {
       console.error("Error deleting center:", error);
       setError(error.response?.data?.detail || "Failed to delete center");
@@ -286,7 +286,7 @@ const CentersContent = () => {
       setNewCenter({ name: "", city: "", address: "" });
       fetchCenters();
       refreshCenters(); // Update global context
-      toast.error("Center created successfully!");
+      toast.success("Center created successfully!");
     } catch (error: any) {
       console.error("Error creating center:", error);
       setError(error.response?.data?.detail || "Failed to create center");
@@ -1144,12 +1144,12 @@ const CentersContent = () => {
                                 <td className="px-4 py-3 text-sm text-gray-500">{user.email}</td>
                                 <td className="px-4 py-3 text-sm">
                                   <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'institute_admin'
-                                      ? 'bg-indigo-50 text-indigo-700 ring-indigo-700/10'
-                                      : user.role?.toLowerCase() === 'teacher'
-                                        ? 'bg-green-50 text-green-700 ring-green-600/20'
-                                        : user.role?.toLowerCase() === 'student'
-                                          ? 'bg-yellow-50 text-yellow-800 ring-yellow-600/20'
-                                          : 'bg-gray-50 text-gray-600 ring-gray-500/10'
+                                    ? 'bg-indigo-50 text-indigo-700 ring-indigo-700/10'
+                                    : user.role?.toLowerCase() === 'teacher'
+                                      ? 'bg-green-50 text-green-700 ring-green-600/20'
+                                      : user.role?.toLowerCase() === 'student'
+                                        ? 'bg-yellow-50 text-yellow-800 ring-yellow-600/20'
+                                        : 'bg-gray-50 text-gray-600 ring-gray-500/10'
                                     }`}>
                                     {user.role?.replace('_', ' ').split(' ').map((w: string) =>
                                       w.charAt(0).toUpperCase() + w.slice(1)
