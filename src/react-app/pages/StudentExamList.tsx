@@ -42,6 +42,7 @@ interface Exam {
   max_attempts: number;
   used_attempts?: number;
   is_public: boolean;
+  is_flexible?: boolean;
   allow_late_submission: boolean;
   require_fullscreen: boolean;
   enable_webcam_proctoring: boolean;
@@ -440,6 +441,14 @@ export default function StudentExamList() {
                       <h3 className="text-lg font-bold text-slate-900 mb-2">{exam.title}</h3>
                       {exam.description && (
                         <p className="text-sm text-slate-600 line-clamp-2">{exam.description}</p>
+                      )}
+                      {exam.is_flexible && (
+                        <div className="mt-2">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200">
+                            <Clock className="w-2.5 h-2.5" />
+                            Flexible Window
+                          </span>
+                        </div>
                       )}
                     </div>
                     {getStatusBadge(exam.status)}
