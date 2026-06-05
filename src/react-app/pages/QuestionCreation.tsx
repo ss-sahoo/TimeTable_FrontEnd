@@ -5,7 +5,6 @@ import {
   Save,
   Plus,
   Trash2,
-  Edit,
   CheckCircle,
   AlertCircle,
   Info,
@@ -16,10 +15,6 @@ import {
   Hash,
   Image,
   Upload,
-  Eye,
-  EyeOff,
-  Copy,
-  RotateCcw
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
@@ -278,23 +273,6 @@ export default function QuestionCreation() {
         return <Hash className="w-4 h-4 text-red-600" />;
       default:
         return <Type className="w-4 h-4 text-slate-600" />;
-    }
-  };
-
-  const getQuestionTypeColor = (type: string) => {
-    switch (type) {
-      case 'mcq':
-        return 'bg-blue-100 text-blue-700';
-      case 'numerical':
-        return 'bg-green-100 text-green-700';
-      case 'subjective':
-        return 'bg-purple-100 text-purple-700';
-      case 'true_false':
-        return 'bg-orange-100 text-orange-700';
-      case 'fill_blank':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-slate-100 text-slate-700';
     }
   };
 

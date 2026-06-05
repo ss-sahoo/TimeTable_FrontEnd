@@ -6,25 +6,19 @@ import {
     FileText,
     TrendingUp,
     Clock,
-    CheckCircle2,
-    AlertCircle,
     ArrowUpRight,
-    Calendar,
     BarChart3,
     Activity,
     Target,
     Zap,
-    BookOpen,
     Play,
     Award,
     Loader2,
     Layers,
-    PieChart,
     ChevronRight,
     ClipboardCheck,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { api } from '../../hooks/useApi';
 import { useAuthContext } from '../../contexts/AuthContext';
 
 interface TeacherStats {

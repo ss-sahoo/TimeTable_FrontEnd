@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import Webcam from 'react-webcam';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, AlertTriangle, CheckCircle, EyeOff, Maximize2, Minimize2, Settings, X } from 'lucide-react';
+import { Camera, AlertTriangle, CheckCircle, EyeOff, Minimize2, X } from 'lucide-react';
 import useProctoringCamera, { CameraStatusPayload } from '../hooks/useProctoringCamera';
 
 interface ViolationData {
@@ -41,9 +41,6 @@ const WebcamMonitor: React.FC<WebcamMonitorProps> = ({
     detectionStatus,
     lastCapture,
     violationCount,
-    startMonitoring,
-    stopMonitoring,
-    captureSnapshot,
     handleCameraError,
     handleUserMedia,
     permissionState

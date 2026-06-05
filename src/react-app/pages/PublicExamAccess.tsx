@@ -4,7 +4,6 @@ import {
   AlertCircle,
   ArrowLeft,
   BookOpen,
-  Building2,
   Calendar,
   CheckCircle,
   CheckCircle2,
@@ -20,7 +19,7 @@ import {
   Target,
   Users,
 } from 'lucide-react';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage, extractApiError } from '../hooks/useApi';
 
 interface PublicExam {
   id: number;
@@ -121,11 +120,11 @@ export default function PublicExamAccess() {
           id: examData.exam_id,
         });
       } catch (err: any) {
-        const responseMessage = err?.response?.data?.error;
-        const fallbackMessage = err?.message === 'Network Error'
+        const apiErr = extractApiError(err);
+        const fallbackMessage = apiErr.status === 0
           ? 'We could not connect to the exam server. Please check your connection and try again.'
           : 'Failed to load exam details';
-        setError(responseMessage || fallbackMessage);
+        setError(apiErr.status > 0 ? (apiErr.detail || fallbackMessage) : fallbackMessage);
         console.error('Error fetching exam:', err);
       } finally {
         setLoading(false);
@@ -220,7 +219,7 @@ export default function PublicExamAccess() {
       }
     } catch (err: any) {
       console.error('Failed to initiate secure exam:', err);
-      setStartExamError(err?.response?.data?.error || 'Unable to create an exam session right now.');
+      setStartExamError(getErrorMessage(err, 'Unable to create an exam session right now.'));
     } finally {
       setStartingExam(false);
     }

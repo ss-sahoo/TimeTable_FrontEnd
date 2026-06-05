@@ -29,7 +29,6 @@ import StudentDashboard from "@/react-app/pages/StudentDashboard";
 import AdminHomeContent from "./components/admin/AdminHomeContent";
 import AdminPeopleContent from "./components/admin/AdminPeopleContent";
 import AdminBatchesContent from "./components/admin/AdminBatchesContent";
-import StudentDashboardImproved from "@/react-app/pages/StudentDashboardImproved";
 import StudentAnalytics from "@/react-app/pages/StudentAnalytics";
 import StudentAnalyticsOverview from "@/react-app/pages/StudentAnalyticsOverview";
 import StudentExamList from "@/react-app/pages/StudentExamList";
@@ -60,7 +59,6 @@ import PublicExamAccess from "@/react-app/pages/PublicExamAccess";
 import TeacherAnalytics from "@/react-app/pages/TeacherAnalytics";
 import TeacherEvaluationDashboard from "@/react-app/pages/TeacherEvaluationDashboard";
 import InstituteProfile from "@/react-app/pages/InstituteProfile";
-import LandingPage from "@/react-app/pages/LandingPage";
 import LandingPageEnhanced from "@/react-app/pages/LandingPageEnhanced";
 import ProctoringDiagnostics from "@/react-app/pages/ProctoringDiagnostics";
 import ProctoringSnapshotsView from "@/react-app/pages/ProctoringSnapshotsView";
@@ -78,7 +76,6 @@ import CenterAdminLayout from "@/react-app/components/admin/CenterAdminLayout";
 import TeacherLayout from "@/react-app/components/teacher/TeacherLayout";
 import StudentLayout from "@/react-app/components/student/StudentLayout";
 import TeacherHomeContent from "@/react-app/components/teacher/TeacherHomeContent";
-import InstituteContent from "@/react-app/components/superadmin/InstituteContent";
 import CentersContent from "@/react-app/components/superadmin/CentersContent";
 import UsersContent from "@/react-app/components/superadmin/UsersContent";
 import ExamsContent from "@/react-app/components/superadmin/ExamsContent";
@@ -88,7 +85,6 @@ import SettingsContent from "@/react-app/components/superadmin/SettingsContent";
 import ProfileContent from "@/react-app/components/superadmin/ProfileContent";
 import {
   AdminRoleDashboard,
-  TeacherRoleDashboard,
   StaffDashboard,
 } from "@/react-app/pages/RoleDashboards";
 import Timetablelanding from "./pages/TimeTablelanding";
@@ -97,6 +93,7 @@ import TimetableRegister from "./pages/TimetableRegister";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import ExtractionV3Page from "@/react-app/pages/ExtractionV3";
 import ExtractionReviewPage from "@/react-app/pages/ExtractionV3/Review";
+import AnswerKeyUploadPage from "@/react-app/pages/AnswerKeyUpload";
 import ExtractionV2Page from "@/react-app/pages/ExtractionNew/ExtractionV2Page";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -618,6 +615,11 @@ function AppRoutes() {
       <Route path="/exams/:examId/extraction-v3/review/:jobId" element={
         <FullscreenProtectedRoute>
           <ExtractionReviewPage />
+        </FullscreenProtectedRoute>
+      } />
+      <Route path="/exams/:examId/answer-key" element={
+        <FullscreenProtectedRoute>
+          <AnswerKeyUploadPage />
         </FullscreenProtectedRoute>
       } />
       <Route path="/exam-view/:examId" element={

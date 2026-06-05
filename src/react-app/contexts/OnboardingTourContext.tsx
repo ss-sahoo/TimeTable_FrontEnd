@@ -33,12 +33,6 @@ interface StoredTourState {
   isPaused: boolean;
 }
 
-const defaultStoredState: StoredTourState = {
-  hasCompleted: false,
-  lastStepIndex: 0,
-  isPaused: false,
-};
-
 const safeWindow = typeof window !== 'undefined' ? window : undefined;
 
 export function OnboardingTourProvider({ children }: { children: ReactNode }) {

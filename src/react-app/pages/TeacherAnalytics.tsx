@@ -3,21 +3,12 @@ import { Link, useParams } from 'react-router';
 import {
   BookOpen,
   TrendingUp,
-  Clock,
   AlertCircle,
   Eye,
-  Calendar,
   BarChart3,
-  Users,
-  CheckCircle,
-  XCircle,
-  Activity,
-  Target,
-  Award,
   FileText,
   ArrowLeft
 } from 'lucide-react';
-import { useAuthContext } from '../contexts/AuthContext';
 import { useApi } from '../hooks/useApi';
 
 interface ExamAnalytics {
@@ -56,9 +47,8 @@ interface ExamAttempt {
 }
 
 export default function TeacherAnalytics() {
-  const { user } = useAuthContext();
   const { examId } = useParams<{ examId: string }>();
-  const [selectedExam, setSelectedExam] = useState<ExamAnalytics | null>(null);
+  const [, setSelectedExam] = useState<ExamAnalytics | null>(null);
 
   // Fetch exams and attempts data
   const { data: exams, loading: examsLoading, error: examsError } = useApi<{results: ExamAnalytics[]}>('/exams/exams/');

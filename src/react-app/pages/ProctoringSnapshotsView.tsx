@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router';
+import { useParams, useNavigate } from 'react-router';
 import { ArrowLeft, Camera, AlertTriangle, CheckCircle, Clock, User, FileText, Filter } from 'lucide-react';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 
 interface Snapshot {
   timestamp: string;
@@ -43,10 +43,6 @@ interface SnapshotsResponse {
 const ProctoringSnapshotsView: React.FC = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const isSuperAdminPath = location.pathname.startsWith('/superadmin');
-  const isCenterAdminPath = location.pathname.startsWith('/center-admin');
-  const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
   const [data, setData] = useState<SnapshotsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +67,7 @@ const ProctoringSnapshotsView: React.FC = () => {
       setData(response.data);
       setError(null);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load snapshots');
+      setError(getErrorMessage(err, 'Failed to load snapshots'));
       console.error('Error loading snapshots:', err);
     } finally {
       setLoading(false);

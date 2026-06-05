@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Users, Building2, FileText, TrendingUp, CheckCircle, BarChart3, BookOpen, Eye, Plus, Grid3x3,
+  Users, FileText, TrendingUp, CheckCircle, BarChart3, BookOpen, Eye, Plus, Grid3x3,
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';

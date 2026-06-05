@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
 import { BarChart3, Settings2, TrendingUp, Hash, Activity } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 import GlassCard from '@/react-app/components/analytics/GlassCard';
 import ModernChartContainer from '@/react-app/components/analytics/ModernChartContainer';
 import PageHeader from '@/react-app/components/analytics/PageHeader';
@@ -54,7 +54,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function HistogramPage() {
-  const { examId, queryParams, examData } = useOutletContext<{
+  const { examId, queryParams } = useOutletContext<{
     examId: string;
     queryParams: string;
     examData: any;
@@ -80,7 +80,7 @@ export default function HistogramPage() {
       const response = await api.get(`/exams/exams/${examId}/analytics/histogram/?${params.toString()}`);
       setData(response.data);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load histogram data');
+      setError(getErrorMessage(err, 'Failed to load histogram data'));
     } finally {
       setLoading(false);
     }

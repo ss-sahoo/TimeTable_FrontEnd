@@ -10,15 +10,9 @@ import {
   Eye,
   EyeOff,
   Key,
-  Mail,
-  Phone,
   Building2,
-  Globe,
-  Lock,
-  Unlock,
   CheckCircle,
   AlertCircle,
-  Info
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
@@ -62,7 +56,6 @@ export default function Settings() {
   const navigate = useNavigate();
   const { user, logout } = useAuthContext();
   const [activeTab, setActiveTab] = useState('profile');
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});

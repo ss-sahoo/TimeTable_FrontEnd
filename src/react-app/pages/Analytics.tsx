@@ -1,22 +1,15 @@
 import { useState, useEffect } from 'react';
-import { 
-  BarChart3, 
-  TrendingUp, 
-  TrendingDown,
-  Users, 
-  BookOpen, 
+import {
+  BarChart3,
+  TrendingUp,
+  Users,
+  BookOpen,
   CheckCircle,
   Clock,
   Award,
   Target,
-  Calendar,
-  Eye,
   Download,
-  Filter,
-  RefreshCw
 } from 'lucide-react';
-import { useAuthContext } from '../contexts/AuthContext';
-import { api } from '../hooks/useApi';
 
 interface AnalyticsData {
   exams: {
@@ -59,7 +52,6 @@ interface AnalyticsData {
 }
 
 export default function Analytics() {
-  const { user } = useAuthContext();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30d');

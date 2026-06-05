@@ -18,14 +18,12 @@ import {
   Sparkles,
   Zap,
   BookOpen,
-  RefreshCw,
   Loader2,
-  MessageSquare,
   X,
   Maximize2,
   Minimize2
 } from 'lucide-react';
-import { useApi, api } from '../hooks/useApi';
+import { useApi, api, getErrorMessage } from '../hooks/useApi';
 import { useAuthContext } from '../contexts/AuthContext';
 import RichTextEditor from '../components/RichTextEditor';
 import AIImageToText from '../components/AIImageToText';
@@ -438,7 +436,7 @@ export default function EnhancedQuestionEditor() {
   const [existingNumbers, setExistingNumbers] = useState<Set<number>>(new Set());
   const [existingNumbersBySection, setExistingNumbersBySection] = useState<Record<number, Set<number>>>({});
   const [existingQuestionsBySection, setExistingQuestionsBySection] = useState<Record<number, Map<number, QuestionData>>>({});
-  const [sectionAbsoluteRanges, setSectionAbsoluteRanges] = useState<Record<number, { start: number; end: number; length: number }>>({});
+  const [, setSectionAbsoluteRanges] = useState<Record<number, { start: number; end: number; length: number }>>({});
   const [bulkDataLoaded, setBulkDataLoaded] = useState(false);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(true); // Default to true as per user request
@@ -2005,11 +2003,7 @@ export default function EnhancedQuestionEditor() {
       setAiSuccess(response.data?.message || 'AI generated a draft question. Review before saving.');
     } catch (error: unknown) {
       console.error('AI generation failed:', error);
-      const responseMessage =
-        typeof error === 'object' && error !== null && 'response' in error && (error as { response?: { data?: { error?: string } } }).response?.data?.error;
-      const fallbackMessage =
-        typeof error === 'object' && error !== null && 'message' in error ? String((error as { message?: unknown }).message) : undefined;
-      setAiError(responseMessage || fallbackMessage || 'Failed to generate question. Please try again.');
+      setAiError(getErrorMessage(error, 'Failed to generate question. Please try again.'));
     } finally {
       setAiGenerating(false);
     }
@@ -2088,11 +2082,7 @@ export default function EnhancedQuestionEditor() {
       setAiSuccess('AI has solved the question successfully.');
     } catch (error: any) {
       console.error('AI solver failed:', error);
-      const responseMessage =
-        typeof error === 'object' && error !== null && 'response' in error && (error as { response?: { data?: { error?: string } } }).response?.data?.error;
-      const fallbackMessage =
-        typeof error === 'object' && error !== null && 'message' in error ? String((error as { message?: unknown }).message) : undefined;
-      setAiError(responseMessage || fallbackMessage || 'Failed to solve question with AI.');
+      setAiError(getErrorMessage(error, 'Failed to solve question with AI.'));
     } finally {
       setAiSolving(false);
     }
@@ -2269,9 +2259,6 @@ export default function EnhancedQuestionEditor() {
         const selectedAnswers = correct_answer
           ? correct_answer.split('|').filter(Boolean)
           : [];
-        const normalizedSelectedAnswers = selectedAnswers.map((answer) =>
-          normalizeOptionValue(answer),
-        );
         return (
           <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-2xl p-5 shadow-lg">
             <div className="flex items-center gap-3 mb-4">

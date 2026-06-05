@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Upload, CheckCircle, XCircle, FileWarning, RefreshCw, X, Download, FileText, Layers, BookOpen, Target } from 'lucide-react';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 
 // Import existing components
 import FileUploader from '../components/extraction/FileUploader';
@@ -76,14 +76,6 @@ const parseDocumentStructure = (data: unknown): DocumentStructure | null => {
     total_sections: Number(d.total_sections || 0),
     total_questions_detected: Number(d.total_questions_detected || 0),
   };
-};
-
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (typeof error === 'object' && error !== null) {
-    const maybe = error as { response?: { data?: { error?: string } } };
-    if (maybe.response?.data?.error) return maybe.response.data.error;
-  }
-  return fallback;
 };
 
 interface BulkImportState {

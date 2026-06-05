@@ -5,7 +5,6 @@ import {
   Save,
   Plus,
   Trash2,
-  Edit,
   CheckCircle,
   AlertCircle,
   BookOpen,
@@ -40,11 +39,6 @@ interface PatternSection {
   min_questions_to_attempt: number;
   is_compulsory: boolean;
   order: number;
-}
-
-interface SubjectWithSections {
-  name: string;
-  sections: PatternSection[];
 }
 
 interface ExamPattern {
@@ -111,44 +105,6 @@ export default function PatternCreation() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
-  };
-
-  // Helper function to group sections by subject
-  const getSubjectsWithSections = (): SubjectWithSections[] => {
-    const subjectMap = new Map<string, PatternSection[]>();
-
-    pattern.sections.forEach(section => {
-      if (!subjectMap.has(section.subject)) {
-        subjectMap.set(section.subject, []);
-      }
-      subjectMap.get(section.subject)!.push(section);
-    });
-
-    return Array.from(subjectMap.entries()).map(([subjectName, sections]) => ({
-      name: subjectName,
-      sections: sections.sort((a, b) => a.order - b.order)
-    }));
-  };
-
-  const addSectionToSubject = (subjectName: string) => {
-    const newSection: PatternSection = {
-      name: '',
-      subject: subjectName,
-      question_type: 'mcq',
-      start_question: 1,
-      end_question: 1,
-      marks_per_question: 1,
-      negative_marking: 0.25,
-      min_questions_to_attempt: 0,
-      is_compulsory: true,
-      order: nextSectionOrder,
-    };
-
-    setPattern(prev => ({
-      ...prev,
-      sections: [...prev.sections, newSection],
-    }));
-    setNextSectionOrder(prev => prev + 1);
   };
 
   const addSection = () => {

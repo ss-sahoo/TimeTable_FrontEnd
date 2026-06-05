@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 import {
     FileText,
     Upload,
@@ -645,7 +645,7 @@ function EvaluationReviewModal({ submission, onClose, onUpdate, examId, viewOnly
             }
         } catch (err: any) {
             console.error('Failed to update mark:', err);
-            setError(err.response?.data?.error || 'Failed to update mark');
+            setError(getErrorMessage(err, 'Failed to update mark'));
         } finally {
             setSaving(false);
         }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { api } from "../hooks/useApi";
+import { api, getErrorMessage } from "../hooks/useApi";
 import { useAuthContext } from "../contexts/AuthContext";
 
 interface Teacher {
@@ -167,7 +167,7 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
     } catch (error: any) {
       setMessage({
         type: "error",
-        text: error.response?.data?.error || error.message || "Failed to create teacher"
+        text: getErrorMessage(error, "Failed to create teacher")
       });
     } finally {
       setLoading(false);
@@ -239,7 +239,7 @@ const TeacherManagement: React.FC<TeacherManagementProps> = ({
     } catch (error: any) {
       setMessage({
         type: "error",
-        text: error.response?.data?.error || error.message || "Failed to bulk create teachers"
+        text: getErrorMessage(error, "Failed to bulk create teachers")
       });
     } finally {
       setLoading(false);

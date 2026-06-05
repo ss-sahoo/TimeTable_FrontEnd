@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
 import { useTimetableCenter } from '../contexts/TimetableCenterContext';
-import { Building2, Landmark, AlertCircle, MapPin, CalendarDays, Users } from 'lucide-react';
+import { Building2, Landmark, AlertCircle, CalendarDays, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const TimetableDashboard: React.FC = () => {
     const { user } = useAuthContext();
-    const { selectedCenterId, selectedCenterName, centers } = useTimetableCenter();
+    const { selectedCenterName, centers } = useTimetableCenter();
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 

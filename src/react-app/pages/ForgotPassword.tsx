@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -19,7 +19,7 @@ export default function ForgotPassword() {
       await api.post('/auth/forgot-password/', { email });
       setSuccess(true);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to send reset email. Please try again.');
+      setError(getErrorMessage(err, 'Failed to send reset email. Please try again.'));
     } finally {
       setLoading(false);
     }

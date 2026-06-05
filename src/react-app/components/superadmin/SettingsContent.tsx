@@ -1,9 +1,6 @@
-import { useState } from "react";
-import { Settings, Bell, Shield, Globe, Database, Mail, Save, User, Building, Lock, Eye, EyeOff, Activity } from "lucide-react";
+import { Settings, Bell, Shield, Globe, Database, Mail, Save } from "lucide-react";
 
 const SettingsContent = () => {
-  const [showPassword, setShowPassword] = useState(false);
-
   return (
     <div className="space-y-8 pb-20">
       <div>

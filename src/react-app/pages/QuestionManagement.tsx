@@ -1,20 +1,14 @@
-import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import {
   Plus,
   BookOpen,
   Clock,
-  CheckCircle,
   Target,
-  TrendingUp,
   Zap,
   ArrowRight,
   FileQuestion,
-  Upload,
-  Download
 } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
-import BulkImportModal from '../components/BulkImportModal';
 
 interface Pattern {
   id: number;
@@ -33,7 +27,7 @@ export default function QuestionManagement() {
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
   const isCenterAdminPath = location.pathname.startsWith('/center-admin');
   const basePath = isSuperAdminPath ? '/superadmin' : (isCenterAdminPath ? '/center-admin' : '');
-  const { data: patternsData, loading, refetch } = useApi<{ results: Pattern[] }>('/patterns/patterns/');
+  const { data: patternsData, loading } = useApi<{ results: Pattern[] }>('/patterns/patterns/');
   const patterns = patternsData?.results || [];
 
   if (loading) {

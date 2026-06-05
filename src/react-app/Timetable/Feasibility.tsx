@@ -61,7 +61,7 @@ const Feasibility: React.FC = () => {
   const [result, setResult] = useState<FeasibilityResult | null>(null);
   const [hasRun, setHasRun] = useState(false);
   const [generatedTimetable, setGeneratedTimetable] = useState<any>(null);
-  const [payload, setPayload] = useState<any>(null);
+  const [, setPayload] = useState<any>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState<OptimizationSettings>(DEFAULT_SETTINGS);
   const [settingsChanged, setSettingsChanged] = useState(false);
@@ -595,13 +595,6 @@ const Feasibility: React.FC = () => {
       }));
       setSettingsChanged(true);
     }
-  };
-
-  /* Get violation count for a rule */
-  const getViolationCount = (ruleKey: string): number => {
-    if (!result?.violations) return 0;
-    const violations = result.violations[ruleKey as keyof typeof result.violations];
-    return violations?.length || 0;
   };
 
   return (

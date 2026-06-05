@@ -1,27 +1,9 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import {
-  LayoutGrid,
-  Building2,
-  MapPin,
-  Users,
-  FileText,
-  Layers,
-  Calendar,
-  Bell,
-  HelpCircle,
-  Search,
-  ChevronDown,
-  Zap,
   TrendingUp,
-  ArrowUpRight,
   CheckCircle,
-  MoreVertical,
   Download,
-  LogOut,
-  Settings,
-  ChartPie,
-  Receipt,
   Filter,
   ChevronLeft,
   ChevronRight,
@@ -29,36 +11,10 @@ import {
   Calculator,
   FlaskConical,
   GraduationCap,
-  X,
+  MoreVertical,
 } from "lucide-react";
 import { useAuthContext } from "../contexts/AuthContext";
 import { api } from "../hooks/useApi";
-
-// Import content components
-import InstituteContent from "../components/superadmin/InstituteContent";
-import CentersContent from "../components/superadmin/CentersContent";
-import UsersContent from "../components/superadmin/UsersContent";
-import ExamsContent from "../components/superadmin/ExamsContent";
-import BatchesContent from "../components/superadmin/BatchesContent";
-import TimetableContent from "../components/superadmin/TimetableContent";
-import SettingsContent from "../components/superadmin/SettingsContent";
-import ProfileContent from "../components/superadmin/ProfileContent";
-import { ref } from "process";
-
-type TabType = "overview" | "users" | "institutes" | "exams" | "batches" | "timetable" | "billing" | "settings" | "profile";
-
-const platformNavItems = [
-  { id: "overview" as const, label: "Overview", icon: LayoutGrid },
-  { id: "users" as const, label: "User Management", icon: Users },
-];
-
-const operationsNavItems = [
-  { id: "institutes" as const, label: "Institutes & Centers", icon: Building2, badge: true },
-  { id: "exams" as const, label: "Exam Controller", icon: FileText },
-  { id: "batches" as const, label: "Batches", icon: Layers },
-  { id: "timetable" as const, label: "Timetable", icon: Calendar },
-  { id: "billing" as const, label: "Billing & Logs", icon: Receipt },
-];
 
 export default function NewSuperAdminDashboard() {
   const { user, isAuthenticated, loading: authLoading } = useAuthContext();
@@ -99,7 +55,7 @@ function DashboardContent({ user }: { user: any }) {
     capacity: 0,
   });
   const [recentExams, setRecentExams] = useState<any[]>([]);
-  const [trafficData, setTrafficData] = useState<any[]>([]);
+  const [, setTrafficData] = useState<any[]>([]);
   const [regionalStatus, setRegionalStatus] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 

@@ -2,25 +2,15 @@
 // This is the original design from Vivid-Canvas without any exam app modifications
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Link } from 'react-router';
-import { 
-  Zap, Menu, X, ChevronDown, Hexagon, 
-  Bot, ShieldCheck, TrendingUp, User, Users, 
-  GraduationCap, UserCheck, CheckCircle, BarChart3, 
-  FileText, FileSpreadsheet, Mail, AlertTriangle,
-  Sparkle, TreeStructure, Monitor, ChartPieSlice,
-  ArrowRight, Play, LockKeyhole, Building2, Layers,
-  Repeat, Maximize2, Copy, Layout, Video, Wifi,
-  ClipboardList, Lightning, ArrowsUpDown
-} from 'lucide-react';
+import { Menu, X, ChevronDown, Hexagon } from 'lucide-react';
 
 // This page is an EXACT replica of Vivid-Canvas design
 // Use this as the landing page to show the original design
 
 export default function VividCanvasLanding() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeRole, setActiveRole] = useState("creators");
 
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-blue-100 selection:text-blue-900">

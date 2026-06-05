@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 import { toast } from "react-toastify";
 import {
   BookOpen,
@@ -145,10 +145,7 @@ export default function StudentDashboard() {
       }
     } catch (error: unknown) {
       console.error('Failed to start exam:', error);
-      const errorMessage = error instanceof Error && 'response' in error
-        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-        : 'Failed to start exam. Please try again.';
-      toast.error(errorMessage);
+      toast.error(getErrorMessage(error, 'Failed to start exam. Please try again.'));
     }
   };
 

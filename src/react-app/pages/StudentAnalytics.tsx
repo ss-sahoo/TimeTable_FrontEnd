@@ -1,43 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 import { useAuthContext } from '@/react-app/contexts/AuthContext';
 import { SkeletonChart, SkeletonCard, SkeletonText, SkeletonStatsCard } from '@/react-app/components/SkeletonLoader';
 import {
   BarChart3,
   TrendingUp,
-  TrendingDown,
   Target,
   Clock,
-  Award,
   BookOpen,
   AlertTriangle,
   CheckCircle,
-  XCircle,
-  Calendar,
   Zap,
-  Star,
   Trophy,
-  Brain,
-  PieChart,
   Activity,
-  ChevronRight,
   RefreshCw,
-  Download,
-  Filter,
-  Search,
-  Eye,
-  BarChart,
   LineChart,
-  Users,
   Timer,
   Shield,
-  Lightbulb,
   ArrowUp,
-  ArrowDown,
-  Minus,
-  Plus,
-  Info
 } from 'lucide-react';
 
 interface AnalyticsOverview {
@@ -169,7 +150,7 @@ export default function StudentAnalytics() {
 
   const [activeTab, setActiveTab] = useState('overview');
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
-  const [examAnalytics, setExamAnalytics] = useState<ExamAnalytics | null>(null);
+  const [, setExamAnalytics] = useState<ExamAnalytics | null>(null);
   const [weakAreas, setWeakAreas] = useState<WeakArea[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [performanceTrends, setPerformanceTrends] = useState<any>(null);
@@ -235,65 +216,9 @@ export default function StudentAnalytics() {
         statusText: err.response?.statusText,
         data: err.response?.data
       });
-      setError(err.response?.data?.error || err.message || 'Failed to load analytics data');
+      setError(getErrorMessage(err, 'Failed to load analytics data'));
     } finally {
       setLoading(false);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
-    } else {
-      return `${secs}s`;
-    }
-  };
-
-  const getPerformanceColor = (score: number) => {
-    if (score >= 80) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
-    if (score >= 40) return 'text-orange-600';
-    return 'text-red-600';
-  };
-
-  const getPerformanceBgColor = (score: number) => {
-    if (score >= 80) return 'bg-green-100';
-    if (score >= 60) return 'bg-yellow-100';
-    if (score >= 40) return 'bg-orange-100';
-    return 'bg-red-100';
-  };
-
-  const getRarityColor = (rarity: string) => {
-    switch (rarity) {
-      case 'common': return 'text-gray-600 bg-gray-100';
-      case 'uncommon': return 'text-green-600 bg-green-100';
-      case 'rare': return 'text-blue-600 bg-blue-100';
-      case 'epic': return 'text-purple-600 bg-purple-100';
-      case 'legendary': return 'text-yellow-600 bg-yellow-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
-  };
-
-  const getStrengthColor = (level: string) => {
-    switch (level) {
-      case 'strong': return 'text-green-600 bg-green-100';
-      case 'moderate': return 'text-yellow-600 bg-yellow-100';
-      case 'weak': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
     }
   };
 
@@ -450,7 +375,7 @@ export default function StudentAnalytics() {
 
 // Overview Tab Component
 function OverviewTab({ data }: { data: AnalyticsOverview }) {
-  const { overview, performance_trend, subject_performance, time_analysis, violation_stats, recent_activity, performance_categories } = data;
+  const { overview, performance_trend, subject_performance, time_analysis, violation_stats, performance_categories } = data;
 
   return (
     <div className="space-y-6">
@@ -621,7 +546,7 @@ function OverviewTab({ data }: { data: AnalyticsOverview }) {
 }
 
 // Trends Tab Component
-function TrendsTab({ data }: { data: any }) {
+function TrendsTab({}: { data: any }) {
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-lg border border-slate-200 p-4">

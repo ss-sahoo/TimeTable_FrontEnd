@@ -1,32 +1,20 @@
 import { useState, useEffect } from 'react';
 import {
-  Plus,
   Search,
   Filter,
-  MoreVertical,
-  Eye,
   Edit,
   Trash2,
   Users as UsersIcon,
   UserPlus,
-  Mail,
-  Phone,
-  Calendar,
-  Shield,
   CheckCircle,
   AlertCircle,
-  Clock,
   Building2,
-  GraduationCap,
-  Settings,
-  Ban,
-  UserCheck,
   X,
   Loader2
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useTimetableCenter } from '../contexts/TimetableCenterContext';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 
 interface UserData {
   id: number;
@@ -139,13 +127,6 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
     }
   };
 
-  const openInviteModal = () => {
-    setInviteForm({ email: '', role: 'teacher', message: '' });
-    setActionError(null);
-    setActionMessage(null);
-    setInviteModalOpen(true);
-  };
-
   const openAddUserModal = () => {
     setAddUserForm({
       username: '',
@@ -233,21 +214,9 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
       }
     } catch (error: any) {
       console.error('Bulk import failed:', error);
-      setActionError(error.response?.data?.error || error.response?.data?.detail || 'Failed to import users.');
+      setActionError(getErrorMessage(error, 'Failed to import users.'));
     } finally {
       setFormSubmitting(false);
-    }
-  };
-
-  const openViewModal = async (userId: number) => {
-    try {
-      setActionError(null);
-      const response = await api.get(`/auth/users/${userId}/`);
-      setSelectedUser(response.data);
-      setViewModalOpen(true);
-    } catch (error: any) {
-      console.error('Failed to load user details:', error);
-      setActionError('Failed to load user details.');
     }
   };
 
@@ -322,7 +291,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
       setInviteForm({ email: '', role: 'teacher', message: '' });
     } catch (error: any) {
       console.error('Failed to send invitation:', error);
-      setActionError(error.response?.data?.error || 'Failed to send invitation.');
+      setActionError(getErrorMessage(error, 'Failed to send invitation.'));
     } finally {
       setFormSubmitting(false);
     }
@@ -491,7 +460,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
 
     } catch (error: any) {
       console.error('Failed to create user:', error);
-      setActionError(error.response?.data?.error || error.response?.data?.detail || 'Failed to create user.');
+      setActionError(getErrorMessage(error, 'Failed to create user.'));
     } finally {
       setFormSubmitting(false);
     }
@@ -513,25 +482,6 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
         return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400';
       default:
         return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
-    }
-  };
-
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'super_admin':
-        return <Shield className="w-3 h-3" />;
-      case 'institute_admin':
-        return <Building2 className="w-3 h-3" />;
-      case 'exam_admin':
-        return <Settings className="w-3 h-3" />;
-      case 'teacher':
-        return <GraduationCap className="w-3 h-3" />;
-      case 'student':
-        return <UsersIcon className="w-3 h-3" />;
-      case 'admin':
-        return <Shield className="w-3 h-3" />;
-      default:
-        return <UsersIcon className="w-3 h-3" />;
     }
   };
 
@@ -572,58 +522,6 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
 
   const stats = getUserStats();
   const roleStats = getRoleStats();
-
-  const statCards = [
-    {
-      label: 'Total Users',
-      value: stats.total,
-      description: 'All accounts in your institute',
-      icon: UsersIcon,
-      iconClass: 'text-emerald-600 dark:text-emerald-400',
-      iconBg: 'bg-emerald-50 dark:bg-emerald-500/10'
-    },
-    {
-      label: 'Active',
-      value: stats.active,
-      description: 'Users currently enabled for access',
-      icon: CheckCircle,
-      iconClass: 'text-sky-600 dark:text-sky-400',
-      iconBg: 'bg-sky-50 dark:bg-sky-500/10'
-    },
-    {
-      label: 'Inactive',
-      value: stats.inactive,
-      description: 'Disabled accounts awaiting review',
-      icon: AlertCircle,
-      iconClass: 'text-slate-500 dark:text-slate-300',
-      iconBg: 'bg-slate-100 dark:bg-slate-500/10'
-    },
-    {
-      label: 'Verified',
-      value: stats.verified,
-      description: 'Email confirmed and verified users',
-      icon: UserCheck,
-      iconClass: 'text-indigo-600 dark:text-indigo-400',
-      iconBg: 'bg-indigo-50 dark:bg-indigo-500/10'
-    },
-    {
-      label: 'Pending',
-      value: stats.unverified,
-      description: 'Invited users awaiting verification',
-      icon: Clock,
-      iconClass: 'text-amber-600 dark:text-amber-400',
-      iconBg: 'bg-amber-50 dark:bg-amber-500/10'
-    }
-  ];
-
-  const roleDistribution = [
-    { label: 'Super Admin', value: roleStats.super_admin, color: 'bg-rose-500' },
-    { label: 'Admins', value: roleStats.admin, color: 'bg-purple-500' },
-    { label: 'Teachers', value: roleStats.teacher, color: 'bg-emerald-500' },
-    { label: 'Students', value: roleStats.student, color: 'bg-amber-500' }
-  ];
-
-  const totalRoleCount = roleDistribution.reduce((sum, item) => sum + item.value, 0) || 1;
 
   if (loading) {
     return (

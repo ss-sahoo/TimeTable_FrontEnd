@@ -351,9 +351,6 @@ const TeachersAvailability: React.FC = () => {
                               statusText = 'U';
                             }
 
-                            const batchInfo = slot.batch_name || slot.batch_code || '';
-                            const subjectInfo = slot.subject_name || slot.subject_code || '';
-
                             return (
                               <button
                                 key={slot.slot_id}

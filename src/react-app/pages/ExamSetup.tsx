@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
 import {
   CheckCircle,
@@ -10,15 +10,13 @@ import {
   Play,
   Loader2,
   Sparkles,
-  Shield,
   ShieldCheck,
   ShieldAlert,
   Clock,
-  AlertCircle,
   Target,
   BookOpen
 } from 'lucide-react';
-import { useApi, api } from '../hooks/useApi';
+import { useApi, api, getErrorMessage } from '../hooks/useApi';
 
 interface PatternSection {
   id: number;
@@ -133,12 +131,7 @@ const ExamSetup: React.FC = () => {
       }
     } catch (error: unknown) {
       console.error('Start exam error:', error);
-      const responseMessage =
-        typeof error === 'object' &&
-        error !== null &&
-        'response' in error &&
-        (error as { response?: { data?: { error?: string } } }).response?.data?.error;
-      setError(responseMessage || 'Failed to start exam');
+      setError(getErrorMessage(error, 'Failed to start exam'));
     } finally {
       setLoading(false);
     }

@@ -21,7 +21,6 @@ export default function StepIndicator({ steps, currentStep }: StepIndicatorProps
         {steps.map((step, stepIdx) => {
           const isComplete = currentStep > step.id;
           const isCurrent = currentStep === step.id;
-          const isUpcoming = currentStep < step.id;
 
           return (
             <li

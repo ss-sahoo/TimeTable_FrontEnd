@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Mail, Send, Loader2, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 
 interface ExamInvitationModalProps {
   isOpen: boolean;
@@ -74,10 +74,7 @@ const ExamInvitationModal: React.FC<ExamInvitationModalProps> = ({
       setSuccess(true);
       onSuccess();
     } catch (err) {
-      const errorMessage = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
-        : undefined;
-      setError(errorMessage || 'Failed to send invitations');
+      setError(getErrorMessage(err, 'Failed to send invitations'));
     } finally {
       setLoading(false);
     }
@@ -101,10 +98,7 @@ const ExamInvitationModal: React.FC<ExamInvitationModalProps> = ({
       await api.post(`/exams/${examId}/reminders/`);
       setSuccess(true);
     } catch (err) {
-      const errorMessage = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
-        : undefined;
-      setError(errorMessage || 'Failed to send reminders');
+      setError(getErrorMessage(err, 'Failed to send reminders'));
     } finally {
       setLoading(false);
     }

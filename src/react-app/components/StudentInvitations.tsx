@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Clock, CheckCircle, XCircle, AlertCircle, Calendar, BookOpen } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 
 interface Invitation {
   id: number;
@@ -37,10 +37,7 @@ const StudentInvitations: React.FC = () => {
       const response = await api.get('/exams/invitations/student/');
       setInvitations(response.data);
     } catch (err) {
-      const errorMessage = err && typeof err === 'object' && 'response' in err 
-        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error 
-        : undefined;
-      setError(errorMessage || 'Failed to load invitations');
+      setError(getErrorMessage(err, 'Failed to load invitations'));
     } finally {
       setLoading(false);
     }
@@ -52,10 +49,7 @@ const StudentInvitations: React.FC = () => {
       await api.post(`/exams/invitations/${invitationId}/accept/`);
       await loadInvitations();
     } catch (err) {
-      const errorMessage = err && typeof err === 'object' && 'response' in err 
-        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error 
-        : undefined;
-      setError(errorMessage || 'Failed to accept invitation');
+      setError(getErrorMessage(err, 'Failed to accept invitation'));
     } finally {
       setActionLoading(null);
     }
@@ -69,10 +63,7 @@ const StudentInvitations: React.FC = () => {
       });
       await loadInvitations();
     } catch (err) {
-      const errorMessage = err && typeof err === 'object' && 'response' in err 
-        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error 
-        : undefined;
-      setError(errorMessage || 'Failed to decline invitation');
+      setError(getErrorMessage(err, 'Failed to decline invitation'));
     } finally {
       setActionLoading(null);
     }

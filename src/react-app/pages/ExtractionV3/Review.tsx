@@ -3,11 +3,10 @@ import { useParams, useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from "react-toastify";
 import {
-    CheckCircle, AlertCircle, Loader2, Cpu,
-    ArrowLeft, ChevronRight, FileText, Database,
+    CheckCircle, AlertCircle, Loader2,
+    ArrowLeft, FileText, Database,
     Zap, Save, Trash2, Edit3, Beaker,
-    Filter, MoreHorizontal, Check, X,
-    ExternalLink, Info, BookOpen
+    X, BookOpen
 } from 'lucide-react';
 import { api } from '@/react-app/hooks/useApi';
 
@@ -86,7 +85,7 @@ export default function ExtractionReviewPage() {
                 question_number: idx + 1 // Simple numbering for now
             }));
 
-            const res = await api.post('/questions/bulk-import-extracted/', {
+            await api.post('/questions/bulk-import-extracted/', {
                 job_id: job.id,
                 question_ids: questions.map(q => q.id),
                 mappings

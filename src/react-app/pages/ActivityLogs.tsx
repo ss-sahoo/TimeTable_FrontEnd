@@ -4,13 +4,9 @@ import {
     Clock,
     User,
     BookOpen,
-    AlertTriangle,
-    CheckCircle,
-    Filter,
     Search,
     ArrowRight,
     Shield,
-    PlusCircle,
     LogIn
 } from 'lucide-react';
 import { api } from '../hooks/useApi';

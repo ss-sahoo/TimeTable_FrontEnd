@@ -6,12 +6,10 @@ import { toast } from "react-toastify";
 import {
   ArrowLeft,
   Search,
-  Filter,
   Download,
   Eye,
   Users,
   Trophy,
-  Clock,
   AlertTriangle,
   BarChart3,
   FileText,
@@ -19,12 +17,7 @@ import {
   SortAsc,
   SortDesc,
   CheckCircle,
-  XCircle,
   Camera,
-  Loader2,
-  Calendar,
-  Target,
-  TrendingUp,
   Award
 } from 'lucide-react';
 

@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 import { useAuthContext } from '../contexts/AuthContext';
 import {
-  BarChart3,
   TrendingUp,
-  TrendingDown,
   Target,
   Clock,
-  Award,
   BookOpen,
   AlertCircle,
   CheckCircle,
@@ -20,9 +17,6 @@ import {
   Brain,
   PieChart,
   Activity,
-  ChevronRight,
-  RefreshCw,
-  Download,
   Eye,
   Timer,
   Shield,
@@ -30,7 +24,6 @@ import {
   ArrowUp,
   ArrowDown,
   Minus,
-  Users,
   BarChart,
   LineChart
 } from 'lucide-react';
@@ -85,7 +78,6 @@ export default function StudentAnalyticsOverview() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (user?.role?.toLowerCase() === 'student') {
@@ -101,16 +93,10 @@ export default function StudentAnalyticsOverview() {
       setData(response.data);
     } catch (err: any) {
       console.error('Error loading analytics:', err);
-      setError(err.response?.data?.error || 'Failed to load analytics');
+      setError(getErrorMessage(err, 'Failed to load analytics'));
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadAnalytics();
-    setRefreshing(false);
   };
 
   const formatTime = (seconds: number) => {

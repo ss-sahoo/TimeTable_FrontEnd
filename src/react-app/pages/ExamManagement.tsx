@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { toast } from "react-toastify";
 import {
   Plus,
@@ -8,28 +8,19 @@ import {
   MoreVertical,
   Eye,
   Edit,
-  Copy,
   Trash2,
-  Users,
   BarChart3,
   Calendar,
   Clock,
   BookOpen,
   CheckCircle,
-  AlertCircle,
   Play,
   Pause,
-  Settings,
-  Download,
-  Upload,
-  Mail,
-  Share2,
   CheckSquare,
   Square,
   X
 } from 'lucide-react';
-import { useAuthContext } from '../contexts/AuthContext';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 
 interface Exam {
   id: number;
@@ -62,8 +53,6 @@ interface Exam {
 }
 
 export default function ExamManagement() {
-  const navigate = useNavigate();
-  const { user } = useAuthContext();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -261,11 +250,10 @@ export default function ExamManagement() {
         setShowSelectionMode(false);
         toast.error(`Successfully deleted ${response.data.deleted_count} exam(s)`);
       } else {
-        toast.error('Failed to delete exams: ' + (response.data.error || 'Unknown error'));
+        toast.error('Failed to delete exams: ' + (response.data.detail || response.data.error || 'Unknown error'));
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      toast.error('Failed to delete exams: ' + errorMessage);
+      toast.error('Failed to delete exams: ' + getErrorMessage(err, 'Unknown error'));
     } finally {
       setIsDeleting(false);
     }

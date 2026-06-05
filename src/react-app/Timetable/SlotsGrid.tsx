@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from "../hooks/useApi";
 
 // All days including Sunday
@@ -163,7 +163,7 @@ const SlotsGrid: React.FC = () => {
   const [days, setDays] = useState<DaySlots[]>(loadSavedData);
   const [editingSlot, setEditingSlot] = useState<{ dayIndex: number, slotIndex: number } | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [lastSavedTime, setLastSavedTime] = useState<string>("");
+  const [, setLastSavedTime] = useState<string>("");
   // const [showDayDropdown, setShowDayDropdown] = useState<number | null>(null);
   const [showAddDayModal, setShowAddDayModal] = useState(false);
   const [selectionMode, setSelectionMode] = useState<DaySelectionMode>("dropdown");
@@ -479,8 +479,8 @@ const SlotsGrid: React.FC = () => {
     return weeklySlots;
   };
 
-  const [fetchedSlots, setFetchedSlots] = useState<any | null>(null);
-  const [fetchingSlots, setFetchingSlots] = useState<boolean>(false);
+  const [, setFetchedSlots] = useState<any | null>(null);
+  const [, setFetchingSlots] = useState<boolean>(false);
   const [isEditMode, setIsEditMode] = useState<boolean>(false); // Track if editing existing timetable
 
   // Convert "08:00" → "8:00 AM"

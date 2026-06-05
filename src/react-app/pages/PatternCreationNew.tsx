@@ -16,8 +16,6 @@ import {
   Type,
   Hash,
   Zap,
-  Eye,
-  ChevronDown,
   Settings,
   X,
   Layers,
@@ -25,7 +23,6 @@ import {
   List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuthContext } from '../contexts/AuthContext';
 import { api, useApi } from '../hooks/useApi';
 
 interface Subject {
@@ -94,7 +91,6 @@ export default function PatternCreation() {
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
   const basePath = isSuperAdminPath ? '/superadmin' : '';
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuthContext();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});

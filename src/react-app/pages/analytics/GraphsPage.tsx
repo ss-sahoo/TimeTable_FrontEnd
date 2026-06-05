@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router';
 import { motion } from 'framer-motion';
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
   ScatterChart,
@@ -18,8 +16,8 @@ import {
   Legend,
   Cell,
 } from 'recharts';
-import { LineChart as LineChartIcon, BarChart3, ScatterChart as ScatterIcon, TrendingUp, Clock, Layers } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
+import { LineChart as LineChartIcon, ScatterChart as ScatterIcon, TrendingUp, Clock, Layers } from 'lucide-react';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 import GlassCard from '@/react-app/components/analytics/GlassCard';
 import ModernChartContainer from '@/react-app/components/analytics/ModernChartContainer';
 import PageHeader from '@/react-app/components/analytics/PageHeader';
@@ -92,7 +90,7 @@ export default function GraphsPage() {
       const response = await api.get(`/exams/exams/${examId}/analytics/graphs/?${queryParams}`);
       setData(response.data);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load graphs data');
+      setError(getErrorMessage(err, 'Failed to load graphs data'));
     } finally {
       setLoading(false);
     }
@@ -133,7 +131,7 @@ export default function GraphsPage() {
   ];
 
   // Generate gradient colors for bars
-  const getBarColor = (index: number, total: number) => {
+  const getBarColor = (index: number, _total: number) => {
     const colors = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
     return colors[index % colors.length];
   };

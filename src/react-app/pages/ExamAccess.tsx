@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 import {
   Key,
   Clock,
@@ -9,7 +9,6 @@ import {
   Camera,
   Monitor,
   Shield,
-  ArrowRight,
   Loader2,
   Download,
   Upload,
@@ -213,7 +212,7 @@ const ExamAccess: React.FC = () => {
       fetchSubmissions(); // Update list
     } catch (err: any) {
       console.error('Failed to upload subjective answer sheet:', err);
-      setError(err.response?.data?.error || 'Failed to upload answer sheet. Please try again.');
+      setError(getErrorMessage(err, 'Failed to upload answer sheet. Please try again.'));
     } finally {
       setSubjectiveUploading(false);
     }
@@ -252,7 +251,7 @@ const ExamAccess: React.FC = () => {
       } else {
         setError(data.error || 'Invalid access code');
       }
-    } catch (error) {
+    } catch {
       setError('Failed to validate access code');
     } finally {
       setLoading(false);
@@ -354,7 +353,7 @@ const ExamAccess: React.FC = () => {
       fetchSubmissions(); // Update list
     } catch (err: any) {
       console.error('Failed to upload OMR:', err);
-      setError(err.response?.data?.error || 'Failed to upload OMR sheet. Please try again.');
+      setError(getErrorMessage(err, 'Failed to upload OMR sheet. Please try again.'));
     } finally {
       setOmrUploading(false);
     }

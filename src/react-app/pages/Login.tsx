@@ -8,12 +8,10 @@ import {
   Lock,
   Zap,
   AlertCircle,
-  Sparkles,
   Star,
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import DeviceConflictModal from '../components/DeviceConflictModal';
-import { deviceManager } from '../services/DeviceManager';
 
 export default function Login() {
   const [formData, setFormData] = useState({

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { api } from "../../hooks/useApi";
+import { api, getErrorMessage } from "../../hooks/useApi";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { toast } from "react-toastify";
 import {
@@ -276,12 +276,7 @@ const AdminPeopleContent = () => {
             }
         } catch (error: any) {
             console.error("Error adding user:", error);
-            const errorMessage = error.response?.data?.detail ||
-                error.response?.data?.message ||
-                error.response?.data?.error ||
-                JSON.stringify(error.response?.data) ||
-                "Failed to add user";
-            setError(errorMessage);
+            setError(getErrorMessage(error, "Failed to add user"));
         } finally {
             setLoading(false);
         }
@@ -426,7 +421,7 @@ const AdminPeopleContent = () => {
             fetchUsers();
         } catch (error: any) {
             console.error("Error importing users:", error);
-            setError(error.response?.data?.detail || error.response?.data?.message || error.response?.data?.error || "Failed to import users");
+            setError(getErrorMessage(error, "Failed to import users"));
         } finally {
             setLoading(false);
         }

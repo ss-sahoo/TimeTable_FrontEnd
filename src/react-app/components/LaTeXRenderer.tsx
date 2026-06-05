@@ -35,7 +35,7 @@ function renderTextWithImages(text: string, key: number) {
   }
 
   // Build parts array
-  matches.forEach((m, i) => {
+  matches.forEach((m) => {
     // Add text before this image
     if (m.index > lastIndex) {
       parts.push({ type: 'text', content: tempText.substring(lastIndex, m.index) });
@@ -185,7 +185,7 @@ export default function LaTeXRenderer({ content, className = '' }: LaTeXRenderer
         if (part.type === 'block') {
           try {
             return <BlockMath key={part.index} math={part.content} />;
-          } catch (e) {
+          } catch {
             // If rendering fails, show as code
             return <code key={part.index} className="text-xs">$${part.content}$$</code>;
           }
@@ -221,14 +221,14 @@ export default function LaTeXRenderer({ content, className = '' }: LaTeXRenderer
             // Render as block math instead
             try {
               return <BlockMath key={part.index} math={part.content} />;
-            } catch (e) {
+            } catch {
               return <code key={part.index} className="text-xs">${part.content}$</code>;
             }
           }
 
           try {
             return <InlineMath key={part.index} math={part.content} />;
-          } catch (e) {
+          } catch {
             // If rendering fails, show as code
             return <code key={part.index} className="text-xs">${part.content}$</code>;
           }

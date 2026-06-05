@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileQuestion, TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, MinusCircle, Search, Filter } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
+import { FileQuestion, Clock, CheckCircle, XCircle, MinusCircle, Search, Filter } from 'lucide-react';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 import GlassCard from '@/react-app/components/analytics/GlassCard';
 import ModernChartContainer from '@/react-app/components/analytics/ModernChartContainer';
 import PageHeader from '@/react-app/components/analytics/PageHeader';
@@ -62,7 +62,7 @@ export default function QuestionsPage() {
       const response = await api.get(`/exams/exams/${examId}/analytics/questions/?${queryParams}`);
       setData(response.data);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load question analytics');
+      setError(getErrorMessage(err, 'Failed to load question analytics'));
     } finally {
       setLoading(false);
     }
@@ -70,15 +70,6 @@ export default function QuestionsPage() {
 
   const handleExport = (format: 'csv' | 'excel' | 'pdf' | 'image') => {
     console.log('Export as', format);
-  };
-
-  const handleSort = (field: typeof sortBy) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('asc');
-    }
   };
 
   const filteredAndSortedData = data?.question_analytics

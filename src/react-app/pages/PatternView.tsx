@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link, useLocation } from 'react-router';
+import { useState } from 'react';
+import { useParams, Link, useLocation } from 'react-router';
 import {
   ArrowLeft,
   Eye,
@@ -8,14 +8,12 @@ import {
   Clock,
   BookOpen,
   BarChart3,
-  Users,
   CheckCircle,
   AlertCircle,
   Calculator,
   FileText,
   Type,
   Hash,
-  Zap,
   User,
   Settings,
   Upload,
@@ -70,7 +68,6 @@ interface ExamPattern {
 
 export default function PatternView() {
   const { patternId } = useParams<{ patternId: string }>();
-  const navigate = useNavigate();
   const location = useLocation();
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
   const isCenterAdminPath = location.pathname.startsWith('/center-admin');

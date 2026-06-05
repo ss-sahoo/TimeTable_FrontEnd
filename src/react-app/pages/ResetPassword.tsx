@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 
 export default function ResetPassword() {
   const { uid, token } = useParams<{ uid: string; token: string }>();
@@ -35,7 +35,7 @@ export default function ResetPassword() {
         setTokenValid(true);
         setUserEmail(response.data.user_email);
       } catch (err: any) {
-        setError(err.response?.data?.error || 'Invalid or expired reset link');
+        setError(getErrorMessage(err, 'Invalid or expired reset link'));
         setTokenValid(false);
       } finally {
         setValidating(false);

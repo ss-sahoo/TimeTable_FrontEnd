@@ -80,10 +80,6 @@ const BatchSchedule: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Add Batch State
-  const [showAddBatch, setShowAddBatch] = useState(false);
-  const [newBatchName, setNewBatchName] = useState("");
-  const [newBatchYear, setNewBatchYear] = useState("2nd Year");
-  const [newBatchStudents, setNewBatchStudents] = useState("");
   const [showBatchSelector, setShowBatchSelector] = useState(false);
   const [selectedBatchToAdd, setSelectedBatchToAdd] = useState<string>("");
 
@@ -95,7 +91,7 @@ const BatchSchedule: React.FC = () => {
   const [showHelp, setShowHelp] = useState(true);
 
   // State for timetable name (display only)
-  const [timetableName, setTimetableName] = useState<string>("");
+  const [, setTimetableName] = useState<string>("");
 
   // State for free classes count
   const [freeClassesCount, setFreeClassesCount] = useState<number>(0);
@@ -797,7 +793,7 @@ const BatchSchedule: React.FC = () => {
         month: 'short',
         day: 'numeric'
       });
-    } catch (error) {
+    } catch {
       return dateString;
     }
   };
@@ -1048,18 +1044,8 @@ const BatchSchedule: React.FC = () => {
     saveAssignmentsToBackend();
   };
 
-  const handleSaveAndNext = () => {
-    saveAssignmentsToBackend();
-    // You can add navigation to next page here
-    toast.error("Saved! Next page would open here.");
-  };
-
   const refreshBatches = () => {
     fetchBatchesFromAPI();
-  };
-
-  const refreshTeachers = () => {
-    fetchTeachersFromAPI();
   };
 
   // Open batch selector

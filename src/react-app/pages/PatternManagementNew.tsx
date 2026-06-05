@@ -1,18 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Eye, 
-  Edit, 
-  Copy, 
-  Trash2, 
-  BookOpen, 
-  Clock, 
-  Users, 
-  Settings,
+import { Link } from 'react-router';
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreVertical,
+  Eye,
+  Edit,
+  BookOpen,
+  Clock,
   CheckCircle,
   CheckSquare,
   AlertCircle,
@@ -22,7 +18,6 @@ import {
   Hash,
   Type
 } from 'lucide-react';
-import { useAuthContext } from '../contexts/AuthContext';
 import { api } from '../hooks/useApi';
 
 interface PatternSection {
@@ -55,8 +50,6 @@ interface ExamPattern {
 }
 
 export default function PatternManagement() {
-  const navigate = useNavigate();
-  const { user } = useAuthContext();
   const [patterns, setPatterns] = useState<ExamPattern[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

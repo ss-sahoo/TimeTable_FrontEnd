@@ -4,9 +4,6 @@ import { motion } from 'framer-motion';
 import {
   Eye,
   EyeOff,
-  Mail,
-  Lock,
-  User,
   Calendar,
   AlertCircle,
   CheckCircle,

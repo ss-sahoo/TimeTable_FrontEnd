@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router';
 import { motion } from 'framer-motion';
 import { ClipboardCheck, CheckCircle, Clock, AlertCircle, Zap, UserCheck, FileCheck } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 import GlassCard from '@/react-app/components/analytics/GlassCard';
 import ModernCard from '@/react-app/components/analytics/ModernCard';
 import ModernChartContainer from '@/react-app/components/analytics/ModernChartContainer';
@@ -63,7 +63,7 @@ export default function EvaluationPage() {
       const response = await api.get(`/exams/exams/${examId}/analytics/evaluation/?${queryParams}`);
       setData(response.data);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load evaluation analytics');
+      setError(getErrorMessage(err, 'Failed to load evaluation analytics'));
     } finally {
       setLoading(false);
     }

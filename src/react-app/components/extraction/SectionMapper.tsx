@@ -119,7 +119,7 @@ const SectionMapper: React.FC<SectionMapperProps> = ({
     const sectionCounts: Record<number, number> = {};
 
     // Count questions per section
-    Object.entries(mappings).forEach(([questionId, sectionId]) => {
+    Object.entries(mappings).forEach(([, sectionId]) => {
       sectionCounts[sectionId] = (sectionCounts[sectionId] || 0) + 1;
     });
 

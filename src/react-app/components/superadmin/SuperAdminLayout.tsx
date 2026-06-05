@@ -10,16 +10,12 @@ import {
     Bell,
     HelpCircle,
     Search,
-    ChevronDown,
-    Zap,
     LogOut,
     Settings,
-    Receipt,
     ChevronLeft,
     ChevronRight,
     X,
     Activity,
-    User,
 } from "lucide-react";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { api } from "../../hooks/useApi";

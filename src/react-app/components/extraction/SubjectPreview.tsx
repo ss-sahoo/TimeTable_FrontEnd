@@ -30,9 +30,7 @@ interface SubjectPreviewProps {
 }
 
 const SubjectPreview: React.FC<SubjectPreviewProps> = ({
-  jobId,
   subjects,
-  documentType,
   totalQuestions,
   onBack,
   onDownload,

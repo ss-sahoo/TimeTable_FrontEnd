@@ -4,9 +4,9 @@ import { useAuthContext } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import {
   Building2, Users, UserPlus, GraduationCap, BookOpen, Shield,
-  Plus, Search, Edit, Trash2, Eye, EyeOff, Copy, Check,
-  ChevronDown, X, AlertCircle, CheckCircle, Loader2,
-  LayoutDashboard, Settings, LogOut, Menu, Bell, RefreshCw,
+  Plus, Edit, Trash2, Copy, Check,
+  X, AlertCircle, CheckCircle, Loader2,
+  LayoutDashboard, Settings, LogOut, Menu, RefreshCw,
   Upload, FileSpreadsheet, Download
 } from "lucide-react";
 

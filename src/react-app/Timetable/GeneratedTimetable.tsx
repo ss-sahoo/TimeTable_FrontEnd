@@ -87,26 +87,6 @@ const SUBJECT_COLORS: { [key: string]: { bg: string; text: string; border: strin
   "default": { bg: "#f1f5f9", text: "#475569", border: "#cbd5e1" },
 };
 
-const DAY_COLORS: { [key: string]: string } = {
-  "d1": "#3b82f6",
-  "d2": "#10b981",
-  "d3": "#8b5cf6",
-  "d4": "#f59e0b",
-  "d5": "#ef4444",
-  "d6": "#ec4899",
-  "d7": "#06b6d4",
-};
-
-const DAY_NAMES: { [key: string]: string } = {
-  "d1": "Monday",
-  "d2": "Tuesday",
-  "d3": "Wednesday",
-  "d4": "Thursday",
-  "d5": "Friday",
-  "d6": "Saturday",
-  "d7": "Sunday",
-};
-
 const DAY_SHORT_NAMES: { [key: string]: string } = {
   "d1": "Mon",
   "d2": "Tue",
@@ -132,13 +112,6 @@ const TEACHER_COLORS = [
 ];
 
 /* ================= HELPER FUNCTIONS ================= */
-// Function to get weekday name for any day index
-const getWeekdayName = (dayIndex: number): string => {
-  const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-  const adjustedIndex = (dayIndex - 1) % 7;
-  return weekdays[adjustedIndex];
-};
-
 // Function to get weekday short name
 const getWeekdayShortName = (dayIndex: number): string => {
   const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -1276,9 +1249,8 @@ const GeneratedTimetable: React.FC = () => {
         ) : Object.keys(slotsWithTeachers).length === 0 ? (
           <EmptyState message="No slots with available teachers data found" />
         ) : (
-          <AvailableTeachersView 
-            slotsWithTeachers={slotsWithTeachers} 
-            getSubjectColor={getSubjectColor}
+          <AvailableTeachersView
+            slotsWithTeachers={slotsWithTeachers}
             toggleAvailableTeachers={toggleAvailableTeachers}
             loadingAvailableTeachers={loadingAvailableTeachers}
           />
@@ -1299,16 +1271,14 @@ const EmptyState: React.FC<{ message: string }> = ({ message }) => (
 /* ================= AVAILABLE TEACHERS VIEW ================= */
 interface AvailableTeachersViewProps {
   slotsWithTeachers: { [slotId: string]: { slot: SlotData; teachers: AvailableTeacher[] } };
-  getSubjectColor: (s: string | null) => { bg: string; text: string; border: string };
   toggleAvailableTeachers: (slotId: string, dayKey: string, timeSlot: string, entityId: string, entityType: 'batch' | 'teacher') => void;
   loadingAvailableTeachers: {[key: string]: boolean};
 }
 
-const AvailableTeachersView: React.FC<AvailableTeachersViewProps> = ({ 
-  slotsWithTeachers, 
-  getSubjectColor,
+const AvailableTeachersView: React.FC<AvailableTeachersViewProps> = ({
+  slotsWithTeachers,
   toggleAvailableTeachers,
-  loadingAvailableTeachers 
+  loadingAvailableTeachers
 }) => {
   // Group slots by day and time
   const groupedSlots = React.useMemo(() => {

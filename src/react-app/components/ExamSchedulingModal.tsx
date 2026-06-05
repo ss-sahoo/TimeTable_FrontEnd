@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '@/react-app/hooks/useApi';
-import { Clock, Globe, Calendar, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
+import { Globe, Calendar, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import DateTimeInput from '@/react-app/components/common/DateTimeInput';
 
 interface Timezone {
   value: string;
@@ -112,10 +113,7 @@ export default function ExamSchedulingModal({ isOpen, onClose, examId, examTitle
       onClose();
     } catch (error) {
       console.error('Error updating exam schedule:', error);
-      const errorMessage = error && typeof error === 'object' && 'response' in error
-        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-        : undefined;
-      setError(errorMessage || 'Failed to update exam schedule');
+      setError(getErrorMessage(error, 'Failed to update exam schedule'));
     } finally {
       setSaving(false);
     }
@@ -190,11 +188,10 @@ export default function ExamSchedulingModal({ isOpen, onClose, examId, examTitle
                     <Calendar className="w-4 h-4 inline mr-1" />
                     Start Date & Time
                   </label>
-                  <input
-                    type="datetime-local"
+                  <DateTimeInput
                     value={formData.start_date}
-                    onChange={(e) => handleInputChange('start_date', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(v) => handleInputChange('start_date', v)}
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
                 </div>
@@ -204,11 +201,10 @@ export default function ExamSchedulingModal({ isOpen, onClose, examId, examTitle
                     <Calendar className="w-4 h-4 inline mr-1" />
                     End Date & Time
                   </label>
-                  <input
-                    type="datetime-local"
+                  <DateTimeInput
                     value={formData.end_date}
-                    onChange={(e) => handleInputChange('end_date', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(v) => handleInputChange('end_date', v)}
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
                 </div>
@@ -315,11 +311,10 @@ export default function ExamSchedulingModal({ isOpen, onClose, examId, examTitle
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                           Reschedule Deadline
                         </label>
-                        <input
-                          type="datetime-local"
+                        <DateTimeInput
                           value={formData.reschedule_deadline}
-                          onChange={(e) => handleInputChange('reschedule_deadline', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          onChange={(v) => handleInputChange('reschedule_deadline', v)}
+                          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                     </div>

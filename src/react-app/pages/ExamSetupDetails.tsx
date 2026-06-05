@@ -4,6 +4,7 @@ import { ArrowLeft, BookOpen, Plus, Edit3, List, FileText, Calendar, Clock } fro
 import { useApi, api } from '@/react-app/hooks/useApi';
 import { Exam, ExamSubject, ExamSection, CreateSection } from '@/shared/types';
 import CreateSectionModal from '@/react-app/components/CreateSectionModal';
+import DateTimeInput from '@/react-app/components/common/DateTimeInput';
 
 export default function ExamSetupDetails() {
   const { examId } = useParams<{ examId: string }>();
@@ -211,11 +212,10 @@ export default function ExamSetupDetails() {
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         Start Date & Time
                       </label>
-                      <input
-                        type="datetime-local"
+                      <DateTimeInput
                         value={examFormData.start_date}
-                        onChange={(e) => setExamFormData(prev => ({ ...prev, start_date: e.target.value }))}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        onChange={(v) => setExamFormData(prev => ({ ...prev, start_date: v }))}
+                        className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
 
@@ -223,11 +223,10 @@ export default function ExamSetupDetails() {
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         End Date & Time
                       </label>
-                      <input
-                        type="datetime-local"
+                      <DateTimeInput
                         value={examFormData.end_date}
-                        onChange={(e) => setExamFormData(prev => ({ ...prev, end_date: e.target.value }))}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        onChange={(v) => setExamFormData(prev => ({ ...prev, end_date: v }))}
+                        className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                   </div>

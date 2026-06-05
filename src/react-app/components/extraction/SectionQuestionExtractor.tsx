@@ -6,13 +6,10 @@
  * - POST /api/questions/section-import-preview/
  * - POST /api/questions/confirm-section-import/
  */
-import React, { useState, useEffect } from 'react';
-import { api } from '../../hooks/useApi';
+import React, { useState } from 'react';
+import { api, getErrorMessage } from '../../hooks/useApi';
 import {
-  Download,
   FileText,
-  ChevronDown,
-  ChevronUp,
   CheckCircle,
   XCircle,
   AlertTriangle,
@@ -202,7 +199,7 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
       */
     } catch (err: any) {
       console.error('Extraction failed:', err);
-      setError(err.response?.data?.error || 'Failed to extract questions');
+      setError(getErrorMessage(err, 'Failed to extract questions'));
       setExtractionState('idle');
     }
   };
@@ -242,7 +239,7 @@ const SectionQuestionExtractor: React.FC<SectionQuestionExtractorProps> = ({
       moveToNextSubject();
     } catch (err: any) {
       console.error('Import failed:', err);
-      setError(err.response?.data?.error || 'Failed to import questions');
+      setError(getErrorMessage(err, 'Failed to import questions'));
       setExtractionState('preview');
     }
   };

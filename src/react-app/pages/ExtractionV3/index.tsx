@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { toast } from "react-toastify";
 import {
     Upload, CheckCircle, AlertCircle, Loader2, Cpu,
-    BookOpen, X, FileText, Database, Zap,
-    Edit3, Trash2, Save, Play
+    BookOpen, X, Zap,
+    Edit3, Trash2, Save
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 
 // Types for Review
 interface ExtractedQuestion {
@@ -183,7 +183,7 @@ export default function ExtractionV3Page() {
         } catch (err: any) {
             console.error(err);
             setStep('upload');
-            setError(err.response?.data?.error || 'Upload failed');
+            setError(getErrorMessage(err, 'Upload failed'));
         }
     };
 
@@ -209,7 +209,7 @@ export default function ExtractionV3Page() {
             navigate(`/exams/${examId}`);
         } catch (err: any) {
             console.error("Import failed:", err);
-            toast.error(`Failed to import: ${err.response?.data?.error || err.message}`);
+            toast.error(`Failed to import: ${getErrorMessage(err, 'Import failed')}`);
         } finally {
             setImporting(false);
         }
@@ -225,7 +225,7 @@ export default function ExtractionV3Page() {
 
     const updateQuestion = async (id: number, data: any) => {
         try {
-            const res = await api.patch(`/questions/extracted-questions/${id}/`, data);
+            await api.patch(`/questions/extracted-questions/${id}/`, data);
             const updatedRes = await api.get(`/questions/extracted-questions/${id}/`);
             setQuestions(prev => prev.map(q => q.id === id ? updatedRes.data : q));
             setEditingQuestion(null);

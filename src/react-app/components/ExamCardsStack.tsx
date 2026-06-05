@@ -261,7 +261,7 @@ function FloatingParticles() {
 
 export default function ExamCardsStack() {
   const [isHovered, setIsHovered] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [, setActiveIndex] = useState(0);
 
   // Auto-rotate cards
   useEffect(() => {
