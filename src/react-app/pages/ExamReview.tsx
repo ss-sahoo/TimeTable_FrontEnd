@@ -246,7 +246,7 @@ const ExamReview: React.FC = () => {
       console.log('Saving feedback:', feedback);
       console.log('Saving marks:', marks);
       // For now, just show success message
-      toast.error('Feedback saved successfully!');
+      toast.success('Feedback saved successfully!');
     } catch (error) {
       console.error('Error saving feedback:', error);
       toast.error('Failed to save feedback');

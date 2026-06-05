@@ -140,6 +140,7 @@ interface ExamFormData {
   is_published: boolean;
   allow_negative_marking: boolean;
   negative_marking_percentage: number;
+  is_flexible: boolean;
   // Exam mode settings
   exam_mode: 'online' | 'offline_omr' | 'offline_subjective' | 'hybrid';
   ai_evaluation_enabled: boolean;
@@ -196,6 +197,7 @@ const getDefaultFormData = (): ExamFormData => ({
   is_published: false,
   allow_negative_marking: false,
   negative_marking_percentage: 25,
+  is_flexible: false,
   // Shuffle settings
   shuffle_questions: false,
   shuffle_within_sections: true,
@@ -273,7 +275,6 @@ export default function ExamCreation() {
 
   const [formData, setFormData] = useState<ExamFormData>(getDefaultFormData());
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
-  const [isFlexibleWindow, setIsFlexibleWindow] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -431,6 +432,7 @@ export default function ExamCreation() {
         batch_ids: exam.allowed_batches_data ? exam.allowed_batches_data.map((b: any) => String(b.id)) : [],
         program_id: exam.program?.id || exam.program || null,
         copy_from_exam_id: null,
+        is_flexible: exam.is_flexible || false,
       });
 
 
@@ -445,13 +447,13 @@ export default function ExamCreation() {
         fetchPublicLinkInfo(examId);
       }
 
-      // If end date is significantly different from start + duration, enable flexible window
-      if (exam.start_date && exam.end_date && exam.duration_minutes) {
+      // If end date is significantly different from start + duration, enable flexible window if not already set
+      if (!exam.is_flexible && exam.start_date && exam.end_date && exam.duration_minutes) {
         const start = new Date(exam.start_date);
         const end = new Date(exam.end_date);
         const diff = (end.getTime() - start.getTime()) / 60000;
         if (Math.abs(diff - exam.duration_minutes) > 1) {
-          setIsFlexibleWindow(true);
+          setFormData(prev => ({ ...prev, is_flexible: true }));
         }
       }
     } catch (error) {
@@ -492,7 +494,7 @@ export default function ExamCreation() {
           duration_minutes: newDuration,
           exam_mode: newMode
         };
-        if (!isFlexibleWindow && prev.start_date) {
+        if (!prev.is_flexible && prev.start_date) {
           const startDate = new Date(prev.start_date);
           const endDate = new Date(startDate.getTime() + newDuration * 60000);
           newData.end_date = formatDateTimeLocal(endDate.toISOString(), prev.timezone);
@@ -768,7 +770,7 @@ export default function ExamCreation() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 pb-32">
-<div className="w-full px-4 sm:px-6 lg:px-8 py-6 pb-28">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-6 pb-28">
 
         <div className="flex items-center gap-3 mb-6">
           <button
@@ -1057,7 +1059,7 @@ export default function ExamCreation() {
                     onChange={(newStartDate) => {
                       setFormData(prev => {
                         const newData = { ...prev, start_date: newStartDate };
-                        if (!isFlexibleWindow && newStartDate && prev.duration_minutes) {
+                        if (!prev.is_flexible && newStartDate && prev.duration_minutes) {
                           const startDate = new Date(newStartDate);
                           const endDate = new Date(startDate.getTime() + prev.duration_minutes * 60000);
                           newData.end_date = formatDateTimeLocal(endDate.toISOString(), prev.timezone);
@@ -1086,7 +1088,7 @@ export default function ExamCreation() {
                       const newDuration = parseInt(e.target.value) || 0;
                       setFormData(prev => {
                         const newData = { ...prev, duration_minutes: newDuration };
-                        if (!isFlexibleWindow && prev.start_date && newDuration) {
+                        if (!prev.is_flexible && prev.start_date && newDuration) {
                           const startDate = new Date(prev.start_date);
                           const endDate = new Date(startDate.getTime() + newDuration * 60000);
                           newData.end_date = formatDateTimeLocal(endDate.toISOString(), prev.timezone);
@@ -1110,10 +1112,10 @@ export default function ExamCreation() {
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={isFlexibleWindow}
+                        checked={formData.is_flexible}
                         onChange={(e) => {
                           const checked = e.target.checked;
-                          setIsFlexibleWindow(checked);
+                          handleInputChange('is_flexible', checked);
                           if (!checked && formData.start_date && formData.duration_minutes) {
                             const startDate = new Date(formData.start_date);
                             const endDate = new Date(startDate.getTime() + formData.duration_minutes * 60000);
@@ -1125,13 +1127,13 @@ export default function ExamCreation() {
                       <span className="text-sm font-medium text-slate-700">Flexible Exam Window</span>
                     </label>
                     <p className="text-xs text-slate-500">
-                      {isFlexibleWindow
+                      {formData.is_flexible
                         ? "Set a custom end date for a wider availability window."
                         : "Exam ends automatically after the duration."}
                     </p>
                   </div>
 
-                  {isFlexibleWindow ? (
+                  {formData.is_flexible ? (
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1">
                         End Date *
@@ -1172,900 +1174,900 @@ export default function ExamCreation() {
                   )}
                 </div>
               </div>
-            </div>
 
-            {/* Exam Visibility Section */}
-            <div className="bg-white rounded-xl border border-slate-200 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <Users className="w-4 h-4 text-indigo-600" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Exam Visibility</h2>
-                  <p className="text-xs text-slate-600">Control which students can see and take this exam</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {/* Visibility Scope Options */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <label className={`flex flex-col p-3 border rounded-xl cursor-pointer transition-all ${formData.visibility_scope === 'institute' ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'}`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold text-slate-900">Institute-Wide</span>
-                      <input
-                        type="radio"
-                        name="visibility_scope"
-                        checked={formData.visibility_scope === 'institute'}
-                        onChange={() => handleInputChange('visibility_scope', 'institute')}
-                        className="w-4 h-4 text-indigo-600"
-                      />
-                    </div>
-                    <p className="text-[10px] text-slate-500">All students in your institute can take this exam.</p>
-                  </label>
-
-                  <label className={`flex flex-col p-3 border rounded-xl cursor-pointer transition-all ${formData.visibility_scope === 'centers' ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'}`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold text-slate-900">Specific Centers</span>
-                      <input
-                        type="radio"
-                        name="visibility_scope"
-                        checked={formData.visibility_scope === 'centers'}
-                        onChange={() => handleInputChange('visibility_scope', 'centers')}
-                        className="w-4 h-4 text-indigo-600"
-                      />
-                    </div>
-                    <p className="text-[10px] text-slate-500">Only students in selected centers can take this exam.</p>
-                  </label>
-
-                  <label className={`flex flex-col p-3 border rounded-xl cursor-pointer transition-all ${formData.visibility_scope === 'batches' ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'}`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold text-slate-900">Specific Batches</span>
-                      <input
-                        type="radio"
-                        name="visibility_scope"
-                        checked={formData.visibility_scope === 'batches'}
-                        onChange={() => handleInputChange('visibility_scope', 'batches')}
-                        className="w-4 h-4 text-indigo-600"
-                      />
-                    </div>
-                    <p className="text-[10px] text-slate-500">Only students in selected batches can take this exam.</p>
-                  </label>
-
-                  <label className={`flex flex-col p-3 border rounded-xl cursor-pointer transition-all ${formData.visibility_scope === 'program' ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'}`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold text-slate-900">Specific Program</span>
-                      <input
-                        type="radio"
-                        name="visibility_scope"
-                        checked={formData.visibility_scope === 'program'}
-                        onChange={() => handleInputChange('visibility_scope', 'program')}
-                        className="w-4 h-4 text-indigo-600"
-                      />
-                    </div>
-                    <p className="text-[10px] text-slate-500">Only students in the selected program can take this exam.</p>
-                  </label>
-                </div>
-
-                {/* Center Selection (shown when centers scope is selected) */}
-                {formData.visibility_scope === 'centers' && (
-                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <p className="text-xs font-medium text-slate-700 mb-2">Select Centers:</p>
-                    {centers.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic">No centers available</p>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                        {centers.map((center) => (
-                          <label key={center.id} className="flex items-center gap-2 p-2 rounded border border-slate-100 bg-white hover:bg-indigo-50 cursor-pointer transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={formData.center_ids.includes(String(center.id))}
-                              onChange={(e) => {
-                                const centerId = String(center.id);
-                                if (e.target.checked) {
-                                  handleInputChange('center_ids', [...formData.center_ids, centerId]);
-                                } else {
-                                  handleInputChange('center_ids', formData.center_ids.filter((id: string) => id !== centerId));
-                                }
-                              }}
-                              className="rounded text-indigo-600"
-                            />
-                            <span className="text-xs font-medium text-slate-700">{center.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    {errors.visibility_scope && formData.visibility_scope === 'centers' && (
-                      <p className="text-red-600 text-[10px] mt-2 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" /> {errors.visibility_scope}
-                      </p>
-                    )}
+              {/* Exam Visibility Section */}
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                    <Users className="w-4 h-4 text-indigo-600" />
                   </div>
-                )}
-
-                {/* Batch Selection (shown when batches scope is selected) */}
-                {formData.visibility_scope === 'batches' && (
-                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <p className="text-xs font-medium text-slate-700 mb-2">Select Batches:</p>
-                    {batches.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic">No batches available</p>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                        {batches.map((batch) => (
-                          <label key={batch.id} className="flex items-center gap-2 p-2 rounded border border-slate-100 bg-white hover:bg-indigo-50 cursor-pointer transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={formData.batch_ids.includes(String(batch.id))}
-                              onChange={(e) => {
-                                const batchId = String(batch.id);
-                                if (e.target.checked) {
-                                  handleInputChange('batch_ids', [...formData.batch_ids, batchId]);
-                                } else {
-                                  handleInputChange('batch_ids', formData.batch_ids.filter((id: string) => id !== batchId));
-                                }
-                              }}
-                              className="rounded text-indigo-600"
-                            />
-                            <div>
-                              <span className="text-xs font-medium text-slate-700">{batch.name}</span>
-                              <span className="text-[10px] text-slate-400 ml-1">({batch.code})</span>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    {errors.visibility_scope && formData.visibility_scope === 'batches' && (
-                      <p className="text-red-600 text-[10px] mt-2 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" /> {errors.visibility_scope}
-                      </p>
-                    )}
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Exam Visibility</h2>
+                    <p className="text-xs text-slate-600">Control which students can see and take this exam</p>
                   </div>
-                )}
+                </div>
 
-                {/* Program Selection (shown when program scope is selected) */}
-                {formData.visibility_scope === 'program' && (
-                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <p className="text-xs font-medium text-slate-700 mb-2">Select Program:</p>
-                    {programs.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic">No programs available</p>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                        {programs.map((program) => (
-                          <label key={program.id} className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-all ${String(formData.program_id) === String(program.id) ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 bg-white hover:bg-slate-50'}`}>
-                            <input
-                              type="radio"
-                              name="program_selection"
-                              checked={String(formData.program_id) === String(program.id)}
-                              onChange={() => handleInputChange('program_id', program.id)}
-                              className="w-3 h-3 text-indigo-600"
-                            />
-                            <div>
-                              <span className="text-xs font-medium text-slate-700">{program.name}</span>
-                              {program.category && (
-                                <span className="text-[10px] text-slate-400 ml-1">({program.category})</span>
-                              )}
-                            </div>
-                          </label>
-                        ))}
+                <div className="space-y-4">
+                  {/* Visibility Scope Options */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <label className={`flex flex-col p-3 border rounded-xl cursor-pointer transition-all ${formData.visibility_scope === 'institute' ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold text-slate-900">Institute-Wide</span>
+                        <input
+                          type="radio"
+                          name="visibility_scope"
+                          checked={formData.visibility_scope === 'institute'}
+                          onChange={() => handleInputChange('visibility_scope', 'institute')}
+                          className="w-4 h-4 text-indigo-600"
+                        />
                       </div>
-                    )}
-                    {errors.visibility_scope && formData.visibility_scope === 'program' && (
-                      <p className="text-red-600 text-[10px] mt-2 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" /> {errors.visibility_scope}
-                      </p>
-                    )}
+                      <p className="text-[10px] text-slate-500">All students in your institute can take this exam.</p>
+                    </label>
+
+                    <label className={`flex flex-col p-3 border rounded-xl cursor-pointer transition-all ${formData.visibility_scope === 'centers' ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold text-slate-900">Specific Centers</span>
+                        <input
+                          type="radio"
+                          name="visibility_scope"
+                          checked={formData.visibility_scope === 'centers'}
+                          onChange={() => handleInputChange('visibility_scope', 'centers')}
+                          className="w-4 h-4 text-indigo-600"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-500">Only students in selected centers can take this exam.</p>
+                    </label>
+
+                    <label className={`flex flex-col p-3 border rounded-xl cursor-pointer transition-all ${formData.visibility_scope === 'batches' ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold text-slate-900">Specific Batches</span>
+                        <input
+                          type="radio"
+                          name="visibility_scope"
+                          checked={formData.visibility_scope === 'batches'}
+                          onChange={() => handleInputChange('visibility_scope', 'batches')}
+                          className="w-4 h-4 text-indigo-600"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-500">Only students in selected batches can take this exam.</p>
+                    </label>
+
+                    <label className={`flex flex-col p-3 border rounded-xl cursor-pointer transition-all ${formData.visibility_scope === 'program' ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold text-slate-900">Specific Program</span>
+                        <input
+                          type="radio"
+                          name="visibility_scope"
+                          checked={formData.visibility_scope === 'program'}
+                          onChange={() => handleInputChange('visibility_scope', 'program')}
+                          className="w-4 h-4 text-indigo-600"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-500">Only students in the selected program can take this exam.</p>
+                    </label>
                   </div>
-                )}
-              </div>
-            </div>
 
+                  {/* Center Selection (shown when centers scope is selected) */}
+                  {formData.visibility_scope === 'centers' && (
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <p className="text-xs font-medium text-slate-700 mb-2">Select Centers:</p>
+                      {centers.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic">No centers available</p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                          {centers.map((center) => (
+                            <label key={center.id} className="flex items-center gap-2 p-2 rounded border border-slate-100 bg-white hover:bg-indigo-50 cursor-pointer transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={formData.center_ids.includes(String(center.id))}
+                                onChange={(e) => {
+                                  const centerId = String(center.id);
+                                  if (e.target.checked) {
+                                    handleInputChange('center_ids', [...formData.center_ids, centerId]);
+                                  } else {
+                                    handleInputChange('center_ids', formData.center_ids.filter((id: string) => id !== centerId));
+                                  }
+                                }}
+                                className="rounded text-indigo-600"
+                              />
+                              <span className="text-xs font-medium text-slate-700">{center.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      {errors.visibility_scope && formData.visibility_scope === 'centers' && (
+                        <p className="text-red-600 text-[10px] mt-2 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> {errors.visibility_scope}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
+                  {/* Batch Selection (shown when batches scope is selected) */}
+                  {formData.visibility_scope === 'batches' && (
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <p className="text-xs font-medium text-slate-700 mb-2">Select Batches:</p>
+                      {batches.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic">No batches available</p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                          {batches.map((batch) => (
+                            <label key={batch.id} className="flex items-center gap-2 p-2 rounded border border-slate-100 bg-white hover:bg-indigo-50 cursor-pointer transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={formData.batch_ids.includes(String(batch.id))}
+                                onChange={(e) => {
+                                  const batchId = String(batch.id);
+                                  if (e.target.checked) {
+                                    handleInputChange('batch_ids', [...formData.batch_ids, batchId]);
+                                  } else {
+                                    handleInputChange('batch_ids', formData.batch_ids.filter((id: string) => id !== batchId));
+                                  }
+                                }}
+                                className="rounded text-indigo-600"
+                              />
+                              <div>
+                                <span className="text-xs font-medium text-slate-700">{batch.name}</span>
+                                <span className="text-[10px] text-slate-400 ml-1">({batch.code})</span>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      {errors.visibility_scope && formData.visibility_scope === 'batches' && (
+                        <p className="text-red-600 text-[10px] mt-2 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> {errors.visibility_scope}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-
-            {/* Exam Settings */}
-            <div className="bg-white rounded-xl border border-slate-200 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                  <Settings className="w-4 h-4 text-green-600" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Exam Settings</h2>
-                  <p className="text-xs text-slate-600">Configure exam behavior and rules</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-              
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Passing Marks (%) *</label>
-                  <input
-                    type="number"
-                    value={formData.passing_marks}
-                    onChange={(e) => handleInputChange('passing_marks', parseInt(e.target.value) || 0)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.passing_marks ? 'border-red-300' : 'border-slate-300'
-                      }`}
-                    min="0"
-                    max="100"
-                  />
-                  {errors.passing_marks && (
-                    <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" /> {errors.passing_marks}
-                    </p>
+                  {/* Program Selection (shown when program scope is selected) */}
+                  {formData.visibility_scope === 'program' && (
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <p className="text-xs font-medium text-slate-700 mb-2">Select Program:</p>
+                      {programs.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic">No programs available</p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                          {programs.map((program) => (
+                            <label key={program.id} className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-all ${String(formData.program_id) === String(program.id) ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 bg-white hover:bg-slate-50'}`}>
+                              <input
+                                type="radio"
+                                name="program_selection"
+                                checked={String(formData.program_id) === String(program.id)}
+                                onChange={() => handleInputChange('program_id', program.id)}
+                                className="w-3 h-3 text-indigo-600"
+                              />
+                              <div>
+                                <span className="text-xs font-medium text-slate-700">{program.name}</span>
+                                {program.category && (
+                                  <span className="text-[10px] text-slate-400 ml-1">({program.category})</span>
+                                )}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      {errors.visibility_scope && formData.visibility_scope === 'program' && (
+                        <p className="text-red-600 text-[10px] mt-2 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> {errors.visibility_scope}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
 
-            </div>
 
-            {/* Security & Proctoring Settings */}
-            <div className="bg-white rounded-xl border border-slate-200 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-                  <Settings className="w-4 h-4 text-red-600" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Security & Proctoring</h2>
-                  <p className="text-xs text-slate-600">Configure exam security settings</p>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center justify-between">
+
+              {/* Exam Settings */}
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                    <Settings className="w-4 h-4 text-green-600" />
+                  </div>
                   <div>
-                    <label className="text-xs font-medium text-slate-700">Require Fullscreen</label>
-                    <p className="text-xs text-slate-500">Force fullscreen mode during exam</p>
+                    <h2 className="text-lg font-semibold text-slate-900">Exam Settings</h2>
+                    <p className="text-xs text-slate-600">Configure exam behavior and rules</p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.require_fullscreen}
-                      onChange={(e) => handleInputChange('require_fullscreen', e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+
+
                   <div>
-                    <label className="text-xs font-medium text-slate-700">Disable Copy/Paste</label>
-                    <p className="text-xs text-slate-500">Prevent copy and paste actions</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Passing Marks (%) *</label>
                     <input
-                      type="checkbox"
-                      checked={formData.disable_copy_paste}
-                      onChange={(e) => handleInputChange('disable_copy_paste', e.target.checked)}
-                      className="sr-only peer"
+                      type="number"
+                      value={formData.passing_marks}
+                      onChange={(e) => handleInputChange('passing_marks', parseInt(e.target.value) || 0)}
+                      className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.passing_marks ? 'border-red-300' : 'border-slate-300'
+                        }`}
+                      min="0"
+                      max="100"
                     />
-                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-xs font-medium text-slate-700">Disable Right Click</label>
-                    <p className="text-xs text-slate-500">Prevent right-click context menu</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.disable_right_click}
-                      onChange={(e) => handleInputChange('disable_right_click', e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-xs font-medium text-slate-700">Webcam Proctoring</label>
-                    <p className="text-xs text-slate-500">Monitor students via webcam</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.enable_webcam_proctoring}
-                      onChange={(e) => handleInputChange('enable_webcam_proctoring', e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-xs font-medium text-slate-700">Allow Tab Switching</label>
-                    <p className="text-xs text-slate-500">Allow switching between browser tabs</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.allow_tab_switching}
-                      onChange={(e) => handleInputChange('allow_tab_switching', e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Advanced Settings */}
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setAdvancedExpanded((prev) => !prev)}
-                className="w-full flex items-center justify-between px-4 py-3 text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-50"
-                aria-expanded={advancedExpanded}
-              >
-                <span className="flex items-center gap-3">
-                  <span className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <Settings className="w-4 h-4 text-purple-600" />
-                  </span>
-                  <span>
-                    <span className="block text-lg font-semibold text-slate-900">Advanced Settings</span>
-                    <span className="block text-xs text-slate-600">Configure advanced exam options</span>
-                  </span>
-                </span>
-                <ChevronDown
-                  className={`w-5 h-5 text-slate-500 transition-transform ${advancedExpanded ? 'rotate-180' : ''
-                    }`}
-                />
-              </button>
-
-              {advancedExpanded && (
-                <div className="px-4 pb-4 pt-3 space-y-4 border-t border-slate-100 bg-white">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">Timezone</label>
-                      <select
-                        value={formData.timezone}
-                        onChange={(e) => handleInputChange('timezone', e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      >
-                        {timezones.map((tz) => (
-                          <option key={tz} value={tz}>
-                            {tz.replace(/_/g, ' ')}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">Grace Period (minutes)</label>
-                      <input
-                        type="number"
-                        value={formData.grace_period_minutes}
-                        onChange={(e) => handleInputChange('grace_period_minutes', parseInt(e.target.value) || 0)}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                        min="0"
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Extra time after end date</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">Buffer Time (minutes)</label>
-                      <input
-                        type="number"
-                        value={formData.buffer_time_minutes}
-                        onChange={(e) => handleInputChange('buffer_time_minutes', parseInt(e.target.value) || 15)}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                        min="0"
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Time before exam starts when students can access</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">Late Submission Penalty (%)</label>
-                      <input
-                        type="number"
-                        value={formData.late_submission_penalty}
-                        onChange={(e) => handleInputChange('late_submission_penalty', parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Penalty for late submissions</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-xs font-medium text-slate-700">Auto Start</label>
-                        <p className="text-xs text-slate-500">Automatically start exam at start time</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.auto_start}
-                          onChange={(e) => handleInputChange('auto_start', e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-xs font-medium text-slate-700">Auto End</label>
-                        <p className="text-xs text-slate-500">Automatically end exam at end time</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.auto_end}
-                          onChange={(e) => handleInputChange('auto_end', e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-xs font-medium text-slate-700">Allow Late Submission</label>
-                        <p className="text-xs text-slate-500">Allow submissions after end time</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.allow_late_submission}
-                          onChange={(e) => handleInputChange('allow_late_submission', e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-xs font-medium text-slate-700">Public Exam</label>
-                        <p className="text-xs text-slate-500">Allow any student to access</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.is_public}
-                          onChange={(e) => handleInputChange('is_public', e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-100 space-y-3">
-                    <h4 className="text-xs font-semibold text-slate-700 mb-2">Question Shuffling</h4>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-xs font-medium text-slate-700">Enable Shuffling</label>
-                        <p className="text-xs text-slate-500">Master toggle for question shuffling</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.shuffle_questions}
-                          onChange={(e) => handleInputChange('shuffle_questions', e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-
-                    {formData.shuffle_questions && (
-                      <div className="ml-4 pl-4 border-l-2 border-blue-200 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <label className="text-xs font-medium text-slate-700">Shuffle Within Sections</label>
-                            <p className="text-xs text-slate-500">Randomize questions within each section</p>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={formData.shuffle_within_sections}
-                              onChange={(e) => handleInputChange('shuffle_within_sections', e.target.checked)}
-                              className="sr-only peer"
-                            />
-                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                          </label>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <label className="text-xs font-medium text-slate-700">Shuffle Sections</label>
-                            <p className="text-xs text-slate-500">Randomize the order of sections</p>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={formData.shuffle_sections}
-                              onChange={(e) => handleInputChange('shuffle_sections', e.target.checked)}
-                              className="sr-only peer"
-                            />
-                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                          </label>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <label className="text-xs font-medium text-slate-700">Shuffle Subjects</label>
-                            <p className="text-xs text-slate-500">Randomize the order of subjects</p>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={formData.shuffle_subjects}
-                              onChange={(e) => handleInputChange('shuffle_subjects', e.target.checked)}
-                              className="sr-only peer"
-                            />
-                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                          </label>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <label className="text-xs font-medium text-slate-700">Shuffle Options</label>
-                            <p className="text-xs text-slate-500">Randomize MCQ answer options</p>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={formData.shuffle_options}
-                              onChange={(e) => handleInputChange('shuffle_options', e.target.checked)}
-                              className="sr-only peer"
-                            />
-                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                          </label>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <label className="text-xs font-medium text-slate-700">Unique Order Per Student</label>
-                            <p className="text-xs text-slate-500">Each student gets a different shuffle order</p>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={formData.shuffle_seed_per_student}
-                              onChange={(e) => handleInputChange('shuffle_seed_per_student', e.target.checked)}
-                              className="sr-only peer"
-                            />
-                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                          </label>
-                        </div>
-                      </div>
+                    {errors.passing_marks && (
+                      <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> {errors.passing_marks}
+                      </p>
                     )}
+                  </div>
+                </div>
 
-                    <div className="flex items-center justify-between">
+              </div>
+
+              {/* Security & Proctoring Settings */}
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                    <Settings className="w-4 h-4 text-red-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Security & Proctoring</h2>
+                    <p className="text-xs text-slate-600">Configure exam security settings</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-xs font-medium text-slate-700">Require Fullscreen</label>
+                      <p className="text-xs text-slate-500">Force fullscreen mode during exam</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.require_fullscreen}
+                        onChange={(e) => handleInputChange('require_fullscreen', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-xs font-medium text-slate-700">Disable Copy/Paste</label>
+                      <p className="text-xs text-slate-500">Prevent copy and paste actions</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.disable_copy_paste}
+                        onChange={(e) => handleInputChange('disable_copy_paste', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-xs font-medium text-slate-700">Disable Right Click</label>
+                      <p className="text-xs text-slate-500">Prevent right-click context menu</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.disable_right_click}
+                        onChange={(e) => handleInputChange('disable_right_click', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-xs font-medium text-slate-700">Webcam Proctoring</label>
+                      <p className="text-xs text-slate-500">Monitor students via webcam</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.enable_webcam_proctoring}
+                        onChange={(e) => handleInputChange('enable_webcam_proctoring', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-xs font-medium text-slate-700">Allow Tab Switching</label>
+                      <p className="text-xs text-slate-500">Allow switching between browser tabs</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.allow_tab_switching}
+                        onChange={(e) => handleInputChange('allow_tab_switching', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Advanced Settings */}
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setAdvancedExpanded((prev) => !prev)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-50"
+                  aria-expanded={advancedExpanded}
+                >
+                  <span className="flex items-center gap-3">
+                    <span className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <Settings className="w-4 h-4 text-purple-600" />
+                    </span>
+                    <span>
+                      <span className="block text-lg font-semibold text-slate-900">Advanced Settings</span>
+                      <span className="block text-xs text-slate-600">Configure advanced exam options</span>
+                    </span>
+                  </span>
+                  <ChevronDown
+                    className={`w-5 h-5 text-slate-500 transition-transform ${advancedExpanded ? 'rotate-180' : ''
+                      }`}
+                  />
+                </button>
+
+                {advancedExpanded && (
+                  <div className="px-4 pb-4 pt-3 space-y-4 border-t border-slate-100 bg-white">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-xs font-medium text-slate-700">Delay Results Display</label>
-                        <p className="text-xs text-slate-500">Only show scores after the exam ends</p>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">Timezone</label>
+                        <select
+                          value={formData.timezone}
+                          onChange={(e) => handleInputChange('timezone', e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                        >
+                          {timezones.map((tz) => (
+                            <option key={tz} value={tz}>
+                              {tz.replace(/_/g, ' ')}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">Grace Period (minutes)</label>
                         <input
-                          type="checkbox"
-                          checked={formData.show_result_after_exam_end}
-                          onChange={(e) => handleInputChange('show_result_after_exam_end', e.target.checked)}
-                          className="sr-only peer"
+                          type="number"
+                          value={formData.grace_period_minutes}
+                          onChange={(e) => handleInputChange('grace_period_minutes', parseInt(e.target.value) || 0)}
+                          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                          min="0"
                         />
-                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
+                        <p className="text-xs text-slate-500 mt-1">Extra time after end date</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">Buffer Time (minutes)</label>
+                        <input
+                          type="number"
+                          value={formData.buffer_time_minutes}
+                          onChange={(e) => handleInputChange('buffer_time_minutes', parseInt(e.target.value) || 15)}
+                          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                          min="0"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Time before exam starts when students can access</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">Late Submission Penalty (%)</label>
+                        <input
+                          type="number"
+                          value={formData.late_submission_penalty}
+                          onChange={(e) => handleInputChange('late_submission_penalty', parseFloat(e.target.value) || 0)}
+                          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Penalty for late submissions</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-medium text-slate-700">Auto Start</label>
+                          <p className="text-xs text-slate-500">Automatically start exam at start time</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.auto_start}
+                            onChange={(e) => handleInputChange('auto_start', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-medium text-slate-700">Auto End</label>
+                          <p className="text-xs text-slate-500">Automatically end exam at end time</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.auto_end}
+                            onChange={(e) => handleInputChange('auto_end', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-medium text-slate-700">Allow Late Submission</label>
+                          <p className="text-xs text-slate-500">Allow submissions after end time</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.allow_late_submission}
+                            onChange={(e) => handleInputChange('allow_late_submission', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-medium text-slate-700">Public Exam</label>
+                          <p className="text-xs text-slate-500">Allow any student to access</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.is_public}
+                            onChange={(e) => handleInputChange('is_public', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 space-y-3">
+                      <h4 className="text-xs font-semibold text-slate-700 mb-2">Question Shuffling</h4>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-medium text-slate-700">Enable Shuffling</label>
+                          <p className="text-xs text-slate-500">Master toggle for question shuffling</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.shuffle_questions}
+                            onChange={(e) => handleInputChange('shuffle_questions', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+
+                      {formData.shuffle_questions && (
+                        <div className="ml-4 pl-4 border-l-2 border-blue-200 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <label className="text-xs font-medium text-slate-700">Shuffle Within Sections</label>
+                              <p className="text-xs text-slate-500">Randomize questions within each section</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={formData.shuffle_within_sections}
+                                onChange={(e) => handleInputChange('shuffle_within_sections', e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <label className="text-xs font-medium text-slate-700">Shuffle Sections</label>
+                              <p className="text-xs text-slate-500">Randomize the order of sections</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={formData.shuffle_sections}
+                                onChange={(e) => handleInputChange('shuffle_sections', e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <label className="text-xs font-medium text-slate-700">Shuffle Subjects</label>
+                              <p className="text-xs text-slate-500">Randomize the order of subjects</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={formData.shuffle_subjects}
+                                onChange={(e) => handleInputChange('shuffle_subjects', e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <label className="text-xs font-medium text-slate-700">Shuffle Options</label>
+                              <p className="text-xs text-slate-500">Randomize MCQ answer options</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={formData.shuffle_options}
+                                onChange={(e) => handleInputChange('shuffle_options', e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <label className="text-xs font-medium text-slate-700">Unique Order Per Student</label>
+                              <p className="text-xs text-slate-500">Each student gets a different shuffle order</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={formData.shuffle_seed_per_student}
+                                onChange={(e) => handleInputChange('shuffle_seed_per_student', e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-medium text-slate-700">Delay Results Display</label>
+                          <p className="text-xs text-slate-500">Only show scores after the exam ends</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.show_result_after_exam_end}
+                            onChange={(e) => handleInputChange('show_result_after_exam_end', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
                     </div>
                   </div>
+                )}
+              </div>
+
+              {formData.is_public && (
+                <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="flex flex-col gap-2 mb-3">
+                    <h3 className="text-sm font-semibold text-blue-900">Public Access Link</h3>
+                    <p className="text-xs text-blue-700">Share this link with students who should access the exam without logging in.</p>
+                    {publicLinkError && (
+                      <span className="text-xs text-red-600">{publicLinkError}</span>
+                    )}
+                    {publicLinkCopyMessage && (
+                      <span className="text-xs text-green-700">{publicLinkCopyMessage}</span>
+                    )}
+                  </div>
+
+                  {isEditMode ? (
+                    examId ? (
+                      <div className="space-y-4">
+                        {publicLinkLoading && (
+                          <p className="text-xs text-blue-700">Loading public link details...</p>
+                        )}
+
+                        {publicLinkInfo && !publicLinkLoading && (
+                          <div className="space-y-4">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                              <div className="flex-1">
+                                <p className="text-xs font-medium text-slate-600">Shareable URL</p>
+                                <p className="text-sm font-semibold text-blue-900 break-all">{normalizeShareUrl(publicLinkInfo.share_url)}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={handleCopyPublicLink}
+                                  className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                                >
+                                  Copy Link
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleRegeneratePublicLink}
+                                  disabled={publicLinkLoading}
+                                  className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-60"
+                                >
+                                  {publicLinkLoading ? 'Regenerating…' : 'Regenerate'}
+                                </button>
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">Link Expiry</label>
+                              <DateTimeInput
+                                value={formData.public_token_expires_at}
+                                onChange={(v) => handleInputChange('public_token_expires_at', v)}
+                                className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                              />
+                              <p className="text-xs text-slate-500 mt-1">Leave blank for no expiration.</p>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <input
+                                id="public-allow-multiple-devices"
+                                type="checkbox"
+                                checked={formData.public_allow_multiple_devices}
+                                onChange={(e) => handleInputChange('public_allow_multiple_devices', e.target.checked)}
+                                className="w-4 h-4 text-blue-600 border-blue-200 rounded focus:ring-blue-500"
+                              />
+                              <label htmlFor="public-allow-multiple-devices" className="text-xs text-slate-600">
+                                Allow access from multiple devices
+                              </label>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={handleSavePublicLink}
+                                disabled={publicLinkLoading}
+                                className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60"
+                              >
+                                {publicLinkLoading ? 'Saving…' : 'Save Access Settings'}
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs text-slate-600">
+                              <div>
+                                <p className="font-medium text-slate-700">Link Created</p>
+                                <p>{formatDateTimeDisplay(publicLinkInfo.created_at)}</p>
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-700">Last Used</p>
+                                <p>{formatDateTimeDisplay(publicLinkInfo.last_used_at)}</p>
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-700">Usage Count</p>
+                                <p>{publicLinkInfo.usage_count}</p>
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-700">Status</p>
+                                <p className={publicLinkInfo.is_expired ? 'text-red-600 font-medium' : 'text-green-600 font-medium'}>
+                                  {publicLinkInfo.is_expired ? 'Expired' : 'Active'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {publicLinkInfo.recent_logs && publicLinkInfo.recent_logs.length > 0 && (
+                              <div className="pt-3 border-t border-blue-200">
+                                <p className="text-xs font-semibold text-slate-700 mb-2">Recent Access</p>
+                                <div className="space-y-2">
+                                  {publicLinkInfo.recent_logs.map((log, index) => (
+                                    <div key={`${log.accessed_at}-${index}`} className="text-xs text-slate-600 flex flex-wrap gap-2">
+                                      <span className="font-medium text-slate-700">{formatDateTimeDisplay(log.accessed_at)}</span>
+                                      <span>• {log.status === 'granted' ? 'Granted' : 'Denied'}</span>
+                                      {log.student_email && <span>• {log.student_email}</span>}
+                                      {log.ip_address && <span>• {log.ip_address}</span>}
+                                      {log.reason && <span className="text-slate-500">({log.reason})</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {!publicLinkInfo && !publicLinkLoading && (
+                          <p className="text-xs text-slate-600">Public link details will appear here once generated.</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-600">Save the exam to generate a shareable public link.</p>
+                    )
+                  ) : (
+                    <p className="text-xs text-slate-600">
+                      Create the exam to generate a shareable public link. After saving you'll be redirected here with the link ready to share.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
 
-            {formData.is_public && (
-              <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4">
-                <div className="flex flex-col gap-2 mb-3">
-                  <h3 className="text-sm font-semibold text-blue-900">Public Access Link</h3>
-                  <p className="text-xs text-blue-700">Share this link with students who should access the exam without logging in.</p>
-                  {publicLinkError && (
-                    <span className="text-xs text-red-600">{publicLinkError}</span>
-                  )}
-                  {publicLinkCopyMessage && (
-                    <span className="text-xs text-green-700">{publicLinkCopyMessage}</span>
-                  )}
-                </div>
-
-                {isEditMode ? (
-                  examId ? (
-                    <div className="space-y-4">
-                      {publicLinkLoading && (
-                        <p className="text-xs text-blue-700">Loading public link details...</p>
-                      )}
-
-                      {publicLinkInfo && !publicLinkLoading && (
-                        <div className="space-y-4">
-                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                            <div className="flex-1">
-                              <p className="text-xs font-medium text-slate-600">Shareable URL</p>
-                              <p className="text-sm font-semibold text-blue-900 break-all">{normalizeShareUrl(publicLinkInfo.share_url)}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={handleCopyPublicLink}
-                                className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                              >
-                                Copy Link
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleRegeneratePublicLink}
-                                disabled={publicLinkLoading}
-                                className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-60"
-                              >
-                                {publicLinkLoading ? 'Regenerating…' : 'Regenerate'}
-                              </button>
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Link Expiry</label>
-                            <DateTimeInput
-                              value={formData.public_token_expires_at}
-                              onChange={(v) => handleInputChange('public_token_expires_at', v)}
-                              className="px-3 py-2 text-sm border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                            />
-                            <p className="text-xs text-slate-500 mt-1">Leave blank for no expiration.</p>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <input
-                              id="public-allow-multiple-devices"
-                              type="checkbox"
-                              checked={formData.public_allow_multiple_devices}
-                              onChange={(e) => handleInputChange('public_allow_multiple_devices', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 border-blue-200 rounded focus:ring-blue-500"
-                            />
-                            <label htmlFor="public-allow-multiple-devices" className="text-xs text-slate-600">
-                              Allow access from multiple devices
-                            </label>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={handleSavePublicLink}
-                              disabled={publicLinkLoading}
-                              className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60"
-                            >
-                              {publicLinkLoading ? 'Saving…' : 'Save Access Settings'}
-                            </button>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs text-slate-600">
-                            <div>
-                              <p className="font-medium text-slate-700">Link Created</p>
-                              <p>{formatDateTimeDisplay(publicLinkInfo.created_at)}</p>
-                            </div>
-                            <div>
-                              <p className="font-medium text-slate-700">Last Used</p>
-                              <p>{formatDateTimeDisplay(publicLinkInfo.last_used_at)}</p>
-                            </div>
-                            <div>
-                              <p className="font-medium text-slate-700">Usage Count</p>
-                              <p>{publicLinkInfo.usage_count}</p>
-                            </div>
-                            <div>
-                              <p className="font-medium text-slate-700">Status</p>
-                              <p className={publicLinkInfo.is_expired ? 'text-red-600 font-medium' : 'text-green-600 font-medium'}>
-                                {publicLinkInfo.is_expired ? 'Expired' : 'Active'}
-                              </p>
-                            </div>
-                          </div>
-
-                          {publicLinkInfo.recent_logs && publicLinkInfo.recent_logs.length > 0 && (
-                            <div className="pt-3 border-t border-blue-200">
-                              <p className="text-xs font-semibold text-slate-700 mb-2">Recent Access</p>
-                              <div className="space-y-2">
-                                {publicLinkInfo.recent_logs.map((log, index) => (
-                                  <div key={`${log.accessed_at}-${index}`} className="text-xs text-slate-600 flex flex-wrap gap-2">
-                                    <span className="font-medium text-slate-700">{formatDateTimeDisplay(log.accessed_at)}</span>
-                                    <span>• {log.status === 'granted' ? 'Granted' : 'Denied'}</span>
-                                    {log.student_email && <span>• {log.student_email}</span>}
-                                    {log.ip_address && <span>• {log.ip_address}</span>}
-                                    {log.reason && <span className="text-slate-500">({log.reason})</span>}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {!publicLinkInfo && !publicLinkLoading && (
-                        <p className="text-xs text-slate-600">Public link details will appear here once generated.</p>
-                      )}
+            {/* Sidebar - Takes 1 column */}
+            <div className="space-y-4">
+              {/* Exam Summary */}
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">Exam Summary</h3>
+                <div className="space-y-3">
+                  {isEditMode && (
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <Info className="w-3 h-3 text-slate-400" />
+                        <span className="text-xs text-slate-600">Status</span>
+                      </div>
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${formData.status === 'published'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-slate-100 text-slate-700'
+                        }`}>
+                        {formData.status === 'published' ? 'Published' : 'Draft'}
+                      </span>
                     </div>
-                  ) : (
-                    <p className="text-xs text-slate-600">Save the exam to generate a shareable public link.</p>
-                  )
-                ) : (
-                  <p className="text-xs text-slate-600">
-                    Create the exam to generate a shareable public link. After saving you'll be redirected here with the link ready to share.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Sidebar - Takes 1 column */}
-          <div className="space-y-4">
-            {/* Exam Summary */}
-            <div className="bg-white rounded-xl border border-slate-200 p-4">
-              <h3 className="text-sm font-semibold text-slate-900 mb-3">Exam Summary</h3>
-              <div className="space-y-3">
-                {isEditMode && (
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                  )}
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Info className="w-3 h-3 text-slate-400" />
-                      <span className="text-xs text-slate-600">Status</span>
+                      <BookOpen className="w-3 h-3 text-slate-400" />
+                      <span className="text-xs text-slate-600">Pattern</span>
                     </div>
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${formData.status === 'published'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-slate-100 text-slate-700'
-                      }`}>
-                      {formData.status === 'published' ? 'Published' : 'Draft'}
+                    <span className="text-xs font-medium text-slate-900">
+                      {selectedPattern ? selectedPattern.name : 'Not selected'}
                     </span>
                   </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="w-3 h-3 text-slate-400" />
-                    <span className="text-xs text-slate-600">Pattern</span>
-                  </div>
-                  <span className="text-xs font-medium text-slate-900">
-                    {selectedPattern ? selectedPattern.name : 'Not selected'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-3 h-3 text-slate-400" />
-                    <span className="text-xs text-slate-600">Duration</span>
-                  </div>
-                  <span className="text-xs font-medium text-slate-900">{formData.duration_minutes} min</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-3 h-3 text-slate-400" />
-                    <span className="text-xs text-slate-600">Max Attempts</span>
-                  </div>
-                  <span className="text-xs font-medium text-slate-900">{formData.max_attempts}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-3 h-3 text-slate-400" />
-                    <span className="text-xs text-slate-600">Passing Marks</span>
-                  </div>
-                  <span className="text-xs font-medium text-slate-900">{formData.passing_marks}%</span>
-                </div>
-                {selectedPattern && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="w-3 h-3 text-slate-400" />
-                        <span className="text-xs text-slate-600">Total Questions</span>
-                      </div>
-                      <span className="text-xs font-medium text-slate-900">{selectedPattern.total_questions}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-3 h-3 text-slate-400" />
+                      <span className="text-xs text-slate-600">Duration</span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="w-3 h-3 text-slate-400" />
-                        <span className="text-xs text-slate-600">Total Marks</span>
-                      </div>
-                      <span className="text-xs font-medium text-slate-900">{selectedPattern.total_marks}</span>
+                    <span className="text-xs font-medium text-slate-900">{formData.duration_minutes} min</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-3 h-3 text-slate-400" />
+                      <span className="text-xs text-slate-600">Max Attempts</span>
                     </div>
-                  </>
-                )}
+                    <span className="text-xs font-medium text-slate-900">{formData.max_attempts}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-3 h-3 text-slate-400" />
+                      <span className="text-xs text-slate-600">Passing Marks</span>
+                    </div>
+                    <span className="text-xs font-medium text-slate-900">{formData.passing_marks}%</span>
+                  </div>
+                  {selectedPattern && (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="w-3 h-3 text-slate-400" />
+                          <span className="text-xs text-slate-600">Total Questions</span>
+                        </div>
+                        <span className="text-xs font-medium text-slate-900">{selectedPattern.total_questions}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-3 h-3 text-slate-400" />
+                          <span className="text-xs text-slate-600">Total Marks</span>
+                        </div>
+                        <span className="text-xs font-medium text-slate-900">{selectedPattern.total_marks}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
 
 
 
-            {/* Help */}
-            <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-medium text-blue-900 mb-1 text-sm">Exam Guidelines</h4>
-                  <ul className="text-xs text-blue-700 space-y-1">
-                    <li>• Select a pattern to define exam structure</li>
-                    <li>• Set appropriate duration and attempts</li>
-                    <li>• Configure passing marks and negative marking</li>
-                    <li>• Add clear instructions for students</li>
-                  </ul>
+              {/* Help */}
+              <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-blue-900 mb-1 text-sm">Exam Guidelines</h4>
+                    <ul className="text-xs text-blue-700 space-y-1">
+                      <li>• Select a pattern to define exam structure</li>
+                      <li>• Set appropriate duration and attempts</li>
+                      <li>• Configure passing marks and negative marking</li>
+                      <li>• Add clear instructions for students</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Sticky Action Footer */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 p-4 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] z-50 transition-all">
-          <div className="w-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-            <div className="hidden lg:flex items-center gap-8">
-              <div className="flex flex-col">
-                <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-none mb-1.5">Exam Setting</span>
-                <span className="text-sm font-bold text-slate-800 truncate max-w-[200px]">{formData.title || 'Untitled Exam'}</span>
-              </div>
-              <div className="h-8 w-px bg-slate-200"></div>
-              <div className="flex flex-col">
-                <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-none mb-1.5">Pattern Selection</span>
-                <div className="flex items-center gap-2">
-                  <Zap className={`w-3 h-3 ${selectedPattern ? 'text-purple-500' : 'text-slate-300'}`} />
-                  <span className="text-sm font-bold text-slate-800">{selectedPattern?.name || 'Incomplete'}</span>
+          {/* Sticky Action Footer */}
+          <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 p-4 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] z-50 transition-all">
+            <div className="w-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+              <div className="hidden lg:flex items-center gap-8">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-none mb-1.5">Exam Setting</span>
+                  <span className="text-sm font-bold text-slate-800 truncate max-w-[200px]">{formData.title || 'Untitled Exam'}</span>
+                </div>
+                <div className="h-8 w-px bg-slate-200"></div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-none mb-1.5">Pattern Selection</span>
+                  <div className="flex items-center gap-2">
+                    <Zap className={`w-3 h-3 ${selectedPattern ? 'text-purple-500' : 'text-slate-300'}`} />
+                    <span className="text-sm font-bold text-slate-800">{selectedPattern?.name || 'Incomplete'}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-4 w-full md:w-auto">
-              <button
-                onClick={() => navigate(`${basePath}/exams`)}
-                className="hidden sm:flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors"
-              >
-                Cancel
-              </button>
+              <div className="flex items-center gap-4 w-full md:w-auto">
+                <button
+                  onClick={() => navigate(`${basePath}/exams`)}
+                  className="hidden sm:flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors"
+                >
+                  Cancel
+                </button>
 
-              <div className="flex-grow md:flex-grow-0 flex items-center gap-3">
-                {!isEditMode ? (
-                  <>
+                <div className="flex-grow md:flex-grow-0 flex items-center gap-3">
+                  {!isEditMode ? (
+                    <>
+                      <button
+                        onClick={() => handleSubmit(true)}
+                        disabled={saving}
+                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 disabled:opacity-50 transition-all border border-slate-200"
+                      >
+                        <Save className="w-4 h-4" />
+                        {saving ? 'Saving...' : 'Save Draft'}
+                      </button>
+                      <button
+                        onClick={() => handleSubmit(false)}
+                        disabled={saving}
+                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-2.5 text-sm font-bold bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 shadow-lg shadow-green-100 transition-all active:scale-95"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        {saving ? 'Publishing...' : 'Publish Exam'}
+                      </button>
+                    </>
+                  ) : (
                     <button
-                      onClick={() => handleSubmit(true)}
+                      onClick={() => handleSubmit(formData.status === 'draft')}
                       disabled={saving}
-                      className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 disabled:opacity-50 transition-all border border-slate-200"
+                      className="flex-1 md:flex-none flex items-center justify-center gap-2 px-10 py-2.5 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 shadow-lg shadow-blue-100 transition-all active:scale-95"
                     >
                       <Save className="w-4 h-4" />
-                      {saving ? 'Saving...' : 'Save Draft'}
+                      {saving ? 'Updating...' : 'Update Exam'}
                     </button>
-                    <button
-                      onClick={() => handleSubmit(false)}
-                      disabled={saving}
-                      className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-2.5 text-sm font-bold bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 shadow-lg shadow-green-100 transition-all active:scale-95"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                      {saving ? 'Publishing...' : 'Publish Exam'}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => handleSubmit(formData.status === 'draft')}
-                    disabled={saving}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-10 py-2.5 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 shadow-lg shadow-blue-100 transition-all active:scale-95"
-                  >
-                    <Save className="w-4 h-4" />
-                    {saving ? 'Updating...' : 'Update Exam'}
-                  </button>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <AnimatePresence>
-        {showToast && (
-          <motion.div
-            initial={{ opacity: 0, y: -20, x: 20 }}
-            animate={{ opacity: 1, y: 0, x: 0 }}
-            exit={{ opacity: 0, y: -20, x: 20 }}
-            className="fixed top-6 right-6 z-[100] bg-green-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-green-500/50 backdrop-blur-sm"
-          >
-            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-5 h-5" />
-            </div>
-            <span className="font-bold text-sm tracking-tight">{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div >
+        <AnimatePresence>
+          {showToast && (
+            <motion.div
+              initial={{ opacity: 0, y: -20, x: 20 }}
+              animate={{ opacity: 1, y: 0, x: 0 }}
+              exit={{ opacity: 0, y: -20, x: 20 }}
+              className="fixed top-6 right-6 z-[100] bg-green-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-green-500/50 backdrop-blur-sm"
+            >
+              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-5 h-5" />
+              </div>
+              <span className="font-bold text-sm tracking-tight">{toastMessage}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
   );
 }

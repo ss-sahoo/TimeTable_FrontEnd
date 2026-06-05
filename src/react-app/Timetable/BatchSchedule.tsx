@@ -711,7 +711,7 @@ const BatchSchedule: React.FC = () => {
       setShowBatchSelector(false);
       setSelectedBatchToAdd("");
 
-      toast.error(`Batch "${newBatch.name}" assigned successfully!`);
+      toast.success(`Batch "${newBatch.name}" assigned successfully!`);
 
     } catch (error: any) {
       toast.error(`Failed to assign batch: ${error.message}`);

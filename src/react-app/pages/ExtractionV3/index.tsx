@@ -205,7 +205,7 @@ export default function ExtractionV3Page() {
                 mappings
             });
 
-            toast.error('Questions imported successfully!');
+            toast.success('Questions imported successfully!');
             navigate(`/exams/${examId}`);
         } catch (err: any) {
             console.error("Import failed:", err);

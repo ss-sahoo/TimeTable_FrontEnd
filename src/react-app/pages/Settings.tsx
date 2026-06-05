@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import {
   Settings as SettingsIcon,
   User,
@@ -52,7 +53,8 @@ interface UserSettings {
 }
 
 export default function Settings() {
-  const { user } = useAuthContext();
+  const navigate = useNavigate();
+  const { user, logout } = useAuthContext();
   const [activeTab, setActiveTab] = useState('profile');
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -104,7 +106,9 @@ export default function Settings() {
     { id: 'profile', name: 'Profile', icon: User },
     { id: 'preferences', name: 'Preferences', icon: SettingsIcon },
     { id: 'security', name: 'Security', icon: Shield },
-    { id: 'institute', name: 'Institute', icon: Building2 }
+    ...(user?.role?.toLowerCase() === 'super_admin' || user?.role?.toLowerCase() === 'institute_admin'
+      ? [{ id: 'institute-redirect', name: 'Institute', icon: Building2 }]
+      : [{ id: 'institute', name: 'Institute', icon: Building2 }])
   ];
 
   const handleInputChange = (section: keyof UserSettings, field: string, value: any) => {
@@ -269,12 +273,17 @@ export default function Settings() {
                   return (
                     <button
                       key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        activeTab === tab.id
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'text-slate-600 dark:text-gray-400 hover:bg-slate-100 hover:text-slate-900 dark:text-gray-100'
-                      }`}
+                      onClick={() => {
+                        if (tab.id === 'institute-redirect') {
+                          navigate('/institute-profile');
+                        } else {
+                          setActiveTab(tab.id);
+                        }
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === tab.id
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'text-slate-600 dark:text-gray-400 hover:bg-slate-100 hover:text-slate-900 dark:text-gray-100'
+                        }`}
                     >
                       <Icon className="w-4 h-4" />
                       {tab.name}
@@ -302,9 +311,8 @@ export default function Settings() {
                       type="text"
                       value={settings.profile.first_name}
                       onChange={(e) => handleInputChange('profile', 'first_name', e.target.value)}
-                      className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                        errors.first_name ? 'border-red-300' : 'border-slate-300'
-                      }`}
+                      className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.first_name ? 'border-red-300' : 'border-slate-300'
+                        }`}
                     />
                     {errors.first_name && (
                       <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
@@ -319,9 +327,8 @@ export default function Settings() {
                       type="text"
                       value={settings.profile.last_name}
                       onChange={(e) => handleInputChange('profile', 'last_name', e.target.value)}
-                      className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                        errors.last_name ? 'border-red-300' : 'border-slate-300'
-                      }`}
+                      className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.last_name ? 'border-red-300' : 'border-slate-300'
+                        }`}
                     />
                     {errors.last_name && (
                       <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
@@ -336,9 +343,8 @@ export default function Settings() {
                       type="email"
                       value={settings.profile.email}
                       onChange={(e) => handleInputChange('profile', 'email', e.target.value)}
-                      className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                        errors.email ? 'border-red-300' : 'border-slate-300'
-                      }`}
+                      className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.email ? 'border-red-300' : 'border-slate-300'
+                        }`}
                     />
                     {errors.email && (
                       <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
@@ -518,9 +524,8 @@ export default function Settings() {
                           type={showPassword ? 'text' : 'password'}
                           value={passwordForm.current_password}
                           onChange={(e) => handlePasswordChange('current_password', e.target.value)}
-                          className={`w-full px-3 py-2 pr-10 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                            errors.current_password ? 'border-red-300' : 'border-slate-300'
-                          }`}
+                          className={`w-full px-3 py-2 pr-10 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.current_password ? 'border-red-300' : 'border-slate-300'
+                            }`}
                         />
                         <button
                           type="button"
@@ -543,9 +548,8 @@ export default function Settings() {
                         type="password"
                         value={passwordForm.new_password}
                         onChange={(e) => handlePasswordChange('new_password', e.target.value)}
-                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                          errors.new_password ? 'border-red-300' : 'border-slate-300'
-                        }`}
+                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.new_password ? 'border-red-300' : 'border-slate-300'
+                          }`}
                       />
                       {errors.new_password && (
                         <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
@@ -560,9 +564,8 @@ export default function Settings() {
                         type="password"
                         value={passwordForm.confirm_password}
                         onChange={(e) => handlePasswordChange('confirm_password', e.target.value)}
-                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                          errors.confirm_password ? 'border-red-300' : 'border-slate-300'
-                        }`}
+                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.confirm_password ? 'border-red-300' : 'border-slate-300'
+                          }`}
                       />
                       {errors.confirm_password && (
                         <p className="text-red-600 text-xs mt-1 flex items-center gap-1">

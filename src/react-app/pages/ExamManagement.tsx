@@ -36,6 +36,7 @@ interface Exam {
   total_marks: number;
   created_at: string;
   updated_at: string;
+  is_flexible: boolean;
   pattern: {
     id: number;
     name: string;
@@ -54,7 +55,7 @@ interface Exam {
 export default function ExamManagement() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Multi-select state for bulk delete
   const [selectedExams, setSelectedExams] = useState<number[]>([]);
   const [showSelectionMode, setShowSelectionMode] = useState(false);
@@ -215,8 +216,8 @@ export default function ExamManagement() {
 
   // Multi-select functions
   const toggleExamSelection = (examId: number) => {
-    setSelectedExams(prev => 
-      prev.includes(examId) 
+    setSelectedExams(prev =>
+      prev.includes(examId)
         ? prev.filter(id => id !== examId)
         : [...prev, examId]
     );
@@ -232,7 +233,7 @@ export default function ExamManagement() {
 
   const handleBulkDelete = async () => {
     if (selectedExams.length === 0) return;
-    
+
     const confirmMessage = `Are you sure you want to delete ${selectedExams.length} exam(s)? This action cannot be undone.`;
     if (!window.confirm(confirmMessage)) return;
 
@@ -241,7 +242,7 @@ export default function ExamManagement() {
       const response = await api.post('/exams/exams/bulk-delete/', {
         exam_ids: selectedExams
       });
-      
+
       if (response.data.success) {
         // Remove deleted exams from the list
         setExams(exams.filter(exam => !selectedExams.includes(exam.id)));
@@ -532,11 +533,10 @@ export default function ExamManagement() {
         {/* Exams Grid */}
         <div id="exam-grid" data-tour-id="exam-list" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {exams.map((exam) => (
-            <div 
-              key={exam.id} 
-              className={`bg-white rounded-lg border p-4 hover:shadow-md transition-shadow ${
-                selectedExams.includes(exam.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200'
-              }`}
+            <div
+              key={exam.id}
+              className={`bg-white rounded-lg border p-4 hover:shadow-md transition-shadow ${selectedExams.includes(exam.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200'
+                }`}
             >
               <div className="flex items-start justify-between mb-3">
                 {showSelectionMode && (
@@ -567,6 +567,12 @@ export default function ExamManagement() {
                   {getStatusIcon(exam.status)}
                   {exam.status.charAt(0).toUpperCase() + exam.status.slice(1)}
                 </span>
+                {exam.is_flexible && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                    <Clock className="w-3 h-3" />
+                    Flexible
+                  </span>
+                )}
               </div>
 
               <div className="space-y-2 mb-4">

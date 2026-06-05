@@ -17,7 +17,9 @@ import {
   Building2,
   Copy,
   Check,
-  CheckCircle
+  CheckCircle,
+  Key,
+  Lock
 } from "lucide-react";
 
 interface UserData {
@@ -56,6 +58,11 @@ const UsersContent = () => {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<string>("all");
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [resetPasswordData, setResetPasswordData] = useState({
+    password: "",
+    confirm_password: ""
+  });
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -99,7 +106,7 @@ const UsersContent = () => {
       // Request all users by setting a high page_size (backend max is 100, so we'll make multiple requests if needed)
       const response = await api.get(`/auth/people/?institute_id=${instituteId}&page_size=100`);
       let allUsers = response.data.users || response.data.results || response.data;
-      
+
       // If there are more pages, fetch them all
       const totalPages = response.data.total_pages || 1;
       if (totalPages > 1) {
@@ -109,7 +116,7 @@ const UsersContent = () => {
             api.get(`/auth/people/?institute_id=${instituteId}&page_size=100&page=${page}`)
           );
         }
-        
+
         const additionalResponses = await Promise.all(additionalRequests);
         additionalResponses.forEach(res => {
           const pageData = res.data.users || res.data.results || res.data;
@@ -118,7 +125,7 @@ const UsersContent = () => {
           }
         });
       }
-      
+
       setUsers(Array.isArray(allUsers) ? allUsers : []);
       console.log(`Fetched ${Array.isArray(allUsers) ? allUsers.length : 0} users total`);
     } catch (error) {
@@ -165,7 +172,7 @@ const UsersContent = () => {
       setSelectedUser(null);
       setSelectedCenterId("");
 
-      toast.error(`Successfully assigned center to ${selectedUser.email}`);
+      toast.success(`Successfully assigned center to ${selectedUser.email}`);
       fetchUsers();
     } catch (error: any) {
       console.error("Error assigning center:", error);
@@ -208,7 +215,7 @@ const UsersContent = () => {
       setEditingUser(null);
       setSelectedCenterId("");
 
-      toast.error(`User ${editingUser.email} updated successfully`);
+      toast.success(`User ${editingUser.email} updated successfully`);
       fetchUsers();
     } catch (error: any) {
       console.error("Error updating user:", error);
@@ -429,7 +436,7 @@ const UsersContent = () => {
         });
         setShowCredentialsModal(true);
       } else {
-        toast.error("User added successfully!");
+        toast.success("User added successfully!");
       }
     } catch (error: any) {
       console.error("Error adding user:", error);
@@ -443,6 +450,44 @@ const UsersContent = () => {
       setLoading(false);
     }
   };
+  const handleAdminResetPassword = async () => {
+    if (!selectedUser) return;
+    if (resetPasswordData.password !== resetPasswordData.confirm_password) {
+      setError("Passwords do not match");
+      return;
+    }
+    if (resetPasswordData.password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    try {
+      setError("");
+      setLoading(true);
+      await api.post(`/auth/users/${selectedUser.id}/reset-password/`, {
+        password: resetPasswordData.password,
+        confirm_password: resetPasswordData.confirm_password
+      });
+
+      setShowResetPasswordModal(false);
+      setResetPasswordData({ password: "", confirm_password: "" });
+      setSelectedUser(null);
+      toast.success(`Password for ${selectedUser.email} has been reset successfully`);
+    } catch (error: any) {
+      console.error("Error resetting password:", error);
+      setError(error.response?.data?.error || "Failed to reset password");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openResetPasswordModal = (user: UserData) => {
+    setSelectedUser(user);
+    setShowResetPasswordModal(true);
+    setResetPasswordData({ password: "", confirm_password: "" });
+    setError("");
+  };
+
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm("Are you sure you want to delete this user?")) return;
@@ -585,7 +630,7 @@ const UsersContent = () => {
 
       const successCount = response.data.success || response.data.created_count || 0;
       const totalCount = response.data.total || 0;
-      toast.error(`Successfully imported ${successCount} out of ${totalCount} users!`);
+      toast.success(`Successfully imported ${successCount} out of ${totalCount} users!`);
 
       fetchUsers();
     } catch (error: any) {
@@ -852,6 +897,7 @@ const UsersContent = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              autoComplete="off"
               className="block w-full rounded-md border-0 py-2 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
               placeholder="Search by name, email, or ID..."
             />
@@ -944,6 +990,11 @@ const UsersContent = () => {
                             {user.center?.name || user.center_name}
                           </span>
                         </div>
+                      ) : user.role?.toLowerCase() === 'super_admin' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-700/10">
+                          <Building2 className="h-3 w-3" />
+                          Whole Institute
+                        </span>
                       ) : (
                         (currentUser?.role?.toLowerCase() !== 'teacher' && currentUser?.role?.toLowerCase() !== 'student') && (
                           <button
@@ -966,6 +1017,13 @@ const UsersContent = () => {
                     </td>
                     {(currentUser?.role?.toLowerCase() !== 'teacher' && currentUser?.role?.toLowerCase() !== 'student') && (
                       <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                        <button
+                          onClick={() => openResetPasswordModal(user)}
+                          className="text-gray-400 hover:text-indigo-600 mr-3"
+                          title="Reset Password"
+                        >
+                          <Key className="w-5 h-5" />
+                        </button>
                         <button
                           onClick={() => openEditModal(user)}
                           className="text-gray-400 hover:text-blue-600 mr-3"
@@ -1734,6 +1792,94 @@ const UsersContent = () => {
                     I've Saved the Credentials
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Reset Password Modal */}
+      {showResetPasswordModal && selectedUser && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowResetPasswordModal(false)}></div>
+
+            <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+              <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold leading-6 text-gray-900">Reset User Password</h3>
+                  <button onClick={() => setShowResetPasswordModal(false)} className="text-gray-400 hover:text-gray-500">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+
+                {error && (
+                  <div className="mb-4 rounded-md bg-red-50 p-4">
+                    <div className="flex">
+                      <AlertCircle className="h-5 w-5 text-red-400" />
+                      <div className="ml-3">
+                        <p className="text-sm text-red-800">{error}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div className="rounded-md bg-indigo-50 p-4">
+                    <div className="flex">
+                      <Lock className="h-5 w-5 text-indigo-400" />
+                      <div className="ml-3">
+                        <p className="text-sm text-indigo-700">
+                          Resetting password for: <strong>{selectedUser.first_name} {selectedUser.last_name || selectedUser.username}</strong> ({selectedUser.email})
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      value={resetPasswordData.password}
+                      onChange={(e) => setResetPasswordData({ ...resetPasswordData, password: e.target.value })}
+                      autoComplete="new-password"
+                      className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                      placeholder="Minimum 8 characters"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Confirm New Password
+                    </label>
+                    <input
+                      type="password"
+                      value={resetPasswordData.confirm_password}
+                      onChange={(e) => setResetPasswordData({ ...resetPasswordData, confirm_password: e.target.value })}
+                      autoComplete="new-password"
+                      className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                <button
+                  type="button"
+                  disabled={loading || !resetPasswordData.password || resetPasswordData.password !== resetPasswordData.confirm_password}
+                  onClick={handleAdminResetPassword}
+                  className="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:ml-3 sm:w-auto disabled:opacity-50"
+                >
+                  {loading ? "Resetting..." : "Reset Password"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowResetPasswordModal(false)}
+                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>

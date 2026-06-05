@@ -29,6 +29,7 @@ interface Exam {
   enable_webcam_proctoring: boolean;
   disable_copy_paste: boolean;
   disable_right_click: boolean;
+  is_flexible?: boolean;
   exam_mode?: 'online' | 'offline_omr' | 'offline_subjective';
   omr_sheet_file?: string;
   omr_sheet_generated?: boolean;
@@ -429,6 +430,13 @@ const ExamAccess: React.FC = () => {
               <div className="text-right">
                 <div className="text-sm text-gray-500">Duration</div>
                 <div className="text-lg font-semibold text-gray-900">{exam.duration_minutes} minutes</div>
+                {exam.is_flexible && (
+                  <div className="mt-2">
+                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold uppercase tracking-wider border border-blue-200">
+                      Flexible Window
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -447,18 +455,36 @@ const ExamAccess: React.FC = () => {
               </div>
             </div>
 
-            {/* Countdown Timer */}
+            {/* Availability UI */}
             {timeRemaining > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <div className="flex items-center justify-center gap-2">
-                  <Clock className="w-5 h-5 text-blue-600" />
-                  <span className="text-blue-800 font-medium">
-                    {new Date() < new Date(exam.start_date) ? 'Exam starts in: ' : 'Time remaining: '}
-                  </span>
-                  <span className="text-2xl font-bold text-blue-900 font-mono">
-                    {formatTime(timeRemaining)}
-                  </span>
-                </div>
+              <div className={`rounded-xl p-6 mb-8 border-2 ${exam.is_flexible ? 'bg-indigo-50 border-indigo-200' : 'bg-blue-50 border-blue-200'}`}>
+                {exam.is_flexible ? (
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-3 mb-2 text-indigo-800">
+                      <Clock className="w-6 h-6" />
+                      <span className="text-xl font-bold">Flexible Exam Window Active</span>
+                    </div>
+                    <p className="text-indigo-700 font-medium">
+                      You can start this exam anytime before it closes on <span className="font-bold underline">{new Date(exam.end_date).toLocaleString()}</span>.
+                    </p>
+                    <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-800 rounded-lg font-bold">
+                      <Clock className="w-5 h-5" />
+                      Duration: {exam.duration_minutes} Minutes
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-blue-600" />
+                      <span className="text-blue-800 font-medium">
+                        {new Date() < new Date(exam.start_date) ? 'Exam starts in: ' : 'Time remaining: '}
+                      </span>
+                    </div>
+                    <span className="text-3xl font-bold text-blue-900 font-mono">
+                      {formatTime(timeRemaining)}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -882,9 +908,7 @@ const ExamAccess: React.FC = () => {
             ) : (
               <>
                 {/* Existing Online Exam logic */}
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-                  {/* ... debug info ... */}
-                </div>
+
                 <button
                   onClick={handleStartExam}
                   disabled={!canStart || (exam?.enable_webcam_proctoring && !systemChecks.camera)}
@@ -893,7 +917,8 @@ const ExamAccess: React.FC = () => {
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     }`}
                 >
-                  {/* ... button content ... */}
+                  <ArrowRight className="w-5 h-5" />
+                  {canStart ? 'Proceed to Pre-Exam Setup' : 'Exam Not Yet Available'}
                 </button>
               </>
             )}

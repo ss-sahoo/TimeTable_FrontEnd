@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import { 
-  Building2, Mail, Phone, Globe, MapPin, Users, Settings, 
+import { useNavigate, useParams } from 'react-router';
+import {
+  Building2, Mail, Phone, Globe, MapPin, Users, Settings,
   Edit2, Save, X, CheckCircle, AlertCircle, Clock, Shield,
   Calendar, FileText, Activity, TrendingUp, Award, UserCheck
 } from 'lucide-react';
@@ -60,20 +60,21 @@ interface InstituteStats {
 
 export default function InstituteProfile() {
   const navigate = useNavigate();
+  const { id: urlId } = useParams();
   const { user: currentUser } = useAuthContext();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  
+
   const [activeTab, setActiveTab] = useState<'overview' | 'settings' | 'users' | 'stats'>('overview');
   const [isEditing, setIsEditing] = useState(false);
-  
+
   const [institute, setInstitute] = useState<Institute | null>(null);
   const [settings, setSettings] = useState<InstituteSettings | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<InstituteStats | null>(null);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     domain: '',
@@ -129,9 +130,9 @@ export default function InstituteProfile() {
       setLoading(true);
       setError(null);
 
-      // Get institute ID from currentUser
-      const instituteId = currentUser?.institute?.id;
-      
+      // Get institute ID from URL or currentUser
+      const instituteId = urlId || currentUser?.institute?.id;
+
       if (!instituteId) {
         setError('No institute associated with your account');
         setLoading(false);
@@ -179,11 +180,11 @@ export default function InstituteProfile() {
   const loadStats = async () => {
     try {
       // Calculate stats from users data
-      const instituteId = currentUser?.institute?.id;
+      const instituteId = urlId || currentUser?.institute?.id;
       if (!instituteId) return;
-      
+
       const usersResponse = await api.get(`/auth/institutes/${instituteId}/users/`);
-      
+
       // Handle both array and paginated response
       let allUsers = usersResponse.data;
       if (!Array.isArray(allUsers)) {
@@ -237,7 +238,7 @@ export default function InstituteProfile() {
       setError(null);
       setSuccess(null);
 
-      const instituteId = currentUser?.institute?.id;
+      const instituteId = urlId || currentUser?.institute?.id;
       if (!instituteId) {
         setError('No institute ID found');
         setSaving(false);
@@ -273,7 +274,8 @@ export default function InstituteProfile() {
     }
   };
 
-  const canEdit = currentUser?.role === 'super_admin' || currentUser?.role === 'institute_admin';
+  const userRoleLower = currentUser?.role?.toLowerCase();
+  const canEdit = userRoleLower === 'super_admin';
 
   if (loading) {
     return (
@@ -375,11 +377,10 @@ export default function InstituteProfile() {
           <div className="flex gap-2 overflow-x-auto">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`px-3 py-2 rounded-md whitespace-nowrap text-sm font-medium transition-colors ${
-                activeTab === 'overview'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800'
-              }`}
+              className={`px-3 py-2 rounded-md whitespace-nowrap text-sm font-medium transition-colors ${activeTab === 'overview'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800'
+                }`}
             >
               <Building2 className="w-4 h-4 inline mr-2" />
               Overview
@@ -387,11 +388,10 @@ export default function InstituteProfile() {
             {canEdit && (
               <button
                 onClick={() => setActiveTab('settings')}
-                className={`px-3 py-2 rounded-md whitespace-nowrap text-sm font-medium transition-colors ${
-                  activeTab === 'settings'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800'
-                }`}
+                className={`px-3 py-2 rounded-md whitespace-nowrap text-sm font-medium transition-colors ${activeTab === 'settings'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800'
+                  }`}
               >
                 <Settings className="w-4 h-4 inline mr-2" />
                 Settings
@@ -400,11 +400,10 @@ export default function InstituteProfile() {
             {canEdit && (
               <button
                 onClick={() => setActiveTab('users')}
-                className={`px-3 py-2 rounded-md whitespace-nowrap text-sm font-medium transition-colors ${
-                  activeTab === 'users'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800'
-                }`}
+                className={`px-3 py-2 rounded-md whitespace-nowrap text-sm font-medium transition-colors ${activeTab === 'users'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800'
+                  }`}
               >
                 <Users className="w-4 h-4 inline mr-2" />
                 Users
@@ -412,11 +411,10 @@ export default function InstituteProfile() {
             )}
             <button
               onClick={() => setActiveTab('stats')}
-              className={`px-3 py-2 rounded-md whitespace-nowrap text-sm font-medium transition-colors ${
-                activeTab === 'stats'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800'
-              }`}
+              className={`px-3 py-2 rounded-md whitespace-nowrap text-sm font-medium transition-colors ${activeTab === 'stats'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800'
+                }`}
             >
               <Activity className="w-4 h-4 inline mr-2" />
               Statistics
@@ -638,7 +636,7 @@ export default function InstituteProfile() {
           <div className="space-y-6">
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-slate-200 dark:border-gray-700 p-4">
               <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Institute Settings</h3>
-              
+
               <div className="space-y-4">
                 {/* Student Registration */}
                 <div className="flex items-center justify-between py-3 border-b border-slate-200 dark:border-gray-700">
@@ -770,7 +768,7 @@ export default function InstituteProfile() {
         {activeTab === 'users' && (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-slate-200 dark:border-gray-700 p-4">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Institute Users</h3>
-            
+
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>

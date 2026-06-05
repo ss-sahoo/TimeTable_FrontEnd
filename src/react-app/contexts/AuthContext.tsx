@@ -12,6 +12,7 @@ interface Institute {
   contact_email?: string;
   contact_phone?: string;
   website?: string;
+  logo?: string;
   is_active?: boolean;
   is_verified?: boolean;
 }
