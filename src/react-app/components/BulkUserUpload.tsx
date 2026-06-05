@@ -5,7 +5,7 @@ import {
   Upload, X, FileSpreadsheet, CheckCircle, AlertCircle, Download,
   Loader2, Eye, EyeOff, Copy, Check, GraduationCap, Briefcase, UserCog,
 } from 'lucide-react';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 
 type UserRole = 'teacher' | 'student' | 'staff';
 
@@ -140,12 +140,13 @@ export default function BulkUserUpload({ isOpen, onClose, onSuccess, centerId, d
         onSuccess();
       }
     } catch (error: any) {
+      const msg = getErrorMessage(error, 'Upload failed');
       setResult({
-        message: error.response?.data?.detail || error.response?.data?.error || 'Upload failed',
+        message: msg,
         total: 0,
         success: 0,
         failed: 1,
-        errors: [{ row: 0, error: error.response?.data?.detail || error.response?.data?.error || 'Upload failed', data: {} }],
+        errors: [{ row: 0, error: msg, data: {} }],
       });
     } finally {
       setUploading(false);

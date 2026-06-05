@@ -21,7 +21,7 @@ import WebcamMonitor from '../components/WebcamMonitor';
 import ViolationToast from '../components/ViolationToast';
 import LaTeXRenderer from '../components/LaTeXRenderer';
 import ViolationsPanel from '../components/ViolationsPanel';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 
 interface Question {
   id: number;
@@ -561,7 +561,7 @@ const SecureExamExperience: React.FC = () => {
       // Use replace so exam page is removed from history stack
       navigate(`/exam-results/${attemptId}`, { replace: true });
     } catch (error: any) {
-      setError(error.response?.data?.error || 'Failed to submit exam');
+      setError(getErrorMessage(error, 'Failed to submit exam'));
       setIsSubmitting(false);
     }
   };
@@ -578,7 +578,7 @@ const SecureExamExperience: React.FC = () => {
       await api.post('/exams/submit-exam/', submissionData);
       navigate(`/exam-results/${attemptId}`, { replace: true });
     } catch (error: any) {
-      setError(error.response?.data?.error || 'Failed to auto-submit exam');
+      setError(getErrorMessage(error, 'Failed to auto-submit exam'));
       setIsSubmitting(false);
     }
   };

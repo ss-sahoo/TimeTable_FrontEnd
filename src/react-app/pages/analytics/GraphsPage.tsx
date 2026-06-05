@@ -17,7 +17,7 @@ import {
   Cell,
 } from 'recharts';
 import { LineChart as LineChartIcon, ScatterChart as ScatterIcon, TrendingUp, Clock, Layers } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 import GlassCard from '@/react-app/components/analytics/GlassCard';
 import ModernChartContainer from '@/react-app/components/analytics/ModernChartContainer';
 import PageHeader from '@/react-app/components/analytics/PageHeader';
@@ -90,7 +90,7 @@ export default function GraphsPage() {
       const response = await api.get(`/exams/exams/${examId}/analytics/graphs/?${queryParams}`);
       setData(response.data);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load graphs data');
+      setError(getErrorMessage(err, 'Failed to load graphs data'));
     } finally {
       setLoading(false);
     }

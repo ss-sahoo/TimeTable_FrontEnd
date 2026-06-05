@@ -18,7 +18,7 @@ import ViolationWarning from '../components/ViolationWarning';
 import ViolationToast from '../components/ViolationToast';
 import LaTeXRenderer from '../components/LaTeXRenderer';
 import ViolationsPanel from '../components/ViolationsPanel';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 import { CameraStatusPayload, ProctoringIncidentPayload } from '../hooks/useProctoringCamera';
 
 interface Question {
@@ -609,7 +609,7 @@ const SecureExamView: React.FC = () => {
     } catch (error: any) {
       console.error('❌ Submission failed:', error);
       console.error('Error response:', error.response?.data);
-      setError(error.response?.data?.error || 'Failed to submit exam');
+      setError(getErrorMessage(error, 'Failed to submit exam'));
     } finally {
       setIsSubmitting(false);
     }

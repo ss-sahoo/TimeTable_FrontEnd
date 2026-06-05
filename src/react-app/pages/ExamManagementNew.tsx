@@ -245,7 +245,7 @@ export default function ExamManagement() {
         setShowSelectionMode(false);
         toast.error(`Successfully deleted ${response.data.deleted_count} exam(s)`);
       } else {
-        toast.error('Failed to delete exams: ' + (response.data.error || 'Unknown error'));
+        toast.error('Failed to delete exams: ' + (response.data.detail || response.data.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Failed to bulk delete exams:', error);

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router';
 import { motion } from 'framer-motion';
 import { Grid3X3, BookOpen } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 import GlassCard from '@/react-app/components/analytics/GlassCard';
 import ModernChartContainer from '@/react-app/components/analytics/ModernChartContainer';
 import PageHeader from '@/react-app/components/analytics/PageHeader';
@@ -84,7 +84,7 @@ export default function HeatMapPage() {
       const response = await api.get(`/exams/exams/${examId}/analytics/heatmap/?${queryParams}`);
       setData(response.data);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load heat map data');
+      setError(getErrorMessage(err, 'Failed to load heat map data'));
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 import { Globe, Calendar, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import DateTimeInput from '@/react-app/components/common/DateTimeInput';
 
@@ -113,10 +113,7 @@ export default function ExamSchedulingModal({ isOpen, onClose, examId, examTitle
       onClose();
     } catch (error) {
       console.error('Error updating exam schedule:', error);
-      const errorMessage = error && typeof error === 'object' && 'response' in error
-        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-        : undefined;
-      setError(errorMessage || 'Failed to update exam schedule');
+      setError(getErrorMessage(error, 'Failed to update exam schedule'));
     } finally {
       setSaving(false);
     }

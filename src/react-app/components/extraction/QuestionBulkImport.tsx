@@ -11,7 +11,7 @@ import ExtractionProgress from './ExtractionProgress';
 import QuestionPreview from './QuestionPreview';
 import SectionMapper from './SectionMapper';
 import ImportSummary from './ImportSummary';
-import { api } from '../../hooks/useApi';
+import { api, getErrorMessage } from '../../hooks/useApi';
 
 interface PreAnalysisResult {
   job_id: string;
@@ -118,7 +118,7 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
       setCurrentStep('pre-analysis');
     } catch (err: any) {
       console.error('Pre-analysis failed:', err);
-      setError(err.response?.data?.error || 'Failed to analyze document');
+      setError(getErrorMessage(err, 'Failed to analyze document'));
     } finally {
       setUploading(false);
     }
@@ -141,7 +141,7 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
       setCurrentStep('extracting');
     } catch (err: any) {
       console.error('Confirm failed:', err);
-      setError(err.response?.data?.error || 'Failed to start extraction');
+      setError(getErrorMessage(err, 'Failed to start extraction'));
     } finally {
       setConfirmingPreAnalysis(false);
     }
@@ -154,7 +154,7 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
       setCurrentStep('subject-preview');
     } catch (err: any) {
       console.error('Failed to load subjects:', err);
-      setError(err.response?.data?.error || 'Failed to load subject content');
+      setError(getErrorMessage(err, 'Failed to load subject content'));
     }
   };
 
@@ -247,8 +247,9 @@ const QuestionBulkImport: React.FC<QuestionBulkImportProps> = ({
       console.error('Import failed:', err);
 
       // Handle error response
-      const errorMessage = err.response?.data?.error || 'Failed to import questions';
-      const errorDetails = err.response?.data?.errors || [];
+      const errorMessage = getErrorMessage(err, 'Failed to import questions');
+      const rawErrors = err.response?.data?.errors;
+      const errorDetails = Array.isArray(rawErrors) ? rawErrors : [];
 
       setImportResult({
         success: false,

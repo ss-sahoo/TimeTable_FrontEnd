@@ -32,7 +32,7 @@ import {
   RefreshCw,
   KeyRound
 } from 'lucide-react';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 import QuestionBulkImport from '../components/extraction/QuestionBulkImport';
 import OMRManagement from '../components/OMRManagement';
 import AnswerSheetUpload from '../components/AnswerSheetUpload';
@@ -216,7 +216,7 @@ export default function ExamView() {
       }
     } catch (err: any) {
       console.error('Failed to publish exam:', err);
-      const msg = err.response?.data?.error || err.response?.data?.detail || 'Failed to publish exam.';
+      const msg = getErrorMessage(err, 'Failed to publish exam.');
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -232,7 +232,7 @@ export default function ExamView() {
       await fetchExam(); // Refresh to get the file link
     } catch (err: any) {
       console.error('Failed to generate OMR:', err);
-      const msg = err.response?.data?.error || 'Failed to generate OMR sheet.';
+      const msg = getErrorMessage(err, 'Failed to generate OMR sheet.');
       toast.error(msg);
     } finally {
       setGeneratingOMR(false);
@@ -255,7 +255,7 @@ export default function ExamView() {
       toast.success(`Section "${sectionToDelete.name}" deleted successfully!`);
     } catch (err: any) {
       console.error('Failed to delete section:', err);
-      const msg = err.response?.data?.error || err.response?.data?.detail || 'Failed to delete section.';
+      const msg = getErrorMessage(err, 'Failed to delete section.');
       toast.error(msg);
     } finally {
       setDeletingSection(false);

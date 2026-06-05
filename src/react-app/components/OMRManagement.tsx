@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage, extractApiError } from '../hooks/useApi';
 
 import {
     FileText,
@@ -265,7 +265,7 @@ export default function OMRManagement({ examId, examTitle, patternId }: OMRManag
             setTimeout(() => setSuccess(null), 3000);
         } catch (err: any) {
             console.error('Failed to generate OMR sheet:', err);
-            setError(err.response?.data?.error || 'Failed to generate OMR sheet');
+            setError(getErrorMessage(err, 'Failed to generate OMR sheet'));
         } finally {
             setGenerating(false);
         }
@@ -297,7 +297,7 @@ export default function OMRManagement({ examId, examTitle, patternId }: OMRManag
             setTimeout(() => setSuccess(null), 3000);
         } catch (err: any) {
             console.error('Failed to upload OMR submission:', err);
-            setError(err.response?.data?.error || 'Failed to upload scanned sheet');
+            setError(getErrorMessage(err, 'Failed to upload scanned sheet'));
         } finally {
             setUploading(false);
         }
@@ -312,7 +312,7 @@ export default function OMRManagement({ examId, examTitle, patternId }: OMRManag
             setTimeout(() => setSuccess(null), 3000);
         } catch (err: any) {
             console.error('Failed to evaluate submission:', err);
-            setError(err.response?.data?.error || 'Failed to evaluate submission');
+            setError(getErrorMessage(err, 'Failed to evaluate submission'));
         }
     };
 
@@ -355,7 +355,10 @@ export default function OMRManagement({ examId, examTitle, patternId }: OMRManag
             setTimeout(() => setSuccess(null), 3000);
         } catch (err: any) {
             console.error('Failed to save answer key:', err);
-            setError(err.response?.data?.error || err.response?.data?.details?.join(', ') || 'Failed to save answer key');
+            const apiErr = extractApiError(err);
+            const legacyDetails = err?.response?.data?.details;
+            const detailsStr = Array.isArray(legacyDetails) ? legacyDetails.join(', ') : undefined;
+            setError(apiErr.detail || detailsStr || 'Failed to save answer key');
         } finally {
             setSavingAnswerKey(false);
         }

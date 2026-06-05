@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 import { useAuthContext } from '../contexts/AuthContext';
 import {
   BookOpen,
@@ -109,7 +109,7 @@ export default function StudentExamList() {
       setExams(allExams);
     } catch (err: any) {
       console.error('Error loading exams:', err);
-      setError(err.response?.data?.error || 'Failed to load exams');
+      setError(getErrorMessage(err, 'Failed to load exams'));
     } finally {
       setLoading(false);
     }

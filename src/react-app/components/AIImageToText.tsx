@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Upload, Copy, Loader, FileImage, X, CheckCircle, Sparkles, Eye } from 'lucide-react';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 import LaTeXRenderer from './LaTeXRenderer';
 
 interface NestedPart {
@@ -207,7 +207,7 @@ export default function AIImageToText({
       }
     } catch (err: any) {
       console.error('Image extraction failed:', err);
-      setError(err.response?.data?.error || 'Failed to process image. Please try again.');
+      setError(getErrorMessage(err, 'Failed to process image. Please try again.'));
     } finally {
       setIsProcessing(false);
     }

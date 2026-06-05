@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronRight, ChevronDown, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
-import { api } from '../../hooks/useApi';
+import { api, getErrorMessage } from '../../hooks/useApi';
 import { toast } from "react-toastify";
 
 interface PatternMappingStepProps {
@@ -49,7 +49,7 @@ export default function PatternMappingStep({
     } catch (error: any) {
       console.error('Error loading pattern structure:', error);
       console.error('Error details:', error.response?.data);
-      toast.error(`Failed to load pattern structure: ${error.response?.data?.error || error.message}`);
+      toast.error(`Failed to load pattern structure: ${getErrorMessage(error, error.message || 'Unknown error')}`);
     } finally {
       setLoading(false);
     }

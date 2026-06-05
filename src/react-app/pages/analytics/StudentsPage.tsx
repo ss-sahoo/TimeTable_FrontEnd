@@ -5,7 +5,7 @@ import {
   Search, Mail, Clock, Award, AlertTriangle, ChevronRight,
   User, TrendingUp, Users, Filter, SortAsc
 } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 import GlassCard from '@/react-app/components/analytics/GlassCard';
 import ModernCard from '@/react-app/components/analytics/ModernCard';
 import ModernChartContainer from '@/react-app/components/analytics/ModernChartContainer';
@@ -83,7 +83,7 @@ export default function StudentsPage() {
       const response = await api.get(`/exams/exams/${examId}/results-dashboard/?${params.toString()}`);
       setData(response.data);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load student results');
+      setError(getErrorMessage(err, 'Failed to load student results'));
     } finally {
       setLoading(false);
     }

@@ -5,7 +5,7 @@ import {
   RefreshCw, Settings,
   MousePointer, Keyboard, Monitor, Wifi
 } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 
 interface AIProctoringDashboardProps {
   examId: number;
@@ -77,10 +77,7 @@ const AIProctoringDashboard: React.FC<AIProctoringDashboardProps> = ({ examId, e
       setViolations(violationsResponse.data.violations);
       
     } catch (err) {
-      const errorMessage = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
-        : undefined;
-      setError(errorMessage || 'Failed to load proctoring data');
+      setError(getErrorMessage(err, 'Failed to load proctoring data'));
     } finally {
       setLoading(false);
     }

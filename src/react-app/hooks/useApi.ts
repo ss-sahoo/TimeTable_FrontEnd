@@ -1,5 +1,110 @@
 import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import axios, { AxiosError, AxiosHeaders, InternalAxiosRequestConfig } from 'axios';
+
+export type ApiError = {
+  status: number;
+  code: string;
+  detail: string;
+  errors?: Record<string, string[]>;
+  requestId?: string;
+};
+
+const REQUEST_ID_HEADER = 'X-Request-Id';
+
+function generateRequestId(): string {
+  const c = (typeof globalThis !== 'undefined' ? globalThis.crypto : undefined) as
+    | (Crypto & { randomUUID?: () => string })
+    | undefined;
+  if (c?.randomUUID) return c.randomUUID();
+  if (c?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    c.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  return `req-${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
+export function normalizeApiError(err: unknown): ApiError {
+  if (axios.isAxiosError(err)) {
+    const axErr = err as AxiosError<Record<string, unknown>>;
+    const res = axErr.response;
+    const body = (res?.data ?? {}) as Record<string, unknown>;
+
+    const detail =
+      (typeof body.detail === 'string' && body.detail) ||
+      (typeof body.error === 'string' && body.error) ||
+      axErr.message ||
+      'Request failed';
+
+    const code =
+      (typeof body.code === 'string' && body.code) ||
+      (typeof body.error_code === 'string' && body.error_code) ||
+      (res ? `http_${res.status}` : 'network_error');
+
+    const errors =
+      body.errors && typeof body.errors === 'object' && !Array.isArray(body.errors)
+        ? (body.errors as Record<string, string[]>)
+        : undefined;
+
+    const headerRequestId =
+      (res?.headers && (res.headers as Record<string, string>)[REQUEST_ID_HEADER.toLowerCase()]) ||
+      (res?.headers && (res.headers as Record<string, string>)[REQUEST_ID_HEADER]) ||
+      undefined;
+    const bodyRequestId = typeof body.request_id === 'string' ? body.request_id : undefined;
+    const configRequestId =
+      (axErr.config?.headers as AxiosHeaders | undefined)?.get?.(REQUEST_ID_HEADER) ?? undefined;
+
+    return {
+      status: res?.status ?? 0,
+      code,
+      detail: String(detail),
+      errors,
+      requestId: bodyRequestId || headerRequestId || (configRequestId as string | undefined),
+    };
+  }
+
+  const message = err instanceof Error ? err.message : 'Unknown error';
+  return { status: 0, code: 'unknown_error', detail: message };
+}
+
+export function extractApiError(err: unknown): ApiError {
+  if (err && typeof err === 'object' && 'apiError' in err) {
+    const attached = (err as { apiError?: ApiError }).apiError;
+    if (attached) return attached;
+  }
+  return normalizeApiError(err);
+}
+
+export function getFieldErrors(err: unknown): Record<string, string[]> {
+  return extractApiError(err).errors ?? {};
+}
+
+/**
+ * Returns the backend-provided `detail` message when the server responded with
+ * a body, otherwise falls back to the caller's domain-specific message (used for
+ * pre-response network failures, where axios only exposes a generic "Network Error").
+ */
+export function getErrorMessage(err: unknown, fallback: string): string {
+  const apiErr = extractApiError(err);
+  if (apiErr.status === 0) return fallback;
+  return apiErr.detail || fallback;
+}
+
+export function reportApiError(error: ApiError, context?: Record<string, unknown>): void {
+  if (typeof console !== 'undefined') {
+    console.error('[api-error]', {
+      status: error.status,
+      code: error.code,
+      detail: error.detail,
+      requestId: error.requestId,
+      ...(error.errors ? { errors: error.errors } : {}),
+      ...(context ?? {}),
+    });
+  }
+}
 
 // Auto-detect API URL based on current host
 const getDefaultApiUrl = () => {
@@ -13,7 +118,10 @@ const getDefaultApiUrl = () => {
 
     // For development
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://0.0.0.0:8000/api';
+      // Use 127.0.0.1 (not 0.0.0.0): Safari/WebKit refuses to connect to
+      // 0.0.0.0, causing requests to hang forever. Chrome/Firefox silently
+      // remap it, which is why this only broke on Safari.
+      return 'http://127.0.0.1:8000/api';
     }
 
     // For production exams domain or any other domain
@@ -33,9 +141,9 @@ export const api = axios.create({
   withCredentials: true, // Important for sending cookies (like JWT refresh tokens)
 });
 
-// Interceptor to attach JWT token and device fingerprint to requests
+// Interceptor to attach JWT token, device fingerprint, and request id to requests
 api.interceptors.request.use(
-  (config) => {
+  (config: InternalAxiosRequestConfig) => {
     const accessToken = localStorage.getItem('access_token');
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
@@ -45,6 +153,10 @@ api.interceptors.request.use(
     const deviceFingerprint = localStorage.getItem('device_fingerprint');
     if (deviceFingerprint) {
       config.headers['X-Device-Fingerprint'] = deviceFingerprint;
+    }
+
+    if (!config.headers[REQUEST_ID_HEADER]) {
+      config.headers[REQUEST_ID_HEADER] = generateRequestId();
     }
 
     return config;
@@ -61,7 +173,10 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // Check if this is a device session invalidation error
-    if (error.response?.status === 401 && error.response?.data?.error_code === 'DEVICE_SESSION_INVALID') {
+    const deviceSessionInvalid =
+      error.response?.data?.code === 'device_session_invalid' ||
+      error.response?.data?.error_code === 'DEVICE_SESSION_INVALID';
+    if (error.response?.status === 401 && deviceSessionInvalid) {
       // Device session was invalidated (user logged in on another device)
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
@@ -103,9 +218,19 @@ api.interceptors.response.use(
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         window.location.href = '/login';
+        const normalized = normalizeApiError(refreshError);
+        (refreshError as { apiError?: ApiError }).apiError = normalized;
+        reportApiError(normalized, { phase: 'token_refresh' });
         return Promise.reject(refreshError);
       }
     }
+
+    const normalized = normalizeApiError(error);
+    (error as { apiError?: ApiError }).apiError = normalized;
+    reportApiError(normalized, {
+      url: originalRequest?.url,
+      method: originalRequest?.method,
+    });
     return Promise.reject(error);
   }
 );
@@ -140,8 +265,7 @@ export function useApi<T>(
       const response = await api.get<T>(endpoint);
       setData(response.data);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch data';
-      setError(errorMessage);
+      setError(extractApiError(err).detail);
     } finally {
       setLoading(false);
     }

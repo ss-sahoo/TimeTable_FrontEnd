@@ -20,7 +20,7 @@ import {
   Square,
   X
 } from 'lucide-react';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 
 interface Exam {
   id: number;
@@ -250,11 +250,10 @@ export default function ExamManagement() {
         setShowSelectionMode(false);
         toast.error(`Successfully deleted ${response.data.deleted_count} exam(s)`);
       } else {
-        toast.error('Failed to delete exams: ' + (response.data.error || 'Unknown error'));
+        toast.error('Failed to delete exams: ' + (response.data.detail || response.data.error || 'Unknown error'));
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      toast.error('Failed to delete exams: ' + errorMessage);
+      toast.error('Failed to delete exams: ' + getErrorMessage(err, 'Unknown error'));
     } finally {
       setIsDeleting(false);
     }

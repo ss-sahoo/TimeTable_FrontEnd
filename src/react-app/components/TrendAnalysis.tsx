@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  TrendingUp, TrendingDown, BarChart3, LineChart, 
-  Calendar, RefreshCw, 
+import {
+  TrendingUp, TrendingDown, BarChart3, LineChart,
+  Calendar, RefreshCw,
   Target, Users, Clock, Award, AlertTriangle,
   ChevronDown, ChevronUp
 } from 'lucide-react';
+import { getErrorMessage } from '@/react-app/hooks/useApi';
 
 interface TrendData {
   period: string;
@@ -47,10 +48,7 @@ const TrendAnalysis: React.FC<TrendAnalysisProps> = ({
       const mockData: TrendData[] = generateMockTrendData(timeRange);
       setTrendData(mockData);
     } catch (err) {
-      const errorMessage = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
-        : undefined;
-      setError(errorMessage || 'Failed to load trend data');
+      setError(getErrorMessage(err, 'Failed to load trend data'));
     } finally {
       setLoading(false);
     }

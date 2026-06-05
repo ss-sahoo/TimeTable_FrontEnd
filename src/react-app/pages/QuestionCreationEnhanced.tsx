@@ -23,7 +23,7 @@ import {
   Maximize2,
   Minimize2
 } from 'lucide-react';
-import { useApi, api } from '../hooks/useApi';
+import { useApi, api, getErrorMessage } from '../hooks/useApi';
 import { useAuthContext } from '../contexts/AuthContext';
 import RichTextEditor from '../components/RichTextEditor';
 import AIImageToText from '../components/AIImageToText';
@@ -2003,11 +2003,7 @@ export default function EnhancedQuestionEditor() {
       setAiSuccess(response.data?.message || 'AI generated a draft question. Review before saving.');
     } catch (error: unknown) {
       console.error('AI generation failed:', error);
-      const responseMessage =
-        typeof error === 'object' && error !== null && 'response' in error && (error as { response?: { data?: { error?: string } } }).response?.data?.error;
-      const fallbackMessage =
-        typeof error === 'object' && error !== null && 'message' in error ? String((error as { message?: unknown }).message) : undefined;
-      setAiError(responseMessage || fallbackMessage || 'Failed to generate question. Please try again.');
+      setAiError(getErrorMessage(error, 'Failed to generate question. Please try again.'));
     } finally {
       setAiGenerating(false);
     }
@@ -2086,11 +2082,7 @@ export default function EnhancedQuestionEditor() {
       setAiSuccess('AI has solved the question successfully.');
     } catch (error: any) {
       console.error('AI solver failed:', error);
-      const responseMessage =
-        typeof error === 'object' && error !== null && 'response' in error && (error as { response?: { data?: { error?: string } } }).response?.data?.error;
-      const fallbackMessage =
-        typeof error === 'object' && error !== null && 'message' in error ? String((error as { message?: unknown }).message) : undefined;
-      setAiError(responseMessage || fallbackMessage || 'Failed to solve question with AI.');
+      setAiError(getErrorMessage(error, 'Failed to solve question with AI.'));
     } finally {
       setAiSolving(false);
     }

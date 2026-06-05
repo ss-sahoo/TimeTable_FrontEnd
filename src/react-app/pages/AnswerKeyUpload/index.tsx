@@ -16,7 +16,7 @@ import {
     ChevronUp,
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 
 type JobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
@@ -165,7 +165,7 @@ export default function AnswerKeyUploadPage() {
             setPhase('processing');
         } catch (err: any) {
             console.error(err);
-            const msg = err.response?.data?.error || err.response?.data?.detail || err.message || 'Upload failed';
+            const msg = getErrorMessage(err, err.message || 'Upload failed');
             setError(msg);
             toast.error(msg);
         } finally {
@@ -193,7 +193,7 @@ export default function AnswerKeyUploadPage() {
                 setRowSavedId((cur) => (cur === rowId ? null : cur));
             }, 1200);
         } catch (err: any) {
-            const msg = err.response?.data?.error || 'Failed to update row';
+            const msg = getErrorMessage(err, 'Failed to update row');
             toast.error(msg);
         } finally {
             setRowSavingId((cur) => (cur === rowId ? null : cur));
@@ -209,7 +209,7 @@ export default function AnswerKeyUploadPage() {
             setApplyResult(res.data);
             setPhase('applied');
         } catch (err: any) {
-            const msg = err.response?.data?.error || err.message || 'Failed to apply answers';
+            const msg = getErrorMessage(err, err.message || 'Failed to apply answers');
             toast.error(msg);
         } finally {
             setApplying(false);

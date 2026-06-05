@@ -4,7 +4,7 @@
  * NO question extraction - just content categorization
  */
 import React, { useState, useEffect } from 'react';
-import { api } from '../../hooks/useApi';
+import { api, getErrorMessage } from '../../hooks/useApi';
 import { toast } from "react-toastify";
 import {
   Download,
@@ -84,7 +84,7 @@ const SubjectContentPreview: React.FC<SubjectContentPreviewProps> = ({
       }
     } catch (err: any) {
       console.error('Failed to fetch subject contents:', err);
-      setError(err.response?.data?.error || 'Failed to load subject content');
+      setError(getErrorMessage(err, 'Failed to load subject content'));
     } finally {
       setLoading(false);
     }

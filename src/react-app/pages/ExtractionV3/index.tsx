@@ -8,7 +8,7 @@ import {
     Edit3, Trash2, Save
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 
 // Types for Review
 interface ExtractedQuestion {
@@ -183,7 +183,7 @@ export default function ExtractionV3Page() {
         } catch (err: any) {
             console.error(err);
             setStep('upload');
-            setError(err.response?.data?.error || 'Upload failed');
+            setError(getErrorMessage(err, 'Upload failed'));
         }
     };
 
@@ -209,7 +209,7 @@ export default function ExtractionV3Page() {
             navigate(`/exams/${examId}`);
         } catch (err: any) {
             console.error("Import failed:", err);
-            toast.error(`Failed to import: ${err.response?.data?.error || err.message}`);
+            toast.error(`Failed to import: ${getErrorMessage(err, 'Import failed')}`);
         } finally {
             setImporting(false);
         }

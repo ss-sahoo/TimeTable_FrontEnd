@@ -26,7 +26,7 @@ import {
   List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { api, useApi } from '../hooks/useApi';
+import { api, useApi, getErrorMessage, getFieldErrors } from '../hooks/useApi';
 import { MarkingScheme } from '../../shared/types';
 import MarkingSchemeConfig from '../components/MarkingSchemeConfig';
 import { toast } from "react-toastify";
@@ -305,7 +305,7 @@ export default function PatternCreation() {
       console.log('Subject removed successfully');
     } catch (error: any) {
       console.error('Failed to remove subject:', error);
-      toast.error(error.response?.data?.error || 'Failed to remove subject. Please try again.');
+      toast.error(getErrorMessage(error, 'Failed to remove subject. Please try again.'));
     }
   };
 
@@ -395,15 +395,22 @@ export default function PatternCreation() {
       console.error('Failed to add subject:', error);
 
       // Handle the case where the subject already exists on the server but wasn't in our local list
+      const fieldErrs = getFieldErrors(error);
+      const legacyData = error.response?.data as Record<string, unknown> | undefined;
+      const legacyName = Array.isArray(legacyData?.name) ? (legacyData!.name as string[]) : undefined;
+      const legacyNonField = Array.isArray(legacyData?.non_field_errors) ? (legacyData!.non_field_errors as string[]) : undefined;
+      const nameErr = fieldErrs.name?.[0] ?? legacyName?.[0];
+      const nonFieldErr = fieldErrs.non_field_errors?.[0] ?? legacyNonField?.[0];
+
       if (error.response?.status === 400 &&
-        (error.response.data?.name?.[0]?.toLowerCase().includes('already exists') ||
-          error.response.data?.non_field_errors?.[0]?.toLowerCase().includes('already exists'))) {
+        (nameErr?.toLowerCase().includes('already exists') ||
+          nonFieldErr?.toLowerCase().includes('already exists'))) {
 
         const subjectName = newSubjectName.trim();
         await refetchSubjects();
         handleSubjectSelect(subjectName);
       } else {
-        setSubjectError(error.response?.data?.name?.[0] || error.response?.data?.error || 'Failed to add subject. Please try again.');
+        setSubjectError(nameErr || getErrorMessage(error, 'Failed to add subject. Please try again.'));
       }
     } finally {
       setAddingSubject(false);
@@ -759,16 +766,10 @@ export default function PatternCreation() {
 
       let errorMessage = 'Failed to save pattern. ';
       if (error.response?.data) {
-        if (error.response.data.error) {
-          errorMessage += error.response.data.detail || error.response.data.error;
-        } else if (error.response.data.detail) {
-          errorMessage += error.response.data.detail;
-        } else {
-          errorMessage += JSON.stringify(error.response.data);
-        }
+        errorMessage += getErrorMessage(error, JSON.stringify(error.response.data));
         setErrors(error.response.data);
       } else {
-        errorMessage += error.message || 'Unknown error';
+        errorMessage += getErrorMessage(error, 'Unknown error');
       }
 
       toast.error(errorMessage);
@@ -814,16 +815,10 @@ export default function PatternCreation() {
 
       let errorMessage = 'Failed to publish pattern. ';
       if (error.response?.data) {
-        if (error.response.data.error) {
-          errorMessage += error.response.data.detail || error.response.data.error;
-        } else if (error.response.data.detail) {
-          errorMessage += error.response.data.detail;
-        } else {
-          errorMessage += JSON.stringify(error.response.data);
-        }
+        errorMessage += getErrorMessage(error, JSON.stringify(error.response.data));
         setErrors(error.response.data);
       } else {
-        errorMessage += error.message || 'Unknown error';
+        errorMessage += getErrorMessage(error, 'Unknown error');
       }
 
       toast.error(errorMessage);

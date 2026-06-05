@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, AlertCircle, Loader2, Package, FileText, Tag } from 'lucide-react';
-import { api } from '../../hooks/useApi';
+import { api, getErrorMessage } from '../../hooks/useApi';
 
 interface FinalizationStepProps {
   examId: number;
@@ -179,7 +179,7 @@ export default function FinalizationStep({
       console.error('Import failed:', error);
       setImportResult({
         success: false,
-        error: error.response?.data?.error || 'Import failed',
+        error: getErrorMessage(error, 'Import failed'),
       });
     } finally {
       setImporting(false);

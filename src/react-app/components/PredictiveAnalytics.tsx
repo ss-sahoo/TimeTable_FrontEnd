@@ -4,7 +4,7 @@ import {
   Target, BarChart3, CheckCircle, 
   XCircle, Loader2, RefreshCw
 } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 
 interface PredictiveAnalyticsProps {
   examId: number;
@@ -92,10 +92,7 @@ const PredictiveAnalytics: React.FC<PredictiveAnalyticsProps> = ({ examId, examT
       const response = await api.get(`/exams/${examId}/performance-insights/`);
       setInsights(response.data);
     } catch (err) {
-      const errorMessage = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
-        : undefined;
-      setError(errorMessage || 'Failed to load predictive analytics');
+      setError(getErrorMessage(err, 'Failed to load predictive analytics'));
     } finally {
       setLoading(false);
     }

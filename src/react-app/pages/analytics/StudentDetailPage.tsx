@@ -6,7 +6,7 @@ import {
   CheckCircle, XCircle, MinusCircle, BarChart3, FileText, Calendar,
   Shield, TrendingUp
 } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 import GlassCard from '@/react-app/components/analytics/GlassCard';
 import ModernCard from '@/react-app/components/analytics/ModernCard';
 import ModernTabs from '@/react-app/components/analytics/ModernTabs';
@@ -83,7 +83,7 @@ export default function StudentDetailPage() {
       const response = await api.get(`/exams/exams/${examId}/student-result/${studentId}/`);
       setData(response.data);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load student details');
+      setError(getErrorMessage(err, 'Failed to load student details'));
     } finally {
       setLoading(false);
     }

@@ -4,7 +4,7 @@ import {
   Clock, Target, Award, Loader2, RefreshCw,
   Eye, EyeOff
 } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 
 interface ExamComparison {
   exam_id: number;
@@ -64,10 +64,7 @@ const ComparativeAnalysis: React.FC<ComparativeAnalysisProps> = ({
       
       setExams(examData);
     } catch (err) {
-      const errorMessage = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
-        : undefined;
-      setError(errorMessage || 'Failed to load comparison data');
+      setError(getErrorMessage(err, 'Failed to load comparison data'));
     } finally {
       setLoading(false);
     }

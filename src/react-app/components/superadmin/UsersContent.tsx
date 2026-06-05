@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { api } from "../../hooks/useApi";
+import { api, getErrorMessage } from "../../hooks/useApi";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { toast } from "react-toastify";
 import {
@@ -176,7 +176,7 @@ const UsersContent = () => {
       fetchUsers();
     } catch (error: any) {
       console.error("Error assigning center:", error);
-      setError(error.response?.data?.error || "Failed to assign center");
+      setError(getErrorMessage(error, "Failed to assign center"));
     } finally {
       setLoading(false);
     }
@@ -219,7 +219,7 @@ const UsersContent = () => {
       fetchUsers();
     } catch (error: any) {
       console.error("Error updating user:", error);
-      setError(error.response?.data?.detail || error.response?.data?.error || "Failed to update user");
+      setError(getErrorMessage(error, "Failed to update user"));
     } finally {
       setLoading(false);
     }
@@ -440,12 +440,7 @@ const UsersContent = () => {
       }
     } catch (error: any) {
       console.error("Error adding user:", error);
-      const errorMessage = error.response?.data?.detail ||
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        JSON.stringify(error.response?.data) ||
-        "Failed to add user";
-      setError(errorMessage);
+      setError(getErrorMessage(error, "Failed to add user"));
     } finally {
       setLoading(false);
     }
@@ -635,7 +630,7 @@ const UsersContent = () => {
       fetchUsers();
     } catch (error: any) {
       console.error("Error importing users:", error);
-      setError(error.response?.data?.detail || error.response?.data?.message || error.response?.data?.error || "Failed to import users");
+      setError(getErrorMessage(error, "Failed to import users"));
     } finally {
       setLoading(false);
     }

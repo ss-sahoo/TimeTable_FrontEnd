@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 import { useAuthContext } from '../contexts/AuthContext';
 import {
   TrendingUp,
@@ -93,7 +93,7 @@ export default function StudentAnalyticsOverview() {
       setData(response.data);
     } catch (err: any) {
       console.error('Error loading analytics:', err);
-      setError(err.response?.data?.error || 'Failed to load analytics');
+      setError(getErrorMessage(err, 'Failed to load analytics'));
     } finally {
       setLoading(false);
     }

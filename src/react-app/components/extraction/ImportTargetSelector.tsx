@@ -6,7 +6,7 @@
  * - Import to specific section within a subject
  */
 import React, { useState, useEffect } from 'react';
-import { api } from '../../hooks/useApi';
+import { api, getErrorMessage } from '../../hooks/useApi';
 import {
   Target,
   Layers,
@@ -158,7 +158,7 @@ const ImportTargetSelector: React.FC<ImportTargetSelectorProps> = ({
         }
       } catch (err: any) {
         console.error('Failed to fetch pattern data:', err);
-        setError(err.response?.data?.error || 'Failed to load pattern data');
+        setError(getErrorMessage(err, 'Failed to load pattern data'));
       } finally {
         setLoading(false);
       }

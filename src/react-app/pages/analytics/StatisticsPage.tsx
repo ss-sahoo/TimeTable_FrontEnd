@@ -5,7 +5,7 @@ import {
   BarChart3, TrendingUp, Target, TrendingDown, Clock, Users, AlertTriangle,
   Activity, Percent, Timer, UserCheck
 } from 'lucide-react';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 import ModernCard from '@/react-app/components/analytics/ModernCard';
 import StatCard from '@/react-app/components/analytics/StatCard';
 import GlassCard from '@/react-app/components/analytics/GlassCard';
@@ -78,7 +78,7 @@ export default function StatisticsPage() {
       const response = await api.get(`/exams/exams/${examId}/analytics/statistics/?${queryParams}`);
       setData(response.data);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load statistics');
+      setError(getErrorMessage(err, 'Failed to load statistics'));
     } finally {
       setLoading(false);
     }

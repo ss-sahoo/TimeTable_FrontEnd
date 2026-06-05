@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 import { useAuthContext } from '@/react-app/contexts/AuthContext';
 import { SkeletonChart, SkeletonCard, SkeletonText, SkeletonStatsCard } from '@/react-app/components/SkeletonLoader';
 import {
@@ -216,7 +216,7 @@ export default function StudentAnalytics() {
         statusText: err.response?.statusText,
         data: err.response?.data
       });
-      setError(err.response?.data?.error || err.message || 'Failed to load analytics data');
+      setError(getErrorMessage(err, 'Failed to load analytics data'));
     } finally {
       setLoading(false);
     }

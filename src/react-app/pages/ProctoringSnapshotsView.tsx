@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { ArrowLeft, Camera, AlertTriangle, CheckCircle, Clock, User, FileText, Filter } from 'lucide-react';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 
 interface Snapshot {
   timestamp: string;
@@ -67,7 +67,7 @@ const ProctoringSnapshotsView: React.FC = () => {
       setData(response.data);
       setError(null);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load snapshots');
+      setError(getErrorMessage(err, 'Failed to load snapshots'));
       console.error('Error loading snapshots:', err);
     } finally {
       setLoading(false);

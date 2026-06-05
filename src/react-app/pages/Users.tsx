@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useTimetableCenter } from '../contexts/TimetableCenterContext';
-import { api } from '../hooks/useApi';
+import { api, getErrorMessage } from '../hooks/useApi';
 
 interface UserData {
   id: number;
@@ -214,7 +214,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
       }
     } catch (error: any) {
       console.error('Bulk import failed:', error);
-      setActionError(error.response?.data?.error || error.response?.data?.detail || 'Failed to import users.');
+      setActionError(getErrorMessage(error, 'Failed to import users.'));
     } finally {
       setFormSubmitting(false);
     }
@@ -291,7 +291,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
       setInviteForm({ email: '', role: 'teacher', message: '' });
     } catch (error: any) {
       console.error('Failed to send invitation:', error);
-      setActionError(error.response?.data?.error || 'Failed to send invitation.');
+      setActionError(getErrorMessage(error, 'Failed to send invitation.'));
     } finally {
       setFormSubmitting(false);
     }
@@ -460,7 +460,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
 
     } catch (error: any) {
       console.error('Failed to create user:', error);
-      setActionError(error.response?.data?.error || error.response?.data?.detail || 'Failed to create user.');
+      setActionError(getErrorMessage(error, 'Failed to create user.'));
     } finally {
       setFormSubmitting(false);
     }

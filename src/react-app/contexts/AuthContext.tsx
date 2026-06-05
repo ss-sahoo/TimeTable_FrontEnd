@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { api } from '@/react-app/hooks/useApi';
+import { api, getErrorMessage } from '@/react-app/hooks/useApi';
 import { jwtDecode } from 'jwt-decode';
 import { deviceManager } from '@/react-app/services/DeviceManager';
 
@@ -299,12 +299,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logout(); // Ensure no stale tokens/user data
       setLoading(false);
 
-      // Extract error message from response
-      const errorMessage = error.response?.data?.detail ||
-        error.response?.data?.error ||
-        error.message ||
-        'Login failed. Please check your credentials.';
-      throw new Error(errorMessage);
+      throw new Error(getErrorMessage(error, 'Login failed. Please check your credentials.'));
     }
   };
 
