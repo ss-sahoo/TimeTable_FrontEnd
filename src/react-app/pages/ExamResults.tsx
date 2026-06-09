@@ -233,10 +233,77 @@ const ExamResults: React.FC = () => {
     () => (result ? Object.values(result.section_results || {}) : []),
     [result]
   );
-  const totalMarks = useMemo(
-    () => sectionValues.reduce((sum, section) => sum + (section.max_marks || 0), 0),
-    [sectionValues]
-  );
+  const attemptPercentageValue = useMemo(() => {
+    const raw = result?.attempt?.percentage;
+    const numeric = Number(raw);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+    const fallback = Number(result?.percentage);
+    return Number.isFinite(fallback) ? fallback : 0;
+  }, [result]);
+  const totalMarks = useMemo(() => {
+    // 1. Try to calculate from score and percentage if score > 0
+    const score = result?.attempt?.score || 0;
+    const pct = attemptPercentageValue;
+    if (score > 0 && pct > 0) {
+      return Math.round((score / pct) * 100);
+    }
+    
+    // 2. Try to get it from nested exam object if present
+    const examTotalMarks = (result?.attempt as any)?.exam?.total_marks;
+    if (examTotalMarks !== undefined && examTotalMarks !== null) {
+      return examTotalMarks;
+    }
+    
+    // 3. Fallback to section results sum
+    return sectionValues.reduce((sum, section) => sum + (section.max_marks || 0), 0);
+  }, [result, attemptPercentageValue, sectionValues]);
+  const totalQuestions = useMemo(() => {
+    if (!result) return 0;
+    
+    // Filter detailed answers by cumulative max_marks
+    const entries = Object.entries(result.detailed_answers || {}).map(([key, value]) => ({
+      id: key,
+      ...value,
+    }));
+
+    const uniqueMap = new Map<string, typeof entries[0]>();
+    entries.forEach((entry) => {
+      const uniqueKey = `${entry.subject || 'General'}-${entry.question_number || entry.id}`;
+      const existing = uniqueMap.get(uniqueKey);
+      if (!existing) {
+        uniqueMap.set(uniqueKey, entry);
+      } else {
+        const existingHasAnswer = existing.user_answer && existing.user_answer.trim() !== '';
+        const newHasAnswer = entry.user_answer && entry.user_answer.trim() !== '';
+        if (!existingHasAnswer && newHasAnswer) {
+          uniqueMap.set(uniqueKey, entry);
+        }
+      }
+    });
+
+    let uniqueEntries = Array.from(uniqueMap.values());
+    uniqueEntries.sort((a, b) => {
+      const subjectA = (a.subject || 'General').toLowerCase();
+      const subjectB = (b.subject || 'General').toLowerCase();
+      if (subjectA !== subjectB) return subjectA.localeCompare(subjectB);
+      return (a.question_number || 0) - (b.question_number || 0);
+    });
+
+    let cumulativeMarks = 0;
+    let count = 0;
+    for (const entry of uniqueEntries) {
+      cumulativeMarks += entry.max_marks || 0;
+      if (cumulativeMarks <= totalMarks) {
+        count++;
+      } else {
+        break;
+      }
+    }
+    
+    return count || (result?.attempt as any)?.exam?.total_questions || result.total_questions;
+  }, [result, totalMarks]);
   const availableSections = useMemo(
     () => sectionValues.filter(section => section.status === 'available'),
     [sectionValues]
@@ -292,32 +359,60 @@ const ExamResults: React.FC = () => {
       return numA - numB;
     });
 
+    // Filter out questions that exceed the cumulative max_marks of the attempt
+    let cumulativeMarks = 0;
+    const filteredByMarks: typeof uniqueEntries = [];
+    for (const entry of uniqueEntries) {
+      cumulativeMarks += entry.max_marks || 0;
+      if (cumulativeMarks <= totalMarks) {
+        filteredByMarks.push(entry);
+      } else {
+        break;
+      }
+    }
+
     // Apply filter
     if (detailFilter === 'correct') {
-      return uniqueEntries.filter((entry) => entry.is_correct);
+      return filteredByMarks.filter((entry) => entry.is_correct);
     }
     if (detailFilter === 'incorrect') {
-      return uniqueEntries.filter((entry) => !entry.is_correct);
+      return filteredByMarks.filter((entry) => !entry.is_correct);
     }
-    return uniqueEntries;
-  }, [result, detailFilter]);
+    return filteredByMarks;
+  }, [result, detailFilter, totalMarks]);
   const accuracy = useMemo(() => {
     if (!result || totalMarks === 0) return 0;
     return ((result.attempt?.score || 0) / totalMarks) * 100;
   }, [result, totalMarks]);
-  const attemptPercentageValue = useMemo(() => {
-    const raw = result?.attempt?.percentage;
-    const numeric = Number(raw);
-    if (Number.isFinite(numeric)) {
-      return numeric;
-    }
-    const fallback = Number(result?.percentage);
-    return Number.isFinite(fallback) ? fallback : 0;
-  }, [result]);
   const performance = useMemo(
     () => getPerformanceLevel(attemptPercentageValue),
     [attemptPercentageValue]
   );
+  
+  const getSectionMaxMarks = React.useCallback((section: any) => {
+    // Filter detailedEntries (original questions the student took) that match this section's type
+    const matchingQuestions = detailedEntries.filter(q => {
+      const typeMatches = q.question_type === section.question_type;
+      if (q.subject && section.section_name) {
+        const subjectLower = q.subject.toLowerCase();
+        const sectionNameLower = section.section_name.toLowerCase();
+        return typeMatches && (sectionNameLower.includes(subjectLower) || subjectLower.includes(sectionNameLower));
+      }
+      return typeMatches;
+    });
+
+    if (matchingQuestions.length > 0) {
+      return matchingQuestions.reduce((sum, q) => sum + (q.max_marks || 0), 0);
+    }
+
+    const currentTotalMarks = sectionValues.reduce((sum, s) => sum + (s.max_marks || 0), 0);
+    if (currentTotalMarks > 0) {
+      return Math.round(section.max_marks * (totalMarks / currentTotalMarks));
+    }
+
+    return section.max_marks;
+  }, [detailedEntries, totalMarks, sectionValues]);
+
   const canDownloadAnswerSheet = activeTab === 'detailed' && detailedEntries.length > 0;
 
   const RenderStudentAnswer = ({ answer }: { answer: string }) => {
@@ -676,7 +771,7 @@ const ExamResults: React.FC = () => {
                 <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
                   <p className="text-xs uppercase tracking-wide text-blue-600">Score</p>
                   <p className="text-2xl font-bold text-blue-900 mt-1">{attempt.score || 0}</p>
-                  <p className="text-xs text-blue-700">out of {totalMarks || result.total_questions}</p>
+                  <p className="text-xs text-blue-700">out of {totalMarks}</p>
                 </div>
                 <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                   <p className="text-xs uppercase tracking-wide text-emerald-600">Accuracy</p>
@@ -707,7 +802,7 @@ const ExamResults: React.FC = () => {
               </button>
               <div className="p-3 border border-slate-100 rounded-xl bg-slate-50">
                 <p className="text-xs text-slate-500 uppercase">Questions Attempted</p>
-                <p className="text-lg font-semibold text-slate-900 mt-1">{result.total_questions}</p>
+                <p className="text-lg font-semibold text-slate-900 mt-1">{totalQuestions}</p>
                 <p className="text-xs text-slate-500">Across sections</p>
               </div>
               <div className="p-3 border border-slate-100 rounded-xl bg-slate-50">
@@ -819,7 +914,7 @@ const ExamResults: React.FC = () => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-slate-600">Total Questions:</span>
-                        <span className="font-medium">{result.total_questions}</span>
+                        <span className="font-medium">{totalQuestions}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">Correct Answers:</span>
@@ -854,7 +949,7 @@ const ExamResults: React.FC = () => {
                             </div>
                             <div className="text-right">
                               <p className="text-base font-semibold text-green-600">
-                                {section.score || 0}/{section.max_marks}
+                                {section.score || 0}/{getSectionMaxMarks(section)}
                               </p>
                               <p className="text-xs text-slate-500">{section.feedback}</p>
                             </div>
@@ -931,7 +1026,7 @@ const ExamResults: React.FC = () => {
                               </div>
                               <div className="text-right">
                                 <p className="text-lg font-bold text-green-600">
-                                  {section.score || 0}/{section.max_marks}
+                                  {section.score || 0}/{getSectionMaxMarks(section)}
                                 </p>
                                 <p className="text-xs text-slate-500">{section.feedback}</p>
                               </div>
@@ -1027,7 +1122,7 @@ const ExamResults: React.FC = () => {
                         </div>
                         <div>
                           <p className="text-xs uppercase text-slate-400">Total Marks</p>
-                          <p className="font-semibold text-slate-900">{totalMarks || result.total_questions}</p>
+                          <p className="font-semibold text-slate-900">{totalMarks}</p>
                         </div>
                         <div>
                           <p className="text-xs uppercase text-slate-400">Duration</p>
@@ -1039,7 +1134,7 @@ const ExamResults: React.FC = () => {
                     {/* Performance summary for PDF */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {[
-                        { label: 'Score', value: `${attempt.score || 0} / ${totalMarks || result.total_questions}` },
+                        { label: 'Score', value: `${attempt.score || 0} / ${totalMarks}` },
                         { label: 'Accuracy', value: `${accuracy.toFixed(1)}%` },
                         { label: 'Violations', value: `${attempt.violations_count}` },
                         { label: 'Sections graded', value: `${availableSections.length}` },

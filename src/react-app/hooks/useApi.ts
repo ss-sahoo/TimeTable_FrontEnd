@@ -116,12 +116,16 @@ const getDefaultApiUrl = () => {
       return 'https://exams.dashoapp.com/api'; // Timetable uses same backend
     }
 
-    // For development
+    // For local development
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      // Use 127.0.0.1 (not 0.0.0.0): Safari/WebKit refuses to connect to
-      // 0.0.0.0, causing requests to hang forever. Chrome/Firefox silently
-      // remap it, which is why this only broke on Safari.
-      return 'http://127.0.0.1:8000/api';
+      // Option A: Use local backend (direct connection)
+      // return 'http://127.0.0.1:8000/api';
+
+      // Option B: Use production backend (via relative path + Vite proxy to avoid CORS issues)
+      return '/api';
+
+      // Option C: Use production backend directly (triggers CORS issues in local development)
+      // return 'https://exams.dashoapp.com/api';
     }
 
     // For production exams domain or any other domain
@@ -151,7 +155,8 @@ api.interceptors.request.use(
 
     // Add device fingerprint to headers if available
     const deviceFingerprint = localStorage.getItem('device_fingerprint');
-    if (deviceFingerprint) {
+    const isAuthEndpoint = config.url?.includes('/auth/login/') || config.url?.includes('/auth/logout/') || config.url?.includes('/auth/token/refresh/');
+    if (deviceFingerprint && !isAuthEndpoint) {
       config.headers['X-Device-Fingerprint'] = deviceFingerprint;
     }
 
