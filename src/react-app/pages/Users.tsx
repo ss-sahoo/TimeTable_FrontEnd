@@ -54,6 +54,8 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [addUserModalOpen, setAddUserModalOpen] = useState(false);
   const [bulkImportModalOpen, setBulkImportModalOpen] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+  const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
   const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
   const [bulkImportResults, setBulkImportResults] = useState<any>(null);
   const [addUserForm, setAddUserForm] = useState({
@@ -255,6 +257,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
     setInviteModalOpen(false);
     setAddUserModalOpen(false);
     setBulkImportModalOpen(false);
+    setBulkDeleteModalOpen(false);
     setSelectedUser(null);
     setFormSubmitting(false);
     setBulkImportFile(null);
@@ -335,6 +338,43 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
     } catch (error: any) {
       console.error('Failed to delete user:', error);
       setActionError(error.response?.data?.detail || 'Failed to delete user.');
+      setFormSubmitting(false);
+    }
+  };
+
+  const handleSelectUser = (id: number | string) => {
+    const numericId = Number(id);
+    if (isNaN(numericId)) return;
+    setSelectedUserIds(prev => {
+      const next = prev.includes(numericId) ? prev.filter(x => x !== numericId) : [...prev, numericId];
+      console.log('Selected User IDs updated:', next);
+      return next;
+    });
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      const allIds = filteredUsers.map(u => Number(u.id)).filter(id => !isNaN(id));
+      console.log('Selecting all matching user IDs:', allIds);
+      setSelectedUserIds(allIds);
+    } else {
+      console.log('Clearing all selected user IDs');
+      setSelectedUserIds([]);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setFormSubmitting(true);
+    setActionError(null);
+    try {
+      await Promise.all(selectedUserIds.map(id => api.delete(`/auth/users/${id}/`)));
+      setSelectedUserIds([]);
+      setBulkDeleteModalOpen(false);
+      await fetchUsers();
+    } catch (error: any) {
+      console.error('Failed to bulk delete users:', error);
+      setActionError('Failed to delete some selected users. Please try again.');
+    } finally {
       setFormSubmitting(false);
     }
   };
@@ -700,6 +740,18 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
                   style={{ borderColor: '#e5e7eb' }}
                 />
               </div>
+              {user?.role?.toLowerCase() !== 'teacher' && user?.role?.toLowerCase() !== 'student' && selectedUserIds.length > 0 && (
+                <button
+                  onClick={() => setBulkDeleteModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-white rounded-lg transition-colors"
+                  style={{ backgroundColor: '#ef4444' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Selected ({selectedUserIds.length})
+                </button>
+              )}
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className="inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-lg transition-colors"
@@ -742,7 +794,12 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
                 <thead className="border-b bg-slate-50 dark:bg-gray-700 border-slate-200 dark:border-gray-600">
                   <tr>
                     <th className="px-4 py-3 text-left">
-                      <input type="checkbox" className="rounded" />
+                      <input
+                        type="checkbox"
+                        className="rounded"
+                        checked={filteredUsers.length > 0 && filteredUsers.every(u => selectedUserIds.includes(Number(u.id)))}
+                        onChange={handleSelectAll}
+                      />
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-gray-300">User Details</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-gray-300">Role</th>
@@ -756,7 +813,12 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
                   {filteredUsers.map((userData) => (
                     <tr key={userData.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-4 py-3">
-                        <input type="checkbox" className="rounded" />
+                        <input
+                          type="checkbox"
+                          className="rounded"
+                          checked={selectedUserIds.includes(Number(userData.id))}
+                          onChange={() => handleSelectUser(userData.id)}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -873,7 +935,7 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
 
       {/* Modals */}
       {
-        (viewModalOpen || editModalOpen || deleteModalOpen || inviteModalOpen || addUserModalOpen || bulkImportModalOpen) && (
+        (viewModalOpen || editModalOpen || deleteModalOpen || inviteModalOpen || addUserModalOpen || bulkImportModalOpen || bulkDeleteModalOpen) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
             <div className="relative w-full max-w-lg rounded-xl bg-white shadow-xl">
               <button
@@ -1293,6 +1355,35 @@ export default function Users({ selectedCenterId: propCenterId }: { selectedCent
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {bulkDeleteModalOpen && (
+                <div className="p-6 space-y-4">
+                  <h2 className="text-xl font-semibold text-red-600">Delete Selected Users</h2>
+                  {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+                  <p className="text-sm text-slate-700">
+                    Are you sure you want to delete the <strong>{selectedUserIds.length}</strong> selected users? This action cannot be undone.
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={closeModals} className="px-4 py-2 text-sm rounded-lg border">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleBulkDelete}
+                      disabled={formSubmitting}
+                      className="px-4 py-2 text-sm rounded-lg text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {formSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        'Delete All'
+                      )}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

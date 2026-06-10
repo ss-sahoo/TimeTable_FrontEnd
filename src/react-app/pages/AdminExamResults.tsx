@@ -18,7 +18,8 @@ import {
   SortDesc,
   CheckCircle,
   Camera,
-  Award
+  Award,
+  Loader2
 } from 'lucide-react';
 
 interface StudentResult {
@@ -86,6 +87,43 @@ const AdminExamResults: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [statusFilter, setStatusFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingAttemptId, setLoadingAttemptId] = useState<number | null>(null);
+
+  const handleViewResult = async (studentId: number) => {
+    try {
+      setLoadingAttemptId(studentId);
+      const response = await api.get(`/exams/exams/${examId}/student-result/${studentId}/`);
+      const attemptId = response.data.attempt_id;
+      if (attemptId) {
+        navigate(`${basePath}/exam-results/${attemptId}`);
+      } else {
+        toast.error('No attempt found for this student');
+      }
+    } catch (error) {
+      console.error('Failed to get student attempt:', error);
+      toast.error('Failed to load student result detail');
+    } finally {
+      setLoadingAttemptId(null);
+    }
+  };
+
+  const handleViewProctoring = async (studentId: number) => {
+    try {
+      setLoadingAttemptId(studentId);
+      const response = await api.get(`/exams/exams/${examId}/student-result/${studentId}/`);
+      const attemptId = response.data.attempt_id;
+      if (attemptId) {
+        navigate(`${basePath}/proctoring-snapshots/${attemptId}`);
+      } else {
+        toast.error('No attempt found for this student');
+      }
+    } catch (error) {
+      console.error('Failed to get student attempt:', error);
+      toast.error('Failed to load proctoring snapshots');
+    } finally {
+      setLoadingAttemptId(null);
+    }
+  };
 
   useEffect(() => {
     loadExamResults();
@@ -103,7 +141,7 @@ const AdminExamResults: React.FC = () => {
         status: statusFilter
       });
       
-      const response = await api.get(`/exams/${examId}/results-dashboard/?${params}`);
+      const response = await api.get(`/exams/exams/${examId}/results-dashboard/?${params}`);
       setData(response.data);
       setError(null);
     } catch (error: any) {
@@ -133,7 +171,7 @@ const AdminExamResults: React.FC = () => {
 
   const handleExportCSV = async () => {
     try {
-      const response = await api.get(`/exams/${examId}/export/csv/`, {
+      const response = await api.get(`/exams/exams/${examId}/export/csv/`, {
         responseType: 'blob'
       });
       
@@ -156,7 +194,7 @@ const AdminExamResults: React.FC = () => {
 
   const handleExportExcel = async () => {
     try {
-      const response = await api.get(`/exams/${examId}/export/excel/`, {
+      const response = await api.get(`/exams/exams/${examId}/export/excel/`, {
         responseType: 'blob'
       });
       
@@ -221,6 +259,14 @@ const AdminExamResults: React.FC = () => {
       default:
         return 'text-gray-600 bg-gray-50';
     }
+  };
+
+  const getAttemptTotalMarks = (result: StudentResult) => {
+    if (result.score > 0 && result.percentage > 0) {
+      const computed = Math.round((result.score * 100) / result.percentage);
+      if (computed > 0) return computed;
+    }
+    return data?.exam?.total_marks || 0;
   };
 
   // Calculate statistics
@@ -527,7 +573,7 @@ const AdminExamResults: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="text-sm font-semibold text-slate-900">
-                        {result.score} / {data.exam.total_marks}
+                        {result.score} / {getAttemptTotalMarks(result)}
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
@@ -571,19 +617,29 @@ const AdminExamResults: React.FC = () => {
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => navigate(`${basePath}/exam-results/${result.task_no}`)}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          onClick={() => handleViewResult(result.student_id)}
+                          disabled={loadingAttemptId !== null}
+                          className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-55"
                           title="View detailed results"
                         >
-                          <Eye className="w-4 h-4" />
+                          {loadingAttemptId === result.student_id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
                         </button>
                         {result.violations_count > 0 && (
                           <button
-                            onClick={() => navigate(`${basePath}/proctoring-snapshots/${result.task_no}`)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            onClick={() => handleViewProctoring(result.student_id)}
+                            disabled={loadingAttemptId !== null}
+                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-55"
                             title="View proctoring snapshots"
                           >
-                            <Camera className="w-4 h-4" />
+                            {loadingAttemptId === result.student_id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Camera className="w-4 h-4" />
+                            )}
                           </button>
                         )}
                       </div>

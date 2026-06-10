@@ -52,6 +52,9 @@ interface Exam {
   violations_count?: number;
   results_hidden?: boolean;
   results_available_at?: string;
+  // If provided by backend, use these to show the original attempt totals
+  attempt_total_marks?: number;
+  attempt_total_questions?: number;
 }
 
 type ExamStatus = 'all' | 'available' | 'scheduled' | 'ongoing' | 'completed';
@@ -147,8 +150,10 @@ export default function StudentExamList() {
     setFilteredExams(filtered);
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'N/A';
     const month = date.toLocaleDateString('en-US', { month: 'short' });
     const day = date.getDate();
     const year = date.getFullYear();
@@ -166,6 +171,32 @@ export default function StudentExamList() {
     const minutes = Math.floor((seconds % 3600) / 60);
     if (hours > 0) return `${hours}h ${minutes}m`;
     return `${minutes}m`;
+  };
+
+  const getAttemptTotalMarks = (exam: Exam) => {
+    if (exam.attempt_total_marks !== undefined && exam.attempt_total_marks !== null) {
+      return exam.attempt_total_marks;
+    }
+    if (exam.latest_percentage !== undefined && exam.latest_percentage !== null && exam.latest_percentage > 0 && exam.latest_score !== undefined && exam.latest_score !== null) {
+      const computed = Math.round((exam.latest_score * 100) / exam.latest_percentage);
+      if (computed > 0) return computed;
+    }
+    return exam.total_marks || 0;
+  };
+
+  const getAttemptTotalQuestions = (exam: Exam) => {
+    if (exam.attempt_total_questions !== undefined && exam.attempt_total_questions !== null) {
+      return exam.attempt_total_questions;
+    }
+    
+    // Calculate if we have computed attempt total marks and it differs from current total_marks
+    const attemptMarks = getAttemptTotalMarks(exam);
+    if (attemptMarks > 0 && exam.total_marks > 0 && attemptMarks !== exam.total_marks) {
+      const computed = Math.round(exam.total_questions * (attemptMarks / exam.total_marks));
+      if (computed > 0) return computed;
+    }
+    
+    return exam.total_questions || 0;
   };
 
   const getStatusBadge = (status: string) => {
@@ -438,11 +469,19 @@ export default function StudentExamList() {
                   <div className="grid grid-cols-2 gap-3 mt-4">
                     <div className="flex items-center gap-2 text-sm text-slate-600">
                       <BookOpen className="w-4 h-4 text-blue-600" />
-                      <span>{exam.total_questions} Questions</span>
+                      <span>
+                        {exam.status === 'completed' || exam.status === 'disqualified'
+                          ? getAttemptTotalQuestions(exam)
+                          : exam.total_questions} Questions
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-slate-600">
                       <Award className="w-4 h-4 text-green-600" />
-                      <span>{exam.total_marks} Marks</span>
+                      <span>
+                        {exam.status === 'completed' || exam.status === 'disqualified'
+                          ? getAttemptTotalMarks(exam)
+                          : exam.total_marks} Marks
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-slate-600">
                       <Timer className="w-4 h-4 text-orange-600" />
@@ -511,7 +550,7 @@ export default function StudentExamList() {
                         <span className="text-sm font-medium text-slate-700">Your Score:</span>
                         <div className="flex items-center gap-2">
                           <span className="text-lg font-bold text-blue-600">
-                            {exam.latest_score}/{exam.total_marks}
+                            {exam.latest_score}/{getAttemptTotalMarks(exam)}
                           </span>
                           <span className="text-sm text-slate-600">({exam.latest_percentage.toFixed(0)}%)</span>
                         </div>

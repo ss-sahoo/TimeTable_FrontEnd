@@ -126,6 +126,32 @@ const ExamReview: React.FC = () => {
   const [marks, setMarks] = useState<{ [key: string]: number }>({});
   const [saving, setSaving] = useState(false);
 
+  const filteredDetailedAnswers = React.useMemo(() => {
+    if (!reviewData?.detailed_answers) return [];
+    const entries = Object.entries(reviewData.detailed_answers).map(([key, value]) => ({
+      key,
+      ...value,
+    }));
+    entries.sort((a, b) => (a.question_id || 0) - (b.question_id || 0));
+    
+    const totalMarksLimit = reviewData.attempt?.exam?.total_marks;
+    if (totalMarksLimit === undefined || totalMarksLimit === null) {
+      return entries;
+    }
+    
+    let cumulativeMarks = 0;
+    const resultList: typeof entries = [];
+    for (const entry of entries) {
+      cumulativeMarks += entry.marks || 0;
+      if (cumulativeMarks <= totalMarksLimit) {
+        resultList.push(entry);
+      } else {
+        break;
+      }
+    }
+    return resultList;
+  }, [reviewData]);
+
   useEffect(() => {
     if (attemptId) {
       loadExamReview();
@@ -508,8 +534,8 @@ const ExamReview: React.FC = () => {
                 </div>
 
                 <div className="space-y-4">
-                  {Object.entries(reviewData.detailed_answers).map(([questionId, answer]) => (
-                    <div key={questionId} className="bg-gray-50 p-6 rounded-lg">
+                  {filteredDetailedAnswers.map((answer) => (
+                    <div key={answer.key} className="bg-gray-50 p-6 rounded-lg">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-3">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -658,8 +684,8 @@ const ExamReview: React.FC = () => {
                 </div>
 
                 <div className="space-y-4">
-                  {Object.entries(reviewData.detailed_answers).map(([questionId, answer]) => (
-                    <div key={questionId} className="bg-gray-50 p-6 rounded-lg">
+                  {filteredDetailedAnswers.map((answer) => (
+                    <div key={answer.key} className="bg-gray-50 p-6 rounded-lg">
                       <div className="flex items-center justify-between mb-4">
                         <h4 className="font-medium text-gray-900">Question {answer.question_id}</h4>
                         <div className="flex items-center gap-2">
@@ -670,8 +696,8 @@ const ExamReview: React.FC = () => {
                             max={answer.marks}
                             step="0.5"
                             placeholder="Marks"
-                            value={marks[questionId] || answer.user_marks || ''}
-                            onChange={(e) => setMarks({ ...marks, [questionId]: parseFloat(e.target.value) })}
+                            value={marks[answer.key] || answer.user_marks || ''}
+                            onChange={(e) => setMarks({ ...marks, [answer.key]: parseFloat(e.target.value) })}
                             className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
                           />
                         </div>
@@ -686,8 +712,8 @@ const ExamReview: React.FC = () => {
                           Feedback for this question:
                         </label>
                         <textarea
-                          value={feedback[questionId] || ''}
-                          onChange={(e) => setFeedback({ ...feedback, [questionId]: e.target.value })}
+                          value={feedback[answer.key] || ''}
+                          onChange={(e) => setFeedback({ ...feedback, [answer.key]: e.target.value })}
                           placeholder="Provide feedback for the student's answer..."
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           rows={3}

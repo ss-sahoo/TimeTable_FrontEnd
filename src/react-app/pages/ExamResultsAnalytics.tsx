@@ -145,7 +145,7 @@ export default function ExamResultsAnalytics() {
         status: statusFilter
       });
       
-      const response = await api.get(`/exams/${examId}/results-dashboard/?${params}`);
+      const response = await api.get(`/exams/exams/${examId}/results-dashboard/?${params}`);
       setResultsData(response.data);
     } catch (error) {
       console.error('Error loading results:', error);
@@ -157,7 +157,7 @@ export default function ExamResultsAnalytics() {
   const loadAnalyticsData = async () => {
     try {
       setLoadingAnalytics(true);
-      const response = await api.get(`/exams/${examId}/analytics-dashboard/`);
+      const response = await api.get(`/exams/exams/${examId}/analytics-dashboard/`);
       setAnalyticsData(response.data);
     } catch (error) {
       console.error('Error loading analytics:', error);
