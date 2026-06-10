@@ -591,16 +591,22 @@ export default function PatternCreation() {
       subjectSectionsSorted.forEach((s) => {
         const startQ = typeof s.start_question === 'number' ? s.start_question : (parseInt(String(s.start_question)) || 1);
         const endQ = typeof s.end_question === 'number' ? s.end_question : (parseInt(String(s.end_question)) || 1);
-        const length = Math.max(0, endQ - startQ + 1);
+        const length = Math.max(1, endQ - startQ + 1);
 
         const newStart = currentQ;
-        const newEnd = currentQ + Math.max(length, 1) - 1;
+        const newEnd = currentQ + length - 1;
+
+        // Preserve min_questions if it fits in the new range, otherwise cap it
+        let newMin = s.min_questions_to_attempt;
+        if (typeof newMin !== 'number') newMin = parseInt(String(newMin)) || length;
+        if (newMin > length) newMin = length;
+        if (newMin < 0) newMin = 0;
 
         finalSections[s.originalIndex] = {
           ...finalSections[s.originalIndex],
           start_question: newStart,
           end_question: newEnd,
-          min_questions_to_attempt: Math.max(length, 1)
+          min_questions_to_attempt: newMin
         };
 
         currentQ = newEnd + 1;

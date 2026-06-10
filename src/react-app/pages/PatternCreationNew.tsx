@@ -275,11 +275,15 @@ export default function PatternCreation() {
         const newStart = currentQ;
         const newEnd = currentQ + Math.max(length, 1) - 1;
 
+        // Preserve min_questions if it fits in the new range, otherwise cap it
+        let newMin = s.min_questions_to_attempt;
+        if (newMin > length) newMin = Math.max(length, 1);
+
         finalSections[s.originalIndex] = {
           ...finalSections[s.originalIndex],
           start_question: newStart,
           end_question: newEnd,
-          min_questions_to_attempt: Math.max(length, 1)
+          min_questions_to_attempt: newMin
         };
 
         currentQ = newEnd + 1;
