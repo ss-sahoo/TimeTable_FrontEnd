@@ -119,10 +119,10 @@ const getDefaultApiUrl = () => {
     // For local development
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       // Option A: Use local backend (direct connection)
-      // return 'http://127.0.0.1:8000/api';
+      return 'http://127.0.0.1:8000/api';
 
       // Option B: Use production backend (via relative path + Vite proxy to avoid CORS issues)
-      return '/api';
+      // return '/api';
 
       // Option C: Use production backend directly (triggers CORS issues in local development)
       // return 'https://exams.dashoapp.com/api';
