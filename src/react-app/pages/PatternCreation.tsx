@@ -462,10 +462,38 @@ export default function PatternCreation() {
       marking_scheme: defaultMarkingScheme,
     };
 
-    setPattern(prev => ({
-      ...prev,
-      sections: [...prev.sections, newSection],
-    }));
+    setPattern(prev => {
+      const newSections = [...prev.sections, newSection];
+
+      // Align sections for this subject
+      const subjectSectionsSorted = newSections
+        .map((s, i) => ({ ...s, originalIndex: i }))
+        .filter(s => s.subject === subjectName)
+        .sort((a, b) => a.order - b.order);
+
+      let currentQ = 1;
+      subjectSectionsSorted.forEach((s) => {
+        const startQ = typeof s.start_question === 'number' ? s.start_question : (parseInt(String(s.start_question)) || 1);
+        const endQ = typeof s.end_question === 'number' ? s.end_question : (parseInt(String(s.end_question)) || 1);
+        const length = Math.max(0, endQ - startQ + 1);
+
+        const newStart = currentQ;
+        const newEnd = currentQ + Math.max(length, 1) - 1;
+
+        newSections[s.originalIndex] = {
+          ...newSections[s.originalIndex],
+          start_question: newStart,
+          end_question: newEnd,
+          min_questions_to_attempt: Math.max(length, 1)
+        };
+        currentQ = newEnd + 1;
+      });
+
+      return {
+        ...prev,
+        sections: newSections
+      };
+    });
     setNextSectionOrder(prev => prev + 1);
 
     // Scroll to the subject group and highlight it
@@ -533,31 +561,54 @@ export default function PatternCreation() {
 
   const updateSection = (index: number, field: keyof PatternSection, value: any) => {
     setPattern(prev => {
-      const updatedSections = [...prev.sections];
-      let currentSection = { ...updatedSections[index], [field]: value };
+      // 1. Update the target section
+      const updatedSections = prev.sections.map((section, i) => {
+        if (i !== index) return section;
 
-      if (field === 'start_question' || field === 'end_question') {
-        const startRaw = currentSection.start_question;
-        const endRaw = currentSection.end_question;
-        const startQ = typeof startRaw === 'number' ? startRaw : parseInt(String(startRaw), 10);
-        const endQ = typeof endRaw === 'number' ? endRaw : parseInt(String(endRaw), 10);
+        let updatedSection = { ...section, [field]: value };
 
-        if (Number.isFinite(startQ) && Number.isFinite(endQ) && endQ >= startQ) {
-          currentSection = {
-            ...currentSection,
-            min_questions_to_attempt: Math.max(endQ - startQ + 1, 1),
-          };
+        // Handle numeric inputs
+        if (field === 'start_question' || field === 'end_question' || field === 'min_questions_to_attempt') {
+          const numValue = parseInt(String(value), 10);
+          updatedSection = { ...updatedSection, [field]: isNaN(numValue) ? '' : numValue };
         }
-      }
 
-      updatedSections[index] = currentSection;
+        return updatedSection;
+      });
 
-      // REMOVED: Auto-update subsequent sections' start_question when end_question changes
-      // This was causing automatic calculation - users should manually set end_question values
+      // 2. Automatically align all sections within the SAME SUBJECT
+      const targetSubject = updatedSections[index].subject;
+
+      // Filter and sort sections for this subject by order
+      const subjectSectionsSorted = updatedSections
+        .map((s, i) => ({ ...s, originalIndex: i }))
+        .filter(s => s.subject === targetSubject)
+        .sort((a, b) => a.order - b.order);
+
+      let currentQ = 1;
+      const finalSections = [...updatedSections];
+
+      subjectSectionsSorted.forEach((s) => {
+        const startQ = typeof s.start_question === 'number' ? s.start_question : (parseInt(String(s.start_question)) || 1);
+        const endQ = typeof s.end_question === 'number' ? s.end_question : (parseInt(String(s.end_question)) || 1);
+        const length = Math.max(0, endQ - startQ + 1);
+
+        const newStart = currentQ;
+        const newEnd = currentQ + Math.max(length, 1) - 1;
+
+        finalSections[s.originalIndex] = {
+          ...finalSections[s.originalIndex],
+          start_question: newStart,
+          end_question: newEnd,
+          min_questions_to_attempt: Math.max(length, 1)
+        };
+
+        currentQ = newEnd + 1;
+      });
 
       return {
         ...prev,
-        sections: updatedSections
+        sections: finalSections
       };
     });
 
@@ -585,26 +636,36 @@ export default function PatternCreation() {
 
   const removeSection = (index: number) => {
     setPattern(prev => {
-      const updatedSections = prev.sections.filter((_, i) => i !== index);
+      const subjectToRemoveFrom = prev.sections[index].subject;
+      const newSections = prev.sections.filter((_, i) => i !== index);
 
-      // Recalculate question numbers for remaining sections
-      let currentQuestion = 1;
-      const recalculatedSections = updatedSections.map(section => {
-        const startQ = typeof section.start_question === 'string' ? parseInt(section.start_question) || 0 : section.start_question;
-        const endQ = typeof section.end_question === 'string' ? parseInt(section.end_question) || 0 : section.end_question;
-        const questionsInSection = endQ - startQ + 1;
-        const newSection = {
-          ...section,
-          start_question: currentQuestion,
-          end_question: currentQuestion + questionsInSection - 1
+      // Re-align remaining sections for that subject
+      const subjectSectionsSorted = newSections
+        .map((s, i) => ({ ...s, originalIndex: i }))
+        .filter(s => s.subject === subjectToRemoveFrom)
+        .sort((a, b) => a.order - b.order);
+
+      let currentQ = 1;
+      subjectSectionsSorted.forEach((s) => {
+        const startQ = typeof s.start_question === 'number' ? s.start_question : (parseInt(String(s.start_question)) || 1);
+        const endQ = typeof s.end_question === 'number' ? s.end_question : (parseInt(String(s.end_question)) || 1);
+        const length = Math.max(0, endQ - startQ + 1);
+
+        const newStart = currentQ;
+        const newEnd = currentQ + Math.max(length, 1) - 1;
+
+        newSections[s.originalIndex] = {
+          ...newSections[s.originalIndex],
+          start_question: newStart,
+          end_question: newEnd,
+          min_questions_to_attempt: Math.max(length, 1)
         };
-        currentQuestion += questionsInSection;
-        return newSection;
+        currentQ = newEnd + 1;
       });
 
       return {
         ...prev,
-        sections: recalculatedSections
+        sections: newSections
       };
     });
 
