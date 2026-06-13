@@ -92,6 +92,7 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
     const audioTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const violationCooldownsRef = useRef<Record<string, number>>({});
     const isMountedRef = useRef(true);
+    const incidentInCurrentClip = useRef(false); // Track if a violation happened in this 60s window
 
     // ─── State ─────────────────────────────────────────────────────────────────
     const [status, setStatus] = useState<ProctoringStatus>({
@@ -139,6 +140,9 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
 
         onViolation?.(violation);
 
+        // Mark that an incident occurred in the current video chunk
+        incidentInCurrentClip.current = true;
+
         // Async: report to backend (best-effort, don't await)
         api.post(`/exams/attempts/${attemptId}/violations/`, {
             violation_type: type,
@@ -149,7 +153,7 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
     // ─── Camera Setup ──────────────────────────────────────────────────────────
 
     const startCamera = useCallback(async () => {
-        if (!enableCamera) return;
+        if (!enableCamera || streamRef.current) return;
         updateStatus({ camera: 'requesting' });
 
         try {
@@ -208,24 +212,31 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
                     };
 
                     recorder.onstop = () => {
-                        if (chunks.length > 0) {
+                        if (chunks.length > 0 && incidentInCurrentClip.current) {
                             const blob = new Blob(chunks, { type: 'video/webm' });
                             uploadVideoClip(blob);
                             chunks.length = 0;
+                            incidentInCurrentClip.current = false; // Reset for next chunk
+                        } else {
+                            chunks.length = 0; // Discard clean clip
+                            incidentInCurrentClip.current = false;
                         }
                     };
 
-                    // Record in 60-second chunks
+                    // Record in 60-second chunks for reliability
                     recorder.start();
-                    setInterval(() => {
+                    const chunkInterval = setInterval(() => {
                         if (recorder.state === 'recording') {
                             recorder.stop();
-                            recorder.start();
+                            // Small delay to allow stop event to finish before restarting
+                            setTimeout(() => recorder.start(), 100);
                         }
                     }, 60000);
 
                     mediaRecorderRef.current = recorder;
                     updateStatus({ recording: 'recording' });
+
+                    return () => clearInterval(chunkInterval);
                 } catch {
                     updateStatus({ recording: 'error' });
                 }
@@ -296,23 +307,25 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
         analyser.getByteFrequencyData(dataArray);
 
-        // RMS of frequency bins → normalized 0-100
+        // 1. Calculate overall Volume (RMS) -> normalized 0-100
         const rms = Math.sqrt(dataArray.reduce((sum, v) => sum + v * v, 0) / dataArray.length);
         const normalized = Math.min(100, Math.round((rms / 128) * 100));
 
-        // Detect sustained voice (higher frequencies dominant)
-        // Voice frequency range: roughly bins 8-40 in a 256-bin analyser at 44kHz
-        const voiceBins = Array.from(dataArray.slice(8, 40));
-        const voiceAvg = voiceBins.reduce((a, b) => a + b, 0) / voiceBins.length;
-        const isVoice = voiceAvg > (audioVoiceThreshold / 100) * 128;
+        // 2. WHISPERING / SPEECH DETECTION (Refined frequency range analysis)
+        // Focus on bins 10-60 (approx 400Hz - 2500Hz) where speech power is concentrated
+        const speechBins = Array.from(dataArray.slice(10, 60));
+        const speechAvg = speechBins.reduce((a, b) => a + b, 0) / speechBins.length;
+
+        // Thresholds: Lowered for discrete whispering/talking
+        const isVoice = speechAvg > (audioVoiceThreshold / 100) * 80; // More sensitive
         const isNoise = normalized > audioNoiseThreshold;
 
         updateStatus({ audioLevel: normalized, isVoiceDetected: isVoice });
 
         if (isVoice) {
-            fireViolation('audio_voice_detected', 0.75, `Voice/speech detected in exam environment (level: ${normalized}%)`, 'audio', 20000);
+            fireViolation('audio_voice_detected', 0.85, `VOICE DETECTED: Possible unauthorized talking or whispering (Level: ${normalized}%)`, 'audio', 30000);
         } else if (isNoise) {
-            fireViolation('audio_noise', 0.5, `Background noise detected (level: ${normalized}%)`, 'audio', 30000);
+            fireViolation('audio_noise', 0.5, `HIGH NOISE: Background noise level exceeded (Level: ${normalized}%)`, 'audio', 45000);
         }
     }, [audioNoiseThreshold, audioVoiceThreshold, updateStatus, fireViolation]);
 
@@ -368,6 +381,39 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
         audioTimerRef.current = setInterval(checkAudioLevel, audioCheckIntervalMs);
         return () => { if (audioTimerRef.current) clearInterval(audioTimerRef.current); };
     }, [status.audio, audioCheckIntervalMs, checkAudioLevel]);
+
+    // CAMERA WATCHDOG: Detect and fix dark or frozen feeds
+    useEffect(() => {
+        if (status.camera !== 'active') return;
+
+        const watchdog = setInterval(() => {
+            const video = videoRef.current;
+            if (!video || !streamRef.current) return;
+
+            // 🛠️ AUTO-RECOVER STREAM: If element exists but stream is missing (after maximize)
+            if (video.srcObject !== streamRef.current) {
+                console.log("Watchdog: Re-attaching camera stream to video element.");
+                video.srcObject = streamRef.current;
+            }
+
+            // Check if video is stuck, paused, or black
+            if (video.paused || video.ended || video.readyState < 2) {
+                video.play().catch(() => { });
+            }
+        }, 2000);
+
+        return () => clearInterval(watchdog);
+    }, [status.camera]);
+
+    // RE-SYNC VIDEO: If the video element is remounted (maximized), re-attach the stream
+    useEffect(() => {
+        if (videoRef.current && streamRef.current && status.camera === 'active') {
+            if (videoRef.current.srcObject !== streamRef.current) {
+                videoRef.current.srcObject = streamRef.current;
+                videoRef.current.play().catch(() => { });
+            }
+        }
+    }, [status.camera]); // Re-check when camera state changes or element re-renders
 
     // ─── Public API ────────────────────────────────────────────────────────────
 

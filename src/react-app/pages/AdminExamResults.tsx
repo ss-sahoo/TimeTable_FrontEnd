@@ -16,10 +16,15 @@ import {
   RefreshCw,
   SortAsc,
   SortDesc,
-  CheckCircle,
-  Camera,
   Award,
-  Loader2
+  Loader2,
+  Mic,
+  UserX,
+  UserPlus,
+  Monitor,
+  RotateCcw,
+  CheckCircle,
+  Camera
 } from 'lucide-react';
 
 interface StudentResult {
@@ -36,6 +41,11 @@ interface StudentResult {
   status: string;
   violations_count: number;
   rank: number;
+  has_audio_activity?: boolean;
+  has_face_violation?: boolean;
+  has_multiple_faces?: boolean;
+  has_looking_away?: boolean;
+  has_tab_switch?: boolean;
 }
 
 interface ExamInfo {
@@ -68,19 +78,19 @@ const AdminExamResults: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthContext();
-  
+
   // Determine base path based on current route
   const isSuperAdminPath = location.pathname.startsWith('/superadmin');
   const isCenterAdminPath = location.pathname.startsWith('/center-admin');
   const isTeacherPath = location.pathname.startsWith('/teacher');
-  const basePath = isSuperAdminPath ? '/superadmin' : 
-                   isCenterAdminPath ? '/center-admin' : 
-                   isTeacherPath ? '/teacher' : '';
+  const basePath = isSuperAdminPath ? '/superadmin' :
+    isCenterAdminPath ? '/center-admin' :
+      isTeacherPath ? '/teacher' : '';
 
   const [data, setData] = useState<AdminExamResultsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Filter and sort states
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('submitted_at');
@@ -127,11 +137,18 @@ const AdminExamResults: React.FC = () => {
 
   useEffect(() => {
     loadExamResults();
+
+    // LIVE REFRESH: Update student list and violation counts every 15 seconds
+    const interval = setInterval(() => {
+      loadExamResults();
+    }, 15000);
+
+    return () => clearInterval(interval);
   }, [examId, searchTerm, sortBy, sortOrder, statusFilter]);
 
   const loadExamResults = async () => {
     if (!examId) return;
-    
+
     try {
       setRefreshing(true);
       const params = new URLSearchParams({
@@ -140,7 +157,7 @@ const AdminExamResults: React.FC = () => {
         sort_order: sortOrder,
         status: statusFilter
       });
-      
+
       const response = await api.get(`/exams/exams/${examId}/results-dashboard/?${params}`);
       setData(response.data);
       setError(null);
@@ -174,7 +191,7 @@ const AdminExamResults: React.FC = () => {
       const response = await api.get(`/exams/exams/${examId}/export/csv/`, {
         responseType: 'blob'
       });
-      
+
       const blob = new Blob([response.data], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -184,7 +201,7 @@ const AdminExamResults: React.FC = () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       toast.success('Results exported successfully');
     } catch (error) {
       console.error('Export error:', error);
@@ -197,9 +214,9 @@ const AdminExamResults: React.FC = () => {
       const response = await api.get(`/exams/exams/${examId}/export/excel/`, {
         responseType: 'blob'
       });
-      
-      const blob = new Blob([response.data], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -209,7 +226,7 @@ const AdminExamResults: React.FC = () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       toast.success('Results exported successfully');
     } catch (error) {
       console.error('Export error:', error);
@@ -272,16 +289,16 @@ const AdminExamResults: React.FC = () => {
   // Calculate statistics
   const statistics = useMemo(() => {
     if (!data?.results) return null;
-    
+
     const results = data.results;
     const totalStudents = results.length;
     const submittedCount = results.filter(r => r.status === 'submitted').length;
-    const averageScore = results.length > 0 ? 
+    const averageScore = results.length > 0 ?
       results.reduce((sum, r) => sum + r.percentage, 0) / results.length : 0;
-    const highestScore = results.length > 0 ? 
+    const highestScore = results.length > 0 ?
       Math.max(...results.map(r => r.percentage)) : 0;
     const violationsCount = results.reduce((sum, r) => sum + r.violations_count, 0);
-    
+
     return {
       totalStudents,
       submittedCount,
@@ -387,7 +404,7 @@ const AdminExamResults: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-green-100 rounded-lg">
@@ -399,7 +416,7 @@ const AdminExamResults: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-yellow-100 rounded-lg">
@@ -411,7 +428,7 @@ const AdminExamResults: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-purple-100 rounded-lg">
@@ -423,7 +440,7 @@ const AdminExamResults: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-red-100 rounded-lg">
@@ -453,7 +470,7 @@ const AdminExamResults: React.FC = () => {
                 />
               </div>
             </div>
-            
+
             <div className="flex gap-2">
               <select
                 value={statusFilter}
@@ -553,11 +570,10 @@ const AdminExamResults: React.FC = () => {
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center">
                         {index < 3 ? (
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                            index === 0 ? 'bg-yellow-100 text-yellow-800' :
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-800' :
                             index === 1 ? 'bg-gray-100 text-gray-800' :
-                            'bg-orange-100 text-orange-800'
-                          }`}>
+                              'bg-orange-100 text-orange-800'
+                            }`}>
                             {index + 1}
                           </div>
                         ) : (
@@ -590,7 +606,7 @@ const AdminExamResults: React.FC = () => {
                       <span className="text-sm text-slate-600">{formatTime(result.time_spent)}</span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-2">
                         {result.violations_count > 0 ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                             <AlertTriangle className="w-3 h-3" />
@@ -602,6 +618,37 @@ const AdminExamResults: React.FC = () => {
                             0
                           </span>
                         )}
+
+                        {/* Special Activity Indicators */}
+                        <div className="flex items-center gap-1 ml-1">
+                          {result.has_audio_activity && (
+                            <div title="Audio activity / Voice detected" className="p-1 bg-amber-50 rounded-full border border-amber-200">
+                              <Mic className="w-3.5 h-3.5 text-amber-600" />
+                            </div>
+                          )}
+                          {result.has_face_violation && (
+                            <div title="Face missing or not clear" className="p-1 bg-red-100 rounded-full border border-red-300">
+                              <UserX className="w-3.5 h-3.5 text-red-600" />
+                            </div>
+                          )}
+                          {/* Multiple faces */}
+                          {result.has_multiple_faces && (
+                            <div title="Multiple people detected" className="p-1 bg-purple-100 rounded-full border border-purple-300">
+                              <UserPlus className="w-3.5 h-3.5 text-purple-600" />
+                            </div>
+                          )}
+                          {/* Looking away / Head rotation */}
+                          {result.has_looking_away && (
+                            <div title="Looking away / Head rotation" className="p-1 bg-orange-100 rounded-full border border-orange-300">
+                              <RotateCcw className="w-3.5 h-3.5 text-orange-600" />
+                            </div>
+                          )}
+                          {result.has_tab_switch && (
+                            <div title="Tab switching detected" className="p-1 bg-blue-100 rounded-full border border-blue-300">
+                              <Monitor className="w-3.5 h-3.5 text-blue-600" />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
@@ -649,7 +696,7 @@ const AdminExamResults: React.FC = () => {
               </tbody>
             </table>
           </div>
-          
+
           {data.results.length === 0 && (
             <div className="text-center py-12">
               <Users className="w-12 h-12 text-slate-300 mx-auto mb-4" />

@@ -62,6 +62,7 @@ const useExamSecurity = (
 
   const violationCooldowns = useRef<Record<string, number>>({});
   const lastViolationTimeRef = useRef<number>(0);
+  const startTimeRef = useRef<number>(Date.now()); // Grace period start time
 
   // Log security configuration on initialization
   useEffect(() => {
@@ -158,6 +159,12 @@ const useExamSecurity = (
     };
 
     const handleBlur = () => {
+      // 🛡️ GRACE PERIOD: Ignore window blur for the first 60 seconds (covers permission popups)
+      if (Date.now() - startTimeRef.current < 60000) {
+        console.log('🪟 WINDOW BLUR ignored during setup grace period');
+        return;
+      }
+
       console.log('🪟 WINDOW BLUR detected - logging violation');
       logViolation('window_blur', {
         timestamp: new Date().toISOString(),

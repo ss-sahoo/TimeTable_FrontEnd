@@ -60,6 +60,13 @@ const ProctoringSnapshotsView: React.FC = () => {
 
   useEffect(() => {
     loadSnapshots();
+
+    // LIVE SYNC: Poll for new snapshots every 10 seconds while admin is viewing
+    const interval = setInterval(() => {
+      loadSnapshots();
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, [attemptId, showViolationsOnly]);
 
   const loadSnapshots = async () => {
@@ -99,7 +106,8 @@ const ProctoringSnapshotsView: React.FC = () => {
     }
   };
 
-  const getViolationColor = (severity: string) => {
+  const getViolationColor = (severity: string, type?: string) => {
+    if (type === 'audio_noise') return 'bg-amber-50 text-amber-700 border-amber-200';
     switch (severity) {
       case 'high': return 'bg-red-100 text-red-800 border-red-300';
       case 'medium': return 'bg-orange-100 text-orange-800 border-orange-300';
@@ -331,7 +339,7 @@ const ProctoringSnapshotsView: React.FC = () => {
                       {snapshot.violations.map((violation, vIndex) => (
                         <div
                           key={vIndex}
-                          className={`text-[9px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-tighter ${getViolationColor(violation.severity)}`}
+                          className={`text-[9px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-tighter ${getViolationColor(violation.severity, violation.type)}`}
                         >
                           {getViolationTypeLabel(violation.type)}
                         </div>
@@ -403,7 +411,7 @@ const ProctoringSnapshotsView: React.FC = () => {
                           {selectedSnapshot.violations.map((violation, index) => (
                             <div
                               key={index}
-                              className={`p-4 rounded-xl border flex items-start gap-4 ${getViolationColor(violation.severity)}`}
+                              className={`p-4 rounded-xl border flex items-start gap-4 ${getViolationColor(violation.severity, violation.type)}`}
                             >
                               <div className="shrink-0 pt-1">
                                 <AlertTriangle className="w-4 h-4" />

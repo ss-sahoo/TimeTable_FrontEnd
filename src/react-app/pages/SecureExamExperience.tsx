@@ -1180,7 +1180,7 @@ const SecureExamExperience: React.FC = () => {
               attemptId={parseInt(attemptId!)}
               screenshotIntervalSec={15}
               enableAudio={true}
-              enableVideoRecording={false}
+              enableVideoRecording={true}
               onViolation={handleViolationDetected}
             />
           )}
