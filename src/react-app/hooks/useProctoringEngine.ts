@@ -70,7 +70,7 @@ export interface ProctoringEngineOptions {
 const useProctoringEngine = (options: ProctoringEngineOptions) => {
     const {
         attemptId,
-        screenshotIntervalMs = 10000,
+        screenshotIntervalMs = 15000,
         audioCheckIntervalMs = 1000,
         audioNoiseThreshold = 25,
         audioVoiceThreshold = 45,

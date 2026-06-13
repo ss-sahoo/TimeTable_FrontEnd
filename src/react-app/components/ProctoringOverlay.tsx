@@ -46,7 +46,7 @@ const STATUS_DOT: Record<string, string> = {
 
 const ProctoringOverlay: React.FC<ProctoringOverlayProps> = ({
     attemptId,
-    screenshotIntervalSec = 10,
+    screenshotIntervalSec = 15,
     enableAudio = true,
     enableVideoRecording = false,
     onViolation,
