@@ -367,9 +367,26 @@ const SecureExamExperience: React.FC = () => {
     return () => window.removeEventListener('pageshow', handlePageShow);
   }, [attemptId, navigate]);
 
-  // ── Violations tracking (Silent) ──────────────────────────────────────────
-  // We no longer show toasts or warnings to the student per requirement.
-  // All violations are logged silently to the backend.
+  // ── Violations toast ──────────────────────────────────────────────────────
+  // Per user requirement: Hide AI/Proctoring violations but SHOW Tab Switch to students
+  const lastViolationTimeShown = useRef<number>(0);
+  useEffect(() => {
+    if (violations.length > 0) {
+      const latest = violations[violations.length - 1];
+      const ts = latest.timestamp.getTime();
+
+      // SILENT violations: Audio, Face, Gaze, Head
+      const SILENT_VIOLATIONS = ['audio_noise', 'audio_voice_detected', 'no_face', 'multiple_faces', 'gaze_left', 'gaze_right', 'head_turned_left', 'head_turned_right'];
+      if (SILENT_VIOLATIONS.includes(latest.type)) return;
+
+      // VISIBLE violations: Tab switch, Fullscreen exit
+      if (ts > lastViolationTimeShown.current) {
+        lastViolationTimeShown.current = ts;
+        setCurrentToastViolation(latest);
+      }
+    }
+  }, [violations]);
+
   const handleCloseToast = useCallback(() => setCurrentToastViolation(null), []);
 
   // ── Load exam data ────────────────────────────────────────────────────────
@@ -1168,10 +1185,12 @@ const SecureExamExperience: React.FC = () => {
           )}
 
           {/* 
-            Always mounted — only hidden via CSS when minimized.
-            This keeps the screenshot interval alive even when the widget is minimized.
+            CRITICAL: We MUST NOT use 'display: none' here. 
+            Browsers stop rendering the video element if it's hidden with display:none, 
+            which results in pitch-black snapshots.
+            Instead, we move it far off-screen to keep the stream active for the capture engine.
           */}
-          <div style={{ display: isWebcamMinimized ? 'none' : 'block' }}>
+          <div className={isWebcamMinimized ? "fixed -left-[9999px] opacity-0 pointer-events-none" : "block"}>
             <ProctoringOverlay
               attemptId={parseInt(attemptId!)}
               screenshotIntervalSec={15}
@@ -1193,7 +1212,13 @@ const SecureExamExperience: React.FC = () => {
         isSubmitting={isSubmitting}
       />
 
-      {/* ViolationToast removed for silent proctoring */}
+      {/* Only show toast if it's not a silent violation */}
+      {currentToastViolation && (
+        <ViolationToast
+          violation={currentToastViolation}
+          onClose={handleCloseToast}
+        />
+      )}
 
 
       <ViolationsPanel

@@ -266,19 +266,23 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
     const captureAndAnalyzeScreenshot = useCallback(async (isManual = false) => {
         const video = videoRef.current;
         const canvas = canvasRef.current;
-        if (!video || !canvas || video.readyState < 2) {
-            if (isManual) console.warn('[Proctoring] Manual capture failed: video not ready');
-            return;
-        }
+
+        if (!video || !canvas) return;
 
         try {
-            canvas.width = video.videoWidth || 640;
-            canvas.height = video.videoHeight || 480;
+            // Ensure video is actually playing and providing frames
+            if (video.readyState < 2 || video.videoWidth === 0) {
+                console.warn('[Proctoring] Video not ready for capture. Skipping frame.');
+                return;
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d');
             if (!ctx) return;
 
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const fullDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+            const fullDataUrl = canvas.toDataURL('image/jpeg', 0.8);
 
             console.log(`[Proctoring] ${isManual ? 'MANUAL' : 'AUTO'} Uploading snapshot for attempt ${attemptId}`);
 
@@ -295,21 +299,20 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
                 return next;
             });
 
-            const result = response.data;
-            if (result.violations && Array.isArray(result.violations)) {
-                for (const v of result.violations) {
-                    fireViolation(
-                        v.type as ProctoringViolationType,
-                        v.confidence ?? 0.8,
-                        v.message ?? v.type,
-                        'camera',
-                        15000,
-                    );
-                }
+            // Process analysis results
+            const analysis = response.data.analysis;
+            if (analysis && analysis.success && analysis.violations) {
+                analysis.violations.forEach((v: any) => {
+                    fireViolation(v.type, v.confidence || 0.8, v.message, 'camera', 10000);
+                });
             }
-        } catch (err: unknown) {
+        } catch (err) {
+            console.error('[Proctoring] Upload failed:', err);
             uploadFailCountRef.current += 1;
-            console.error(`[Proctoring] Snapshot upload failed:`, err);
+            if (uploadFailCountRef.current > 5) {
+                console.log('Stopping snapshot loop due to persistent failures');
+                if (screenshotTimerRef.current) clearInterval(screenshotTimerRef.current);
+            }
         }
     }, [attemptId, onStatusChange, fireViolation]);
 
