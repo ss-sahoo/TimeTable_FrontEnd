@@ -421,9 +421,9 @@ export default function ExamCreation() {
         require_fullscreen: exam.require_fullscreen ?? true,
         disable_copy_paste: exam.disable_copy_paste ?? true,
         disable_right_click: exam.disable_right_click ?? true,
-        enable_webcam_proctoring: exam.enable_webcam_proctoring ?? true,
-        proctoring_snapshot_interval: exam.proctoring_snapshot_interval ?? 15,
-        allow_tab_switching: exam.allow_tab_switching ?? true,
+        enable_webcam_proctoring: Boolean(exam.enable_webcam_proctoring),
+        proctoring_snapshot_interval: Number(exam.proctoring_snapshot_interval) || 15,
+        allow_tab_switching: Boolean(exam.allow_tab_switching),
         is_public: exam.is_public || true,
         public_token_expires_at: exam.public_token_expires_at ? formatDateTimeLocal(exam.public_token_expires_at, resolvedTimezone) : '',
         public_allowed_ip_ranges_text: Array.isArray(exam.public_allowed_ip_ranges) ? exam.public_allowed_ip_ranges.join('\n') : '',
@@ -661,6 +661,7 @@ export default function ExamCreation() {
         center_ids: formData.visibility_scope === 'centers' ? formData.center_ids : [],
         batch_ids: formData.visibility_scope === 'batches' ? formData.batch_ids : [],
         program_id: formData.visibility_scope === 'program' ? formData.program_id : null,
+        proctoring_snapshot_interval: Number(formData.proctoring_snapshot_interval) || 15,
       };
 
 
@@ -1492,7 +1493,7 @@ export default function ExamCreation() {
                         type="number"
                         min="15"
                         max="300"
-                        value={formData.proctoring_snapshot_interval || 15}
+                        value={formData.proctoring_snapshot_interval}
                         onChange={(e) => handleInputChange('proctoring_snapshot_interval', parseInt(e.target.value) || 15)}
                         className="w-20 px-2 py-1 text-xs border border-slate-300 rounded focus:ring-2 focus:ring-blue-500"
                       />
