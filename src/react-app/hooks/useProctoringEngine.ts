@@ -93,6 +93,7 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
     const violationCooldownsRef = useRef<Record<string, number>>({});
     const isMountedRef = useRef(true);
     const incidentInCurrentClip = useRef(false); // Track if a violation happened in this 60s window
+    const uploadFailCountRef = useRef(0); // Track consecutive upload failures
 
     // ─── State ─────────────────────────────────────────────────────────────────
     const [status, setStatus] = useState<ProctoringStatus>({
@@ -258,7 +259,10 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
     const captureAndAnalyzeScreenshot = useCallback(async () => {
         const video = videoRef.current;
         const canvas = canvasRef.current;
-        if (!video || !canvas || video.readyState < 2) return;
+        if (!video || !canvas || video.readyState < 2) {
+            console.warn('[Proctoring] Skipping capture: video not ready', { readyState: video?.readyState });
+            return;
+        }
 
         try {
             canvas.width = video.videoWidth || 640;
@@ -267,19 +271,26 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
             if (!ctx) return;
 
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageData = canvas.toDataURL('image/jpeg', 0.7).split(',')[1]; // base64 without prefix
+            // Send FULL data URI so the backend can always detect format
+            const fullDataUrl = canvas.toDataURL('image/jpeg', 0.7);
 
+            console.log(`[Proctoring] Uploading snapshot #${Date.now()} for attempt ${attemptId}`);
+
+            // Send to backend for AI analysis
+            const response = await api.post(`/exams/attempts/${attemptId}/proctoring/snapshot/`, {
+                image_data: fullDataUrl,
+                timestamp: new Date().toISOString(),
+            });
+
+            // Only increment count on successful save
+            uploadFailCountRef.current = 0;
             setStatus(prev => {
                 const next = { ...prev, screenshotCount: prev.screenshotCount + 1, lastScreenshotAt: new Date() };
                 onStatusChange?.(next);
                 return next;
             });
 
-            // Send to backend for AI analysis
-            const response = await api.post(`/exams/attempts/${attemptId}/proctoring/snapshot/`, {
-                image_data: imageData,
-                timestamp: new Date().toISOString(),
-            });
+            console.log(`[Proctoring] ✅ Snapshot saved. Response:`, response.data);
 
             const result = response.data;
             if (result.violations && Array.isArray(result.violations)) {
@@ -293,10 +304,17 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
                     );
                 }
             }
-        } catch {
-            // Silently skip failed captures — don't interrupt the exam
+        } catch (err: unknown) {
+            uploadFailCountRef.current += 1;
+            // Log clearly so developers can see the actual error in browser console
+            const errorDetails = err instanceof Error ? err.message : String(err);
+            console.error(`[Proctoring] ❌ Snapshot upload FAILED (attempt ${uploadFailCountRef.current}):`, errorDetails, err);
+            // After 3 consecutive failures, log a more visible warning
+            if (uploadFailCountRef.current >= 3) {
+                console.error('[Proctoring] ⚠️ 3+ consecutive snapshot failures. Check auth token, network, and backend logs.');
+            }
         }
-    }, [attemptId, updateStatus, fireViolation]);
+    }, [attemptId, onStatusChange, fireViolation]);
 
     // ─── Audio Monitoring ──────────────────────────────────────────────────────
 
