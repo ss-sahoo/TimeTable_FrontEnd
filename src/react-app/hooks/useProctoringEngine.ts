@@ -227,13 +227,19 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
 
                     // Record in 60-second chunks for reliability
                     recorder.start();
+                    // Record in 30s chunks to make uploads more reliable (smaller files)
                     const chunkInterval = setInterval(() => {
                         if (recorder.state === 'recording') {
+                            console.log('[Proctoring] Closing video chunk for upload...');
                             recorder.stop();
                             // Small delay to allow stop event to finish before restarting
-                            setTimeout(() => recorder.start(), 100);
+                            setTimeout(() => {
+                                if (mediaRecorderRef.current && isMountedRef.current) {
+                                    mediaRecorderRef.current.start();
+                                }
+                            }, 100);
                         }
-                    }, 60000);
+                    }, 30000);
 
                     mediaRecorderRef.current = recorder;
                     updateStatus({ recording: 'recording' });

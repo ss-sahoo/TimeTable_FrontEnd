@@ -83,6 +83,17 @@ const ProctoringSnapshotsView: React.FC = () => {
     return () => clearInterval(interval);
   }, [attemptId, showViolationsOnly]);
 
+  const tabSwitchCount = React.useMemo(() => {
+    return data?.violations_log?.filter(v =>
+      v.type === 'tab_switch' || v.type === 'fullscreen_exit' ||
+      v.type === 'window_blur' || v.type === 'tab_hidden'
+    ).length || 0;
+  }, [data]);
+
+  const audioIncidentCount = React.useMemo(() => {
+    return data?.violations_log?.filter(v => v.type.includes('audio') || v.type.includes('voice')).length || 0;
+  }, [data]);
+
   const loadSnapshots = async () => {
     try {
       setLoading(true);
@@ -210,22 +221,30 @@ const ProctoringSnapshotsView: React.FC = () => {
           </div>
 
           {/* Statistics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
             <div className="p-4 bg-white border border-slate-200 rounded-xl">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Snapshots</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tighter">{data.total_count}</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Snapshots</p>
+              <p className="text-2xl font-black text-slate-900 tracking-tighter">{data.total_count}</p>
             </div>
             <div className="p-4 bg-red-50 border border-red-100 rounded-xl">
-              <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1">Total Violations</p>
-              <p className="text-3xl font-black text-red-600 tracking-tighter">{data.total_violations || data.violation_snapshots}</p>
+              <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1">AI Issues</p>
+              <p className="text-2xl font-black text-red-600 tracking-tighter">{data.total_violations || data.violation_snapshots}</p>
+            </div>
+            <div className="p-4 bg-purple-50 border border-purple-100 rounded-xl">
+              <p className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-1">Tab Switches</p>
+              <p className="text-2xl font-black text-purple-600 tracking-tighter">{tabSwitchCount}</p>
+            </div>
+            <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl">
+              <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">Audio Hits</p>
+              <p className="text-2xl font-black text-amber-600 tracking-tighter">{audioIncidentCount}</p>
             </div>
             <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
-              <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Clean Frames</p>
-              <p className="text-3xl font-black text-emerald-600 tracking-tighter">{data.metadata_only_snapshots}</p>
+              <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Clean</p>
+              <p className="text-2xl font-black text-emerald-600 tracking-tighter">{data.metadata_only_snapshots}</p>
             </div>
             <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
-              <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Video Clips</p>
-              <p className="text-3xl font-black text-blue-600 tracking-tighter">{data.video_clips?.length || 0}</p>
+              <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Videos</p>
+              <p className="text-2xl font-black text-blue-600 tracking-tighter">{data.video_clips?.length || 0}</p>
             </div>
           </div>
         </div>
