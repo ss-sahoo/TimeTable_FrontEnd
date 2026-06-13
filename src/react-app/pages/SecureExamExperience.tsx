@@ -373,6 +373,11 @@ const SecureExamExperience: React.FC = () => {
     if (violations.length > 0) {
       const latest = violations[violations.length - 1];
       const ts = latest.timestamp.getTime();
+
+      // Hide SOFT violations (audio) from the student UI/Toast
+      const SOFT_VIOLATIONS = ['audio_noise', 'audio_voice_detected'];
+      if (SOFT_VIOLATIONS.includes(latest.type)) return;
+
       if (ts > lastViolationTimeShown.current) {
         lastViolationTimeShown.current = ts;
         setCurrentToastViolation(latest);

@@ -115,7 +115,12 @@ const useExamSecurity = (
       return newViolations.length > 50 ? newViolations.slice(-50) : newViolations;
     });
 
-    setViolationCount(prev => prev + 1);
+    // Only increment count for HARD violations (visual or system breach)
+    // SOFT violations (audio noise, voice) are logged but don't count towards penalty/disqualification
+    const SOFT_VIOLATIONS = ['audio_noise', 'audio_voice_detected'];
+    if (!SOFT_VIOLATIONS.includes(type)) {
+      setViolationCount(prev => prev + 1);
+    }
 
     // Log to backend if not already logged (e.g. by webcam analyzer)
     if (!skipBackend) {
