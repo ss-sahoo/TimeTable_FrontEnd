@@ -675,20 +675,21 @@ const AdminExamResults: React.FC = () => {
                             <Eye className="w-4 h-4" />
                           )}
                         </button>
-                        {result.violations_count > 0 && (
-                          <button
-                            onClick={() => handleViewProctoring(result.student_id)}
-                            disabled={loadingAttemptId !== null}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-55"
-                            title="View proctoring snapshots"
-                          >
-                            {loadingAttemptId === result.student_id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Camera className="w-4 h-4" />
-                            )}
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleViewProctoring(result.student_id)}
+                          disabled={loadingAttemptId !== null}
+                          className={`p-1 rounded transition-colors disabled:opacity-55 ${result.violations_count > 0
+                              ? 'text-red-600 hover:bg-red-50'
+                              : 'text-blue-600 hover:bg-blue-50'
+                            }`}
+                          title={result.violations_count > 0 ? "View violations and snapshots" : "View monitoring snapshots"}
+                        >
+                          {loadingAttemptId === result.student_id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Camera className="w-4 h-4" />
+                          )}
+                        </button>
                       </div>
                     </td>
                   </tr>
