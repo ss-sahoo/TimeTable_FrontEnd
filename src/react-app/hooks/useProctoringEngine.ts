@@ -92,8 +92,9 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
     const audioTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const violationCooldownsRef = useRef<Record<string, number>>({});
     const isMountedRef = useRef(true);
-    const incidentInCurrentClip = useRef(false); // Track if a violation happened in this 60s window
-    const uploadFailCountRef = useRef(0); // Track consecutive upload failures
+    const uploadFailCountRef = useRef(0);
+    const captureFnRef = useRef<(() => Promise<void>) | null>(null);
+    const incidentInCurrentClip = useRef(false);
 
     // ─── State ─────────────────────────────────────────────────────────────────
     const [status, setStatus] = useState<ProctoringStatus>({
@@ -256,11 +257,11 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
 
     // ─── Screenshot Capture ────────────────────────────────────────────────────
 
-    const captureAndAnalyzeScreenshot = useCallback(async () => {
+    const captureAndAnalyzeScreenshot = useCallback(async (isManual = false) => {
         const video = videoRef.current;
         const canvas = canvasRef.current;
         if (!video || !canvas || video.readyState < 2) {
-            console.warn('[Proctoring] Skipping capture: video not ready', { readyState: video?.readyState });
+            if (isManual) console.warn('[Proctoring] Manual capture failed: video not ready');
             return;
         }
 
@@ -271,26 +272,22 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
             if (!ctx) return;
 
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            // Send FULL data URI so the backend can always detect format
             const fullDataUrl = canvas.toDataURL('image/jpeg', 0.7);
 
-            console.log(`[Proctoring] Uploading snapshot #${Date.now()} for attempt ${attemptId}`);
+            console.log(`[Proctoring] ${isManual ? 'MANUAL' : 'AUTO'} Uploading snapshot for attempt ${attemptId}`);
 
-            // Send to backend for AI analysis
             const response = await api.post(`/exams/attempts/${attemptId}/proctoring/snapshot/`, {
                 image_data: fullDataUrl,
                 timestamp: new Date().toISOString(),
+                metadata: { capture_type: isManual ? 'manual' : 'scheduled' }
             });
 
-            // Only increment count on successful save
             uploadFailCountRef.current = 0;
             setStatus(prev => {
                 const next = { ...prev, screenshotCount: prev.screenshotCount + 1, lastScreenshotAt: new Date() };
                 onStatusChange?.(next);
                 return next;
             });
-
-            console.log(`[Proctoring] ✅ Snapshot saved. Response:`, response.data);
 
             const result = response.data;
             if (result.violations && Array.isArray(result.violations)) {
@@ -306,15 +303,14 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
             }
         } catch (err: unknown) {
             uploadFailCountRef.current += 1;
-            // Log clearly so developers can see the actual error in browser console
-            const errorDetails = err instanceof Error ? err.message : String(err);
-            console.error(`[Proctoring] ❌ Snapshot upload FAILED (attempt ${uploadFailCountRef.current}):`, errorDetails, err);
-            // After 3 consecutive failures, log a more visible warning
-            if (uploadFailCountRef.current >= 3) {
-                console.error('[Proctoring] ⚠️ 3+ consecutive snapshot failures. Check auth token, network, and backend logs.');
-            }
+            console.error(`[Proctoring] Snapshot upload failed:`, err);
         }
     }, [attemptId, onStatusChange, fireViolation]);
+
+    // Update the ref whenever the stable callback changes
+    useEffect(() => {
+        captureFnRef.current = () => captureAndAnalyzeScreenshot(false);
+    }, [captureAndAnalyzeScreenshot]);
 
     // ─── Audio Monitoring ──────────────────────────────────────────────────────
 
@@ -388,9 +384,24 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
     useEffect(() => {
         if (status.camera !== 'active') return;
 
-        screenshotTimerRef.current = setInterval(captureAndAnalyzeScreenshot, screenshotIntervalMs);
-        return () => { if (screenshotTimerRef.current) clearInterval(screenshotTimerRef.current); };
-    }, [status.camera, screenshotIntervalMs, captureAndAnalyzeScreenshot]);
+        console.log(`[Proctoring] Camera active. Taking first immediate snapshot.`);
+        if (captureFnRef.current) {
+            captureFnRef.current();
+        }
+
+        console.log(`[Proctoring] Starting automatic snapshot loop (${screenshotIntervalMs}ms)`);
+
+        // Use a wrapper that calls the ref to avoid interval resets when state changes
+        const interval = setInterval(() => {
+            if (captureFnRef.current) captureFnRef.current();
+        }, screenshotIntervalMs);
+
+        screenshotTimerRef.current = interval;
+        return () => {
+            console.log(`[Proctoring] Stopping snapshot loop.`);
+            clearInterval(interval);
+        };
+    }, [status.camera, screenshotIntervalMs]);
 
     // Start audio loop once audio is active
     useEffect(() => {
@@ -436,7 +447,7 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
     // ─── Public API ────────────────────────────────────────────────────────────
 
     const forceScreenshot = useCallback(() => {
-        captureAndAnalyzeScreenshot();
+        captureAndAnalyzeScreenshot(true);
     }, [captureAndAnalyzeScreenshot]);
 
     const stopProctoring = useCallback(() => {
