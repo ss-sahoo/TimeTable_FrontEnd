@@ -103,6 +103,11 @@ const useExamSecurity = (
 
     console.log(`🚫 Security Violation: ${type}${skipBackend ? ' (Backend sync skipped)' : ''}`, metadata);
 
+    // Trigger proctoring video chunk upload for ALL violations
+    if (typeof (window as any).proctoringMarkIncident === 'function') {
+      (window as any).proctoringMarkIncident();
+    }
+
     const violation: ViolationData = {
       type,
       timestamp: new Date(),

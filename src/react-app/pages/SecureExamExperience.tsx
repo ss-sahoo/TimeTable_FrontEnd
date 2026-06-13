@@ -57,6 +57,7 @@ interface ExamAttempt {
     disable_copy_paste: boolean;
     disable_right_click: boolean;
     enable_webcam_proctoring: boolean;
+    proctoring_snapshot_interval: number;
     allow_tab_switching: boolean;
     end_date: string;
     pattern: {
@@ -375,9 +376,9 @@ const SecureExamExperience: React.FC = () => {
       const latest = violations[violations.length - 1];
       const ts = latest.timestamp.getTime();
 
-      // SILENT violations: Audio, Face, Gaze, Head
-      const SILENT_VIOLATIONS = ['audio_noise', 'audio_voice_detected', 'no_face', 'multiple_faces', 'gaze_left', 'gaze_right', 'head_turned_left', 'head_turned_right'];
-      if (SILENT_VIOLATIONS.includes(latest.type)) return;
+      // Filter what's visible to the student (Whitelist approach)
+      const VISIBLE_TO_STUDENT = ['tab_switch', 'window_blur', 'tab_hidden', 'fullscreen_exit'];
+      if (!VISIBLE_TO_STUDENT.includes(latest.type)) return;
 
       // VISIBLE violations: Tab switch, Fullscreen exit
       if (ts > lastViolationTimeShown.current) {
@@ -1193,10 +1194,11 @@ const SecureExamExperience: React.FC = () => {
           <div className={isWebcamMinimized ? "fixed -left-[9999px] opacity-0 pointer-events-none" : "block"}>
             <ProctoringOverlay
               attemptId={parseInt(attemptId!)}
-              screenshotIntervalSec={15}
+              screenshotIntervalSec={examAttempt?.exam.proctoring_snapshot_interval || 15}
               enableAudio={true}
               enableVideoRecording={true}
               onViolation={handleViolationDetected}
+              externalViolations={violations}
             />
           </div>
         </div>

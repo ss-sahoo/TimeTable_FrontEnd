@@ -118,6 +118,18 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
         });
     }, [onStatusChange]);
 
+    // Manually trigger an incident flag for the current video chunk
+    const markIncident = useCallback(() => {
+        console.log('[Proctoring] Manual incident marked for video recording.');
+        incidentInCurrentClip.current = true;
+    }, []);
+
+    // Expose to window for external violation hooks (like tab switches)
+    useEffect(() => {
+        (window as any).proctoringMarkIncident = markIncident;
+        return () => { delete (window as any).proctoringMarkIncident; };
+    }, [markIncident]);
+
     /** Fire a violation — with a per-type cooldown to avoid spam */
     const fireViolation = useCallback((
         type: ProctoringViolationType,
@@ -143,14 +155,14 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
         onViolation?.(violation);
 
         // Mark that an incident occurred in the current video chunk
-        incidentInCurrentClip.current = true;
+        markIncident();
 
         // Async: report to backend (best-effort, don't await)
         api.post(`/exams/attempts/${attemptId}/violations/`, {
             violation_type: type,
             metadata: { confidence, message, source },
         }).catch(() => {/* silent */ });
-    }, [attemptId, onViolation, onStatusChange]);
+    }, [attemptId, onViolation, onStatusChange, markIncident]);
 
     // ─── Camera Setup ──────────────────────────────────────────────────────────
 
@@ -225,9 +237,8 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
                         }
                     };
 
-                    // Record in 60-second chunks for reliability
-                    recorder.start();
                     // Record in 30s chunks to make uploads more reliable (smaller files)
+                    recorder.start();
                     const chunkInterval = setInterval(() => {
                         if (recorder.state === 'recording') {
                             console.log('[Proctoring] Closing video chunk for upload...');
@@ -477,6 +488,8 @@ const useProctoringEngine = (options: ProctoringEngineOptions) => {
         status,
         /** Manually trigger a screenshot + backend analysis */
         forceScreenshot,
+        /** Manually flag an incident for the current video clip */
+        markIncident,
         /** Cleanly stop all proctoring streams */
         stopProctoring,
     };

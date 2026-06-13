@@ -97,7 +97,9 @@ const ProctoringSnapshotsView: React.FC = () => {
   const loadSnapshots = async () => {
     try {
       setLoading(true);
-      const response = await api.get<SnapshotsResponse>(
+
+      // Fetch snapshots and basics
+      const snapshotsRes = await api.get<SnapshotsResponse>(
         `/exams/attempts/${attemptId}/proctoring/snapshots/`,
         {
           params: {
@@ -105,7 +107,21 @@ const ProctoringSnapshotsView: React.FC = () => {
           }
         }
       );
-      setData(response.data);
+
+      // Fetch unified violations (includes tab switches, AI issues, and video clips)
+      const violationsRes = await api.get<any>(
+        `/exams/attempts/${attemptId}/proctoring-violations/`
+      );
+
+      // Merge data: Use unified violations for the log and video clips
+      const mergedData: SnapshotsResponse = {
+        ...snapshotsRes.data,
+        violations_log: violationsRes.data.violations || snapshotsRes.data.violations_log,
+        video_clips: violationsRes.data.video_clips || snapshotsRes.data.video_clips,
+        total_violations: violationsRes.data.total_violations ?? snapshotsRes.data.total_violations
+      };
+
+      setData(mergedData);
       setError(null);
     } catch (err: any) {
       setError(getErrorMessage(err, 'Failed to load snapshots'));

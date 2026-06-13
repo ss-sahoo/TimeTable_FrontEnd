@@ -33,6 +33,7 @@ interface ProctoringOverlayProps {
     enableAudio?: boolean;            // default true
     enableVideoRecording?: boolean;   // default false
     onViolation?: (v: ProctoringViolation) => void;
+    externalViolations?: any[];       // Violations from other hooks (e.g. useExamSecurity)
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -50,6 +51,7 @@ const ProctoringOverlay: React.FC<ProctoringOverlayProps> = ({
     enableAudio = true,
     enableVideoRecording = false,
     onViolation,
+    externalViolations = [],
 }) => {
     const [expanded, setExpanded] = useState(true);
     const [showLog, setShowLog] = useState(false);
@@ -72,11 +74,20 @@ const ProctoringOverlay: React.FC<ProctoringOverlayProps> = ({
             status.audioLevel > 30 ? 'bg-blue-400' :
                 'bg-emerald-500';
 
-    // Constants for Hard vs Soft violations
-    const SOFT_TYPES = ['audio_noise', 'audio_voice_detected'];
-    const hardViolations = status.violations.filter(v => !SOFT_TYPES.includes(v.type));
-    const hardViolationCount = hardViolations.length;
-    const totalViolationCount = status.violations.length;
+    // Filter for tab violations ONLY as per user requirement (Student only sees tab issues)
+    // We combine external violations (tab switches) with internal ones (AI)
+    // but only display the tab-related ones to the student.
+    const allViolations = [
+        ...status.violations.map(v => ({ ...v, type: v.type as string })),
+        ...externalViolations.map(v => ({ ...v, type: v.type as string }))
+    ];
+
+    const tabViolations = allViolations.filter(v =>
+        ['tab_switch', 'window_blur', 'tab_hidden', 'fullscreen_exit'].includes(v.type)
+    );
+
+    const totalViolationCount = tabViolations.length;
+    const hardViolationCount = tabViolations.length;
 
     return (
         <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
@@ -106,25 +117,20 @@ const ProctoringOverlay: React.FC<ProctoringOverlayProps> = ({
                             </button>
                         </div>
                         <div className="overflow-y-auto max-h-52 divide-y divide-slate-100 dark:divide-slate-800">
-                            {status.violations.length === 0 ? (
+                            {tabViolations.length === 0 ? (
                                 <p className="text-[11px] text-slate-400 text-center py-4">No violations recorded</p>
                             ) : (
-                                [...status.violations].reverse().map((v, i) => {
-                                    const isSoft = SOFT_TYPES.includes(v.type);
+                                [...tabViolations].reverse().map((v, i) => {
                                     return (
                                         <div key={i} className="px-4 py-2.5 flex items-start gap-2">
-                                            {isSoft ? (
-                                                <Mic className="w-3 h-3 text-blue-500 mt-0.5 shrink-0" />
-                                            ) : (
-                                                <AlertTriangle className="w-3 h-3 text-red-500 mt-0.5 shrink-0" />
-                                            )}
+                                            <AlertTriangle className="w-3 h-3 text-red-500 mt-0.5 shrink-0" />
                                             <div>
-                                                <p className={`text-[10px] font-bold uppercase tracking-wide ${isSoft ? 'text-blue-600' : 'text-red-600'}`}>
-                                                    {v.type.replace(/_/g, ' ')}
+                                                <p className="text-[10px] font-bold uppercase tracking-wide text-red-600">
+                                                    {(v.type as string).replace(/_/g, ' ')}
                                                 </p>
                                                 <p className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5">{v.message}</p>
                                                 <p className="text-[8px] text-slate-400 mt-0.5">
-                                                    {v.timestamp.toLocaleTimeString()}
+                                                    {v.timestamp instanceof Date ? v.timestamp.toLocaleTimeString() : new Date(v.timestamp).toLocaleTimeString()}
                                                 </p>
                                             </div>
                                         </div>

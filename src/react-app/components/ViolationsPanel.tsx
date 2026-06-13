@@ -26,7 +26,12 @@ const ViolationsPanel: React.FC<ViolationsPanelProps> = ({ attemptId, isOpen, on
     setError(null);
     try {
       const response = await api.get(`/exams/attempts/${attemptId}/violations/history/`);
-      setViolations(response.data.violations || []);
+      const allViolations = response.data.violations || [];
+      // FILTER: Only show tab and window-related violations to the student
+      const studentVisibleViolations = allViolations.filter((v: any) =>
+        ['tab_switch', 'window_blur', 'tab_hidden', 'fullscreen_exit'].includes(v.violation_type)
+      );
+      setViolations(studentVisibleViolations);
     } catch (err) {
       setError('Failed to load violations');
       console.error('Error fetching violations:', err);
@@ -81,7 +86,7 @@ const ViolationsPanel: React.FC<ViolationsPanelProps> = ({ attemptId, isOpen, on
 
   const getViolationDescription = (violation: Violation) => {
     const { violation_type, metadata } = violation;
-    
+
     switch (violation_type) {
       case 'window_blur':
         return 'Window lost focus - you may have switched to another application';
@@ -156,7 +161,7 @@ const ViolationsPanel: React.FC<ViolationsPanelProps> = ({ attemptId, isOpen, on
                     <div className={`p-2 rounded-lg ${getViolationColor(violation.violation_type)}`}>
                       {getViolationIcon(violation.violation_type)}
                     </div>
-                    
+
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="font-medium text-gray-900">
@@ -166,16 +171,16 @@ const ViolationsPanel: React.FC<ViolationsPanelProps> = ({ attemptId, isOpen, on
                           {violation.violation_type}
                         </span>
                       </div>
-                      
+
                       <p className="text-gray-600 text-sm mb-2">
                         {getViolationDescription(violation)}
                       </p>
-                      
+
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <Clock className="w-3 h-3" />
                         <span>{formatTimestamp(violation.timestamp)}</span>
                       </div>
-                      
+
                       {violation.metadata && Object.keys(violation.metadata).length > 0 && (
                         <details className="mt-2">
                           <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">

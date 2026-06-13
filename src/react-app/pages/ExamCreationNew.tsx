@@ -183,6 +183,7 @@ interface ExamFormData {
   batch_ids: string[];
   program_id: string | number | null;
   copy_from_exam_id: number | null;
+  proctoring_snapshot_interval: number;
 }
 
 const getDefaultFormData = (): ExamFormData => ({
@@ -240,6 +241,7 @@ const getDefaultFormData = (): ExamFormData => ({
   batch_ids: [],
   program_id: null,
   copy_from_exam_id: null,
+  proctoring_snapshot_interval: 15,
 });
 
 export default function ExamCreation() {
@@ -420,6 +422,7 @@ export default function ExamCreation() {
         disable_copy_paste: exam.disable_copy_paste ?? true,
         disable_right_click: exam.disable_right_click ?? true,
         enable_webcam_proctoring: exam.enable_webcam_proctoring ?? true,
+        proctoring_snapshot_interval: exam.proctoring_snapshot_interval ?? 15,
         allow_tab_switching: exam.allow_tab_switching ?? true,
         is_public: exam.is_public || true,
         public_token_expires_at: exam.public_token_expires_at ? formatDateTimeLocal(exam.public_token_expires_at, resolvedTimezone) : '',
@@ -1477,6 +1480,26 @@ export default function ExamCreation() {
                     <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
                   </label>
                 </div>
+
+                {formData.enable_webcam_proctoring && (
+                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">Snapshot Interval</label>
+                      <p className="text-[10px] text-slate-500">Capture frequency in seconds (Min 15s)</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="15"
+                        max="300"
+                        value={formData.proctoring_snapshot_interval || 15}
+                        onChange={(e) => handleInputChange('proctoring_snapshot_interval', parseInt(e.target.value) || 15)}
+                        className="w-20 px-2 py-1 text-xs border border-slate-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs font-bold text-slate-400">SEC</span>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between">
                   <div>
