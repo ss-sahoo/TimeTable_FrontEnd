@@ -1158,10 +1158,14 @@ const SecureExamExperience: React.FC = () => {
         </aside>
       </main>
 
-      {/* Webcam proctoring */}
+      {/* 
+        Webcam proctoring — ProctoringOverlay is ALWAYS mounted (when webcam enabled) to keep 
+        the capture engine alive. When minimized, it's hidden via CSS but screenshots keep running.
+      */}
       {examAttempt?.exam.enable_webcam_proctoring && (
         <div className={`fixed z-50 transition-all duration-300 ${isWebcamMinimized ? 'bottom-4 left-1/2 -translate-x-1/2' : 'bottom-6 left-6'}`}>
-          {isWebcamMinimized ? (
+          {/* Minimized pill shown on top of the hidden overlay */}
+          {isWebcamMinimized && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1170,7 +1174,7 @@ const SecureExamExperience: React.FC = () => {
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                 <Monitor className="w-4 h-4 text-white" />
-                <span className="text-xs font-bold text-white uppercase tracking-wider">Camera Active</span>
+                <span className="text-xs font-bold text-white uppercase tracking-wider">Camera Active • Recording</span>
               </div>
               <button
                 onClick={() => setIsWebcamMinimized(false)}
@@ -1180,7 +1184,13 @@ const SecureExamExperience: React.FC = () => {
                 <Maximize className="w-4 h-4 text-white" />
               </button>
             </motion.div>
-          ) : (
+          )}
+
+          {/* 
+            Always mounted — only hidden via CSS when minimized.
+            This keeps the screenshot interval alive even when the widget is minimized.
+          */}
+          <div style={{ display: isWebcamMinimized ? 'none' : 'block' }}>
             <ProctoringOverlay
               attemptId={parseInt(attemptId!)}
               screenshotIntervalSec={15}
@@ -1188,7 +1198,7 @@ const SecureExamExperience: React.FC = () => {
               enableVideoRecording={true}
               onViolation={handleViolationDetected}
             />
-          )}
+          </div>
         </div>
       )}
 
