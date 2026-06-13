@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { ArrowLeft, Camera, AlertTriangle, CheckCircle, Clock, User, FileText, Filter } from 'lucide-react';
+import { ArrowLeft, Camera, AlertTriangle, CheckCircle, Clock, User, FileText, Filter, Video } from 'lucide-react';
 import { api, getErrorMessage } from '../hooks/useApi';
 
 interface Snapshot {
@@ -30,8 +30,17 @@ interface Snapshot {
   faces_detected: number;
 }
 
+interface VideoClip {
+  id: number;
+  video_file: string;
+  timestamp: string;
+  duration_seconds: number;
+  metadata: Record<string, any>;
+}
+
 interface SnapshotsResponse {
   snapshots: Snapshot[];
+  video_clips?: VideoClip[];
   total_count: number;
   violation_snapshots: number;
   metadata_only_snapshots: number;
@@ -106,9 +115,11 @@ const ProctoringSnapshotsView: React.FC = () => {
       'looking_away': 'Looking Away',
       'tab_switch': 'Tab Switch',
       'window_blur': 'Window Lost Focus',
-      'camera_error': 'Camera Error'
+      'camera_error': 'Camera Error',
+      'audio_noise': 'Background Noise',
+      'audio_voice_detected': 'Voice Detected'
     };
-    return labels[type] || type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return labels[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
   if (loading) {
@@ -156,29 +167,29 @@ const ProctoringSnapshotsView: React.FC = () => {
               <ArrowLeft className="w-5 h-5" />
               <span>Back</span>
             </button>
-            <h1 className="text-2xl font-bold text-gray-900">Proctoring Snapshots Review</h1>
-            <div className="w-24"></div> {/* Spacer for centering */}
+            <h1 className="text-2xl font-bold text-gray-900">Proctoring Review</h1>
+            <div className="w-24"></div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 text-sm">
             <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg">
               <User className="w-5 h-5 text-blue-600" />
               <div>
-                <p className="text-sm text-gray-600">Student</p>
+                <p className="text-gray-600">Student</p>
                 <p className="font-semibold text-gray-900">{data.student_name}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg">
               <FileText className="w-5 h-5 text-green-600" />
               <div>
-                <p className="text-sm text-gray-600">Exam</p>
+                <p className="text-gray-600">Exam</p>
                 <p className="font-semibold text-gray-900">{data.exam_title}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-lg">
               <Camera className="w-5 h-5 text-purple-600" />
               <div>
-                <p className="text-sm text-gray-600">Attempt ID</p>
+                <p className="text-gray-600">Attempt ID</p>
                 <p className="font-semibold text-gray-900">#{data.attempt_id}</p>
               </div>
             </div>
@@ -217,7 +228,41 @@ const ProctoringSnapshotsView: React.FC = () => {
           </div>
         </div>
 
+        {/* Video Clips Section */}
+        {data.video_clips && data.video_clips.length > 0 && (
+          <div className="mb-10">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Video className="w-6 h-6 text-blue-600" />
+              Recorded Video Feed
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {data.video_clips.map((clip) => (
+                <div key={clip.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden group">
+                  <div className="p-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-600 uppercase tracking-tighter">
+                      LOGGED AT {new Date(clip.timestamp).toLocaleTimeString()}
+                    </span>
+                    <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase">
+                      60 SECONDS
+                    </span>
+                  </div>
+                  <video
+                    src={clip.video_file}
+                    controls
+                    className="w-full aspect-video bg-black block"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Snapshots Grid */}
+        <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <Camera className="w-6 h-6 text-purple-600" />
+          Proctoring Analyzed Snapshots
+        </h2>
+
         {snapshotsToShow.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -232,8 +277,8 @@ const ProctoringSnapshotsView: React.FC = () => {
             {snapshotsToShow.map((snapshot, index) => (
               <div
                 key={index}
-                className={`bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer transition-all hover:shadow-md ${snapshot.stored_reason === 'violation_detected'
-                  ? 'border-2 border-red-300'
+                className={`bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer transition-all hover:shadow-md ${snapshot.stored_reason === 'violation_detected'
+                  ? 'ring-2 ring-red-500'
                   : 'border border-gray-200'
                   }`}
                 onClick={() => setSelectedSnapshot(snapshot)}
@@ -247,7 +292,7 @@ const ProctoringSnapshotsView: React.FC = () => {
                       className="w-full h-full object-cover"
                     />
                     {snapshot.stored_reason === 'violation_detected' && (
-                      <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded text-xs font-bold">
+                      <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider shadow-lg">
                         VIOLATION
                       </div>
                     )}
@@ -257,7 +302,6 @@ const ProctoringSnapshotsView: React.FC = () => {
                     <div className="text-center">
                       <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                       <p className="text-xs text-gray-500">No image stored</p>
-                      <p className="text-xs text-gray-400">Metadata only</p>
                     </div>
                   </div>
                 )}
@@ -269,36 +313,30 @@ const ProctoringSnapshotsView: React.FC = () => {
                       <Clock className="w-3 h-3" />
                       <span>{formatTimestamp(snapshot.timestamp)}</span>
                     </div>
-                    {snapshot.analysis.success ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
+                    {snapshot.violations.length > 0 ? (
+                      <AlertTriangle className="w-4 h-4 text-amber-500" />
                     ) : (
-                      <AlertTriangle className="w-4 h-4 text-red-500" />
+                      <CheckCircle className="w-4 h-4 text-green-500" />
                     )}
                   </div>
 
                   <div className="mb-2">
-                    <p className="text-xs text-gray-600">Faces Detected:</p>
-                    <p className="text-sm font-semibold">{snapshot.faces_detected}</p>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase">Analysis</p>
+                    <p className="text-sm font-semibold">{snapshot.faces_detected} face{snapshot.faces_detected !== 1 ? 's' : ''} detected</p>
                   </div>
 
                   {/* Violations */}
                   {snapshot.violations && snapshot.violations.length > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold text-gray-700 mb-1">Violations:</p>
+                    <div className="flex flex-wrap gap-1 mt-2">
                       {snapshot.violations.map((violation, vIndex) => (
                         <div
                           key={vIndex}
-                          className={`text-xs px-2 py-1 rounded border ${getViolationColor(violation.severity)}`}
+                          className={`text-[9px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-tighter ${getViolationColor(violation.severity)}`}
                         >
-                          <span className="font-semibold">{getViolationTypeLabel(violation.type)}</span>
-                          <span className="ml-2 opacity-75">({Math.round(violation.confidence * 100)}% confidence)</span>
+                          {getViolationTypeLabel(violation.type)}
                         </div>
                       ))}
                     </div>
-                  )}
-
-                  {snapshot.violations.length === 0 && snapshot.stored_reason === 'violation_detected' && (
-                    <div className="text-xs text-gray-500 italic">No specific violations detected</div>
                   )}
                 </div>
               </div>
@@ -309,91 +347,91 @@ const ProctoringSnapshotsView: React.FC = () => {
         {/* Modal for Detailed View */}
         {selectedSnapshot && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
             onClick={() => setSelectedSnapshot(null)}
           >
             <div
-              className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              className="bg-white rounded-3xl max-w-4xl w-full my-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold text-gray-900">Snapshot Details</h2>
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 italic tracking-tight">ANALYSIS DETAIL</h2>
                   <button
                     onClick={() => setSelectedSnapshot(null)}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400"
                   >
                     ✕
                   </button>
                 </div>
 
-                {/* Large Image */}
-                {selectedSnapshot.has_image && (selectedSnapshot.image_url || selectedSnapshot.image_data) && (
-                  <div className="mb-6">
-                    <img
-                      src={selectedSnapshot.image_url || `data:image/jpeg;base64,${selectedSnapshot.image_data}`}
-                      alt="Snapshot"
-                      className="w-full rounded-lg border border-gray-200"
-                    />
-                  </div>
-                )}
-
-                {/* Analysis Details */}
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-2">Timestamp</h3>
-                    <p className="text-gray-600">{formatTimestamp(selectedSnapshot.timestamp)}</p>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Left: Image */}
+                  <div className="space-y-4">
+                    {selectedSnapshot.has_image && (selectedSnapshot.image_url || selectedSnapshot.image_data) ? (
+                      <img
+                        src={selectedSnapshot.image_url || `data:image/jpeg;base64,${selectedSnapshot.image_data}`}
+                        alt="Snapshot"
+                        className="w-full rounded-2xl border border-gray-100 shadow-2xl"
+                      />
+                    ) : (
+                      <div className="aspect-video bg-gray-100 rounded-2xl flex items-center justify-center">
+                        <Camera className="w-12 h-12 text-gray-300" />
+                      </div>
+                    )}
                   </div>
 
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-2">Analysis Results</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-700">
-                        <span className="font-semibold">Faces Detected:</span> {selectedSnapshot.faces_detected}
-                      </p>
-                      <p className="text-sm text-gray-700 mt-1">
-                        <span className="font-semibold">Analysis Status:</span>{' '}
-                        {selectedSnapshot.analysis.success ? (
-                          <span className="text-green-600">Success</span>
-                        ) : (
-                          <span className="text-red-600">Failed - {selectedSnapshot.analysis.error}</span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  {selectedSnapshot.violations && selectedSnapshot.violations.length > 0 && (
+                  {/* Right: Info */}
+                  <div className="space-y-6">
                     <div>
-                      <h3 className="font-semibold text-gray-900 mb-2">Detected Violations</h3>
-                      <div className="space-y-2">
-                        {selectedSnapshot.violations.map((violation, index) => (
-                          <div
-                            key={index}
-                            className={`p-4 rounded-lg border ${getViolationColor(violation.severity)}`}
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-semibold">{getViolationTypeLabel(violation.type)}</span>
-                              <span className="text-xs opacity-75">
-                                {violation.severity.toUpperCase()} • {Math.round(violation.confidence * 100)}% confidence
-                              </span>
+                      <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Status</h3>
+                      <div className="flex items-center gap-2">
+                        {selectedSnapshot.violations.length > 0
+                          ? <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold uppercase">Security Violation</span>
+                          : <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold uppercase">Clear</span>
+                        }
+                        <span className="text-sm text-gray-500 font-medium">{formatTimestamp(selectedSnapshot.timestamp)}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Detected Violations</h3>
+                      {selectedSnapshot.violations.length === 0 ? (
+                        <p className="text-sm text-gray-500">No AI-detected violations in this frame.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {selectedSnapshot.violations.map((violation, index) => (
+                            <div
+                              key={index}
+                              className={`p-4 rounded-xl border flex items-start gap-4 ${getViolationColor(violation.severity)}`}
+                            >
+                              <div className="shrink-0 pt-1">
+                                <AlertTriangle className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold uppercase tracking-tight">{getViolationTypeLabel(violation.type)}</p>
+                                <p className="text-xs opacity-90 mt-1">{violation.message}</p>
+                                <p className="text-[10px] font-bold opacity-60 mt-1 uppercase tracking-widest">
+                                  CONFIDENCE: {Math.round(violation.confidence * 100)}%
+                                </p>
+                              </div>
                             </div>
-                            <p className="text-sm">{violation.message}</p>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
 
-                  {selectedSnapshot.metadata && Object.keys(selectedSnapshot.metadata).length > 0 && (
-                    <div>
-                      <h3 className="font-semibold text-gray-900 mb-2">Metadata</h3>
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <pre className="text-xs text-gray-700 overflow-x-auto">
-                          {JSON.stringify(selectedSnapshot.metadata, null, 2)}
-                        </pre>
+                    {selectedSnapshot.metadata && Object.keys(selectedSnapshot.metadata).length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Technical Logs</h3>
+                        <div className="bg-slate-900 p-4 rounded-xl">
+                          <pre className="text-[10px] text-blue-300 overflow-x-auto">
+                            {JSON.stringify(selectedSnapshot.metadata, null, 2)}
+                          </pre>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -405,4 +443,3 @@ const ProctoringSnapshotsView: React.FC = () => {
 };
 
 export default ProctoringSnapshotsView;
-

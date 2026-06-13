@@ -1,0 +1,401 @@
+/**
+ * useProctoringEngine
+ * =====================
+ * Professional, enterprise-grade proctoring hook for exam platforms.
+ *
+ * Features:
+ *  - 📸 Periodic screenshot capture (default: every 10s) → sent to backend AI for analysis
+ *  - 🎤 Audio monitoring via Web Audio API → detects sustained noise / voice
+ *  - 📹 Video clip recording (30s chunks) → saved as blobs (optional upload)
+ *  - 🔔 Violation event bus → fires callbacks with type, confidence, message
+ *  - 🛡️ Graceful degradation → if camera/mic denied, flags it but doesn't crash
+ *
+ * Usage:
+ *   const proctoring = useProctoringEngine({ attemptId, onViolation });
+ *   <video ref={proctoring.videoRef} ... />
+ */
+
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { api } from './useApi';
+
+export type ProctoringViolationType =
+    | 'no_face'
+    | 'multiple_faces'
+    | 'gaze_left'
+    | 'gaze_right'
+    | 'gaze_down'
+    | 'gaze_up'
+    | 'head_turned_left'
+    | 'head_turned_right'
+    | 'head_looking_down'
+    | 'head_tilted'
+    | 'audio_noise'
+    | 'audio_voice_detected'
+    | 'camera_blocked'
+    | 'mic_blocked'
+    | 'multiple_audio_sources';
+
+export interface ProctoringViolation {
+    type: ProctoringViolationType;
+    confidence: number;
+    message: string;
+    timestamp: Date;
+    source: 'camera' | 'audio' | 'system';
+}
+
+export interface ProctoringStatus {
+    camera: 'idle' | 'requesting' | 'active' | 'error' | 'denied';
+    audio: 'idle' | 'requesting' | 'active' | 'error' | 'denied';
+    recording: 'idle' | 'recording' | 'paused' | 'error';
+    screenshotCount: number;
+    lastScreenshotAt: Date | null;
+    audioLevel: number;          // 0-100 normalized
+    isVoiceDetected: boolean;
+    violations: ProctoringViolation[];
+}
+
+export interface ProctoringEngineOptions {
+    attemptId: number;
+    screenshotIntervalMs?: number;   // default 10000 (10s)
+    audioCheckIntervalMs?: number;   // default 1000 (1s)
+    audioNoiseThreshold?: number;    // 0-100, default 25
+    audioVoiceThreshold?: number;    // 0-100, default 40
+    enableCamera?: boolean;          // default true
+    enableAudio?: boolean;           // default true
+    enableVideoRecording?: boolean;  // default false (experimental)
+    onViolation?: (violation: ProctoringViolation) => void;
+    onStatusChange?: (status: ProctoringStatus) => void;
+}
+
+const useProctoringEngine = (options: ProctoringEngineOptions) => {
+    const {
+        attemptId,
+        screenshotIntervalMs = 10000,
+        audioCheckIntervalMs = 1000,
+        audioNoiseThreshold = 25,
+        audioVoiceThreshold = 45,
+        enableCamera = true,
+        enableAudio = true,
+        enableVideoRecording = false,
+        onViolation,
+        onStatusChange,
+    } = options;
+
+    // ─── Refs ──────────────────────────────────────────────────────────────────
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const screenshotTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const audioTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const violationCooldownsRef = useRef<Record<string, number>>({});
+    const isMountedRef = useRef(true);
+
+    // ─── State ─────────────────────────────────────────────────────────────────
+    const [status, setStatus] = useState<ProctoringStatus>({
+        camera: 'idle',
+        audio: 'idle',
+        recording: 'idle',
+        screenshotCount: 0,
+        lastScreenshotAt: null,
+        audioLevel: 0,
+        isVoiceDetected: false,
+        violations: [],
+    });
+
+    // ─── Helpers ───────────────────────────────────────────────────────────────
+
+    const updateStatus = useCallback((patch: Partial<ProctoringStatus>) => {
+        setStatus(prev => {
+            const next = { ...prev, ...patch };
+            onStatusChange?.(next);
+            return next;
+        });
+    }, [onStatusChange]);
+
+    /** Fire a violation — with a per-type cooldown to avoid spam */
+    const fireViolation = useCallback((
+        type: ProctoringViolationType,
+        confidence: number,
+        message: string,
+        source: ProctoringViolation['source'],
+        cooldownMs = 15000,
+    ) => {
+        const now = Date.now();
+        const last = violationCooldownsRef.current[type] ?? 0;
+        if (now - last < cooldownMs) return; // still in cooldown
+        violationCooldownsRef.current[type] = now;
+
+        const violation: ProctoringViolation = { type, confidence, message, timestamp: new Date(), source };
+
+        setStatus(prev => {
+            const violations = [...prev.violations, violation].slice(-100);
+            const next = { ...prev, violations };
+            onStatusChange?.(next);
+            return next;
+        });
+
+        onViolation?.(violation);
+
+        // Async: report to backend (best-effort, don't await)
+        api.post(`/exams/attempts/${attemptId}/violations/`, {
+            violation_type: type,
+            metadata: { confidence, message, source },
+        }).catch(() => {/* silent */ });
+    }, [attemptId, onViolation, onStatusChange]);
+
+    // ─── Camera Setup ──────────────────────────────────────────────────────────
+
+    const startCamera = useCallback(async () => {
+        if (!enableCamera) return;
+        updateStatus({ camera: 'requesting' });
+
+        try {
+            const constraints: MediaStreamConstraints = {
+                video: {
+                    facingMode: 'user',
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    frameRate: { ideal: 15 },
+                },
+                audio: enableAudio ? {
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false,
+                    sampleRate: 44100,
+                } : false,
+            };
+
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            if (!isMountedRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
+
+            streamRef.current = stream;
+
+            // Attach video
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                videoRef.current.play().catch(() => { });
+            }
+
+            updateStatus({ camera: 'active', audio: enableAudio ? 'active' : 'idle' });
+
+            // Set up audio analysis
+            if (enableAudio) {
+                try {
+                    const audioCtx = new AudioContext();
+                    audioContextRef.current = audioCtx;
+                    const source = audioCtx.createMediaStreamSource(stream);
+                    const analyser = audioCtx.createAnalyser();
+                    analyser.fftSize = 256;
+                    analyser.smoothingTimeConstant = 0.8;
+                    source.connect(analyser);
+                    analyserRef.current = analyser;
+                } catch {
+                    updateStatus({ audio: 'error' });
+                }
+            }
+
+            // Set up video recording if requested
+            if (enableVideoRecording && MediaRecorder.isTypeSupported('video/webm')) {
+                try {
+                    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 250000 });
+                    const chunks: Blob[] = [];
+
+                    recorder.ondataavailable = (e) => {
+                        if (e.data && e.data.size > 0) chunks.push(e.data);
+                    };
+
+                    recorder.onstop = () => {
+                        if (chunks.length > 0) {
+                            const blob = new Blob(chunks, { type: 'video/webm' });
+                            uploadVideoClip(blob);
+                            chunks.length = 0;
+                        }
+                    };
+
+                    // Record in 60-second chunks
+                    recorder.start();
+                    setInterval(() => {
+                        if (recorder.state === 'recording') {
+                            recorder.stop();
+                            recorder.start();
+                        }
+                    }, 60000);
+
+                    mediaRecorderRef.current = recorder;
+                    updateStatus({ recording: 'recording' });
+                } catch {
+                    updateStatus({ recording: 'error' });
+                }
+            }
+
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Unknown error';
+            const isDenied = msg.includes('Permission denied') || msg.includes('NotAllowedError');
+            updateStatus({ camera: isDenied ? 'denied' : 'error', audio: isDenied ? 'denied' : 'error' });
+
+            if (isDenied) {
+                fireViolation('camera_blocked', 1.0, 'Camera/microphone permission was denied by the student.', 'system', 0);
+            }
+        }
+    }, [enableCamera, enableAudio, enableVideoRecording, updateStatus, fireViolation]);
+
+    // ─── Screenshot Capture ────────────────────────────────────────────────────
+
+    const captureAndAnalyzeScreenshot = useCallback(async () => {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (!video || !canvas || video.readyState < 2) return;
+
+        try {
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = canvas.toDataURL('image/jpeg', 0.7).split(',')[1]; // base64 without prefix
+
+            setStatus(prev => {
+                const next = { ...prev, screenshotCount: prev.screenshotCount + 1, lastScreenshotAt: new Date() };
+                onStatusChange?.(next);
+                return next;
+            });
+
+            // Send to backend for AI analysis
+            const response = await api.post(`/exams/attempts/${attemptId}/proctoring/snapshot/`, {
+                image_data: imageData,
+                timestamp: new Date().toISOString(),
+            });
+
+            const result = response.data;
+            if (result.violations && Array.isArray(result.violations)) {
+                for (const v of result.violations) {
+                    fireViolation(
+                        v.type as ProctoringViolationType,
+                        v.confidence ?? 0.8,
+                        v.message ?? v.type,
+                        'camera',
+                        15000,
+                    );
+                }
+            }
+        } catch {
+            // Silently skip failed captures — don't interrupt the exam
+        }
+    }, [attemptId, updateStatus, fireViolation]);
+
+    // ─── Audio Monitoring ──────────────────────────────────────────────────────
+
+    const checkAudioLevel = useCallback(() => {
+        const analyser = analyserRef.current;
+        if (!analyser) return;
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(dataArray);
+
+        // RMS of frequency bins → normalized 0-100
+        const rms = Math.sqrt(dataArray.reduce((sum, v) => sum + v * v, 0) / dataArray.length);
+        const normalized = Math.min(100, Math.round((rms / 128) * 100));
+
+        // Detect sustained voice (higher frequencies dominant)
+        // Voice frequency range: roughly bins 8-40 in a 256-bin analyser at 44kHz
+        const voiceBins = Array.from(dataArray.slice(8, 40));
+        const voiceAvg = voiceBins.reduce((a, b) => a + b, 0) / voiceBins.length;
+        const isVoice = voiceAvg > (audioVoiceThreshold / 100) * 128;
+        const isNoise = normalized > audioNoiseThreshold;
+
+        updateStatus({ audioLevel: normalized, isVoiceDetected: isVoice });
+
+        if (isVoice) {
+            fireViolation('audio_voice_detected', 0.75, `Voice/speech detected in exam environment (level: ${normalized}%)`, 'audio', 20000);
+        } else if (isNoise) {
+            fireViolation('audio_noise', 0.5, `Background noise detected (level: ${normalized}%)`, 'audio', 30000);
+        }
+    }, [audioNoiseThreshold, audioVoiceThreshold, updateStatus, fireViolation]);
+
+    // ─── Upload video clip ─────────────────────────────────────────────────────
+
+    const uploadVideoClip = async (blob: Blob) => {
+        try {
+            const formData = new FormData();
+            formData.append('video_clip', blob, `proctoring_${attemptId}_${Date.now()}.webm`);
+            formData.append('attempt_id', String(attemptId));
+            await api.post('/exams/proctoring/upload-clip/', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+        } catch {
+            // Silent — don't disrupt exam
+        }
+    };
+
+    // ─── Lifecycle ─────────────────────────────────────────────────────────────
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        startCamera();
+
+        return () => {
+            isMountedRef.current = false;
+
+            // Stop screenshot loop
+            if (screenshotTimerRef.current) clearInterval(screenshotTimerRef.current);
+            // Stop audio loop
+            if (audioTimerRef.current) clearInterval(audioTimerRef.current);
+            // Stop recorder
+            if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
+            // Close audio context
+            if (audioContextRef.current) audioContextRef.current.close();
+            // Stop all tracks
+            streamRef.current?.getTracks().forEach(t => t.stop());
+        };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Start screenshot loop once camera is active
+    useEffect(() => {
+        if (status.camera !== 'active') return;
+
+        screenshotTimerRef.current = setInterval(captureAndAnalyzeScreenshot, screenshotIntervalMs);
+        return () => { if (screenshotTimerRef.current) clearInterval(screenshotTimerRef.current); };
+    }, [status.camera, screenshotIntervalMs, captureAndAnalyzeScreenshot]);
+
+    // Start audio loop once audio is active
+    useEffect(() => {
+        if (status.audio !== 'active') return;
+
+        audioTimerRef.current = setInterval(checkAudioLevel, audioCheckIntervalMs);
+        return () => { if (audioTimerRef.current) clearInterval(audioTimerRef.current); };
+    }, [status.audio, audioCheckIntervalMs, checkAudioLevel]);
+
+    // ─── Public API ────────────────────────────────────────────────────────────
+
+    const forceScreenshot = useCallback(() => {
+        captureAndAnalyzeScreenshot();
+    }, [captureAndAnalyzeScreenshot]);
+
+    const stopProctoring = useCallback(() => {
+        if (screenshotTimerRef.current) clearInterval(screenshotTimerRef.current);
+        if (audioTimerRef.current) clearInterval(audioTimerRef.current);
+        if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
+        if (audioContextRef.current) audioContextRef.current.close();
+        streamRef.current?.getTracks().forEach(t => t.stop());
+        updateStatus({ camera: 'idle', audio: 'idle', recording: 'idle' });
+    }, [updateStatus]);
+
+    return {
+        /** Attach to a <video> element to show the live feed */
+        videoRef,
+        /** Hidden canvas used for screenshot capture — render off-screen */
+        canvasRef,
+        /** Current proctoring status snapshot */
+        status,
+        /** Manually trigger a screenshot + backend analysis */
+        forceScreenshot,
+        /** Cleanly stop all proctoring streams */
+        stopProctoring,
+    };
+};
+
+export default useProctoringEngine;

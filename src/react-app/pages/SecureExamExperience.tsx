@@ -17,7 +17,7 @@ import {
   Monitor
 } from 'lucide-react';
 import useExamSecurity from '../hooks/useExamSecurity';
-import WebcamMonitor from '../components/WebcamMonitor';
+import ProctoringOverlay from '../components/ProctoringOverlay';
 import ViolationToast from '../components/ViolationToast';
 import LaTeXRenderer from '../components/LaTeXRenderer';
 import ViolationsPanel from '../components/ViolationsPanel';
@@ -483,9 +483,9 @@ const SecureExamExperience: React.FC = () => {
 
       setQuestions(mappedQuestions);
 
-      if (attemptData.answers) {
+      if ((attemptData as any).answers) {
         const existingAnswers = new Map<number, Answer>();
-        Object.entries(attemptData.answers).forEach(([questionId, answer]: [string, any]) => {
+        Object.entries((attemptData as any).answers).forEach(([questionId, answer]: [string, any]) => {
           existingAnswers.set(parseInt(questionId, 10), answer);
         });
         setAnswers(existingAnswers);
@@ -834,7 +834,7 @@ const SecureExamExperience: React.FC = () => {
                                     })()
                                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
                                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                    }`}
+                                      }`}
                                   >
                                     {(function () {
                                       let sel = '';
@@ -1176,27 +1176,13 @@ const SecureExamExperience: React.FC = () => {
               </button>
             </motion.div>
           ) : (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="relative"
-            >
-              <WebcamMonitor
-                attemptId={parseInt(attemptId!)}
-                onViolationDetected={handleViolationDetected}
-                captureInterval={20}
-                showPreview={true}
-                autoStart={true}
-                className="w-48 shadow-2xl rounded-xl border-2 border-white dark:border-slate-800 overflow-hidden"
-              />
-              <button
-                onClick={() => setIsWebcamMinimized(true)}
-                className="absolute top-2 right-2 p-1.5 bg-slate-900/80 hover:bg-slate-900 rounded-lg transition-all shadow-lg z-10"
-                title="Minimize camera"
-              >
-                <Minimize className="w-3.5 h-3.5 text-white" />
-              </button>
-            </motion.div>
+            <ProctoringOverlay
+              attemptId={parseInt(attemptId!)}
+              screenshotIntervalSec={15}
+              enableAudio={true}
+              enableVideoRecording={false}
+              onViolation={handleViolationDetected}
+            />
           )}
         </div>
       )}
