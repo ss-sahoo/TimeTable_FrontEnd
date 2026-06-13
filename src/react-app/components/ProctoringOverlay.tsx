@@ -84,16 +84,6 @@ const ProctoringOverlay: React.FC<ProctoringOverlayProps> = ({
             {/* ── Hidden canvas for screenshot capture ── */}
             <canvas ref={canvasRef} className="hidden" />
 
-            {/* ── Violation badge (only for HARD violations) ── */}
-            {hardViolationCount > 0 && !expanded && (
-                <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute -top-2 -left-2 w-6 h-6 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-lg border-2 border-white z-10"
-                >
-                    {hardViolationCount > 9 ? '9+' : hardViolationCount}
-                </motion.div>
-            )}
 
             {/* ── Violation Log Panel ── */}
             <AnimatePresence>
@@ -168,16 +158,6 @@ const ProctoringOverlay: React.FC<ProctoringOverlayProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                        {/* Violations badge (Hard only) */}
-                        {hardViolationCount > 0 && (
-                            <button
-                                onClick={(e) => { e.stopPropagation(); setShowLog(v => !v); }}
-                                className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors"
-                            >
-                                <AlertTriangle className="w-2.5 h-2.5 text-red-400" />
-                                <span className="text-[9px] font-bold text-red-400">{hardViolationCount}</span>
-                            </button>
-                        )}
                         <div className="p-1 text-slate-400 hover:text-white transition-colors">
                             {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
                         </div>

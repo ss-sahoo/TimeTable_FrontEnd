@@ -367,24 +367,9 @@ const SecureExamExperience: React.FC = () => {
     return () => window.removeEventListener('pageshow', handlePageShow);
   }, [attemptId, navigate]);
 
-  // ── Violations toast ──────────────────────────────────────────────────────
-  const lastViolationTimeShown = useRef<number>(0);
-  useEffect(() => {
-    if (violations.length > 0) {
-      const latest = violations[violations.length - 1];
-      const ts = latest.timestamp.getTime();
-
-      // Hide SOFT violations (audio) from the student UI/Toast
-      const SOFT_VIOLATIONS = ['audio_noise', 'audio_voice_detected'];
-      if (SOFT_VIOLATIONS.includes(latest.type)) return;
-
-      if (ts > lastViolationTimeShown.current) {
-        lastViolationTimeShown.current = ts;
-        setCurrentToastViolation(latest);
-      }
-    }
-  }, [violations]);
-
+  // ── Violations tracking (Silent) ──────────────────────────────────────────
+  // We no longer show toasts or warnings to the student per requirement.
+  // All violations are logged silently to the backend.
   const handleCloseToast = useCallback(() => setCurrentToastViolation(null), []);
 
   // ── Load exam data ────────────────────────────────────────────────────────
@@ -711,18 +696,14 @@ const SecureExamExperience: React.FC = () => {
             </div>
             <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-800" />
             <div className="text-right">
-              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">Violations</p>
-              <button
-                onClick={() => setShowViolationsPanel(true)}
-                className="flex items-center gap-2 justify-end group transition-all"
-              >
-                <div className={`w-1.5 h-1.5 rounded-full ${violationCount > 3 ? 'bg-red-500 animate-pulse' : violationCount > 0 ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                <span className={`text-xs font-bold uppercase transition-colors ${violationCount > 3 ? 'text-red-600' : violationCount > 0 ? 'text-amber-600' : 'text-emerald-600'} group-hover:underline`}>
-                  {violationCount} Records
-                </span>
-              </button>
+              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">Security</p>
+              <div className="flex items-center gap-2 justify-end">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-xs font-bold text-emerald-600 uppercase">Active Monitoring</span>
+              </div>
             </div>
           </div>
+
 
           {/* Timer — no pause button (server controls time) */}
           <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
@@ -1212,10 +1193,8 @@ const SecureExamExperience: React.FC = () => {
         isSubmitting={isSubmitting}
       />
 
-      <ViolationToast
-        violation={currentToastViolation}
-        onClose={handleCloseToast}
-      />
+      {/* ViolationToast removed for silent proctoring */}
+
 
       <ViolationsPanel
         attemptId={parseInt(attemptId!)}
