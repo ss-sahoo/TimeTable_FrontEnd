@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Eye,
   EyeOff,
@@ -9,10 +9,14 @@ import {
   Zap,
   AlertCircle,
   Star,
+  Users,
+  Shield,
+  Building2,
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 import DeviceConflictModal from '../components/DeviceConflictModal';
 
+// Google Client ID – set via env or fallback
 export default function Login() {
   const [formData, setFormData] = useState({
     email: '',
@@ -20,11 +24,18 @@ export default function Login() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
+  const [signupRole, setSignupRole] = useState<'student' | 'institution'>('student');
+  const [instituteName, setInstituteName] = useState('');
 
-  const { login, deviceConflict, setDeviceConflict } = useAuthContext();
+  const GOOGLE_CLIENT_ID =
+    (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) ||
+    '976886272254-0qajikvplhfa5hhl8vv24tgn4kbtf1a5.apps.googleusercontent.com';
+
+  const { login, loginWithGoogle, deviceConflict, setDeviceConflict } = useAuthContext();
   const navigate = useNavigate();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,7 +46,6 @@ export default function Login() {
 
   // Helper function to get dashboard route based on role
   const getDashboardRoute = (role: string): string => {
-    // For timetable domain, always go to timetable page regardless of role
     if (window.location.hostname === 'timetable.dashoapp.com') {
       return '/timetable';
     }
@@ -59,6 +69,103 @@ export default function Login() {
     }
   };
 
+  // --- Google Sign-In handler ---
+  const handleGoogleCredentialResponse = useCallback(
+    async (response: { credential: string }) => {
+      setGoogleLoading(true);
+      setError('');
+
+      try {
+        // Store intent BEFORE calling loginWithGoogle
+        if (signupRole === 'institution') {
+          sessionStorage.setItem('onboarding_intent', 'create');
+          sessionStorage.setItem('pending_institute_name', instituteName);
+        } else {
+          sessionStorage.setItem('onboarding_intent', 'join');
+          sessionStorage.removeItem('pending_institute_name');
+        }
+
+        const result = await loginWithGoogle(
+          response.credential,
+          false,
+          signupRole === 'institution' ? 'super_admin' : 'student',
+          signupRole === 'institution' ? 'create' : 'join',
+          instituteName
+        );
+
+        if (result.onboarding_required) {
+          navigate('/onboarding');
+          return;
+        }
+
+        const dashboardRoute = getDashboardRoute(result.role);
+        navigate(dashboardRoute);
+      } catch (err: any) {
+        if (err.message === 'DEVICE_CONFLICT') {
+          // Modal will show via context state
+          setGoogleLoading(false);
+          return;
+        }
+        setError(err.message || 'Google login failed. Please try again.');
+      } finally {
+        setGoogleLoading(false);
+      }
+    },
+    [navigate, loginWithGoogle, signupRole],
+  );
+
+  // Load Google Identity Services script
+  useEffect(() => {
+    const initializeGoogle = () => {
+      if ((window as any).google?.accounts?.id) {
+        (window as any).google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleCredentialResponse,
+          auto_select: false,
+        });
+
+        // Use a small delay to ensure the container is in the DOM
+        setTimeout(() => {
+          const container = document.getElementById('google-btn-container');
+          if (container) {
+            (window as any).google.accounts.id.renderButton(container, {
+              theme: 'outline',
+              size: 'large',
+              width: container.offsetWidth,
+              text: signupRole === 'institution' ? 'signup_with' : 'continue_with',
+              shape: 'rectangular',
+              logo_alignment: 'left',
+            });
+          }
+        }, 100);
+      }
+    };
+
+    if (document.getElementById('google-gsi-script')) {
+      initializeGoogle();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = 'google-gsi-script';
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = initializeGoogle;
+    document.head.appendChild(script);
+  }, [handleGoogleCredentialResponse, signupRole]);
+
+  const handleGoogleClick = () => {
+    // Validate institute name first if roles is institution
+    if (signupRole === 'institution' && !instituteName) {
+      setError('Please enter your Institute Name before continuing with Google.');
+      const element = document.getElementById('instituteName');
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    // With renderButton, the click is handled by the Google iframe
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -66,8 +173,6 @@ export default function Login() {
 
     try {
       let loggedInUser: any = null;
-
-      // Try role-specific endpoints first (admin, super_admin, teacher, student)
       const roleAttempts = ['admin', 'super_admin', 'teacher', 'student'];
       let loginSuccess = false;
 
@@ -77,42 +182,31 @@ export default function Login() {
           loginSuccess = true;
           break;
         } catch (roleError: any) {
-          console.log('Role login error:', roleError.message);
-          // Check if this is a device conflict
           if (roleError.message === 'DEVICE_CONFLICT') {
-            console.log('Device conflict detected in login component!');
             setLoading(false);
-            return; // Just return, the modal will show via deviceConflict state
+            return;
           }
-          // Continue to next role
           continue;
         }
       }
 
-      // If role-specific login failed, try generic login
       if (!loginSuccess) {
         try {
           loggedInUser = await login(formData.email, formData.password);
         } catch (genericError: any) {
-          console.log('Generic login error:', genericError.message);
-          // Check if this is a device conflict
           if (genericError.message === 'DEVICE_CONFLICT') {
-            console.log('Device conflict detected in generic login!');
             setLoading(false);
-            return; // Just return, the modal will show via deviceConflict state
+            return;
           }
           throw genericError;
         }
       }
 
-      // Redirect based on user role
       if (loggedInUser?.role) {
         const dashboardRoute = getDashboardRoute(loggedInUser.role);
-        console.log('Login successful, redirecting to:', dashboardRoute, 'User role:', loggedInUser.role);
         setLoading(false);
         navigate(dashboardRoute);
       } else {
-        console.warn('No role found in user data, redirecting to default dashboard', loggedInUser);
         setLoading(false);
         navigate('/dashboard');
       }
@@ -126,14 +220,19 @@ export default function Login() {
     if (!deviceConflict) return;
 
     try {
-      // Retry login with stored credentials and force switch flag
-      const { identifier, password, role } = deviceConflict.credentials;
-      const loggedInUser = await login(identifier, password, role, true); // true = forceSwitch
+      let loggedInUser: any = null;
 
-      // Clear device conflict state
+      if (deviceConflict.googleCredential) {
+        // Handle Google switch
+        loggedInUser = await loginWithGoogle(deviceConflict.googleCredential, true);
+      } else {
+        // Handle regular switch
+        const { identifier, password, role } = deviceConflict.credentials;
+        loggedInUser = await login(identifier, password, role, true);
+      }
+
       setDeviceConflict(null);
 
-      // Redirect based on user role
       if (loggedInUser?.role) {
         const dashboardRoute = getDashboardRoute(loggedInUser.role);
         navigate(dashboardRoute);
@@ -147,12 +246,11 @@ export default function Login() {
 
   const handleCancelDeviceSwitch = () => {
     setDeviceConflict(null);
-    setShowDeviceConflict(false);
     setError('Login cancelled. Please use your other device or contact support.');
   };
 
   return (
-    <div className="h-screen flex overflow-hidden">
+    <div className="h-screen flex overflow-hidden text-slate-900">
       {/* Device Conflict Modal */}
       {deviceConflict && (
         <DeviceConflictModal
@@ -174,7 +272,6 @@ export default function Login() {
           `
         }}
       >
-        {/* Abstract SVG Background */}
         <div className="absolute inset-0 z-0 opacity-30">
           <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
             <path d="M0 100 C 20 0 50 0 100 100 Z" fill="url(#grad1)" />
@@ -187,23 +284,22 @@ export default function Login() {
           </svg>
         </div>
 
-        {/* Logo Area */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5 }}
           className="relative z-10 flex items-center gap-3"
         >
-          <div className="w-10 h-10 flex items-center justify-center border border-white/10">
+          <div className="w-10 h-10 flex items-center justify-center border border-white/10 rounded-lg bg-white/5">
             <img
               src="/examlogo.png"
               alt="Exam Logo"
               className="w-8 h-8 object-contain mx-auto"
-            />          </div>
+            />
+          </div>
           <span className="font-bold text-xl tracking-tight">DashoExams</span>
         </motion.div>
 
-        {/* Testimonial / Trust Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -218,7 +314,6 @@ export default function Login() {
               border: '1px solid rgba(255, 255, 255, 0.2)'
             }}
           >
-            {/* Stars */}
             <div className="flex gap-1 mb-4 text-yellow-400">
               {[...Array(5)].map((_, i) => (
                 <Star key={i} className="w-4 h-4" fill="currentColor" />
@@ -231,7 +326,7 @@ export default function Login() {
 
             <div className="flex items-center gap-4">
               <img
-                src="https://ui-avatars.com/api/?name=Dr+Sarah+Chen&background=random"
+                src="https://ui-avatars.com/api/?name=Ipsit+Panda&background=random"
                 alt="User"
                 className="w-10 h-10 rounded-full border-2 border-white/20"
               />
@@ -243,13 +338,6 @@ export default function Login() {
               </div>
             </div>
           </div>
-
-          {/* Trusted By Logos (Subtle) */}
-          <div className="mt-8 flex gap-6 opacity-60">
-            <div className="h-6 w-20 bg-white/20 rounded"></div>
-            <div className="h-6 w-20 bg-white/20 rounded"></div>
-            <div className="h-6 w-20 bg-white/20 rounded"></div>
-          </div>
         </motion.div>
 
         <div className="relative z-10 text-xs text-indigo-200">
@@ -257,7 +345,6 @@ export default function Login() {
         </div>
       </div>
 
-      {/* RIGHT SIDE: Login Form */}
       <div className="w-full lg:w-1/2 bg-white flex flex-col justify-center items-center p-8 lg:p-12 overflow-y-auto relative">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -265,7 +352,6 @@ export default function Login() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md space-y-8"
         >
-          {/* Mobile Logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
               <Zap className="w-4 h-4" fill="currentColor" />
@@ -273,51 +359,94 @@ export default function Login() {
             <span className="font-bold text-lg text-slate-900">DashoExams</span>
           </div>
 
-          {/* Header */}
           <div className="text-center lg:text-left">
             <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome back</h2>
             <p className="mt-2 text-sm text-slate-500">Please enter your details to sign in.</p>
           </div>
 
-          {/* Social Login */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Role Selector (Primarily for first-time Google signups) */}
+          <div className="flex p-1 bg-slate-100 rounded-xl mb-6 relative">
+            <motion.div
+              className="absolute inset-y-1 bg-white rounded-lg shadow-sm z-0"
+              initial={false}
+              animate={{
+                x: signupRole === 'student' ? '0%' : '100%',
+                width: 'calc(50% - 4px)',
+              }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            />
             <button
               type="button"
-              className="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              onClick={() => setSignupRole('student')}
+              className={`relative z-10 flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold transition-colors ${signupRole === 'student' ? 'text-indigo-600' : 'text-slate-500'
+                }`}
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-              </svg>
-              Google
+              <Users className="w-4 h-4" />
+              Student
             </button>
             <button
               type="button"
-              className="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              onClick={() => setSignupRole('institution')}
+              className={`relative z-10 flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold transition-colors ${signupRole === 'institution' ? 'text-indigo-600' : 'text-slate-500'
+                }`}
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#00A4EF" d="M11.4 24H0V12.6h11.4V24z" />
-                <path fill="#FFB900" d="M24 24H12.6V12.6H24V24z" />
-                <path fill="#F25022" d="M11.4 11.4H0V0h11.4v11.4z" />
-                <path fill="#7FBA00" d="M24 11.4H12.6V0H24v11.4z" />
-              </svg>
-              Microsoft
+              <Shield className="w-4 h-4" />
+              Institution
             </button>
           </div>
 
-          {/* Divider */}
+          <AnimatePresence>
+            {signupRole === 'institution' && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                animate={{ opacity: 1, height: 'auto', marginBottom: 24 }}
+                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                className="overflow-hidden"
+              >
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Institute / School Name <span className="text-red-500">*</span>
+                </label>
+                <div className={`relative rounded-xl transition-all duration-200 ${focusedField === 'instituteName' ? 'ring-2 ring-indigo-500/20' : ''}`}>
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Building2 className={`h-4 w-4 transition-colors ${focusedField === 'instituteName' ? 'text-indigo-600' : 'text-slate-400'}`} />
+                  </div>
+                  <input
+                    id="instituteName"
+                    name="instituteName"
+                    type="text"
+                    required
+                    value={instituteName}
+                    onChange={(e) => {
+                      setInstituteName(e.target.value);
+                      setError('');
+                    }}
+                    onFocus={() => setFocusedField('instituteName')}
+                    onBlur={() => setFocusedField(null)}
+                    className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-all"
+                    placeholder="e.g. Stanford University"
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="w-full">
+            <div
+              id="google-btn-container"
+              className="min-h-[40px] flex justify-center"
+              onClick={handleGoogleClick}
+            />
+          </div>
+
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-200"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-slate-400">Or continue with email</span>
+              <span className="px-2 bg-white text-slate-400 font-medium">Or continue with email</span>
             </div>
           </div>
 
-          {/* Error Message */}
           {error && (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -334,9 +463,7 @@ export default function Login() {
             </motion.div>
           )}
 
-          {/* Form */}
           <form className="space-y-5" onSubmit={handleSubmit}>
-            {/* Email Input */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1.5">
                 Email or Teacher ID
@@ -363,7 +490,6 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Password Input */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label htmlFor="password" className="block text-sm font-medium text-slate-700">
@@ -391,7 +517,7 @@ export default function Login() {
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
@@ -403,31 +529,29 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Remember Me & Forgot Password */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <input
-                    id="remember-me"
-                    name="remember-me"
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded cursor-pointer"
-                  />
-                  <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600 cursor-pointer">
-                    Remember me
-                  </label>
-                </div>
-                
-                <Link 
-                  to="/forgot-password" 
-                  className="text-sm font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
-                >
-                  Forgot password?
-                </Link>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <input
+                  id="remember-me"
+                  name="remember-me"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded cursor-pointer"
+                />
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600 cursor-pointer hover:text-slate-900 transition-colors">
+                  Remember me
+                </label>
               </div>
 
-            {/* Submit Button */}
+              <Link
+                to="/forgot-password"
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
+
             <div>
               <motion.button
                 whileHover={{ y: -1 }}
@@ -448,9 +572,8 @@ export default function Login() {
             </div>
           </form>
 
-          {/* Sign Up Link */}
           <div className="text-center mt-6">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 font-medium">
               Don't have an account?{' '}
               <Link to="/register" className="font-semibold text-indigo-600 hover:text-indigo-500 transition-colors">
                 Create an account
@@ -459,7 +582,6 @@ export default function Login() {
           </div>
         </motion.div>
 
-        {/* Footer Links */}
         <div className="mt-8 text-center">
           <div className="flex justify-center gap-6 text-xs text-slate-400">
             <a href="https://www.termsfeed.com/live/d118fde1-02b7-4e48-bcfe-2bb352516ff7" className="hover:text-slate-600 transition-colors">Privacy Policy</a>
