@@ -50,11 +50,17 @@ export default function Login() {
       return '/timetable';
     }
 
-    if (!user?.institute_id && !user?.institute) {
-      return '/onboarding';
-    }
+    // Role-based logic
+    const role = typeof user === 'string' ? user : user?.role;
+    const normalizedRole = role?.toLowerCase();
 
-    const normalizedRole = user?.role?.toLowerCase();
+    // Check for institute if they are an admin
+    if (normalizedRole?.includes('admin') && !user?.institute_id && !user?.id) {
+      // This is a safety check; if we have a user object but no institute, go to onboarding
+      if (typeof user === 'object' && !user.institute_id && !user.institute) {
+        return '/onboarding';
+      }
+    }
 
     switch (normalizedRole) {
       case 'super_admin':
@@ -115,7 +121,7 @@ export default function Login() {
         setGoogleLoading(false);
       }
     },
-    [navigate, loginWithGoogle, signupRole],
+    [navigate, loginWithGoogle, signupRole, instituteName],
   );
 
   // Load Google Identity Services script
@@ -157,7 +163,7 @@ export default function Login() {
     script.defer = true;
     script.onload = initializeGoogle;
     document.head.appendChild(script);
-  }, [handleGoogleCredentialResponse, signupRole]);
+  }, [handleGoogleCredentialResponse, signupRole, GOOGLE_CLIENT_ID]);
 
   const handleGoogleClick = () => {
     // Validate institute name first if roles is institution
@@ -167,7 +173,6 @@ export default function Login() {
       element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    // With renderButton, the click is handled by the Google iframe
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -206,8 +211,12 @@ export default function Login() {
         }
       }
 
-      if (loggedInUser?.role) {
-        const dashboardRoute = getDashboardRoute(loggedInUser.role);
+      if (loggedInUser) {
+        if (loggedInUser.institute_id === null || loggedInUser.onboarding_required) {
+          navigate('/onboarding');
+          return;
+        }
+        const dashboardRoute = getDashboardRoute(loggedInUser);
         setLoading(false);
         navigate(dashboardRoute);
       } else {
@@ -238,10 +247,14 @@ export default function Login() {
       setDeviceConflict(null);
 
       if (loggedInUser) {
+        if (loggedInUser.institute_id === null || loggedInUser.onboarding_required) {
+          navigate('/onboarding');
+          return;
+        }
         const dashboardRoute = getDashboardRoute(loggedInUser);
         navigate(dashboardRoute);
       } else {
-        navigate('/dashboard');
+        navigate('/login');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to switch device. Please try again.');
@@ -330,7 +343,7 @@ export default function Login() {
 
             <div className="flex items-center gap-4">
               <img
-                src="https://ui-avatars.com/api/?name=Ipsit+Panda&background=random"
+                src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
                 alt="User"
                 className="w-10 h-10 rounded-full border-2 border-white/20"
               />
@@ -470,7 +483,7 @@ export default function Login() {
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1.5">
-                Email or Teacher ID
+                Email Address
               </label>
               <div className={`relative group rounded-lg transition-all duration-200 ${focusedField === 'email' ? 'ring-2 ring-indigo-500/20' : ''
                 }`}>
@@ -488,7 +501,7 @@ export default function Login() {
                   onChange={handleInputChange}
                   onFocus={() => setFocusedField('email')}
                   onBlur={() => setFocusedField(null)}
-                  className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-600 transition-all text-sm"
+                  className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-600 transition-all text-sm font-medium"
                   placeholder="name@institution.edu"
                 />
               </div>
@@ -516,7 +529,7 @@ export default function Login() {
                   onChange={handleInputChange}
                   onFocus={() => setFocusedField('password')}
                   onBlur={() => setFocusedField(null)}
-                  className="block w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-600 transition-all text-sm"
+                  className="block w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-600 transition-all text-sm font-medium"
                   placeholder="••••••••"
                 />
                 <button
@@ -543,14 +556,14 @@ export default function Login() {
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded cursor-pointer"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600 cursor-pointer hover:text-slate-900 transition-colors">
-                  Remember me
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600 cursor-pointer hover:text-slate-900 transition-colors font-medium">
+                  Remember this device
                 </label>
               </div>
 
               <Link
                 to="/forgot-password"
-                className="text-sm font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
+                className="text-sm font-bold text-indigo-600 hover:text-indigo-500 transition-colors"
               >
                 Forgot password?
               </Link>
@@ -562,7 +575,7 @@ export default function Login() {
                 whileTap={{ scale: 0.99 }}
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
@@ -579,7 +592,7 @@ export default function Login() {
           <div className="text-center mt-6">
             <p className="text-sm text-slate-500 font-medium">
               Don't have an account?{' '}
-              <Link to="/register" className="font-semibold text-indigo-600 hover:text-indigo-500 transition-colors">
+              <Link to="/register" className="font-bold text-indigo-600 hover:text-indigo-500 transition-colors">
                 Create an account
               </Link>
             </p>
@@ -588,12 +601,12 @@ export default function Login() {
 
         <div className="mt-8 text-center">
           <div className="flex justify-center gap-6 text-xs text-slate-400">
-            <a href="https://www.termsfeed.com/live/d118fde1-02b7-4e48-bcfe-2bb352516ff7" className="hover:text-slate-600 transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-slate-600 transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-slate-600 transition-colors">Help Center</a>
+            <a href="https://www.termsfeed.com/live/d118fde1-02b7-4e48-bcfe-2bb352516ff7" className="hover:text-slate-600 transition-colors font-medium">Privacy Policy</a>
+            <a href="#" className="hover:text-slate-600 transition-colors font-medium">Terms of Service</a>
+            <a href="#" className="hover:text-slate-600 transition-colors font-medium">Help Center</a>
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            Powered by{' '}
+            © 2024 DashoExams Inc. All rights reserved. Powered by{' '}
             <a
               href="https://diracai.com/"
               target="_blank"

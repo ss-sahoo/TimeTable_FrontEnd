@@ -37,17 +37,17 @@ export default function TimetableLogin() {
   };
 
   // Helper function to get dashboard route based on role
+  // NOTE: No onboarding redirect here — onboarding is only for Google auth new signups.
   const getDashboardRoute = (user: any): string => {
     // For timetable domain, always go to timetable page regardless of role
     if (window.location.hostname === 'timetable.dashoapp.com') {
       return '/timetable';
     }
 
-    if (!user?.institute_id && !user?.institute) {
-      return '/onboarding';
-    }
+    // Handle string role for backward compatibility or accidental usage
+    const role = typeof user === 'string' ? user : user?.role;
 
-    switch (user?.role) {
+    switch (role) {
       case 'super_admin':
       case 'SUPER_ADMIN':
         return '/superadmin/dashboard';

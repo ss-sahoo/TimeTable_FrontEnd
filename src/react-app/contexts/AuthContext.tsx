@@ -45,7 +45,13 @@ interface AuthContextType {
   user: User | null;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   login: (identifier: string, password: string, role?: string, forceSwitch?: boolean) => Promise<User>;
-  loginWithGoogle: (credential: string, forceSwitch?: boolean, signupRole?: string, onboardingIntent?: string, instituteName?: string) => Promise<User & { onboarding_required?: boolean }>;
+  loginWithGoogle: (
+    credential: string,
+    forceSwitch?: boolean,
+    role?: string,
+    intent?: string,
+    instituteName?: string
+  ) => Promise<User & { onboarding_required?: boolean }>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   loading: boolean;
@@ -58,9 +64,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [deviceConflict, setDeviceConflict] = useState<any>(null);
+
+  const isAuthenticated = !!user;
 
   useEffect(() => {
     const initAuth = async () => {
@@ -70,7 +77,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (token && savedUser) {
         try {
           setUser(JSON.parse(savedUser));
-          setIsAuthenticated(true);
         } catch (e) {
           localStorage.removeItem('access_token');
           localStorage.removeItem('user_data');
@@ -100,7 +106,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         os: deviceInfo.os,
       });
 
-      const { refresh, access, user: userData, device_session } = response.data;
+      const { tokens, user: userData, device_session } = response.data;
+
+      const access = tokens?.access || response.data.access;
+      const refresh = tokens?.refresh || response.data.refresh;
 
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
@@ -111,7 +120,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       setUser(userData);
-      setIsAuthenticated(true);
       setLoading(false);
       return userData;
     } catch (error: any) {
@@ -129,10 +137,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const loginWithGoogle = async (credential: string, forceSwitch: boolean = false, signupRole?: string, onboardingIntent?: string, instituteName?: string) => {
+  const loginWithGoogle = async (
+    credential: string,
+    forceSwitch: boolean = false,
+    role?: string,
+    intent?: string,
+    instituteName?: string
+  ) => {
     setLoading(true);
     try {
       const deviceInfo = deviceManager.getDeviceInfo();
+
+      if (role) sessionStorage.setItem('onboarding_role', role);
+      if (intent) sessionStorage.setItem('onboarding_intent', intent);
+      if (instituteName) sessionStorage.setItem('pending_institute_name', instituteName);
 
       const response = await api.post('/auth/google/login/', {
         credential,
@@ -143,12 +161,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         browser: deviceInfo.browser,
         os: deviceInfo.os,
         force_login: forceSwitch,
-        signup_role: signupRole,
-        onboarding_intent: onboardingIntent,
-        institute_name: instituteName,
       });
 
-      const { tokens, user: userData, device_session, onboarding_required } = response.data;
+      const { new_user, google_profile, tokens, user: userData, device_session, onboarding_required } = response.data;
+
+      if (new_user) {
+        sessionStorage.setItem('google_profile', JSON.stringify(google_profile));
+        sessionStorage.setItem('google_credential', credential);
+        setLoading(false);
+        return { onboarding_required: true } as any;
+      }
 
       localStorage.setItem('access_token', tokens.access);
       localStorage.setItem('refresh_token', tokens.refresh);
@@ -159,7 +181,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       setUser(userData);
-      setIsAuthenticated(true);
       setLoading(false);
 
       return { ...userData, onboarding_required };
@@ -190,7 +211,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.clear();
     sessionStorage.clear();
 
-    // Clear cookies
     document.cookie.split(";").forEach((c) => {
       const eqPos = c.indexOf("=");
       const name = eqPos > -1 ? c.substr(0, eqPos) : c;
@@ -198,7 +218,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     setUser(null);
-    setIsAuthenticated(false);
   };
 
   const userRole = user ? user.role?.toLowerCase() : null;

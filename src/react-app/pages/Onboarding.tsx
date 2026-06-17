@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -43,6 +43,41 @@ export default function Onboarding() {
 
   const navigate = useNavigate();
 
+  useEffect(() => {
+    // 0. Redirect if already onboarded
+    const user_data = localStorage.getItem('user_data');
+    if (user_data) {
+      try {
+        const user = JSON.parse(user_data);
+        if (user.institute_id || user.institute) {
+          navigate('/dashboard');
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to parse user data for redirect', e);
+      }
+    }
+
+    // 1. Handle pre-filling from Google Sign-In flow (but don't advance step automatically)
+    const pendingName = sessionStorage.getItem('pending_institute_name');
+    if (pendingName) {
+      setInstituteData((prev) => ({ ...prev, name: pendingName }));
+    }
+
+    // 2. Pre-fill contact email from Google profile
+    const googleProfile = sessionStorage.getItem('google_profile');
+    if (googleProfile) {
+      try {
+        const profile = JSON.parse(googleProfile);
+        if (profile.email && !instituteData.contact_email) {
+          setInstituteData((prev) => ({ ...prev, contact_email: profile.email }));
+        }
+      } catch (e) {
+        console.error('Failed to parse google profile', e);
+      }
+    }
+  }, [navigate]);
+
   const handleChoice = (selectedChoice: 'create' | 'join') => {
     setChoice(selectedChoice);
     setStep(2);
@@ -76,21 +111,50 @@ export default function Onboarding() {
     setError('');
 
     try {
-      await api.post('/auth/institutes/', instituteData);
-      
-      // Refresh user data to get updated role (super_admin) and institute
-      try {
-        const userResponse = await api.get('/auth/profile/');
-        const updatedUser = userResponse.data;
-        localStorage.setItem('user_data', JSON.stringify(updatedUser));
-        setUser(updatedUser);
-      } catch (profileErr) {
-        console.warn('Failed to refresh user profile:', profileErr);
+      const googleCredential = sessionStorage.getItem('google_credential');
+
+      if (googleCredential) {
+        // New user from Google flow - use the special endpoint
+        const response = await api.post('/auth/google/onboarding/create-institute/', {
+          credential: googleCredential,
+          institute_data: instituteData,
+        });
+
+        const { tokens, user: userData } = response.data;
+        localStorage.setItem('access_token', tokens.access);
+        localStorage.setItem('refresh_token', tokens.refresh);
+        localStorage.setItem('user_data', JSON.stringify(userData));
+        setUser(userData);
+
+        // Clean up
+        sessionStorage.removeItem('google_credential');
+        sessionStorage.removeItem('google_profile');
+        sessionStorage.removeItem('onboarding_intent');
+        sessionStorage.removeItem('onboarding_role');
+        sessionStorage.removeItem('pending_institute_name');
+      } else {
+        // Regular flow (user is already logged in)
+        await api.post('/auth/institutes/', instituteData);
+
+        // Refresh user data to get updated role (super_admin) and institute
+        try {
+          const userResponse = await api.get('/auth/profile/');
+          const updatedUser = userResponse.data;
+          localStorage.setItem('user_data', JSON.stringify(updatedUser));
+          setUser(updatedUser);
+        } catch (profileErr) {
+          console.warn('Failed to refresh user profile:', profileErr);
+        }
       }
-      
+
       setStep(3);
     } catch (err: any) {
-      setError(err.response?.data?.name?.[0] || err.message || 'Failed to create institute');
+      setError(
+        err.response?.data?.detail ||
+        err.response?.data?.name?.[0] ||
+        err.message ||
+        'Failed to create institute'
+      );
     } finally {
       setLoading(false);
     }
@@ -196,11 +260,10 @@ export default function Onboarding() {
             {steps.map((s, index) => (
               <div key={s.num} className="flex items-center">
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
-                    step >= s.num
-                      ? 'bg-white text-indigo-900'
-                      : 'bg-white/20 text-white/60'
-                  }`}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${step >= s.num
+                    ? 'bg-white text-indigo-900'
+                    : 'bg-white/20 text-white/60'
+                    }`}
                 >
                   {step > s.num ? <CheckCircle className="w-4 h-4" /> : s.num}
                 </div>
@@ -232,11 +295,10 @@ export default function Onboarding() {
               {steps.map((s, index) => (
                 <div key={s.num} className="flex items-center">
                   <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
-                      step >= s.num
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-200 text-slate-500'
-                    }`}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${step >= s.num
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-200 text-slate-500'
+                      }`}
                   >
                     {step > s.num ? <CheckCircle className="w-3.5 h-3.5" /> : s.num}
                   </div>
@@ -393,9 +455,8 @@ export default function Onboarding() {
                         onFocus={() => setFocusedField('name')}
                         onBlur={() => setFocusedField(null)}
                         placeholder="e.g., Tech University"
-                        className={`w-full px-4 py-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50/50 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all ${
-                          focusedField === 'name' ? 'ring-2 ring-indigo-500/20' : ''
-                        }`}
+                        className={`w-full px-4 py-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50/50 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all ${focusedField === 'name' ? 'ring-2 ring-indigo-500/20' : ''
+                          }`}
                         required
                       />
                     </div>
@@ -620,7 +681,7 @@ export default function Onboarding() {
                 >
                   <CheckCircle className="w-12 h-12 text-white" />
                 </motion.div>
-                
+
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}

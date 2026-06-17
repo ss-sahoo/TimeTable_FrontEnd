@@ -215,18 +215,18 @@ function RoleProtectedRoute({
 
 
 // Helper function to get dashboard route based on role and domain
+// NOTE: This does NOT redirect to /onboarding — onboarding is only triggered
+// explicitly by the Google auth flow (via onboarding_required flag in Login.tsx).
+// Email/password users who have no institute should still reach their dashboard.
 function getDashboardRoute(user: any): string {
   // For timetable domain, always go to timetable page regardless of role
   if (typeof window !== 'undefined' && window.location.hostname === 'timetable.dashoapp.com') {
     return '/timetable';
   }
 
-  // If user has no institute, they must go to onboarding
-  if (!user?.institute_id && !user?.institute) {
-    return '/onboarding';
-  }
-
-  const normalizedRole = user?.role?.toLowerCase();
+  // Handle string role for backward compatibility or accidental usage
+  const role = typeof user === 'string' ? user : user?.role;
+  const normalizedRole = role?.toLowerCase();
 
   switch (normalizedRole) {
     case 'manager':
