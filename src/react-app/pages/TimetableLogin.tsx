@@ -37,13 +37,17 @@ export default function TimetableLogin() {
   };
 
   // Helper function to get dashboard route based on role
-  const getDashboardRoute = (role: string): string => {
+  const getDashboardRoute = (user: any): string => {
     // For timetable domain, always go to timetable page regardless of role
     if (window.location.hostname === 'timetable.dashoapp.com') {
       return '/timetable';
     }
-    
-    switch (role) {
+
+    if (!user?.institute_id && !user?.institute) {
+      return '/onboarding';
+    }
+
+    switch (user?.role) {
       case 'super_admin':
       case 'SUPER_ADMIN':
         return '/superadmin/dashboard';
@@ -69,11 +73,11 @@ export default function TimetableLogin() {
 
     try {
       let loggedInUser: any = null;
-      
+
       // Try role-specific endpoints first (admin, super_admin, teacher, student)
       const roleAttempts = ['admin', 'super_admin', 'teacher', 'student'];
       let loginSuccess = false;
-      
+
       for (const roleType of roleAttempts) {
         try {
           loggedInUser = await login(formData.email, formData.password, roleType);
@@ -91,7 +95,7 @@ export default function TimetableLogin() {
           continue;
         }
       }
-      
+
       // If role-specific login failed, try generic login
       if (!loginSuccess) {
         try {
@@ -107,10 +111,10 @@ export default function TimetableLogin() {
           throw genericError;
         }
       }
-      
+
       // Redirect based on user role
       if (loggedInUser?.role) {
-        const dashboardRoute = getDashboardRoute(loggedInUser.role);
+        const dashboardRoute = getDashboardRoute(loggedInUser);
         console.log('Login successful, redirecting to:', dashboardRoute, 'User role:', loggedInUser.role);
         setLoading(false);
         navigate(dashboardRoute);
@@ -132,13 +136,13 @@ export default function TimetableLogin() {
       // Retry login with stored credentials and force switch flag
       const { identifier, password, role } = deviceConflict.credentials;
       const loggedInUser = await login(identifier, password, role, true); // true = forceSwitch
-      
+
       // Clear device conflict state
       setDeviceConflict(null);
-      
+
       // Redirect based on user role
-      if (loggedInUser?.role) {
-        const dashboardRoute = getDashboardRoute(loggedInUser.role);
+      if (loggedInUser) {
+        const dashboardRoute = getDashboardRoute(loggedInUser);
         navigate(dashboardRoute);
       } else {
         navigate('/timetable');
@@ -170,7 +174,7 @@ export default function TimetableLogin() {
           onCancel={handleCancelDeviceSwitch}
         />
       )}
-      
+
       {/* Left Panel - Timetable Branding */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-slate-900 via-teal-900 to-cyan-900 overflow-hidden">
         {/* Animated background elements */}
@@ -218,7 +222,7 @@ export default function TimetableLogin() {
                 </span>
               </h1>
               <p className="text-lg text-slate-300 mb-10 leading-relaxed">
-                Generate perfect timetables in minutes with AI-powered scheduling. 
+                Generate perfect timetables in minutes with AI-powered scheduling.
                 Manage teachers, batches, and eliminate conflicts effortlessly.
               </p>
             </motion.div>
@@ -303,13 +307,11 @@ export default function TimetableLogin() {
                 <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-2">
                   Email, Username, or Teacher Code
                 </label>
-                <div className={`relative rounded-xl transition-all duration-200 ${
-                  focusedField === 'email' ? 'ring-2 ring-cyan-500/20' : ''
-                }`}>
+                <div className={`relative rounded-xl transition-all duration-200 ${focusedField === 'email' ? 'ring-2 ring-cyan-500/20' : ''
+                  }`}>
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Mail className={`h-5 w-5 transition-colors ${
-                      focusedField === 'email' ? 'text-cyan-500' : 'text-slate-400'
-                    }`} />
+                    <Mail className={`h-5 w-5 transition-colors ${focusedField === 'email' ? 'text-cyan-500' : 'text-slate-400'
+                      }`} />
                   </div>
                   <input
                     id="email"
@@ -332,13 +334,11 @@ export default function TimetableLogin() {
                 <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-2">
                   Password
                 </label>
-                <div className={`relative rounded-xl transition-all duration-200 ${
-                  focusedField === 'password' ? 'ring-2 ring-cyan-500/20' : ''
-                }`}>
+                <div className={`relative rounded-xl transition-all duration-200 ${focusedField === 'password' ? 'ring-2 ring-cyan-500/20' : ''
+                  }`}>
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Lock className={`h-5 w-5 transition-colors ${
-                      focusedField === 'password' ? 'text-cyan-500' : 'text-slate-400'
-                    }`} />
+                    <Lock className={`h-5 w-5 transition-colors ${focusedField === 'password' ? 'text-cyan-500' : 'text-slate-400'
+                      }`} />
                   </div>
                   <input
                     id="password"

@@ -45,12 +45,16 @@ export default function Login() {
   };
 
   // Helper function to get dashboard route based on role
-  const getDashboardRoute = (role: string): string => {
+  const getDashboardRoute = (user: any): string => {
     if (window.location.hostname === 'timetable.dashoapp.com') {
       return '/timetable';
     }
 
-    const normalizedRole = role?.toLowerCase();
+    if (!user?.institute_id && !user?.institute) {
+      return '/onboarding';
+    }
+
+    const normalizedRole = user?.role?.toLowerCase();
 
     switch (normalizedRole) {
       case 'super_admin':
@@ -98,7 +102,7 @@ export default function Login() {
           return;
         }
 
-        const dashboardRoute = getDashboardRoute(result.role);
+        const dashboardRoute = getDashboardRoute(result);
         navigate(dashboardRoute);
       } catch (err: any) {
         if (err.message === 'DEVICE_CONFLICT') {
@@ -233,8 +237,8 @@ export default function Login() {
 
       setDeviceConflict(null);
 
-      if (loggedInUser?.role) {
-        const dashboardRoute = getDashboardRoute(loggedInUser.role);
+      if (loggedInUser) {
+        const dashboardRoute = getDashboardRoute(loggedInUser);
         navigate(dashboardRoute);
       } else {
         navigate('/dashboard');
@@ -365,7 +369,7 @@ export default function Login() {
           </div>
 
           {/* Role Selector (Primarily for first-time Google signups) */}
-          <div className="flex p-1 bg-slate-100 rounded-xl mb-6 relative">
+          {/* <div className="flex p-1 bg-slate-100 rounded-xl mb-6 relative">
             <motion.div
               className="absolute inset-y-1 bg-white rounded-lg shadow-sm z-0"
               initial={false}
@@ -393,7 +397,7 @@ export default function Login() {
               <Shield className="w-4 h-4" />
               Institution
             </button>
-          </div>
+          </div> */}
 
           <AnimatePresence>
             {signupRole === 'institution' && (

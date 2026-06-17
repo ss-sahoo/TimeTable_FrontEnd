@@ -215,13 +215,18 @@ function RoleProtectedRoute({
 
 
 // Helper function to get dashboard route based on role and domain
-function getDashboardRoute(role: string | undefined): string {
+function getDashboardRoute(user: any): string {
   // For timetable domain, always go to timetable page regardless of role
   if (typeof window !== 'undefined' && window.location.hostname === 'timetable.dashoapp.com') {
     return '/timetable';
   }
 
-  const normalizedRole = role?.toLowerCase();
+  // If user has no institute, they must go to onboarding
+  if (!user?.institute_id && !user?.institute) {
+    return '/onboarding';
+  }
+
+  const normalizedRole = user?.role?.toLowerCase();
 
   switch (normalizedRole) {
     case 'manager':
@@ -259,7 +264,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return isAuthenticated ? <Navigate to={getDashboardRoute(user?.role)} replace /> : children;
+  return isAuthenticated ? <Navigate to={getDashboardRoute(user)} replace /> : children;
 }
 
 import { TimetableCenterProvider } from "@/react-app/contexts/TimetableCenterContext";
@@ -280,7 +285,7 @@ function LoginRoute() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to={getDashboardRoute(user?.role)} replace />;
+    return <Navigate to={getDashboardRoute(user)} replace />;
   }
 
   // Domain-based login page selection
@@ -309,7 +314,7 @@ function RegisterRoute() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to={getDashboardRoute(user?.role)} replace />;
+    return <Navigate to={getDashboardRoute(user)} replace />;
   }
 
   // Domain-based register page selection
@@ -339,7 +344,7 @@ function LandingRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (isAuthenticated) {
-    return <Navigate to={getDashboardRoute(user?.role)} replace />;
+    return <Navigate to={getDashboardRoute(user)} replace />;
   }
 
   // Domain-based landing page selection
