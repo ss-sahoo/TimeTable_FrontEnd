@@ -34,11 +34,15 @@ interface User {
   username: string;
   email: string;
   full_name: string;
+  first_name: string;
+  last_name: string;
   role: string;
   institute_id: string | null;
   institute_name: string | null;
   center_id: string | null;
   onboarding_required?: boolean;
+  phone?: string;
+  profile_picture?: string;
 }
 
 interface AuthContextType {

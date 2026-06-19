@@ -54,6 +54,10 @@ export default function Login() {
     const role = typeof user === 'string' ? user : user?.role;
     const normalizedRole = role?.toLowerCase();
 
+    if (normalizedRole === 'platform_owner') {
+      return '/platform-owner/dashboard';
+    }
+
     // Check for institute if they are an admin
     if (normalizedRole?.includes('admin') && !user?.institute_id && !user?.id) {
       // This is a safety check; if we have a user object but no institute, go to onboarding
@@ -212,7 +216,9 @@ export default function Login() {
       }
 
       if (loggedInUser) {
-        if (loggedInUser.institute_id === null || loggedInUser.onboarding_required) {
+        const userRole = loggedInUser?.role?.toLowerCase();
+        // platform_owner users intentionally have no institute — skip onboarding check
+        if (userRole !== 'platform_owner' && (loggedInUser.institute_id === null || loggedInUser.onboarding_required)) {
           navigate('/onboarding');
           return;
         }
@@ -247,7 +253,8 @@ export default function Login() {
       setDeviceConflict(null);
 
       if (loggedInUser) {
-        if (loggedInUser.institute_id === null || loggedInUser.onboarding_required) {
+        const userRole = loggedInUser?.role?.toLowerCase();
+        if (userRole !== 'platform_owner' && (loggedInUser.institute_id === null || loggedInUser.onboarding_required)) {
           navigate('/onboarding');
           return;
         }

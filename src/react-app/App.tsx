@@ -61,6 +61,8 @@ import TeacherEvaluationDashboard from "@/react-app/pages/TeacherEvaluationDashb
 import InstituteProfile from "@/react-app/pages/InstituteProfile";
 import LandingPageEnhanced from "@/react-app/pages/LandingPageEnhanced";
 import ProctoringDiagnostics from "@/react-app/pages/ProctoringDiagnostics";
+import PlatformDashboard from './pages/PlatformDashboard';
+import PlatformInstitutes from './pages/PlatformInstitutes';
 import ProctoringSnapshotsView from "@/react-app/pages/ProctoringSnapshotsView";
 import ProctoringTestPage from "@/react-app/pages/ProctoringTestPage";
 import BulkImportPage from "@/react-app/pages/BulkImportPage";
@@ -72,6 +74,7 @@ import TimetableDashboard from "@/react-app/pages/TimetableDashboard";
 import Batches from "@/react-app/pages/Batches";
 import ExamHub from "@/react-app/pages/ExamHub";
 import SuperAdminLayout from "@/react-app/components/superadmin/SuperAdminLayout";
+import PlatformOwnerLayout from "@/react-app/components/PlatformOwnerLayout";
 import CenterAdminLayout from "@/react-app/components/admin/CenterAdminLayout";
 import TeacherLayout from "@/react-app/components/teacher/TeacherLayout";
 import StudentLayout from "@/react-app/components/student/StudentLayout";
@@ -229,6 +232,8 @@ function getDashboardRoute(user: any): string {
   const normalizedRole = role?.toLowerCase();
 
   switch (normalizedRole) {
+    case 'platform_owner':
+      return '/platform-owner/dashboard';
     case 'manager':
       return '/manager';
     case 'super_admin':
@@ -361,6 +366,21 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public Routes */}
+      <Route path="/platform-owner/*" element={
+        <FullscreenProtectedRoute>
+          <PlatformOwnerLayout>
+            <Routes>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<PlatformDashboard />} />
+              <Route path="institutes" element={<PlatformInstitutes />} />
+              <Route path="users" element={<UsersContent />} />
+              <Route path="settings" element={<SettingsContent />} />
+              <Route path="profile" element={<ProfileContent />} />
+              <Route path="*" element={<Navigate to="dashboard" replace />} />
+            </Routes>
+          </PlatformOwnerLayout>
+        </FullscreenProtectedRoute>
+      } />
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/register" element={<RegisterRoute />} />
       <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />

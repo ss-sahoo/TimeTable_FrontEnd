@@ -16,6 +16,8 @@ const ProfileContent = () => {
         phone: user?.phone || "",
     });
 
+    const [uploadingImage, setUploadingImage] = useState(false);
+
     const [passwordData, setPasswordData] = useState({
         current_password: "",
         new_password: "",
@@ -29,7 +31,7 @@ const ProfileContent = () => {
         setSuccess(false);
 
         try {
-            const response = await api.put("/auth/profile/", formData);
+            const response = await api.patch("/auth/profile/", formData);
             setUser(response.data);
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
@@ -53,18 +55,45 @@ const ProfileContent = () => {
         setSuccess(false);
 
         try {
-            await api.post("/auth/password/change/", {
+            await api.post("/auth/change-password/", {
                 old_password: passwordData.current_password,
                 new_password: passwordData.new_password,
+                new_password_confirm: passwordData.confirm_password
             });
             setSuccess(true);
             setPasswordData({ current_password: "", new_password: "", confirm_password: "" });
             setTimeout(() => setSuccess(false), 3000);
         } catch (err: any) {
             console.error("Error changing password:", err);
-            setError(err.response?.data?.detail || "Failed to change password");
+            setError(err.response?.data?.detail || err.response?.data?.error || "Failed to change password");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("profile_picture", file);
+
+        setUploadingImage(true);
+        setError(null);
+        try {
+            const response = await api.patch("/auth/profile/", formData, {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            });
+            setUser(response.data);
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 3000);
+        } catch (err: any) {
+            console.error("Error uploading image:", err);
+            setError("Failed to upload image");
+        } finally {
+            setUploadingImage(false);
         }
     };
 
@@ -94,12 +123,17 @@ const ProfileContent = () => {
                 <div className="md:col-span-1 space-y-6">
                     <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-sm border border-slate-200 dark:border-gray-700 text-center">
                         <div className="relative inline-block mb-4">
-                            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl bg-gradient-to-br from-blue-500 via-blue-600 to-violet-600 flex items-center justify-center text-white text-3xl sm:text-4xl font-bold shadow-xl">
-                                {user?.first_name?.[0] || user?.email?.[0]?.toUpperCase()}
+                            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl bg-gradient-to-br from-blue-500 via-blue-600 to-violet-600 flex items-center justify-center text-white text-3xl sm:text-4xl font-bold shadow-xl overflow-hidden">
+                                {user?.profile_picture ? (
+                                    <img src={user.profile_picture} alt="Profile" className="w-full h-full object-cover" />
+                                ) : (
+                                    user?.first_name?.[0] || user?.email?.[0]?.toUpperCase()
+                                )}
                             </div>
-                            <button className="absolute -bottom-2 -right-2 p-2 bg-white dark:bg-gray-700 rounded-xl shadow-lg border border-slate-100 dark:border-gray-600 text-slate-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                                <Camera size={18} />
-                            </button>
+                            <label className="absolute -bottom-2 -right-2 p-2 bg-white dark:bg-gray-700 rounded-xl shadow-lg border border-slate-100 dark:border-gray-600 text-slate-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer">
+                                {uploadingImage ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+                                <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage} />
+                            </label>
                         </div>
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white truncate">
                             {user?.full_name || `${user?.first_name} ${user?.last_name}`.trim() || user?.email.split('@')[0]}
