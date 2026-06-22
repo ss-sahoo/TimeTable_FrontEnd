@@ -126,6 +126,14 @@ export default function StudentsPage() {
     navigate(`/exams/${examId}/results-analytics/student/${studentId}`);
   };
 
+  const getAttemptTotalMarks = (result: StudentResult) => {
+    if (result.score > 0 && result.percentage > 0) {
+      const computed = Math.round((result.score * 100) / result.percentage);
+      if (computed > 0) return computed;
+    }
+    return totalMarks;
+  };
+
   const totalMarks = data?.exam?.total_marks || examData?.total_marks || 100;
   const avgScore = data?.results?.length 
     ? data.results.reduce((sum, r) => sum + r.score, 0) / data.results.length 
@@ -302,7 +310,7 @@ export default function StudentsPage() {
                         <div className="flex-1 space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-slate-500">Score</span>
-                            <span className="text-sm font-bold text-slate-900">{result.score.toFixed(1)}/{totalMarks}</span>
+                            <span className="text-sm font-bold text-slate-900">{result.score.toFixed(1)}/{getAttemptTotalMarks(result)}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-slate-500">Time</span>
@@ -379,7 +387,7 @@ export default function StudentsPage() {
                           </td>
                           <td className="px-4 py-4 text-center">
                             <span className="font-bold text-slate-900">{result.score.toFixed(1)}</span>
-                            <span className="text-slate-400">/{totalMarks}</span>
+                            <span className="text-slate-400">/{getAttemptTotalMarks(result)}</span>
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex items-center justify-center gap-2">

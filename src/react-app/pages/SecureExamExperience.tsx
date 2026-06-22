@@ -17,7 +17,7 @@ import {
   Monitor
 } from 'lucide-react';
 import useExamSecurity from '../hooks/useExamSecurity';
-import WebcamMonitor from '../components/WebcamMonitor';
+import ProctoringOverlay from '../components/ProctoringOverlay';
 import ViolationToast from '../components/ViolationToast';
 import LaTeXRenderer from '../components/LaTeXRenderer';
 import ViolationsPanel from '../components/ViolationsPanel';
@@ -57,6 +57,7 @@ interface ExamAttempt {
     disable_copy_paste: boolean;
     disable_right_click: boolean;
     enable_webcam_proctoring: boolean;
+    proctoring_snapshot_interval: number;
     allow_tab_switching: boolean;
     end_date: string;
     pattern: {
@@ -368,11 +369,18 @@ const SecureExamExperience: React.FC = () => {
   }, [attemptId, navigate]);
 
   // ── Violations toast ──────────────────────────────────────────────────────
+  // Per user requirement: Hide AI/Proctoring violations but SHOW Tab Switch to students
   const lastViolationTimeShown = useRef<number>(0);
   useEffect(() => {
     if (violations.length > 0) {
       const latest = violations[violations.length - 1];
       const ts = latest.timestamp.getTime();
+
+      // Filter what's visible to the student (Whitelist approach)
+      const VISIBLE_TO_STUDENT = ['tab_switch', 'window_blur', 'tab_hidden', 'fullscreen_exit'];
+      if (!VISIBLE_TO_STUDENT.includes(latest.type)) return;
+
+      // VISIBLE violations: Tab switch, Fullscreen exit
       if (ts > lastViolationTimeShown.current) {
         lastViolationTimeShown.current = ts;
         setCurrentToastViolation(latest);
@@ -483,9 +491,9 @@ const SecureExamExperience: React.FC = () => {
 
       setQuestions(mappedQuestions);
 
-      if (attemptData.answers) {
+      if ((attemptData as any).answers) {
         const existingAnswers = new Map<number, Answer>();
-        Object.entries(attemptData.answers).forEach(([questionId, answer]: [string, any]) => {
+        Object.entries((attemptData as any).answers).forEach(([questionId, answer]: [string, any]) => {
           existingAnswers.set(parseInt(questionId, 10), answer);
         });
         setAnswers(existingAnswers);
@@ -706,18 +714,14 @@ const SecureExamExperience: React.FC = () => {
             </div>
             <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-800" />
             <div className="text-right">
-              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">Violations</p>
-              <button
-                onClick={() => setShowViolationsPanel(true)}
-                className="flex items-center gap-2 justify-end group transition-all"
-              >
-                <div className={`w-1.5 h-1.5 rounded-full ${violationCount > 3 ? 'bg-red-500 animate-pulse' : violationCount > 0 ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                <span className={`text-xs font-bold uppercase transition-colors ${violationCount > 3 ? 'text-red-600' : violationCount > 0 ? 'text-amber-600' : 'text-emerald-600'} group-hover:underline`}>
-                  {violationCount} Records
-                </span>
-              </button>
+              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">Security</p>
+              <div className="flex items-center gap-2 justify-end">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-xs font-bold text-emerald-600 uppercase">Active Monitoring</span>
+              </div>
             </div>
           </div>
+
 
           {/* Timer — no pause button (server controls time) */}
           <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
@@ -834,7 +838,7 @@ const SecureExamExperience: React.FC = () => {
                                     })()
                                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
                                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                    }`}
+                                      }`}
                                   >
                                     {(function () {
                                       let sel = '';
@@ -1153,10 +1157,14 @@ const SecureExamExperience: React.FC = () => {
         </aside>
       </main>
 
-      {/* Webcam proctoring */}
+      {/* 
+        Webcam proctoring — ProctoringOverlay is ALWAYS mounted (when webcam enabled) to keep 
+        the capture engine alive. When minimized, it's hidden via CSS but screenshots keep running.
+      */}
       {examAttempt?.exam.enable_webcam_proctoring && (
         <div className={`fixed z-50 transition-all duration-300 ${isWebcamMinimized ? 'bottom-4 left-1/2 -translate-x-1/2' : 'bottom-6 left-6'}`}>
-          {isWebcamMinimized ? (
+          {/* Minimized pill shown on top of the hidden overlay */}
+          {isWebcamMinimized && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1165,7 +1173,7 @@ const SecureExamExperience: React.FC = () => {
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                 <Monitor className="w-4 h-4 text-white" />
-                <span className="text-xs font-bold text-white uppercase tracking-wider">Camera Active</span>
+                <span className="text-xs font-bold text-white uppercase tracking-wider">Camera Active • Recording</span>
               </div>
               <button
                 onClick={() => setIsWebcamMinimized(false)}
@@ -1175,29 +1183,24 @@ const SecureExamExperience: React.FC = () => {
                 <Maximize className="w-4 h-4 text-white" />
               </button>
             </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="relative"
-            >
-              <WebcamMonitor
-                attemptId={parseInt(attemptId!)}
-                onViolationDetected={handleViolationDetected}
-                captureInterval={20}
-                showPreview={true}
-                autoStart={true}
-                className="w-48 shadow-2xl rounded-xl border-2 border-white dark:border-slate-800 overflow-hidden"
-              />
-              <button
-                onClick={() => setIsWebcamMinimized(true)}
-                className="absolute top-2 right-2 p-1.5 bg-slate-900/80 hover:bg-slate-900 rounded-lg transition-all shadow-lg z-10"
-                title="Minimize camera"
-              >
-                <Minimize className="w-3.5 h-3.5 text-white" />
-              </button>
-            </motion.div>
           )}
+
+          {/* 
+            CRITICAL: We MUST NOT use 'display: none' here. 
+            Browsers stop rendering the video element if it's hidden with display:none, 
+            which results in pitch-black snapshots.
+            Instead, we move it far off-screen to keep the stream active for the capture engine.
+          */}
+          <div className={isWebcamMinimized ? "fixed -left-[9999px] opacity-0 pointer-events-none" : "block"}>
+            <ProctoringOverlay
+              attemptId={parseInt(attemptId!)}
+              screenshotIntervalSec={examAttempt?.exam.proctoring_snapshot_interval || 15}
+              enableAudio={true}
+              enableVideoRecording={true}
+              onViolation={handleViolationDetected}
+              externalViolations={violations}
+            />
+          </div>
         </div>
       )}
 
@@ -1211,10 +1214,14 @@ const SecureExamExperience: React.FC = () => {
         isSubmitting={isSubmitting}
       />
 
-      <ViolationToast
-        violation={currentToastViolation}
-        onClose={handleCloseToast}
-      />
+      {/* Only show toast if it's not a silent violation */}
+      {currentToastViolation && (
+        <ViolationToast
+          violation={currentToastViolation}
+          onClose={handleCloseToast}
+        />
+      )}
+
 
       <ViolationsPanel
         attemptId={parseInt(attemptId!)}

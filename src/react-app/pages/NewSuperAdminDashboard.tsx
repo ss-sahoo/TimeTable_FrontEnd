@@ -55,6 +55,9 @@ function DashboardContent({ user }: { user: any }) {
     capacity: 0,
   });
   const [recentExams, setRecentExams] = useState<any[]>([]);
+  const [recentExamsPage, setRecentExamsPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState("");
+  const recentExamsPerPage = 5;
   const [, setTrafficData] = useState<any[]>([]);
   const [regionalStatus, setRegionalStatus] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +99,7 @@ function DashboardContent({ user }: { user: any }) {
 
         // Set recent exams
         if (Array.isArray(exams)) {
-          setRecentExams(exams.slice(0, 5));
+          setRecentExams(exams);
         }
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
@@ -130,7 +133,7 @@ function DashboardContent({ user }: { user: any }) {
           });
 
           if (Array.isArray(exams)) {
-            setRecentExams(exams.slice(0, 5));
+            setRecentExams(exams);
           }
         } catch (fallbackError) {
           console.error("Fallback API also failed:", fallbackError);
@@ -148,6 +151,18 @@ function DashboardContent({ user }: { user: any }) {
     { name: "Asia Pacific (Singapore)", latency: "86ms", status: "operational" },
     { name: "US East (N. Virginia)", latency: "140ms", status: "degraded" },
   ];
+
+  const filteredExams = recentExams.filter(exam => {
+    if (!statusFilter) return true;
+    const status = exam.status?.toLowerCase() || "";
+    return status.includes(statusFilter.toLowerCase());
+  });
+
+  const totalExamPages = Math.ceil(filteredExams.length / recentExamsPerPage);
+  const displayedExams = filteredExams.slice(
+    (recentExamsPage - 1) * recentExamsPerPage,
+    recentExamsPage * recentExamsPerPage
+  );
 
   return (
     <div className="space-y-6">
@@ -273,7 +288,12 @@ function DashboardContent({ user }: { user: any }) {
               <input
                 type="text"
                 placeholder="Filter status..."
-                className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-violet-500"
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setRecentExamsPage(1);
+                }}
+                className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-violet-500 bg-white text-slate-900"
               />
             </div>
           </div>
@@ -291,14 +311,14 @@ function DashboardContent({ user }: { user: any }) {
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700">
-              {recentExams.length > 0 ? (
-                recentExams.map((exam, idx) => (
+              {displayedExams.length > 0 ? (
+                displayedExams.map((exam, idx) => (
                   <ExamTableRow key={exam.id || idx} exam={exam} />
                 ))
               ) : (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                    {loading ? "Loading exams..." : "No exams found. Create your first exam to get started."}
+                    {loading ? "Loading exams..." : "No exams found matching filter."}
                   </td>
                 </tr>
               )}
@@ -306,12 +326,23 @@ function DashboardContent({ user }: { user: any }) {
           </table>
         </div>
         <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
-          <span className="text-xs text-slate-500">Showing 1-{Math.min(recentExams.length, 5)} of {stats.exams} exams</span>
+          <span className="text-xs text-slate-500">
+            Showing {filteredExams.length > 0 ? (recentExamsPage - 1) * recentExamsPerPage + 1 : 0}-
+            {Math.min(recentExamsPage * recentExamsPerPage, filteredExams.length)} of {filteredExams.length} exams
+          </span>
           <div className="flex gap-2">
-            <button className="px-3 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1">
+            <button
+              onClick={() => setRecentExamsPage(p => Math.max(1, p - 1))}
+              disabled={recentExamsPage === 1 || filteredExams.length === 0}
+              className="px-3 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 text-slate-700 font-medium"
+            >
               <ChevronLeft className="w-3 h-3" /> Previous
             </button>
-            <button className="px-3 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 flex items-center gap-1">
+            <button
+              onClick={() => setRecentExamsPage(p => Math.min(totalExamPages, p + 1))}
+              disabled={recentExamsPage === totalExamPages || filteredExams.length === 0}
+              className="px-3 py-1 text-xs border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 text-slate-700 font-medium"
+            >
               Next <ChevronRight className="w-3 h-3" />
             </button>
           </div>

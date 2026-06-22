@@ -8,7 +8,9 @@ export default function SmartDashboard() {
   // Route based on user role
   const normalizedRole = user?.role?.toLowerCase();
 
-  if (normalizedRole === 'super_admin' || normalizedRole === 'superadmin') {
+  if (normalizedRole === 'platform_owner') {
+    return <Navigate to="/platform-owner/dashboard" replace />;
+  } else if (normalizedRole === 'super_admin' || normalizedRole === 'superadmin') {
     return <Navigate to="/superadmin/dashboard" replace />;
   } else if (normalizedRole === 'student') {
     return <Navigate to="/student-dashboard" replace />;

@@ -54,6 +54,7 @@ interface NewUserData {
 
 const UsersContent = () => {
   const { user: currentUser } = useAuthContext();
+  const isPlatformOwner = currentUser?.role?.toLowerCase() === 'platform_owner';
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -92,6 +93,7 @@ const UsersContent = () => {
     subjects: "General"
   });
   const [error, setError] = useState<string>("");
+  const [showBulkDeleteConfirmModal, setShowBulkDeleteConfirmModal] = useState(false);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -99,31 +101,40 @@ const UsersContent = () => {
   }, [currentUser?.institute_id]);
 
   const fetchUsers = async () => {
-    const instituteId = currentUser?.institute_id || currentUser?.institute?.id;
-    if (!instituteId) return;
+    const instituteId = currentUser?.institute_id;
+
+    if (!instituteId && !isPlatformOwner) return;
     setLoading(true);
     try {
-      // Request all users by setting a high page_size (backend max is 100, so we'll make multiple requests if needed)
-      const response = await api.get(`/auth/people/?institute_id=${instituteId}&page_size=100`);
-      let allUsers = response.data.users || response.data.results || response.data;
+      let allUsers = [];
 
-      // If there are more pages, fetch them all
-      const totalPages = response.data.total_pages || 1;
-      if (totalPages > 1) {
-        const additionalRequests = [];
-        for (let page = 2; page <= totalPages; page++) {
-          additionalRequests.push(
-            api.get(`/auth/people/?institute_id=${instituteId}&page_size=100&page=${page}`)
-          );
-        }
+      if (isPlatformOwner) {
+        // Platform owner fetches all users from the dedicated platform endpoint
+        const response = await api.get('/auth/platform/users/');
+        allUsers = response.data.results || response.data || [];
+      } else {
+        // Request all users by setting a high page_size (backend max is 100, so we'll make multiple requests if needed)
+        const response = await api.get(`/auth/people/?institute_id=${instituteId}&page_size=100`);
+        allUsers = response.data.users || response.data.results || response.data;
 
-        const additionalResponses = await Promise.all(additionalRequests);
-        additionalResponses.forEach(res => {
-          const pageData = res.data.users || res.data.results || res.data;
-          if (Array.isArray(pageData)) {
-            allUsers = [...allUsers, ...pageData];
+        // If there are more pages, fetch them all
+        const totalPages = response.data.total_pages || 1;
+        if (totalPages > 1) {
+          const additionalRequests = [];
+          for (let page = 2; page <= totalPages; page++) {
+            additionalRequests.push(
+              api.get(`/auth/people/?institute_id=${instituteId}&page_size=100&page=${page}`)
+            );
           }
-        });
+
+          const additionalResponses = await Promise.all(additionalRequests);
+          additionalResponses.forEach(res => {
+            const pageData = res.data.users || res.data.results || res.data;
+            if (Array.isArray(pageData)) {
+              allUsers = [...allUsers, ...pageData];
+            }
+          });
+        }
       }
 
       setUsers(Array.isArray(allUsers) ? allUsers : []);
@@ -137,12 +148,13 @@ const UsersContent = () => {
   };
 
   const fetchCenters = async () => {
-    const instituteId = currentUser?.institute_id || currentUser?.institute?.id;
-    if (!instituteId) return;
+    const instituteId = currentUser?.institute_id;
+
+    if (!instituteId && !isPlatformOwner) return;
 
     try {
-      // Use timetable centers endpoint
-      const response = await api.get(`/timetable/centers/?institute_id=${instituteId}`);
+      const url = isPlatformOwner ? '/timetable/centers/' : `/timetable/centers/?institute_id=${instituteId}`;
+      const response = await api.get(url);
       // The response format is { count: X, results: [...] }
       const centersData = response.data.results || response.data.centers || response.data || [];
       setCenters(Array.isArray(centersData) ? centersData : []);
@@ -226,7 +238,7 @@ const UsersContent = () => {
   };
 
   const handleAddUser = async () => {
-    const instituteId = currentUser?.institute_id || currentUser?.institute?.id;
+    const instituteId = currentUser?.institute_id;
     if (!instituteId) {
       setError("Institute ID is required");
       return;
@@ -496,6 +508,24 @@ const UsersContent = () => {
     }
   };
 
+  const handleBulkDelete = async () => {
+    try {
+      setError("");
+      setLoading(true);
+      const userIdsToDelete = Array.from(selectedUsers);
+      await Promise.all(userIdsToDelete.map(id => api.delete(`/auth/users/${id}/`)));
+      setSelectedUsers(new Set());
+      setShowBulkDeleteConfirmModal(false);
+      toast.success("Successfully deleted selected users!");
+      fetchUsers();
+    } catch (error: any) {
+      console.error("Error bulk deleting users:", error);
+      setError("Failed to delete some selected users. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const copyToClipboard = (text: string, field: string) => {
     navigator.clipboard.writeText(text).then(() => {
       setCopiedField(field);
@@ -583,7 +613,7 @@ const UsersContent = () => {
       return;
     }
 
-    const instituteId = currentUser?.institute_id || currentUser?.institute?.id;
+    const instituteId = currentUser?.institute_id;
     if (!instituteId) return;
 
     try {
@@ -825,32 +855,36 @@ const UsersContent = () => {
                     {roleCounts.super_admin || 0}
                   </span>
                 </button>
-                <button
-                  onClick={() => setActiveTab("admin")}
-                  className={`${activeTab === "admin"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                    } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
-                >
-                  Admins
-                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === "admin" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
-                    }`}>
-                    {roleCounts.admin || 0}
-                  </span>
-                </button>
-                <button
-                  onClick={() => setActiveTab("teacher")}
-                  className={`${activeTab === "teacher"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                    } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
-                >
-                  Teachers
-                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === "teacher" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
-                    }`}>
-                    {roleCounts.teacher || 0}
-                  </span>
-                </button>
+                {!isPlatformOwner && (
+                  <button
+                    onClick={() => setActiveTab("admin")}
+                    className={`${activeTab === "admin"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                      } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
+                  >
+                    Admins
+                    <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === "admin" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
+                      }`}>
+                      {roleCounts.admin || 0}
+                    </span>
+                  </button>
+                )}
+                {!isPlatformOwner && (
+                  <button
+                    onClick={() => setActiveTab("teacher")}
+                    className={`${activeTab === "teacher"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                      } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
+                  >
+                    Teachers
+                    <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === "teacher" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
+                      }`}>
+                      {roleCounts.teacher || 0}
+                    </span>
+                  </button>
+                )}
                 <button
                   onClick={() => setActiveTab("student")}
                   className={`${activeTab === "student"
@@ -864,19 +898,21 @@ const UsersContent = () => {
                     {roleCounts.student || 0}
                   </span>
                 </button>
-                <button
-                  onClick={() => setActiveTab("staff")}
-                  className={`${activeTab === "staff"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                    } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
-                >
-                  Staff
-                  <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === "staff" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
-                    }`}>
-                    {roleCounts.staff || 0}
-                  </span>
-                </button>
+                {!isPlatformOwner && (
+                  <button
+                    onClick={() => setActiveTab("staff")}
+                    className={`${activeTab === "staff"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                      } whitespace-nowrap border-b-2 pb-4 px-1 text-sm font-medium`}
+                  >
+                    Staff
+                    <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === "staff" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"
+                      }`}>
+                      {roleCounts.staff || 0}
+                    </span>
+                  </button>
+                )}
               </nav>
             </div>
           </div>
@@ -898,6 +934,19 @@ const UsersContent = () => {
             />
           </div>
           <div className="flex gap-2">
+            {selectedUsers.size > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setShowBulkDeleteConfirmModal(true);
+                }}
+                className="inline-flex items-center gap-x-1.5 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
+              >
+                <Trash2 className="-ml-0.5 h-5 w-5" />
+                Delete Selected ({selectedUsers.size})
+              </button>
+            )}
             <button
               type="button"
               className="inline-flex items-center gap-x-1.5 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
@@ -1871,6 +1920,59 @@ const UsersContent = () => {
                 <button
                   type="button"
                   onClick={() => setShowResetPasswordModal(false)}
+                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirm Modal */}
+      {showBulkDeleteConfirmModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowBulkDeleteConfirmModal(false)}></div>
+
+            <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+              <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold leading-6 text-red-600">Delete Selected Users</h3>
+                  <button onClick={() => setShowBulkDeleteConfirmModal(false)} className="text-gray-400 hover:text-gray-500">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+
+                {error && (
+                  <div className="mb-4 rounded-md bg-red-50 p-4">
+                    <div className="flex">
+                      <AlertCircle className="h-5 w-5 text-red-400" />
+                      <div className="ml-3">
+                        <p className="text-sm text-red-800">{error}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-sm text-gray-600">
+                  Are you sure you want to delete the <strong>{selectedUsers.size}</strong> selected users? This action cannot be undone.
+                </p>
+              </div>
+
+              <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  disabled={loading}
+                  className="inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto"
+                >
+                  {loading ? "Deleting..." : "Delete All"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBulkDeleteConfirmModal(false)}
                   className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
                 >
                   Cancel

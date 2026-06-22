@@ -62,6 +62,7 @@ const useExamSecurity = (
 
   const violationCooldowns = useRef<Record<string, number>>({});
   const lastViolationTimeRef = useRef<number>(0);
+  const startTimeRef = useRef<number>(Date.now()); // Grace period start time
 
   // Log security configuration on initialization
   useEffect(() => {
@@ -102,6 +103,11 @@ const useExamSecurity = (
 
     console.log(`🚫 Security Violation: ${type}${skipBackend ? ' (Backend sync skipped)' : ''}`, metadata);
 
+    // Trigger proctoring video chunk upload for ALL violations
+    if (typeof (window as any).proctoringMarkIncident === 'function') {
+      (window as any).proctoringMarkIncident();
+    }
+
     const violation: ViolationData = {
       type,
       timestamp: new Date(),
@@ -114,7 +120,12 @@ const useExamSecurity = (
       return newViolations.length > 50 ? newViolations.slice(-50) : newViolations;
     });
 
-    setViolationCount(prev => prev + 1);
+    // Only increment count for HARD violations (visual or system breach)
+    // SOFT violations (audio noise, voice) are logged but don't count towards penalty/disqualification
+    const SOFT_VIOLATIONS = ['audio_noise', 'audio_voice_detected'];
+    if (!SOFT_VIOLATIONS.includes(type)) {
+      setViolationCount(prev => prev + 1);
+    }
 
     // Log to backend if not already logged (e.g. by webcam analyzer)
     if (!skipBackend) {
@@ -158,6 +169,12 @@ const useExamSecurity = (
     };
 
     const handleBlur = () => {
+      // 🛡️ GRACE PERIOD: Ignore window blur for the first 60 seconds (covers permission popups)
+      if (Date.now() - startTimeRef.current < 60000) {
+        console.log('🪟 WINDOW BLUR ignored during setup grace period');
+        return;
+      }
+
       console.log('🪟 WINDOW BLUR detected - logging violation');
       logViolation('window_blur', {
         timestamp: new Date().toISOString(),

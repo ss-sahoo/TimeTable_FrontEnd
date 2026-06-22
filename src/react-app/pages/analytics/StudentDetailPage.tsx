@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -161,9 +161,85 @@ export default function StudentDetailPage() {
 
   if (!data) return null;
 
-  const totalCorrect = data.question_responses?.filter(q => q.is_correct).length || 0;
-  const totalWrong = data.question_responses?.filter(q => !q.is_correct && q.is_answered).length || 0;
-  const totalUnattempted = data.question_responses?.filter(q => !q.is_answered).length || 0;
+  const attemptTotalMarks = useMemo(() => {
+    if (!data) return 0;
+    if (data.score > 0 && data.percentage > 0) {
+      const computed = Math.round((data.score * 100) / data.percentage);
+      if (computed > 0) return computed;
+    }
+    return data.exam.total_marks;
+  }, [data]);
+
+  const detailedEntries = useMemo(() => {
+    if (!data || !data.question_responses) return [];
+    
+    // Sort by question_number
+    const sortedEntries = [...data.question_responses].sort((a, b) => {
+      return (a.question_number || 0) - (b.question_number || 0);
+    });
+
+    let cumulativeMarks = 0;
+    const filteredByMarks: typeof sortedEntries = [];
+    for (const entry of sortedEntries) {
+      cumulativeMarks += entry.max_marks || 0;
+      if (cumulativeMarks <= attemptTotalMarks) {
+        filteredByMarks.push(entry);
+      } else {
+        break;
+      }
+    }
+    return filteredByMarks;
+  }, [data, attemptTotalMarks]);
+
+  const getSectionStats = useCallback((sectionKey: string, section: any) => {
+    if (!data) return section;
+    
+    const matchingQuestions = detailedEntries.filter(q => {
+      const qSubject = (q as any).subject || '';
+      const qSection = (q as any).section_name || '';
+      
+      const subjectMatch = qSubject && section.subject && qSubject.toLowerCase() === section.subject.toLowerCase();
+      const sectionNameMatch = qSection && section.section_name && qSection.toLowerCase() === section.section_name.toLowerCase();
+      const typeMatches = q.question_type && (
+        q.question_type.toLowerCase() === section.subject?.toLowerCase() ||
+        q.question_type.toLowerCase() === section.section_name?.toLowerCase()
+      );
+      
+      return subjectMatch || sectionNameMatch || typeMatches;
+    });
+    
+    if (matchingQuestions.length > 0) {
+      const score = matchingQuestions.reduce((sum, q) => sum + (q.marks_obtained || 0), 0);
+      const max_marks = matchingQuestions.reduce((sum, q) => sum + (q.max_marks || 0), 0);
+      const correct = matchingQuestions.filter(q => q.is_correct).length;
+      const wrong = matchingQuestions.filter(q => !q.is_correct && q.is_answered).length;
+      const unattempted = matchingQuestions.filter(q => !q.is_answered).length;
+      
+      return {
+        ...section,
+        score,
+        max_marks,
+        correct,
+        wrong,
+        unattempted
+      };
+    }
+    
+    // Proportional fallback for max_marks
+    const currentTotalSectionMarks = Object.values(data.section_scores || {}).reduce((sum, s) => sum + (s.max_marks || 0), 0);
+    const max_marks = currentTotalSectionMarks > 0 && attemptTotalMarks > 0 
+      ? Math.round(section.max_marks * (attemptTotalMarks / currentTotalSectionMarks))
+      : section.max_marks;
+      
+    return {
+      ...section,
+      max_marks,
+    };
+  }, [data, detailedEntries, attemptTotalMarks]);
+
+  const totalCorrect = detailedEntries.filter(q => q.is_correct).length;
+  const totalWrong = detailedEntries.filter(q => !q.is_correct && q.is_answered).length;
+  const totalUnattempted = detailedEntries.filter(q => !q.is_answered).length;
   const perfColor = getPerformanceColor(data.percentage);
 
   const tabs = [
@@ -237,7 +313,7 @@ export default function StudentDetailPage() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <ModernCard
             title="Score"
-            value={`${data.score.toFixed(1)}/${data.exam.total_marks}`}
+            value={`${data.score.toFixed(1)}/${attemptTotalMarks}`}
             icon={Award}
             gradient="blue"
             size="sm"
@@ -300,8 +376,9 @@ export default function StudentDetailPage() {
                       Section-wise Performance
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {Object.entries(data.section_scores).map(([sectionId, section], index) => {
-                        const sectionPercentage = (section.score / section.max_marks) * 100;
+                      {Object.entries(data.section_scores).map(([sectionId, rawSection], index) => {
+                        const section = getSectionStats(sectionId, rawSection);
+                        const sectionPercentage = section.max_marks > 0 ? (section.score / section.max_marks) * 100 : 0;
                         const sectionColor = getPerformanceColor(sectionPercentage);
                         return (
                           <motion.div
@@ -376,14 +453,14 @@ export default function StudentDetailPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
               >
-                {data.question_responses?.length === 0 ? (
+                {detailedEntries.length === 0 ? (
                   <div className="text-center py-12">
                     <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                     <p className="text-slate-500">No question data available</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {data.question_responses?.map((q, index) => (
+                    {detailedEntries.map((q, index) => (
                       <motion.div
                         key={q.question_number}
                         initial={{ opacity: 0, x: -10 }}

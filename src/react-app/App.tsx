@@ -61,6 +61,8 @@ import TeacherEvaluationDashboard from "@/react-app/pages/TeacherEvaluationDashb
 import InstituteProfile from "@/react-app/pages/InstituteProfile";
 import LandingPageEnhanced from "@/react-app/pages/LandingPageEnhanced";
 import ProctoringDiagnostics from "@/react-app/pages/ProctoringDiagnostics";
+import PlatformDashboard from './pages/PlatformDashboard';
+import PlatformInstitutes from './pages/PlatformInstitutes';
 import ProctoringSnapshotsView from "@/react-app/pages/ProctoringSnapshotsView";
 import ProctoringTestPage from "@/react-app/pages/ProctoringTestPage";
 import BulkImportPage from "@/react-app/pages/BulkImportPage";
@@ -72,6 +74,7 @@ import TimetableDashboard from "@/react-app/pages/TimetableDashboard";
 import Batches from "@/react-app/pages/Batches";
 import ExamHub from "@/react-app/pages/ExamHub";
 import SuperAdminLayout from "@/react-app/components/superadmin/SuperAdminLayout";
+import PlatformOwnerLayout from "@/react-app/components/PlatformOwnerLayout";
 import CenterAdminLayout from "@/react-app/components/admin/CenterAdminLayout";
 import TeacherLayout from "@/react-app/components/teacher/TeacherLayout";
 import StudentLayout from "@/react-app/components/student/StudentLayout";
@@ -215,15 +218,22 @@ function RoleProtectedRoute({
 
 
 // Helper function to get dashboard route based on role and domain
-function getDashboardRoute(role: string | undefined): string {
+// NOTE: This does NOT redirect to /onboarding — onboarding is only triggered
+// explicitly by the Google auth flow (via onboarding_required flag in Login.tsx).
+// Email/password users who have no institute should still reach their dashboard.
+function getDashboardRoute(user: any): string {
   // For timetable domain, always go to timetable page regardless of role
   if (typeof window !== 'undefined' && window.location.hostname === 'timetable.dashoapp.com') {
     return '/timetable';
   }
 
+  // Handle string role for backward compatibility or accidental usage
+  const role = typeof user === 'string' ? user : user?.role;
   const normalizedRole = role?.toLowerCase();
 
   switch (normalizedRole) {
+    case 'platform_owner':
+      return '/platform-owner/dashboard';
     case 'manager':
       return '/manager';
     case 'super_admin':
@@ -259,7 +269,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return isAuthenticated ? <Navigate to={getDashboardRoute(user?.role)} replace /> : children;
+  return isAuthenticated ? <Navigate to={getDashboardRoute(user)} replace /> : children;
 }
 
 import { TimetableCenterProvider } from "@/react-app/contexts/TimetableCenterContext";
@@ -280,7 +290,7 @@ function LoginRoute() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to={getDashboardRoute(user?.role)} replace />;
+    return <Navigate to={getDashboardRoute(user)} replace />;
   }
 
   // Domain-based login page selection
@@ -309,7 +319,7 @@ function RegisterRoute() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to={getDashboardRoute(user?.role)} replace />;
+    return <Navigate to={getDashboardRoute(user)} replace />;
   }
 
   // Domain-based register page selection
@@ -339,7 +349,7 @@ function LandingRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (isAuthenticated) {
-    return <Navigate to={getDashboardRoute(user?.role)} replace />;
+    return <Navigate to={getDashboardRoute(user)} replace />;
   }
 
   // Domain-based landing page selection
@@ -356,6 +366,21 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public Routes */}
+      <Route path="/platform-owner/*" element={
+        <FullscreenProtectedRoute>
+          <PlatformOwnerLayout>
+            <Routes>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<PlatformDashboard />} />
+              <Route path="institutes" element={<PlatformInstitutes />} />
+              <Route path="users" element={<UsersContent />} />
+              <Route path="settings" element={<SettingsContent />} />
+              <Route path="profile" element={<ProfileContent />} />
+              <Route path="*" element={<Navigate to="dashboard" replace />} />
+            </Routes>
+          </PlatformOwnerLayout>
+        </FullscreenProtectedRoute>
+      } />
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/register" element={<RegisterRoute />} />
       <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />

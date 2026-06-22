@@ -232,6 +232,25 @@ export default function Results() {
     }
   };
 
+  const getAttemptTotalMarks = (attempt: ExamAttempt) => {
+    const score = Number(attempt.score);
+    const pct = Number(attempt.percentage);
+    if (score > 0 && pct > 0) {
+      const computed = Math.round((score * 100) / pct);
+      if (computed > 0) return computed;
+    }
+    return attempt.exam.total_marks;
+  };
+
+  const getAttemptTotalQuestions = (attempt: ExamAttempt) => {
+    const attemptMarks = getAttemptTotalMarks(attempt);
+    if (attemptMarks > 0 && attempt.exam.total_marks > 0 && attemptMarks !== attempt.exam.total_marks) {
+      const computed = Math.round(attempt.exam.total_questions * (attemptMarks / attempt.exam.total_marks));
+      if (computed > 0) return computed;
+    }
+    return attempt.exam.total_questions;
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'submitted':
@@ -661,7 +680,7 @@ export default function Results() {
                             {attempt.exam_title}
                           </div>
                           <div className="text-xs text-slate-500">
-                            {attempt.exam.total_questions} questions • {attempt.exam.total_marks} marks
+                            {getAttemptTotalQuestions(attempt)} questions • {getAttemptTotalMarks(attempt)} marks
                           </div>
                         </div>
                       </td>
@@ -676,7 +695,7 @@ export default function Results() {
                           {attempt.percentage ? `${parseFloat(attempt.percentage).toFixed(1)}%` : '-'}
                         </div>
                         <div className="text-xs text-slate-500">
-                          {attempt.score || 'N/A'}
+                          {attempt.score ? `${attempt.score} / ${getAttemptTotalMarks(attempt)}` : 'N/A'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">

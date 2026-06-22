@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, X, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, X, ShieldAlert, Mic } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ViolationToastProps {
@@ -67,6 +67,16 @@ const ViolationToast: React.FC<ViolationToastProps> = ({ violation, onClose, rem
         return { title: 'Attention Warning', message: 'Please maintain focus on the exam screen.', icon: <AlertTriangle className="w-5 h-5" /> };
       case 'eyes_closed':
         return { title: 'Attention Warning', message: 'Eyes appear to be closed or not visible.', icon: <AlertTriangle className="w-5 h-5" /> };
+      case 'audio_noise':
+        return { title: 'Environment Alert', message: 'High background noise detected.', icon: <Mic className="w-5 h-5" /> };
+      case 'audio_voice_detected':
+        return { title: 'Audio Alert', message: 'Unauthorized voice or whispering detected.', icon: <Mic className="w-5 h-5" /> };
+      case 'keyboard_shortcut':
+        return { title: 'Security Alert', message: 'Restricted keyboard shortcut detected.', icon: <ShieldAlert className="w-5 h-5" /> };
+      case 'camera_blocked':
+        return { title: 'Hardware Alert', message: 'Webcam feed is blocked or unavailable.', icon: <ShieldAlert className="w-5 h-5" /> };
+      case 'mic_blocked':
+        return { title: 'Hardware Alert', message: 'Microphone is blocked or unavailable.', icon: <Mic className="w-5 h-5" /> };
       default:
         return { title: 'Security Alert', message: 'A security violation has been recorded.', icon: <AlertTriangle className="w-5 h-5" /> };
     }

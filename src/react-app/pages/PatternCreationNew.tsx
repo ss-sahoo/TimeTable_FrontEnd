@@ -186,57 +186,118 @@ export default function PatternCreation() {
   };
 
   const addSectionToSubject = (subjectName: string) => {
-    const newSection: PatternSection = {
-      name: '',
-      subject: subjectName,
-      question_type: 'mcq',
-      start_question: 1,
-      end_question: 1,
-      marks_per_question: 1,
-      negative_marking: 1.0,
-      min_questions_to_attempt: 1,
-      is_compulsory: true,
-      order: nextSectionOrder,
-      question_configurations: {},
-    };
+    setPattern(prev => {
+      const newSection: PatternSection = {
+        name: '',
+        subject: subjectName,
+        question_type: 'mcq',
+        start_question: 1,
+        end_question: 1,
+        marks_per_question: 1,
+        negative_marking: 1.0,
+        min_questions_to_attempt: 1,
+        is_compulsory: true,
+        order: nextSectionOrder,
+        question_configurations: {},
+      };
 
-    setPattern(prev => ({
-      ...prev,
-      sections: [...prev.sections, newSection],
-    }));
+      const newSections = [...prev.sections, newSection];
+
+      // Align sections for this subject
+      const subjectSectionsIndices = newSections
+        .map((s, i) => ({ ...s, originalIndex: i }))
+        .filter(s => s.subject === subjectName)
+        .sort((a, b) => a.order - b.order);
+
+      let currentQ = 1;
+      subjectSectionsIndices.forEach((s) => {
+        const length = s.end_question - s.start_question + 1;
+        const newStart = currentQ;
+        const newEnd = currentQ + Math.max(length, 1) - 1;
+        newSections[s.originalIndex] = {
+          ...newSections[s.originalIndex],
+          start_question: newStart,
+          end_question: newEnd,
+        };
+        currentQ = newEnd + 1;
+      });
+
+      const total_questions = newSections.reduce((sum, s) => sum + (s.end_question - s.start_question + 1), 0);
+      const total_marks = newSections.reduce((sum, s) => sum + ((s.end_question - s.start_question + 1) * s.marks_per_question), 0);
+
+      return {
+        ...prev,
+        sections: newSections,
+        total_questions,
+        total_marks
+      };
+    });
     setNextSectionOrder(prev => prev + 1);
   };
 
   const updateSection = (index: number, field: keyof PatternSection, value: any) => {
     setPattern(prev => {
+      // 1. Update the target section
       const updatedSections = prev.sections.map((section, i) => {
         if (i !== index) return section;
 
         let updatedSection: PatternSection = { ...section, [field]: value };
 
+        // Handle question range changes
         if (field === 'start_question' || field === 'end_question') {
-          const startRaw = field === 'start_question' ? value : updatedSection.start_question;
-          const endRaw = field === 'end_question' ? value : updatedSection.end_question;
-          const start =
-            typeof startRaw === 'number' ? startRaw : parseInt(String(startRaw), 10);
-          const end =
-            typeof endRaw === 'number' ? endRaw : parseInt(String(endRaw), 10);
+          const start = field === 'start_question' ? (parseInt(String(value), 10) || 1) : section.start_question;
+          const end = field === 'end_question' ? (parseInt(String(value), 10) || 1) : section.end_question;
 
-          if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
-            const total = (end - start) + 1;
-            updatedSection = {
-              ...updatedSection,
-              min_questions_to_attempt: Math.max(total, 1),
-            };
-          }
+          updatedSection = {
+            ...updatedSection,
+            start_question: start,
+            end_question: end,
+            min_questions_to_attempt: Math.max(end - start + 1, 1),
+          };
         }
-
         return updatedSection;
       });
 
+      // 2. Automatically align all sections within the same subject
+      const targetSubject = updatedSections[index].subject;
+
+      // Sort sections by order to determine the correct flow
+      const subjectSectionsIndices = updatedSections
+        .map((s, i) => ({ ...s, originalIndex: i }))
+        .filter(s => s.subject === targetSubject)
+        .sort((a, b) => a.order - b.order);
+
+      let currentQ = 1;
+      const finalSections = [...updatedSections];
+
+      subjectSectionsIndices.forEach((s) => {
+        const length = s.end_question - s.start_question + 1;
+        const newStart = currentQ;
+        const newEnd = currentQ + Math.max(length, 1) - 1;
+
+        // Preserve min_questions if it fits in the new range, otherwise cap it
+        let newMin = s.min_questions_to_attempt;
+        if (newMin > length) newMin = Math.max(length, 1);
+
+        finalSections[s.originalIndex] = {
+          ...finalSections[s.originalIndex],
+          start_question: newStart,
+          end_question: newEnd,
+          min_questions_to_attempt: newMin
+        };
+
+        currentQ = newEnd + 1;
+      });
+
+      // 3. Recalculate totals
+      const total_questions = finalSections.reduce((sum, s) => sum + (s.end_question - s.start_question + 1), 0);
+      const total_marks = finalSections.reduce((sum, s) => sum + ((s.end_question - s.start_question + 1) * s.marks_per_question), 0);
+
       return {
         ...prev,
-        sections: updatedSections,
+        sections: finalSections,
+        total_questions,
+        total_marks
       };
     });
 
@@ -250,10 +311,39 @@ export default function PatternCreation() {
   };
 
   const removeSection = (index: number) => {
-    setPattern(prev => ({
-      ...prev,
-      sections: prev.sections.filter((_, i) => i !== index),
-    }));
+    setPattern(prev => {
+      const subjectToRemoveFrom = prev.sections[index].subject;
+      const newSections = prev.sections.filter((_, i) => i !== index);
+
+      // Re-align remaining sections for that subject
+      const subjectSectionsIndices = newSections
+        .map((s, i) => ({ ...s, originalIndex: i }))
+        .filter(s => s.subject === subjectToRemoveFrom)
+        .sort((a, b) => a.order - b.order);
+
+      let currentQ = 1;
+      subjectSectionsIndices.forEach((s) => {
+        const length = s.end_question - s.start_question + 1;
+        const newStart = currentQ;
+        const newEnd = currentQ + Math.max(length, 1) - 1;
+        newSections[s.originalIndex] = {
+          ...newSections[s.originalIndex],
+          start_question: newStart,
+          end_question: newEnd,
+        };
+        currentQ = newEnd + 1;
+      });
+
+      const total_questions = newSections.reduce((sum, s) => sum + (s.end_question - s.start_question + 1), 0);
+      const total_marks = newSections.reduce((sum, s) => sum + ((s.end_question - s.start_question + 1) * s.marks_per_question), 0);
+
+      return {
+        ...prev,
+        sections: newSections,
+        total_questions,
+        total_marks
+      };
+    });
 
     // Clear section errors
     if (sectionErrors[index]) {
