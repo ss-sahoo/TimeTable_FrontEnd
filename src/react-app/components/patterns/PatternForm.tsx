@@ -1774,7 +1774,7 @@ export default function PatternCreation() {
             </div>
           </div>
         </div>
-      </div>
+      </div>>
 
       {/* Actions - Fixed at bottom */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 p-4 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] z-50">
@@ -1820,6 +1820,7 @@ export default function PatternCreation() {
                 <span className="whitespace-nowrap">{saving ? 'Publishing...' : 'Save & Publish'}</span>
               </button>
             </div>
+
           </div>
         </div>
       </div>
