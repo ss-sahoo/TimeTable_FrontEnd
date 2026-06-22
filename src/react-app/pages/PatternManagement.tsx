@@ -63,7 +63,7 @@ export default function PatternManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const viewMode = 'grid';
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -204,20 +204,6 @@ export default function PatternManagement() {
             <p className="text-base" style={{ color: '#6b6b6b' }}>Manage and organize your exam pattern</p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="inline-flex items-center rounded-lg border border-slate-300 overflow-hidden">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`px-3 py-2 text-xs ${viewMode === 'list' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 hover:bg-slate-50 dark:bg-gray-900'}`}
-              >
-                List
-              </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`px-3 py-2 text-xs border-l border-slate-300 ${viewMode === 'grid' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 hover:bg-slate-50 dark:bg-gray-900'}`}
-              >
-                Grid
-              </button>
-            </div>
             <Link
               to={`${basePath}/patterns/create`}
               data-tour-id="cta-create-pattern"
