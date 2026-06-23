@@ -309,7 +309,7 @@ export default function ExamCreation() {
       const centersData = response.data.results || response.data.centers || response.data || [];
       const allCenters = Array.isArray(centersData) ? centersData : [];
 
-      const userInstituteId = user?.institute_id || user?.institute?.id;
+      const userInstituteId = user?.institute_id;
 
       if (userInstituteId) {
         const targetId = String(userInstituteId);
@@ -652,7 +652,7 @@ export default function ExamCreation() {
         public_allowed_ip_ranges: allowedIpRanges,
         reschedule_deadline: rescheduleDeadlineISO,
         created_by: user?.id,
-        institute: institute ?? user?.institute_id ?? user?.institute?.id ?? null,
+        institute: institute ?? user?.institute_id ?? null,
         timezone: rest.timezone,
         status: saveAsDraft ? 'draft' : 'published',  // Set status based on button clicked
         is_published: !saveAsDraft,  // Set is_published based on status
@@ -884,62 +884,23 @@ export default function ExamCreation() {
                     <div>
                       <div className="flex items-center gap-2">
                         <h2 className="text-lg font-semibold text-slate-900">Exam Pattern & Content</h2>
-                        <div className="group relative">
-                          <Info className="w-3.5 h-3.5 text-slate-400 cursor-help hover:text-slate-600 transition-colors" />
-                          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-3 bg-slate-900 text-white text-[10px] rounded-xl opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all shadow-xl z-50">
-                            <p className="font-bold mb-1">How Patterns Work</p>
-                            <p className="text-slate-300 leading-relaxed">
-                              Patterns define the structure of your exam: the subjects, question counts, and marks. Select a template to automatically set up these sections for your new exam.
-                            </p>
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
-                          </div>
-                        </div>
                       </div>
                       <p className="text-xs text-slate-600">Select how to populate questions for this exam</p>
                     </div>
                   </div>
 
-                  {!isEditMode && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => handleInputChange('copy_from_exam_id', null)}
-                          className={`w-full group relative flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left h-full ${!formData.copy_from_exam_id
-                            ? 'border-blue-600 bg-blue-50/50 ring-4 ring-blue-50'
-                            : 'border-slate-100 bg-slate-50/50 hover:border-slate-200 hover:bg-white'}`}
-                        >
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${!formData.copy_from_exam_id ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white text-slate-400 border border-slate-200 group-hover:bg-slate-50'}`}>
-                            <Plus className="w-6 h-6" />
-                          </div>
-                          <div className="flex-1">
-                            <p className={`text-sm font-bold ${!formData.copy_from_exam_id ? 'text-blue-900' : 'text-slate-900'}`}>Use Pattern Template</p>
-                            <p className="text-xs text-slate-500">Pick a structure and add questions manually</p>
-                          </div>
-                          {!formData.copy_from_exam_id && (
-                            <CheckCircle className="w-5 h-5 text-blue-600 absolute top-4 right-4" />
-                          )}
-                        </button>
-                      </div>
-
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (confirm('Navigate to Pattern Creation? You may lose unsaved changes in this form.')) {
-                              navigate(`${basePath}/patterns/create`);
-                            }
-                          }}
-                          className="w-full group relative flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 hover:border-blue-200 hover:bg-blue-50 transition-all text-left h-full"
-                        >
-                          <div className="w-12 h-12 rounded-xl bg-white text-slate-400 border border-slate-200 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all">
-                            <Settings className="w-6 h-6" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-bold text-slate-900 group-hover:text-blue-900 transition-colors">Create New Pattern</p>
-                            <p className="text-xs text-slate-500">Build a custom structure from scratch</p>
-                          </div>
-                        </button>
+                  {!formData.copy_from_exam_id && (
+                    <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 mb-6 shadow-sm">
+                      <div className="flex gap-3">
+                        <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-indigo-100 shrink-0">
+                          <Info className="w-4 h-4 text-indigo-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-bold text-indigo-900 mb-1">What is an Exam Pattern?</h4>
+                          <p className="text-[11px] text-indigo-700 leading-relaxed font-medium">
+                            Think of a Pattern as a <span className="text-indigo-900 font-bold underline decoration-indigo-200 decoration-2 underline-offset-2">blueprint</span>. It pre-sets the subject list, question distribution, and marking rules. Selecting a pattern saves you time by automatically building the exam's structural frame.
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -997,28 +958,42 @@ export default function ExamCreation() {
                 )}
 
                 <div className="mb-4">
-                  <label className="block text-xs font-medium text-slate-700 mb-2">Available Patterns *</label>
-                  <div className="relative">
-                    <select
-                      value={formData.pattern || ''}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        handlePatternSelect(value ? parseInt(value) : 0);
-                      }}
-                      disabled={!!formData.copy_from_exam_id}
-                      className={`w-full px-4 py-2.5 text-sm border-2 rounded-xl appearance-none bg-white focus:ring-4 transition-all ${errors.pattern ? 'border-red-300 focus:ring-red-50' : 'border-slate-200 focus:ring-blue-50 focus:border-blue-500'}`}
-                    >
-                      <option value="">Select a pattern structure</option>
-                      {patterns.map((pattern) => (
-                        <option key={pattern.id} value={pattern.id}>
-                          {pattern.name} ({pattern.total_questions} Q, {pattern.total_duration}m)
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400">
-                      <ChevronDown className="w-4 h-4" />
+                  {!formData.copy_from_exam_id && (
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Select From Saved Patterns</label>
+                      <div className="relative">
+                        <select
+                          value={formData.pattern || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === 'CREATE_NEW') {
+                              if (confirm('Navigate to Pattern Creation? You may lose unsaved changes in this form.')) {
+                                navigate(`${basePath}/patterns/create`);
+                              }
+                              return;
+                            }
+                            handlePatternSelect(value ? parseInt(value) : 0);
+                          }}
+                          className={`w-full px-4 py-3 text-sm border-2 rounded-xl appearance-none bg-white font-medium focus:ring-4 transition-all ${errors.pattern ? 'border-red-300 focus:ring-red-50' : 'border-slate-200 focus:ring-blue-50 focus:border-blue-500'}`}
+                        >
+                          <option value="">Choose a pattern structure...</option>
+                          <optgroup label="Your Patterns">
+                            {patterns.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} — ({p.total_questions} Questions, {p.total_duration} min)
+                              </option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="Actions">
+                            <option value="CREATE_NEW">+ Create New Pattern Structure</option>
+                          </optgroup>
+                        </select>
+                        <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400">
+                          <ChevronDown className="w-4 h-4" />
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   {errors.pattern && (
                     <p className="text-red-600 text-xs mt-2 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" /> {errors.pattern}
@@ -2004,11 +1979,23 @@ export default function ExamCreation() {
                 <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <h4 className="font-medium text-blue-900 mb-1 text-sm">Exam Guidelines</h4>
-                  <ul className="text-xs text-blue-700 space-y-1">
-                    <li>• Select a pattern to define exam structure</li>
-                    <li>• Set appropriate duration and attempts</li>
-                    <li>• Configure passing marks and negative marking</li>
-                    <li>• Add clear instructions for students</li>
+                  <ul className="text-xs text-blue-700 space-y-1.5">
+                    <li className="flex gap-1.5 leading-relaxed">
+                      <span className="shrink-0 font-bold">•</span>
+                      <span><strong>Patterns:</strong> Think of them as blueprints that automatically set up subjects and question distribution.</span>
+                    </li>
+                    <li className="flex gap-1.5 leading-relaxed">
+                      <span className="shrink-0 font-bold">•</span>
+                      <span>Set valid start dates and durations for student visibility.</span>
+                    </li>
+                    <li className="flex gap-1.5 leading-relaxed">
+                      <span className="shrink-0 font-bold">•</span>
+                      <span>Ensure passing marks and marking schemes match your rules.</span>
+                    </li>
+                    <li className="flex gap-1.5 leading-relaxed">
+                      <span className="shrink-0 font-bold">•</span>
+                      <span>Publish only when your question paper is fully populated.</span>
+                    </li>
                   </ul>
                 </div>
               </div>

@@ -30,9 +30,13 @@ import {
   Layers,
   Brain,
   RefreshCw,
-  KeyRound
+  KeyRound,
+  Copy,
+  Share2
 } from 'lucide-react';
 import { api, getErrorMessage } from '../hooks/useApi';
+import { getPublicExamLink, normalizeShareUrl } from '../utils/urlUtils';
+
 import QuestionBulkImport from '../components/extraction/QuestionBulkImport';
 import OMRManagement from '../components/OMRManagement';
 import AnswerSheetUpload from '../components/AnswerSheetUpload';
@@ -92,6 +96,8 @@ interface Exam {
   omr_sheet_generated?: boolean;
   omr_sheet_file?: string;
   omr_metadata?: any;
+  share_url?: string | null;
+  public_access_token?: string | null;
 }
 
 interface SectionQuestionStats {
@@ -259,6 +265,23 @@ export default function ExamView() {
       toast.error(msg);
     } finally {
       setDeletingSection(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!exam) return;
+
+    // Prioritize public_access_token/share_url if available, otherwise fallback to student portal link
+    const link =
+      normalizeShareUrl(exam.share_url) ||
+      (exam.public_access_token ? getPublicExamLink(exam.public_access_token) : `${window.location.origin}/exam-access/${exam.id}`);
+
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success('Exam link copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+      toast.error('Failed to copy link.');
     }
   };
 
@@ -511,6 +534,14 @@ export default function ExamView() {
               >
                 <Download className="w-3.5 h-3.5" />
                 Download PDF
+              </button>
+              <button
+                onClick={handleCopyLink}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+                title="Copy Exam Link"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Copy Link
               </button>
               {/* Bulk Import button hidden - use Smart Extract V3 instead */}
               {exam.status === 'draft' && !exam.is_published && (
