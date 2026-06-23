@@ -24,8 +24,11 @@ import {
   Monitor,
   RotateCcw,
   CheckCircle,
-  Camera
+  Camera,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+import { Pagination } from '../components/common/Pagination';
 
 interface StudentResult {
   s_no: number;
@@ -98,6 +101,8 @@ const AdminExamResults: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
   const [loadingAttemptId, setLoadingAttemptId] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(20);
 
   const handleViewResult = async (studentId: number) => {
     try {
@@ -144,7 +149,7 @@ const AdminExamResults: React.FC = () => {
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [examId, searchTerm, sortBy, sortOrder, statusFilter]);
+  }, [examId, searchTerm, sortBy, sortOrder, statusFilter, currentPage]);
 
   const loadExamResults = async () => {
     if (!examId) return;
@@ -155,11 +160,21 @@ const AdminExamResults: React.FC = () => {
         search: searchTerm,
         sort_by: sortBy,
         sort_order: sortOrder,
-        status: statusFilter
+        status: statusFilter,
+        page: currentPage.toString(),
+        page_size: pageSize.toString()
       });
 
       const response = await api.get(`/exams/exams/${examId}/results-dashboard/?${params}`);
-      setData(response.data);
+
+      // Handle paginated response: if 'results' exists and is an object (not array),
+      // it contains our dashboard data. Otherwise use response.data directly.
+      if (response.data && response.data.results && !Array.isArray(response.data.results)) {
+        setData(response.data.results);
+      } else {
+        setData(response.data);
+      }
+
       setError(null);
     } catch (error: any) {
       console.error('Error loading exam results:', error);
@@ -487,7 +502,7 @@ const AdminExamResults: React.FC = () => {
         </div>
 
         {/* Results Table */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
@@ -679,8 +694,8 @@ const AdminExamResults: React.FC = () => {
                           onClick={() => handleViewProctoring(result.student_id)}
                           disabled={loadingAttemptId !== null}
                           className={`p-1 rounded transition-colors disabled:opacity-55 ${result.violations_count > 0
-                              ? 'text-red-600 hover:bg-red-50'
-                              : 'text-blue-600 hover:bg-blue-50'
+                            ? 'text-red-600 hover:bg-red-50'
+                            : 'text-blue-600 hover:bg-blue-50'
                             }`}
                           title={result.violations_count > 0 ? "View violations and snapshots" : "View monitoring snapshots"}
                         >
@@ -710,9 +725,17 @@ const AdminExamResults: React.FC = () => {
         </div>
 
         {/* Summary Footer */}
-        <div className="mt-6 text-center text-sm text-slate-500">
+        <div className="mt-6 text-center text-sm text-slate-500 mb-6">
           Showing {data.results.length} of {data.total_count} results
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalCount={data.total_count}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          loading={refreshing}
+        />
       </div>
     </div>
   );
