@@ -680,11 +680,12 @@ export default function ExamCreation() {
         const newExam = response.data;
 
         if (newExam?.id) {
-          setToastMessage(saveAsDraft ? 'Exam Saved as Draft!' : 'Exam Published Successfully!');
+          setToastMessage('Exam Created Successfully!');
           setShowToast(true);
           setTimeout(() => {
             setShowToast(false);
-            navigate(`${basePath}/exams`);
+            // Redirect to the exam details page instead of the list
+            navigate(`${basePath}/exams/${newExam.id}`);
           }, 1500);
         }
       }
@@ -1992,19 +1993,15 @@ export default function ExamCreation() {
                   <ul className="text-xs text-blue-700 space-y-1.5">
                     <li className="flex gap-1.5 leading-relaxed">
                       <span className="shrink-0 font-bold">•</span>
-                      <span><strong>Patterns:</strong> Think of them as blueprints that automatically set up subjects and question distribution.</span>
+                      <span><strong>Patterns:</strong> Blueprints that automatically set up subjects and question distribution.</span>
                     </li>
                     <li className="flex gap-1.5 leading-relaxed">
                       <span className="shrink-0 font-bold">•</span>
-                      <span>Set valid start dates and durations for student visibility.</span>
+                      <span><strong>Draft Mode:</strong> New exams are created as drafts. Students cannot see or take draft exams.</span>
                     </li>
                     <li className="flex gap-1.5 leading-relaxed">
                       <span className="shrink-0 font-bold">•</span>
-                      <span>Ensure passing marks and marking schemes match your rules.</span>
-                    </li>
-                    <li className="flex gap-1.5 leading-relaxed">
-                      <span className="shrink-0 font-bold">•</span>
-                      <span>Publish only when your question paper is fully populated.</span>
+                      <span><strong>Process:</strong> Create the exam shell first, then add questions, and finally publish when ready.</span>
                     </li>
                   </ul>
                 </div>
@@ -2041,24 +2038,14 @@ export default function ExamCreation() {
 
               <div className="flex-grow md:flex-grow-0 flex items-center gap-3">
                 {!isEditMode ? (
-                  <>
-                    <button
-                      onClick={() => handleSubmit(true)}
-                      disabled={saving}
-                      className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 disabled:opacity-50 transition-all border border-slate-200"
-                    >
-                      <Save className="w-4 h-4" />
-                      {saving ? 'Saving...' : 'Save Draft'}
-                    </button>
-                    <button
-                      onClick={() => handleSubmit(false)}
-                      disabled={saving}
-                      className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-2.5 text-sm font-bold bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 shadow-lg shadow-green-100 transition-all active:scale-95"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                      {saving ? 'Publishing...' : 'Publish Exam'}
-                    </button>
-                  </>
+                  <button
+                    onClick={() => handleSubmit(true)}
+                    disabled={saving}
+                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-2.5 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 shadow-lg shadow-blue-100 transition-all active:scale-95"
+                  >
+                    <Plus className="w-4 h-4" />
+                    {saving ? 'Creating...' : 'Create Exam'}
+                  </button>
                 ) : (
                   <button
                     onClick={() => handleSubmit(formData.status === 'draft')}

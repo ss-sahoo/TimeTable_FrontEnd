@@ -54,6 +54,7 @@ export default function DateTimeInput({
         type="date"
         value={date}
         onChange={(e) => onChange(join(e.target.value, time))}
+        onClick={(e) => (e.target as any).showPicker?.()}
         className={`flex-1 min-w-0 ${className}`}
         style={style}
         min={minDate || undefined}
@@ -67,6 +68,7 @@ export default function DateTimeInput({
         type="time"
         value={time}
         onChange={(e) => onChange(join(date, e.target.value))}
+        onClick={(e) => (e.target as any).showPicker?.()}
         className={`flex-1 min-w-0 ${className}`}
         style={style}
         min={sameDayMin ? minTime : undefined}

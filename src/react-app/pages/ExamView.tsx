@@ -584,10 +584,11 @@ export default function ExamView() {
               )}
               <button
                 onClick={() => navigate(`${basePath}/exams/${exam.id}/edit`)}
-                className="p-2 rounded-md hover:bg-slate-100 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-md bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors shadow-sm"
                 title="Edit Exam"
               >
-                <Edit className="w-4 h-4 text-blue-600" />
+                <Edit className="w-3.5 h-3.5" />
+                Edit Exam
               </button>
             </div>
           </div>

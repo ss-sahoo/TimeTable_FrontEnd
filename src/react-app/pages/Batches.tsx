@@ -142,7 +142,7 @@ export default function Batches() {
       const allPrograms = response.data.programs || [];
 
       // Filter programs by user's institute
-      const userInstituteId = user?.institute_id || user?.institute?.id;
+      const userInstituteId = user?.institute_id;
       if (userInstituteId) {
         const targetId = String(userInstituteId);
         setPrograms(allPrograms.filter((p: any) => String(p.institute_id) === targetId));
@@ -161,7 +161,7 @@ export default function Batches() {
       const allCenters = Array.isArray(centersData) ? centersData : [];
 
       // Get institute ID from either top-level or nested institute object
-      const userInstituteId = user?.institute_id || user?.institute?.id;
+      const userInstituteId = user?.institute_id;
 
       if (userInstituteId) {
         const targetId = String(userInstituteId);
@@ -744,6 +744,7 @@ export default function Batches() {
                       type="date"
                       value={formData.start_date}
                       onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                      onClick={(e) => (e.target as any).showPicker?.()}
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
                     />
                   </div>
@@ -754,6 +755,7 @@ export default function Batches() {
                       type="date"
                       value={formData.end_date}
                       onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                      onClick={(e) => (e.target as any).showPicker?.()}
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
                     />
                   </div>

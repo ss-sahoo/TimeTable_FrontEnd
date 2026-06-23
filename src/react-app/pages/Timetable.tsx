@@ -552,6 +552,7 @@ const Instructions = ({
                       type="date"
                       value={calendarRange.startDate}
                       onChange={(e) => setCalendarRange({ ...calendarRange, startDate: e.target.value })}
+                      onClick={(e) => (e.target as any).showPicker?.()}
                       style={styles.dateInput}
                       min={getCurrentDate()}
                     />
@@ -569,6 +570,7 @@ const Instructions = ({
                       type="date"
                       value={calendarRange.endDate}
                       onChange={(e) => setCalendarRange({ ...calendarRange, endDate: e.target.value })}
+                      onClick={(e) => (e.target as any).showPicker?.()}
                       style={styles.dateInput}
                       min={calendarRange.startDate || getCurrentDate()}
                     />
