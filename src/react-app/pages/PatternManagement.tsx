@@ -305,7 +305,7 @@ export default function PatternManagement() {
         </div>
 
         {/* Patterns List/Grid */}
-        <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4' : 'space-y-4'}`}>
+        <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 md:gap-6' : 'space-y-4'}`}>
           {sortedPatterns.map((pattern) => (
             <div key={pattern.id} className={`bg-white dark:bg-gray-800 rounded-lg border border-slate-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow ${viewMode === 'list' ? 'w-full' : ''}`}>
               <div className="flex items-start justify-between mb-3">
@@ -420,22 +420,22 @@ export default function PatternManagement() {
                             </span>
                           </div>
                           {/* Horizontal sections layout */}
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-wrap gap-2">
                             {sections.map((section: any) => (
                               <div
                                 key={section.id}
-                                className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-md text-xs"
+                                className="flex flex-col gap-1 p-2 bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg text-[11px] min-w-[120px] flex-1"
                               >
-                                <span className="text-slate-700 font-medium">{section.name}</span>
-                                <span className={`inline-flex items-center gap-1 px-1 py-0.5 rounded-full text-xs font-medium ${getQuestionTypeColor(section.question_type)}`}>
-                                  {getQuestionTypeIcon(section.question_type)}
-                                  {section.question_type.replace('_', ' ').toUpperCase()}
-                                </span>
-                                <span className="text-slate-500">
-                                  Question : {section.start_question}-{section.end_question}
-                                </span>
-                                <span className="text-slate-500">•</span>
-                                <span className="text-slate-500">{section.marks_per_question} Marks </span>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-slate-900 font-bold truncate max-w-[80px]">{section.name}</span>
+                                  <span className="text-blue-600 font-semibold">{section.marks_per_question}M</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-slate-500">
+                                  <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold border ${getQuestionTypeColor(section.question_type)}`}>
+                                    {section.question_type.replace('_', ' ').toUpperCase()}
+                                  </span>
+                                  <span>Q{section.start_question}-{section.end_question}</span>
+                                </div>
                               </div>
                             ))}
                           </div>
