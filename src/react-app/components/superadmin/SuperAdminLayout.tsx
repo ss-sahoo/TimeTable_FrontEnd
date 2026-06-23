@@ -16,6 +16,7 @@ import {
     ChevronRight,
     X,
     Activity,
+    Zap,
 } from "lucide-react";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { api } from "../../hooks/useApi";
@@ -32,6 +33,7 @@ const platformNavItems = [
 const operationsNavItems = [
     { id: "institutes", label: "Institutes & Centers", icon: Building2, href: "/superadmin/institutes", badge: true },
     { id: "exams", label: "Exams", icon: FileText, href: "/superadmin/exams" },
+    { id: "patterns", label: "Exam Patterns", icon: Zap, href: "/superadmin/patterns" },
     { id: "batches", label: "Batches", icon: Layers, href: "/superadmin/batches" },
     { id: "timetable", label: "Timetable", icon: Calendar, href: "/superadmin/timetable" },
     { id: "billing", label: "Activity & Logs", icon: Activity, href: "/superadmin/billing" },
@@ -100,7 +102,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
             }
         });
 
-        const instituteId = user?.institute_id || user?.institute?.id;
+        const instituteId = (user as any)?.institute_id || (user as any)?.institute?.id;
         if (instituteId) {
             try {
                 const examsRes = await api.get(`/exams/exams/?institute_id=${instituteId}`);
@@ -189,7 +191,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
                                 className="flex items-center gap-3 w-full hover:bg-slate-100 cursor-pointer transition-colors py-2 px-2 rounded-md -mx-2 group"
                             >
                                 <img
-                                    src={user?.institute?.logo || "/examlogo.png"}
+                                    src={(user as any)?.institute?.logo || "/examlogo.png"}
                                     alt="Institute Logo"
                                     className="w-10 h-10 object-contain flex-shrink-0 rounded-md group-hover:scale-105 transition-transform"
                                     onError={(e) => {
@@ -198,14 +200,14 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
                                 />
                                 <div className="flex-1 overflow-hidden">
                                     <h1 className="font-bold text-md text-slate-900 leading-tight group-hover:text-violet-600 transition-colors">
-                                        {user?.institute?.name || user?.institute_name || "DashoExams"}
+                                        {(user as any)?.institute?.name || (user as any)?.institute_name || "DashoExams"}
                                     </h1>
                                 </div>
                             </div>
                         ) : (
                             <div className="w-8 h-8 flex items-center justify-center mx-auto">
                                 <img
-                                    src={user?.institute?.logo || "/examlogo.png"}
+                                    src={(user as any)?.institute?.logo || "/examlogo.png"}
                                     alt="Institute Logo"
                                     className="w-8 h-8 object-contain rounded-md"
                                     onError={(e) => {

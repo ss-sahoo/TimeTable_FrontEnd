@@ -50,6 +50,7 @@ interface ExamPattern {
     email: string;
   };
   is_active: boolean;
+  is_default: boolean;
   exam_mode: 'online' | 'offline_omr' | 'offline_subjective';
 }
 
@@ -63,7 +64,7 @@ export default function PatternManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
-  const viewMode = 'grid';
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -169,6 +170,12 @@ export default function PatternManagement() {
       (statusFilter === 'active' && pattern.is_active) ||
       (statusFilter === 'inactive' && !pattern.is_active);
     return matchesSearch && matchesStatus;
+  });
+
+  const sortedPatterns = [...filteredPatterns].sort((a, b) => {
+    if (a.is_default && !b.is_default) return -1;
+    if (!a.is_default && b.is_default) return 1;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
   const getPatternStats = () => {
@@ -299,7 +306,7 @@ export default function PatternManagement() {
 
         {/* Patterns List/Grid */}
         <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4' : 'space-y-4'}`}>
-          {filteredPatterns.map((pattern) => (
+          {sortedPatterns.map((pattern) => (
             <div key={pattern.id} className={`bg-white dark:bg-gray-800 rounded-lg border border-slate-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow ${viewMode === 'list' ? 'w-full' : ''}`}>
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
@@ -351,6 +358,12 @@ export default function PatternManagement() {
                   <Monitor className="w-3 h-3" />
                   {pattern.exam_mode === 'online' ? 'Online' : pattern.exam_mode === 'offline_omr' ? 'Offline OMR' : 'Offline Subjective'}
                 </span>
+                {pattern.is_default && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                    <Zap className="w-3 h-3" />
+                    Default Pattern
+                  </span>
+                )}
               </div>
 
               <div className={`mb-4 ${viewMode === 'list' ? 'grid grid-cols-2 md:grid-cols-4 gap-2' : 'space-y-2'}`}>

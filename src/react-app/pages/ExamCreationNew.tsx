@@ -96,6 +96,7 @@ interface ExamPattern {
   total_duration: number;
   sections: PatternSection[];
   created_at: string;
+  is_default: boolean;
   exam_mode?: 'online' | 'offline_omr' | 'offline_subjective';
 }
 
@@ -977,8 +978,17 @@ export default function ExamCreation() {
                           className={`w-full px-4 py-3 text-sm border-2 rounded-xl appearance-none bg-white font-medium focus:ring-4 transition-all ${errors.pattern ? 'border-red-300 focus:ring-red-50' : 'border-slate-200 focus:ring-blue-50 focus:border-blue-500'}`}
                         >
                           <option value="">Choose a pattern structure...</option>
+                          {patterns.some(p => p.is_default) && (
+                            <optgroup label="Default Patterns (Standard)">
+                              {patterns.filter(p => p.is_default).map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} — ({p.total_questions} Questions, {p.total_duration} min)
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
                           <optgroup label="Your Patterns">
-                            {patterns.map((p) => (
+                            {patterns.filter(p => !p.is_default).map((p) => (
                               <option key={p.id} value={p.id}>
                                 {p.name} — ({p.total_questions} Questions, {p.total_duration} min)
                               </option>
