@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router";
 import {
+    IndianRupee,
     Home,
     Building2,
     Users as UsersIcon,
@@ -22,6 +23,7 @@ const navItems = [
     { id: "institutes", label: "Institutes", icon: Building2, href: "/platform-owner/institutes" },
     { id: "users", label: "Users", icon: UsersIcon, href: "/platform-owner/users" },
     { id: "profile", label: "Profile", icon: UserIcon, href: "/platform-owner/profile" },
+    { id: "finance", label: "Platform Invoices", icon: IndianRupee, href: "/platform-owner/finance/platform-invoices" },
     { id: "settings", label: "Settings", icon: SettingsIcon, href: "/platform-owner/settings" },
 ];
 

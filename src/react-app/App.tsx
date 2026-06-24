@@ -63,6 +63,9 @@ import LandingPageEnhanced from "@/react-app/pages/LandingPageEnhanced";
 import ProctoringDiagnostics from "@/react-app/pages/ProctoringDiagnostics";
 import PlatformDashboard from './pages/PlatformDashboard';
 import PlatformInstitutes from './pages/PlatformInstitutes';
+import PlatformInvoices from './pages/Finance/PlatformInvoices';
+import SuperAdminBilling from './pages/Finance/SuperAdminBilling';
+
 import ProctoringSnapshotsView from "@/react-app/pages/ProctoringSnapshotsView";
 import ProctoringTestPage from "@/react-app/pages/ProctoringTestPage";
 import BulkImportPage from "@/react-app/pages/BulkImportPage";
@@ -375,6 +378,8 @@ function AppRoutes() {
               <Route path="institutes" element={<PlatformInstitutes />} />
               <Route path="users" element={<UsersContent />} />
               <Route path="settings" element={<SettingsContent />} />
+              <Route path="finance/platform-invoices" element={<PlatformInvoices />} />
+              
               <Route path="profile" element={<ProfileContent />} />
               <Route path="*" element={<Navigate to="dashboard" replace />} />
             </Routes>
@@ -450,8 +455,11 @@ function AppRoutes() {
               <Route path="questions" element={<QuestionManagement />} />
               <Route path="batches" element={<BatchesContent />} />
               <Route path="timetable" element={<TimetableContent />} />
-              <Route path="billing" element={<ActivityLogs />} />
+              <Route path="billing" element={<SuperAdminBilling />} />
+              <Route path="activity-logs" element={<ActivityLogs />} />
               <Route path="settings" element={<SettingsContent />} />
+              <Route path="finance/platform-invoices" element={<PlatformInvoices />} />
+              
               <Route path="profile" element={<ProfileContent />} />
               <Route path="*" element={<Navigate to="/superadmin/dashboard" replace />} />
             </Routes>

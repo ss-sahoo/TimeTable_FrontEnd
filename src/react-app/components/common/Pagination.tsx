@@ -109,8 +109,8 @@ export const Pagination: React.FC<PaginationProps> = ({
                                     onClick={() => onPageChange(page as number)}
                                     disabled={loading}
                                     className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === page
-                                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                                            : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'
+                                        ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                        : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'
                                         }`}
                                 >
                                     {page}

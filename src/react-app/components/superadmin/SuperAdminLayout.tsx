@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router";
 import {
+    IndianRupee,
     LayoutGrid,
     Building2,
     Users,
@@ -33,10 +34,10 @@ const platformNavItems = [
 const operationsNavItems = [
     { id: "institutes", label: "Institutes & Centers", icon: Building2, href: "/superadmin/institutes", badge: true },
     { id: "exams", label: "Exams", icon: FileText, href: "/superadmin/exams" },
-    { id: "patterns", label: "Exam Patterns", icon: Zap, href: "/superadmin/patterns" },
     { id: "batches", label: "Batches", icon: Layers, href: "/superadmin/batches" },
     { id: "timetable", label: "Timetable", icon: Calendar, href: "/superadmin/timetable" },
-    { id: "billing", label: "Activity & Logs", icon: Activity, href: "/superadmin/billing" },
+    { id: "billing", label: "Billing & Finance", icon: IndianRupee, href: "/superadmin/billing" },
+    { id: "activity", label: "Activity & Logs", icon: Activity, href: "/superadmin/activity-logs" },
 ];
 
 export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
