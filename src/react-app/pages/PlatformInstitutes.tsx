@@ -10,6 +10,7 @@ import { api } from '../hooks/useApi';
 interface Institute {
     id: number;
     name: string;
+    subdomain: string | null;
     domain: string | null;
     contact_email: string;
     is_verified: boolean;
@@ -37,6 +38,7 @@ export default function PlatformInstitutes() {
 
     const [formData, setFormData] = useState({
         name: '',
+        subdomain: '',
         domain: '',
         contact_email: '',
         admin_email: '',
@@ -45,6 +47,10 @@ export default function PlatformInstitutes() {
         admin_last_name: '',
         admin_password: '',
     });
+
+    const [isEditingSubdomain, setIsEditingSubdomain] = useState(false);
+    const [editedSubdomain, setEditedSubdomain] = useState('');
+    const [updateLoading, setUpdateLoading] = useState(false);
 
     const fetchInstitutes = async () => {
         try {
@@ -70,13 +76,35 @@ export default function PlatformInstitutes() {
             setShowCreateModal(false);
             fetchInstitutes();
             setFormData({
-                name: '', domain: '', contact_email: '', admin_email: '',
+                name: '', subdomain: '', domain: '', contact_email: '', admin_email: '',
                 admin_username: '', admin_first_name: '', admin_last_name: '', admin_password: ''
             });
         } catch (err) {
             alert('Failed to create institute');
         } finally {
             setCreateLoading(false);
+        }
+    };
+
+    const handleUpdateSubdomain = async () => {
+        if (!selectedInstitute) return;
+        setUpdateLoading(true);
+        try {
+            const response = await api.patch(`/auth/platform/institutes/${selectedInstitute.id}/`, {
+                subdomain: editedSubdomain
+            });
+            // Update local state
+            setInstitutes(prev => prev.map(inst =>
+                inst.id === selectedInstitute.id ? { ...inst, subdomain: editedSubdomain } : inst
+            ));
+            setSelectedInstitute({ ...selectedInstitute, subdomain: editedSubdomain });
+            setIsEditingSubdomain(false);
+            alert('Subdomain updated successfully');
+        } catch (err) {
+            console.error('Failed to update subdomain', err);
+            alert('Failed to update subdomain. Ensure it is unique.');
+        } finally {
+            setUpdateLoading(false);
         }
     };
 
@@ -335,6 +363,20 @@ export default function PlatformInstitutes() {
                                                 />
                                             </div>
                                             <div>
+                                                <label className="block text-[10px] font-black text-slate-400 mb-2 ml-1 uppercase tracking-widest">Subdomain</label>
+                                                <div className="relative">
+                                                    <input
+                                                        value={formData.subdomain}
+                                                        onChange={(e) => setFormData({ ...formData, subdomain: e.target.value })}
+                                                        className="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all bg-slate-50/50 font-bold placeholder:text-slate-300 pr-32"
+                                                        placeholder="e.g. iitmadras"
+                                                    />
+                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">
+                                                        .exams.dashoapp.com
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div>
                                                 <label className="block text-[10px] font-black text-slate-400 mb-2 ml-1 uppercase tracking-widest">Custom Domain</label>
                                                 <input
                                                     value={formData.domain}
@@ -472,9 +514,27 @@ export default function PlatformInstitutes() {
                                                 {selectedInstitute.is_verified ? 'Verified' : 'Pending'}
                                             </span>
                                         </div>
-                                        <p className="text-slate-500 font-bold flex items-center gap-2">
-                                            <Globe className="w-4 h-4 text-indigo-400" /> {selectedInstitute.domain || 'Direct Ecosystem Access'}
-                                        </p>
+                                        {selectedInstitute.subdomain ? (
+                                            <div className="flex flex-col gap-1 mt-1">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Professional Deployment
+                                                </p>
+                                                <a
+                                                    href={`https://${selectedInstitute.subdomain}.exams.dashoapp.com`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs font-black text-indigo-600 flex items-center gap-1.5 hover:text-indigo-700 transition-all group/link"
+                                                >
+                                                    https://{selectedInstitute.subdomain}.exams.dashoapp.com
+                                                    <ExternalLink className="w-3.5 h-3.5 group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform" />
+                                                </a>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 mt-2 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100/50 w-fit">
+                                                <Globe className="w-3.5 h-3.5 text-amber-500" />
+                                                <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">No Subdomain Configured</span>
+                                            </div>
+                                        )}
                                         <div className="flex items-center gap-4 mt-3 text-xs font-bold text-slate-400 uppercase tracking-widest">
                                             <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Established {new Date(selectedInstitute.created_at).toLocaleDateString()}</span>
                                             <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> {selectedInstitute.center_count} Centers</span>
@@ -546,13 +606,82 @@ export default function PlatformInstitutes() {
                                                     <span className="text-2xl font-black text-slate-900">{selectedInstitute.active_user_count}</span>
                                                 </div>
                                             </div>
-                                            <div className="col-span-2 bg-indigo-50 border border-indigo-100 rounded-3xl p-6 flex justify-between items-center">
-                                                <div>
-                                                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Instance Health</p>
-                                                    <p className="text-lg font-black text-indigo-900 underline decoration-indigo-200">OPTIMAL</p>
+                                            <div className="col-span-2 bg-indigo-50 border border-indigo-100 rounded-3xl p-6">
+                                                <div className="w-full">
+                                                    <div className="flex justify-between items-center mb-4">
+                                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+                                                            <Globe className="w-3.5 h-3.5" /> Domain Identity
+                                                        </p>
+                                                        {!isEditingSubdomain && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditedSubdomain(selectedInstitute.subdomain || '');
+                                                                    setIsEditingSubdomain(true);
+                                                                }}
+                                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-indigo-100 rounded-xl text-[10px] font-black text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                                                            >
+                                                                <Settings className="w-3.5 h-3.5" />
+                                                                MANAGE
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    {isEditingSubdomain ? (
+                                                        <div className="space-y-4">
+                                                            <div className="relative group/input">
+                                                                <input
+                                                                    value={editedSubdomain}
+                                                                    onChange={(e) => setEditedSubdomain(e.target.value)}
+                                                                    autoFocus
+                                                                    className="w-full px-5 py-4 rounded-2xl border-2 border-indigo-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none font-black text-lg text-indigo-900 transition-all pr-[180px]"
+                                                                    placeholder="subdomain"
+                                                                />
+                                                                <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[11px] font-black text-slate-400 group-focus-within/input:text-indigo-400 transition-colors">
+                                                                    .exams.dashoapp.com
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex gap-3">
+                                                                <button
+                                                                    onClick={handleUpdateSubdomain}
+                                                                    disabled={updateLoading}
+                                                                    className="flex-1 bg-indigo-600 text-white py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+                                                                >
+                                                                    {updateLoading ? (
+                                                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                                    ) : (
+                                                                        <>
+                                                                            <ShieldCheck className="w-4 h-4" />
+                                                                            Apply Changes
+                                                                        </>
+                                                                    )}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setIsEditingSubdomain(false)}
+                                                                    className="px-6 py-3.5 bg-white text-slate-500 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all"
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="p-5 bg-white/50 border border-indigo-100/50 rounded-2xl">
+                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 italic">Live Deployment Endpoint</p>
+                                                            <p className="text-base font-black text-indigo-900 break-all">
+                                                                {selectedInstitute.subdomain
+                                                                    ? `https://${selectedInstitute.subdomain}.exams.dashoapp.com`
+                                                                    : 'https://[subdomain].exams.dashoapp.com'}
+                                                            </p>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="px-4 py-2 bg-white rounded-xl text-[10px] font-black text-indigo-600 shadow-sm border border-indigo-100">
-                                                    PING: 14MS
+                                                <div className="flex justify-between items-center pt-4 border-t border-indigo-100">
+                                                    <div>
+                                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Instance Health</p>
+                                                        <p className="text-sm font-black text-indigo-900">OPTIMAL</p>
+                                                    </div>
+                                                    <div className="px-4 py-2 bg-white rounded-xl text-[10px] font-black text-indigo-600 shadow-sm border border-indigo-100">
+                                                        PING: 14MS
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

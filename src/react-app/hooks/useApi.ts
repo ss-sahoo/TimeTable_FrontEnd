@@ -128,8 +128,8 @@ const getDefaultApiUrl = () => {
       // return 'https://exams.dashoapp.com/api';
     }
 
-    // For production exams domain or any other domain
-    return 'https://exams.dashoapp.com/api';
+    // For production exams domain or any other domain (including subdomains)
+    return `${window.location.protocol}//${hostname}${window.location.port ? ':' + window.location.port : ''}/api`;
   }
 
   // Fallback
