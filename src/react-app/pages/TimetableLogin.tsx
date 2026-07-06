@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { motion } from 'framer-motion';
 import {
@@ -13,8 +13,10 @@ import {
   Cpu,
   Users,
   Clock,
+  Building2,
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
+import { api } from '../hooks/useApi';
 import DeviceConflictModal from '../components/DeviceConflictModal';
 
 export default function TimetableLogin() {
@@ -29,6 +31,64 @@ export default function TimetableLogin() {
 
   const { login, deviceConflict, setDeviceConflict } = useAuthContext();
   const navigate = useNavigate();
+
+  interface SubdomainInstitute {
+    id: number;
+    name: string;
+    logo: string | null;
+    subdomain: string;
+    website: string | null;
+    description: string | null;
+  }
+
+  const [subdomainInfo, setSubdomainInfo] = useState<SubdomainInstitute | null>(null);
+  const [subdomainLoading, setSubdomainLoading] = useState(true);
+
+  const getSubdomain = () => {
+    if (typeof window === 'undefined') return null;
+    const hostname = window.location.hostname;
+
+    // Support testing subdomain locally using URL query parameter: ?subdomain=mit
+    const urlParams = new URLSearchParams(window.location.search);
+    const qaSubdomain = urlParams.get('subdomain');
+    if (qaSubdomain) return qaSubdomain;
+
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return null;
+
+    const ROOT_DOMAIN = 'exams.dashoapp.com';
+    const TIMETABLE_DOMAIN = 'timetable.dashoapp.com';
+
+    if (hostname !== ROOT_DOMAIN && hostname !== TIMETABLE_DOMAIN) {
+      if (hostname.endsWith('.' + ROOT_DOMAIN)) {
+        return hostname.replace('.' + ROOT_DOMAIN, '');
+      }
+      if (hostname.endsWith('.localhost')) {
+        return hostname.replace('.localhost', '');
+      }
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    const fetchSubdomainInfo = async () => {
+      const subdomain = getSubdomain();
+      if (!subdomain) {
+        setSubdomainLoading(false);
+        return;
+      }
+
+      try {
+        const response = await api.get(`/auth/institutes/by-subdomain/${subdomain}/`);
+        setSubdomainInfo(response.data);
+      } catch (err) {
+        console.error('Failed to fetch subdomain institute branding:', err);
+      } finally {
+        setSubdomainLoading(false);
+      }
+    };
+
+    fetchSubdomainInfo();
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -197,15 +257,36 @@ export default function TimetableLogin() {
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <motion.div
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: 'spring', duration: 0.8 }}
-              className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center shadow-lg shadow-cyan-500/30"
-            >
-              <Calendar className="w-6 h-6 text-white" />
-            </motion.div>
-            <span className="text-2xl font-bold text-white">IntelliSchedule</span>
+            {subdomainInfo ? (
+              <>
+                {subdomainInfo.logo ? (
+                  <div className="w-12 h-12 flex items-center justify-center border border-white/10 rounded-2xl bg-white p-1 shadow-lg">
+                    <img
+                      src={subdomainInfo.logo}
+                      alt={`${subdomainInfo.name} Logo`}
+                      className="w-full h-full object-contain mx-auto"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                    <Building2 className="w-6 h-6 text-white" />
+                  </div>
+                )}
+                <span className="text-2xl font-bold text-white">{subdomainInfo.name}</span>
+              </>
+            ) : (
+              <>
+                <motion.div
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: 'spring', duration: 0.8 }}
+                  className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center shadow-lg shadow-cyan-500/30"
+                >
+                  <Calendar className="w-6 h-6 text-white" />
+                </motion.div>
+                <span className="text-2xl font-bold text-white">IntelliSchedule</span>
+              </>
+            )}
           </div>
 
           {/* Main content */}
@@ -216,39 +297,56 @@ export default function TimetableLogin() {
               transition={{ delay: 0.2 }}
             >
               <h1 className="text-4xl lg:text-5xl font-bold text-white mb-6 leading-tight">
-                Smart Scheduling
+                {subdomainInfo ? subdomainInfo.name : 'Smart Scheduling'}
                 <span className="block bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 bg-clip-text text-transparent">
-                  Made Simple
+                  {subdomainInfo ? 'Branded Portal' : 'Made Simple'}
                 </span>
               </h1>
               <p className="text-lg text-slate-300 mb-10 leading-relaxed">
-                Generate perfect timetables in minutes with AI-powered scheduling.
-                Manage teachers, batches, and eliminate conflicts effortlessly.
+                {subdomainInfo
+                  ? (subdomainInfo.description || `Welcome to ${subdomainInfo.name}'s schedule and timetable portal. View schedules, manage lessons, and plan sessions.`)
+                  : 'Generate perfect timetables in minutes with AI-powered scheduling. Manage teachers, batches, and eliminate conflicts effortlessly.'}
               </p>
             </motion.div>
 
             {/* Features */}
-            <div className="space-y-4">
-              {features.map((feature, index) => (
-                <motion.div
-                  key={feature.text}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 + index * 0.1 }}
-                  className="flex items-center gap-4 group"
+            {!subdomainInfo && (
+              <div className="space-y-4">
+                {features.map((feature, index) => (
+                  <motion.div
+                    key={feature.text}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 + index * 0.1 }}
+                    className="flex items-center gap-4 group"
+                  >
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
+                      <feature.icon className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-white font-medium">{feature.text}</span>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+
+            {subdomainInfo && subdomainInfo.website && (
+              <div className="mt-4">
+                <a
+                  href={subdomainInfo.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors font-medium border border-cyan-500/30 rounded-xl px-4 py-2 bg-cyan-950/20"
                 >
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
-                    <feature.icon className="w-6 h-6 text-white" />
-                  </div>
-                  <span className="text-white font-medium">{feature.text}</span>
-                </motion.div>
-              ))}
-            </div>
+                  Visit Official Website
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+              </div>
+            )}
           </div>
 
           {/* Footer */}
           <div className="text-slate-400 text-sm">
-            Trusted by 200+ educational institutions
+            {subdomainInfo ? `Official portal for ${subdomainInfo.name}` : 'Trusted by 200+ educational institutions'}
           </div>
         </div>
       </div>
@@ -258,14 +356,35 @@ export default function TimetableLogin() {
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-600 mb-4 shadow-lg shadow-cyan-500/30"
-            >
-              <Calendar className="w-7 h-7 text-white" />
-            </motion.div>
-            <h2 className="text-xl font-bold text-slate-900">IntelliSchedule</h2>
+            {subdomainInfo ? (
+              <div className="inline-flex flex-col items-center">
+                {subdomainInfo.logo ? (
+                  <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center mb-4 shadow-lg p-1 border border-slate-100">
+                    <img
+                      src={subdomainInfo.logo}
+                      alt={`${subdomainInfo.name} Logo`}
+                      className="w-full h-full object-contain mx-auto"
+                    />
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-600 mb-4 shadow-lg shadow-cyan-500/30">
+                    <Building2 className="w-7 h-7 text-white" />
+                  </div>
+                )}
+                <h2 className="text-xl font-bold text-slate-900">{subdomainInfo.name}</h2>
+              </div>
+            ) : (
+              <>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-600 mb-4 shadow-lg shadow-cyan-500/30"
+                >
+                  <Calendar className="w-7 h-7 text-white" />
+                </motion.div>
+                <h2 className="text-xl font-bold text-slate-900">IntelliSchedule</h2>
+              </>
+            )}
           </div>
 
           {/* Header */}
@@ -274,8 +393,12 @@ export default function TimetableLogin() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <h2 className="text-3xl font-bold text-slate-900 mb-2">Welcome back</h2>
-            <p className="text-slate-600">Sign in to access your timetable dashboard</p>
+            <h2 className="text-3xl font-bold text-slate-900 mb-2">
+              {subdomainInfo ? `Welcome to ${subdomainInfo.name}` : 'Welcome back'}
+            </h2>
+            <p className="text-slate-600">
+              {subdomainInfo ? 'Sign in to access your dashboard' : 'Sign in to access your timetable dashboard'}
+            </p>
           </motion.div>
 
           {/* Login Form */}
@@ -436,7 +559,7 @@ export default function TimetableLogin() {
             className="mt-8 text-center"
           >
             <p className="text-xs text-slate-500">
-              © 2024 IntelliSchedule. Powered by{' '}
+              © 2024 {subdomainInfo ? subdomainInfo.name : 'IntelliSchedule'}. Powered by{' '}
               <a
                 href="https://diracai.com/"
                 target="_blank"

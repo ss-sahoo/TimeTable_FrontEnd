@@ -14,6 +14,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
+import { api } from '../hooks/useApi';
 import DeviceConflictModal from '../components/DeviceConflictModal';
 
 // Google Client ID – set via env or fallback
@@ -37,6 +38,64 @@ export default function Login() {
 
   const { login, loginWithGoogle, deviceConflict, setDeviceConflict } = useAuthContext();
   const navigate = useNavigate();
+
+  interface SubdomainInstitute {
+    id: number;
+    name: string;
+    logo: string | null;
+    subdomain: string;
+    website: string | null;
+    description: string | null;
+  }
+
+  const [subdomainInfo, setSubdomainInfo] = useState<SubdomainInstitute | null>(null);
+  const [subdomainLoading, setSubdomainLoading] = useState(true);
+
+  const getSubdomain = () => {
+    if (typeof window === 'undefined') return null;
+    const hostname = window.location.hostname;
+
+    // Support testing subdomain locally using URL query parameter: ?subdomain=mit
+    const urlParams = new URLSearchParams(window.location.search);
+    const qaSubdomain = urlParams.get('subdomain');
+    if (qaSubdomain) return qaSubdomain;
+
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return null;
+
+    const ROOT_DOMAIN = 'exams.dashoapp.com';
+    const TIMETABLE_DOMAIN = 'timetable.dashoapp.com';
+
+    if (hostname !== ROOT_DOMAIN && hostname !== TIMETABLE_DOMAIN) {
+      if (hostname.endsWith('.' + ROOT_DOMAIN)) {
+        return hostname.replace('.' + ROOT_DOMAIN, '');
+      }
+      if (hostname.endsWith('.localhost')) {
+        return hostname.replace('.localhost', '');
+      }
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    const fetchSubdomainInfo = async () => {
+      const subdomain = getSubdomain();
+      if (!subdomain) {
+        setSubdomainLoading(false);
+        return;
+      }
+
+      try {
+        const response = await api.get(`/auth/institutes/by-subdomain/${subdomain}/`);
+        setSubdomainInfo(response.data);
+      } catch (err) {
+        console.error('Failed to fetch subdomain institute branding:', err);
+      } finally {
+        setSubdomainLoading(false);
+      }
+    };
+
+    fetchSubdomainInfo();
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -314,14 +373,35 @@ export default function Login() {
           transition={{ duration: 0.5 }}
           className="relative z-10 flex items-center gap-3"
         >
-          <div className="w-10 h-10 flex items-center justify-center border border-white/10 rounded-lg bg-white/5">
-            <img
-              src="/examlogo.png"
-              alt="Exam Logo"
-              className="w-8 h-8 object-contain mx-auto"
-            />
-          </div>
-          <span className="font-bold text-xl tracking-tight">DashoExams</span>
+          {subdomainInfo ? (
+            <>
+              {subdomainInfo.logo ? (
+                <div className="w-10 h-10 flex items-center justify-center border border-white/10 rounded-lg bg-white p-1">
+                  <img
+                    src={subdomainInfo.logo}
+                    alt={`${subdomainInfo.name} Logo`}
+                    className="w-full h-full object-contain mx-auto"
+                  />
+                </div>
+              ) : (
+                <div className="w-10 h-10 flex items-center justify-center border border-white/10 rounded-lg bg-white/5">
+                  <Building2 className="w-6 h-6 text-white" />
+                </div>
+              )}
+              <span className="font-bold text-xl tracking-tight">{subdomainInfo.name}</span>
+            </>
+          ) : (
+            <>
+              <div className="w-10 h-10 flex items-center justify-center border border-white/10 rounded-lg bg-white/5">
+                <img
+                  src="/examlogo.png"
+                  alt="Exam Logo"
+                  className="w-8 h-8 object-contain mx-auto"
+                />
+              </div>
+              <span className="font-bold text-xl tracking-tight">DashoExams</span>
+            </>
+          )}
         </motion.div>
 
         <motion.div
@@ -345,27 +425,64 @@ export default function Login() {
             </div>
 
             <blockquote className="text-lg font-medium leading-relaxed mb-6">
-              "DashoExams transformed how we handle high-stakes assessments. The AI proctoring is seamless, and the analytics give us insights we never had before."
+              {subdomainInfo
+                ? (subdomainInfo.description || `Welcome to ${subdomainInfo.name}'s Portal. Access your exams, homeworks, and performance reports.`)
+                : `"DashoExams transformed how we handle high-stakes assessments. The AI proctoring is seamless, and the analytics give us insights we never had before."`}
             </blockquote>
 
             <div className="flex items-center gap-4">
-              <img
-                src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-                alt="User"
-                className="w-10 h-10 rounded-full border-2 border-white/20"
-              />
-              <div>
-                <p className="font-bold text-sm">Prof. Ipsit Panda</p>
-                <p className="text-xs text-indigo-200 uppercase tracking-wider font-semibold">
-                  Physics HOD, DiracAI Coaching
-                </p>
-              </div>
+              {subdomainInfo ? (
+                <>
+                  {subdomainInfo.logo ? (
+                    <img
+                      src={subdomainInfo.logo}
+                      alt={subdomainInfo.name}
+                      className="w-10 h-10 rounded-lg border-2 border-white/20 bg-white object-contain"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg border-2 border-white/20 bg-white/10 flex items-center justify-center">
+                      <Building2 className="w-5 h-5 text-white" />
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-bold text-sm">{subdomainInfo.name}</p>
+                    {subdomainInfo.website ? (
+                      <a
+                        href={subdomainInfo.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-indigo-200 hover:text-white transition-colors"
+                      >
+                        {subdomainInfo.website.replace(/^https?:\/\/(www\.)?/, '')}
+                      </a>
+                    ) : (
+                      <p className="text-xs text-indigo-200 uppercase tracking-wider font-semibold">
+                        Branded Portal
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <img
+                    src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+                    alt="User"
+                    className="w-10 h-10 rounded-full border-2 border-white/20"
+                  />
+                  <div>
+                    <p className="font-bold text-sm">Prof. Ipsit Panda</p>
+                    <p className="text-xs text-indigo-200 uppercase tracking-wider font-semibold">
+                      Physics HOD, DiracAI Coaching
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </motion.div>
 
         <div className="relative z-10 text-xs text-indigo-200">
-          © 2024 DashoExams Inc. All rights reserved.
+          © 2024 {subdomainInfo ? subdomainInfo.name : 'DashoExams Inc.'} All rights reserved.
         </div>
       </div>
 
@@ -376,16 +493,39 @@ export default function Login() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md space-y-8"
         >
-          <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
-              <Zap className="w-4 h-4" fill="currentColor" />
+          {subdomainInfo ? (
+            <div className="lg:hidden flex items-center gap-3 mb-8">
+              {subdomainInfo.logo ? (
+                <div className="w-10 h-10 flex items-center justify-center border border-slate-200 rounded-lg bg-white p-1">
+                  <img
+                    src={subdomainInfo.logo}
+                    alt={`${subdomainInfo.name} Logo`}
+                    className="w-full h-full object-contain mx-auto"
+                  />
+                </div>
+              ) : (
+                <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
+                  <Building2 className="w-5 h-5 text-white" />
+                </div>
+              )}
+              <span className="font-bold text-lg text-slate-900">{subdomainInfo.name}</span>
             </div>
-            <span className="font-bold text-lg text-slate-900">DashoExams</span>
-          </div>
+          ) : (
+            <div className="lg:hidden flex items-center gap-2 mb-8">
+              <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
+                <Zap className="w-4 h-4" fill="currentColor" />
+              </div>
+              <span className="font-bold text-lg text-slate-900">DashoExams</span>
+            </div>
+          )}
 
           <div className="text-center lg:text-left">
-            <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome back</h2>
-            <p className="mt-2 text-sm text-slate-500">Please enter your details to sign in.</p>
+            <h2 className="text-3xl font-bold text-slate-900 tracking-tight">
+              {subdomainInfo ? `Welcome to ${subdomainInfo.name}` : 'Welcome back'}
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              {subdomainInfo ? 'Please enter your details to access your portal.' : 'Please enter your details to sign in.'}
+            </p>
           </div>
 
           {/* Role Selector (Primarily for first-time Google signups) */}
