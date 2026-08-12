@@ -1,0 +1,1374 @@
+import React, { useState, useEffect } from "react";
+import SlotsGrid from "../Timetable/SlotsGrid";
+import BatchSchedule from "../Timetable/BatchSchedule";
+import Fixedslots from "../Timetable/Fixedslots";
+import Teachers from "../Timetable/Teachers";
+import Feasibility from "../Timetable/Feasibility";
+import GeneratedTimetable from "../Timetable/GeneratedTimetable";
+import UpdateSlots from "../Timetable/UpdateSlots";
+import { fetchAllTimetables, updateFreeClassesCount, cleanTimetableId } from "../AllApi";
+import { useAuthContext } from "../contexts/AuthContext";
+import { API_BASE_URL } from "../hooks/useApi";
+import { useTimetableCenter } from "../contexts/TimetableCenterContext";
+
+
+
+/* ================================
+   TYPES
+================================ */
+type TabType =
+  | "instructions"
+  | "slots"
+  | "batches"
+  | "teachers"
+  | "fixedSlots"
+  | "feasibility"
+  | "generate"
+  | "UpdateSlots";
+
+/* ================================
+   MAIN COMPONENT
+================================ */
+const Timetable: React.FC = () => {
+  const { user } = useAuthContext();
+  const { selectedCenterId, selectedCenterName } = useTimetableCenter();
+  const [activeTab, setActiveTab] = useState<TabType>("instructions");
+  const [timetables, setTimetables] = useState<any[]>([]);
+  const [loadingTimetables, setLoadingTimetables] = useState(false);
+  const [selectedTimetableId, setSelectedTimetableId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0); // Key to trigger timetable list refresh
+
+  const isStudent = user?.role?.toUpperCase() === 'STUDENT';
+  const isTeacher = user?.role?.toUpperCase() === 'TEACHER';
+  const isReadOnly = isStudent || isTeacher;
+
+  // Load timetables when selected center name is available or refreshKey changes
+  useEffect(() => {
+    const loadTimetables = async () => {
+      setLoadingTimetables(true);
+      try {
+        const data = await fetchAllTimetables(selectedCenterName || undefined);
+        // Handle different response formats: { timetables: [...] }, { results: [...] }, or direct array
+        const timetableList = data.timetables || data.results || (Array.isArray(data) ? data : []);
+        setTimetables(timetableList);
+
+        // Check if there's a stored timetable_id
+        const storedId = localStorage.getItem("timetable_id");
+        if (storedId) {
+          setSelectedTimetableId(JSON.parse(storedId));
+        }
+        // Auto-select first timetable for students/teachers
+        if (isReadOnly && timetableList.length > 0 && !storedId) {
+          const firstId = timetableList[0].id || timetableList[0].timetable_id;
+          setSelectedTimetableId(firstId);
+          localStorage.setItem("timetable_id", JSON.stringify(firstId));
+        }
+      } catch (error) {
+        console.error("Failed to fetch timetables:", error);
+      } finally {
+        setLoadingTimetables(false);
+      }
+    };
+
+    loadTimetables();
+  }, [selectedCenterName, refreshKey]);
+
+  // Callback to refresh timetable list after creation
+  const handleTimetableCreated = (newTimetableId: string) => {
+    setSelectedTimetableId(newTimetableId);
+    setRefreshKey(prev => prev + 1); // Trigger refresh of timetable list
+  };
+
+  // Handle timetable selection - no page reload
+  const handleSelectTimetable = (timetableId: string) => {
+    localStorage.setItem("timetable_id", JSON.stringify(timetableId));
+    setSelectedTimetableId(timetableId);
+  };
+
+  // Tabs configuration - students only see Timetable tab
+  const allTabs: { key: TabType; label: string }[] = [
+    { key: "instructions", label: "Instructions" },
+    { key: "slots", label: "Slots" },
+    { key: "batches", label: "Batches" },
+    { key: "teachers", label: "Teachers" },
+    { key: "fixedSlots", label: "Fixed Slots" },
+    { key: "feasibility", label: "Generate" },
+    { key: "generate", label: "Timetable" },
+  ];
+
+  const tabs = isStudent
+    ? [{ key: "generate" as TabType, label: "My Timetable" }]
+    : isTeacher
+      ? [
+        { key: "generate" as TabType, label: "Timetable" },
+        { key: "batches" as TabType, label: "Batches" },
+      ]
+      : allTabs;
+
+  // Auto-switch students to the generate tab
+  useEffect(() => {
+    if (isStudent && activeTab !== 'generate') {
+      setActiveTab('generate');
+    }
+  }, [isStudent]);
+
+  // Get selected timetable info
+  const selectedTimetable = timetables.find(t => t.id === selectedTimetableId || t.timetable_id === selectedTimetableId);
+
+  // Format timetable display name
+  const formatTimetableName = (tt: any) => {
+    const dateRange = `${tt.from_date} → ${tt.to_date}`;
+    const slots = tt.slots_count || tt.total_slots || 0;
+    return `${tt.name || 'Timetable'} (${dateRange}) - ${slots} slots`;
+  };
+
+  // Student/Teacher: No timetables available
+  if (isReadOnly && !loadingTimetables && timetables.length === 0) {
+    return (
+      <div style={styles.page}>
+        <h2 style={styles.title}>{isStudent ? 'My Timetable' : 'Timetable'}</h2>
+        <div style={{
+          textAlign: 'center',
+          padding: '60px 24px',
+          background: '#f8fafc',
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          marginTop: '24px',
+        }}>
+          <div style={{
+            fontSize: '48px',
+            marginBottom: '16px',
+          }}>📅</div>
+          <h3 style={{
+            fontSize: '20px',
+            fontWeight: '600',
+            color: '#1e293b',
+            marginBottom: '8px',
+          }}>No Timetable Available</h3>
+          <p style={{
+            color: '#64748b',
+            fontSize: '14px',
+            maxWidth: '400px',
+            margin: '0 auto',
+          }}>
+            {isStudent
+              ? 'No timetable has been generated for your batch yet. Please check back later or contact your admin.'
+              : 'No timetable has been generated for your center yet. Please contact the administrator.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.page}>
+      <h2 style={styles.title}>{isStudent ? 'My Timetable' : 'Institute Timetable'}</h2>
+
+      <div style={styles.timetableSelector}>
+        <div style={styles.selectorRow}>
+          <label style={styles.dropdownLabel}>📅 Select Timetable:</label>
+          {loadingTimetables ? (
+            <span style={styles.loadingText}>Loading...</span>
+          ) : (
+            <select
+              style={styles.timetableDropdown}
+              value={selectedTimetableId || ""}
+              onChange={(e) => handleSelectTimetable(e.target.value)}
+              disabled={user?.role?.toUpperCase() === 'SUPER_ADMIN' && !selectedCenterId}
+            >
+              <option value="">-- Select a timetable --</option>
+              {timetables.map((tt) => {
+                const ttId = tt.id || tt.timetable_id;
+                return (
+                  <option key={ttId} value={ttId}>
+                    {formatTimetableName(tt)}
+                  </option>
+                );
+              })}
+            </select>
+          )}
+          {selectedTimetable && (
+            <span style={styles.selectedInfo}>
+              ✓ {selectedTimetable.is_active ? "Active" : "Inactive"}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Clickable Tabs */}
+      <div style={styles.tabContainer}>
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            style={{
+              ...styles.tabButton,
+              ...(activeTab === tab.key ? styles.activeTab : {}),
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      <div style={styles.contentArea}>
+        {activeTab === "instructions" && !isReadOnly && (
+          <>
+            <Instructions
+              onTimetableCreated={handleTimetableCreated}
+              selectedCenterId={selectedCenterId}
+              selectedCenterName={selectedCenterName}
+            />
+            {/* {selectedTimetable && (
+              <div style={{ marginTop: "24px", padding: "16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                <h3 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "12px", color: "#1e293b" }}>Center Details</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <div>
+                    <p style={{ color: "#64748b", fontSize: "14px", marginBottom: "4px" }}>Center Name</p>
+                    <p style={{ fontWeight: "500" }}>{selectedTimetable.center_name || (selectedTimetable as any).center?.name || 'Main Center'}</p>
+                  </div>
+                  <div>
+                    <p style={{ color: "#64748b", fontSize: "14px", marginBottom: "4px" }}>Location</p>
+                    <p style={{ fontWeight: "500" }}>{(selectedTimetable as any).center?.city || 'Default City'}</p>
+                  </div>
+                  <div style={{ gridColumn: "span 2" }}>
+                    <p style={{ color: "#64748b", fontSize: "14px", marginBottom: "4px" }}>Address</p>
+                    <p style={{ fontWeight: "500" }}>{(selectedTimetable as any).center?.address || 'No address provided'}</p>
+                  </div>
+                </div>
+              </div>
+            )} */}
+            {/* <div style={{ marginTop: "24px" }}>
+              <TeacherManagement
+                selectedCenterId={selectedCenterId}
+                selectedCenterName={selectedCenterName}
+              />
+            </div>
+            <div style={{ marginTop: "24px" }}>
+              <Users selectedCenterId={selectedCenterId} />
+            </div> */}
+          </>
+        )}
+        {activeTab === "slots" && !isReadOnly && <Slots key={selectedTimetableId || 'new'} />}
+        {activeTab === "batches" && <Batches />}
+        {activeTab === "teachers" && !isReadOnly && <TeachersWrapper />}
+        {activeTab === "fixedSlots" && !isReadOnly && <FixedSlots />}
+        {activeTab === "feasibility" && !isReadOnly && <Feasibility />}
+        {activeTab === "generate" && <GeneratedTimetable />}
+        {activeTab === "UpdateSlots" && !isReadOnly && <UpdateSlots />}
+      </div>
+    </div>
+  );
+};
+
+/* ================================
+   TAB CONTENT COMPONENTS
+================================ */
+
+// Instructions Tab
+const Instructions = ({
+  onTimetableCreated,
+  selectedCenterId,
+  selectedCenterName
+}: {
+  onTimetableCreated: (id: string) => void,
+  selectedCenterId: string | null,
+  selectedCenterName: string | null
+}) => {
+  const { user } = useAuthContext();
+  const [freeClassesCount, setFreeClassesCount] = useState<number>(0);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Create new timetable states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [timetableName, setTimetableName] = useState<string>("");
+  const [calendarRange, setCalendarRange] = useState({ startDate: "", endDate: "" });
+  const [creatingTimetable, setCreatingTimetable] = useState(false);
+  const [createMessage, setCreateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Get current date in YYYY-MM-DD format
+  const getCurrentDate = () => {
+    return new Date().toISOString().split('T')[0];
+  };
+
+  // Get date 7 days from now
+  const getNextWeekDate = () => {
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    return nextWeek.toISOString().split('T')[0];
+  };
+
+  // Get date 30 days from now
+  const getNextMonthDate = () => {
+    const nextMonth = new Date();
+    nextMonth.setDate(nextMonth.getDate() + 30);
+    return nextMonth.toISOString().split('T')[0];
+  };
+
+  // Get days from date range (for display)
+  const getDaysFromDateRange = (startDate: string, endDate: string): string[] => {
+    if (!startDate || !endDate) return [];
+
+    const ALL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const daysInRange: string[] = [];
+
+    const dayIndexMap: Record<number, string> = {
+      1: "Monday",
+      2: "Tuesday",
+      3: "Wednesday",
+      4: "Thursday",
+      5: "Friday",
+      6: "Saturday",
+      0: "Sunday"
+    };
+
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      const dayIndex = currentDate.getDay();
+      const dayName = dayIndexMap[dayIndex];
+
+      if (dayName && !daysInRange.includes(dayName)) {
+        daysInRange.push(dayName);
+      }
+
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return daysInRange.sort((a, b) => ALL_DAYS.indexOf(a) - ALL_DAYS.indexOf(b));
+  };
+
+  // Get days count from calendar range
+  const getDaysCountFromRange = () => {
+    if (!calendarRange.startDate || !calendarRange.endDate) return 0;
+    return getDaysFromDateRange(calendarRange.startDate, calendarRange.endDate).length;
+  };
+
+  // Create new timetable with initial days
+  const createNewTimetableHandler = async () => {
+    if (!timetableName.trim()) {
+      setCreateMessage({ type: 'error', text: 'Please enter a timetable name' });
+      return;
+    }
+
+    if (!calendarRange.startDate || !calendarRange.endDate) {
+      setCreateMessage({ type: 'error', text: 'Please select start and end dates' });
+      return;
+    }
+
+    if (user?.role?.toUpperCase() === 'SUPER_ADMIN' && !selectedCenterId) {
+      setCreateMessage({ type: 'error', text: 'Please select a center before creating a timetable' });
+      return;
+    }
+
+    setCreatingTimetable(true);
+    setCreateMessage(null);
+
+    try {
+      const accessToken = localStorage.getItem("access_token");
+      if (!accessToken) {
+        throw new Error("No access token found. Please login again.");
+      }
+
+      // Only call create API - no update needed
+      const createPayload: any = {
+        name: timetableName.trim(),
+        from_date: calendarRange.startDate,
+        to_date: calendarRange.endDate,
+        free_classes_count: 0,
+        weekly_slots: {},
+        holidays: [],
+      };
+
+      if (user?.role?.toUpperCase() === 'SUPER_ADMIN') {
+        createPayload.center_id = selectedCenterId;
+        createPayload.center_name = selectedCenterName;
+      }
+
+      const createResponse = await fetch(
+        `${API_BASE_URL}/timetable/admin/timetables/create/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(createPayload),
+        }
+      );
+
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text();
+        throw new Error(`API Error: ${createResponse.status} - ${errorText}`);
+      }
+
+      const createData = await createResponse.json();
+      const timetableId = createData.timetable_id;
+
+      // Store the timetable ID and calendar range in localStorage
+      localStorage.setItem("timetable_id", JSON.stringify(timetableId));
+      localStorage.setItem("timetable_dateRange", JSON.stringify({
+        startDate: calendarRange.startDate,
+        endDate: calendarRange.endDate
+      }));
+
+      setCreateMessage({
+        type: 'success',
+        text: `Timetable "${timetableName}" created successfully! You can now add slots in the Slots tab.`
+      });
+
+      // Reset form
+      setTimetableName("");
+      setCalendarRange({ startDate: "", endDate: "" });
+
+      // Close modal after 2 seconds and notify parent to refresh list
+      setTimeout(() => {
+        setShowCreateModal(false);
+        setCreateMessage(null);
+        onTimetableCreated(timetableId); // Notify parent to refresh timetable list
+      }, 2000);
+
+    } catch (error: any) {
+      console.error("Failed to create timetable:", error);
+      setCreateMessage({ type: 'error', text: error.message || 'Failed to create timetable. Please try again.' });
+    } finally {
+      setCreatingTimetable(false);
+    }
+  };
+
+  const handleSaveFreeClasses = async () => {
+    const timetableId = localStorage.getItem("timetable_id");
+    if (!timetableId) {
+      setSaveMessage({ type: 'error', text: 'Please select a timetable first' });
+      return;
+    }
+
+    if (freeClassesCount < 0) {
+      setSaveMessage({ type: 'error', text: 'Free classes count must be 0 or greater' });
+      return;
+    }
+
+    setSaving(true);
+    setSaveMessage(null);
+
+    try {
+      const cleanId = cleanTimetableId(timetableId);
+      await updateFreeClassesCount(cleanId, freeClassesCount);
+      setSaveMessage({ type: 'success', text: `Free classes count set to ${freeClassesCount} successfully!` });
+    } catch (error: any) {
+      console.error("Failed to save free classes:", error);
+      setSaveMessage({ type: 'error', text: error.message || 'Failed to save. Please try again.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const DAY_ABBREVIATIONS: Record<string, string> = {
+    "Monday": "M",
+    "Tuesday": "TU",
+    "Wednesday": "WE",
+    "Thursday": "TH",
+    "Friday": "FR",
+    "Saturday": "SA",
+    "Sunday": "SU"
+  };
+
+  return (
+    <div style={styles.tabContent}>
+      <div style={styles.headerRow}>
+        <h3 style={styles.tabTitle}>Timetable Configuration</h3>
+      </div>
+
+      {/* Create New Timetable Card */}
+      <div style={styles.configCard}>
+        <div style={styles.configHeader}>
+          <span style={styles.configIcon}>✨</span>
+          <h4 style={styles.configTitle}>Create New Timetable</h4>
+        </div>
+        <p style={styles.configDescription}>
+          Start by creating a new timetable with a name and date range. You'll add specific slots and batches after creation.
+        </p>
+        <button
+          style={{
+            ...styles.saveConfigBtn,
+            opacity: (user?.role?.toUpperCase() === 'SUPER_ADMIN' && !selectedCenterId) ? 0.5 : 1,
+            cursor: (user?.role?.toUpperCase() === 'SUPER_ADMIN' && !selectedCenterId) ? 'not-allowed' : 'pointer'
+          }}
+          onClick={() => setShowCreateModal(true)}
+          disabled={user?.role?.toUpperCase() === 'SUPER_ADMIN' && !selectedCenterId}
+        >
+          {user?.role?.toUpperCase() === 'SUPER_ADMIN' && !selectedCenterId
+            ? 'Select Center to Create'
+            : '+ Create New Timetable'}
+        </button>
+      </div>
+
+      {/* Create Timetable Modal */}
+      {showCreateModal && (
+        <div style={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
+          <div style={{ ...styles.modalContent, width: 500 }} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h3 style={styles.modalTitle}>Create New Timetable</h3>
+              <button
+                style={styles.closeModalBtn}
+                onClick={() => setShowCreateModal(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: 16 }}>
+              <label style={{ display: 'block', marginBottom: 8, color: '#475569' }}>Timetable name</label>
+              <input
+                type="text"
+                value={timetableName}
+                onChange={(e) => setTimetableName(e.target.value)}
+                placeholder="e.g. JEE Main 2025 Schedule"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #e2e8f0' }}
+              />
+            </div>
+
+            {/* Calendar Range Selection */}
+            <div style={{ padding: 12, borderTop: '1px solid #eef2f7' }}>
+              <div style={styles.timeNote}>
+                <p style={styles.noteText}>
+                  💡 <strong>Note:</strong> Select the date range for your timetable. You can add specific time slots after creation.
+                </p>
+              </div>
+
+              <div style={styles.calendarSelection}>
+                <div style={styles.calendarHeader}>
+                  <span style={styles.selectionTitle}>Select Date Range</span>
+                </div>
+
+                <div style={styles.calendarInputs}>
+                  <div style={styles.dateInputGroup}>
+                    <label style={styles.dateLabel}>Start Date</label>
+                    <input
+                      type="date"
+                      value={calendarRange.startDate}
+                      onChange={(e) => setCalendarRange({ ...calendarRange, startDate: e.target.value })}
+                      onClick={(e) => (e.target as any).showPicker?.()}
+                      style={styles.dateInput}
+                      min={getCurrentDate()}
+                    />
+                    <button
+                      style={styles.quickDateBtn}
+                      onClick={() => setCalendarRange({ ...calendarRange, startDate: getCurrentDate() })}
+                    >
+                      Today
+                    </button>
+                  </div>
+
+                  <div style={styles.dateInputGroup}>
+                    <label style={styles.dateLabel}>End Date</label>
+                    <input
+                      type="date"
+                      value={calendarRange.endDate}
+                      onChange={(e) => setCalendarRange({ ...calendarRange, endDate: e.target.value })}
+                      onClick={(e) => (e.target as any).showPicker?.()}
+                      style={styles.dateInput}
+                      min={calendarRange.startDate || getCurrentDate()}
+                    />
+                    <div style={styles.quickDateButtons}>
+                      <button
+                        style={styles.quickDateBtn}
+                        onClick={() => setCalendarRange({ ...calendarRange, endDate: getNextWeekDate() })}
+                      >
+                        Next Week
+                      </button>
+                      <button
+                        style={styles.quickDateBtn}
+                        onClick={() => setCalendarRange({ ...calendarRange, endDate: getNextMonthDate() })}
+                      >
+                        Next Month
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {calendarRange.startDate && calendarRange.endDate && (
+                  <div style={styles.calendarInfo}>
+                    <p>📅 Date range: <strong>{getDaysCountFromRange()}</strong> days</p>
+                    <div style={styles.daysList}>
+                      {getDaysFromDateRange(calendarRange.startDate, calendarRange.endDate).map(day => (
+                        <span key={day} style={styles.dayBadge}>
+                          {DAY_ABBREVIATIONS[day]}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Create Message */}
+            {createMessage && (
+              <div style={{
+                ...styles.messageBox,
+                backgroundColor: createMessage.type === 'success' ? '#dcfce7' : '#fee2e2',
+                color: createMessage.type === 'success' ? '#166534' : '#dc2626',
+                borderColor: createMessage.type === 'success' ? '#bbf7d0' : '#fecaca',
+                margin: '12px 16px 0 16px'
+              }}>
+                {createMessage.type === 'success' ? '✓' : '✗'} {createMessage.text}
+              </div>
+            )}
+
+            <div style={styles.modalFooter}>
+              <button style={styles.cancelModalBtn} onClick={() => setShowCreateModal(false)}>Cancel</button>
+              <button
+                style={styles.confirmModalBtn}
+                onClick={createNewTimetableHandler}
+                disabled={creatingTimetable}
+              >
+                {creatingTimetable ? "Creating..." : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Free Classes Configuration */}
+      <div style={styles.configCard}>
+        <div style={styles.configHeader}>
+          <span style={styles.configIcon}>📚</span>
+          <h4 style={styles.configTitle}>Free Classes Configuration</h4>
+        </div>
+        <p style={styles.configDescription}>
+          How many free classes do you want to schedule simultaneously across all batches?
+        </p>
+        <div style={styles.inputRow}>
+          <label style={styles.inputLabel}>Number of Simultaneous Free Classes:</label>
+          <input
+            type="number"
+            min="0"
+            max="20"
+            value={freeClassesCount}
+            onChange={(e) => setFreeClassesCount(parseInt(e.target.value) || 0)}
+            style={styles.numberInput}
+            placeholder="Enter count"
+          />
+          <button
+            style={styles.saveConfigBtn}
+            onClick={handleSaveFreeClasses}
+            disabled={saving}
+          >
+            {saving ? "Saving..." : "💾 Save"}
+          </button>
+        </div>
+
+        {/* Save Message */}
+        {saveMessage && (
+          <div style={{
+            ...styles.messageBox,
+            backgroundColor: saveMessage.type === 'success' ? '#dcfce7' : '#fee2e2',
+            color: saveMessage.type === 'success' ? '#166534' : '#dc2626',
+            borderColor: saveMessage.type === 'success' ? '#bbf7d0' : '#fecaca',
+          }}>
+            {saveMessage.type === 'success' ? '✓' : '✗'} {saveMessage.text}
+          </div>
+        )}
+
+        <div style={styles.hintBox}>
+          <p style={styles.hintTitle}>💡 What does this mean?</p>
+          <p style={styles.hintDescription}>
+            This setting controls how many free periods can be scheduled at the same time slot across different batches.
+            For example, if set to 3, up to 3 batches can have a free period during the same time slot.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Slots Tab
+const Slots = () => {
+  return (
+    <div style={styles.tabContent}>
+      <SlotsGrid />
+    </div>
+  );
+};
+
+// Batches Tab
+const Batches = () => {
+  return (
+    <div style={styles.tabContent}>
+      <BatchSchedule />
+    </div>
+  );
+};
+
+// Teachers Wrapper Tab
+const TeachersWrapper = () => {
+  console.log('TeachersWrapper component rendered - Teachers tab is active');
+  return (
+    <div style={styles.tabContent}>
+      <Teachers />
+    </div>
+  );
+};
+
+// // Teachers Tab
+// const Teachers = () => {
+//   const tableData: TableData = {
+//     headers: ["Teacher ID", "Name", "Department", "Subject", "Actions"],
+//     rows: [
+//       ["#T001", "Dr. Sharma", "CSE", "Mathematics", renderActions()],
+//       ["#T002", "Prof. Kumar", "ECE", "Digital Electronics", renderActions()],
+//       ["#T003", "Dr. Singh", "CSE", "Data Structures", renderActions()],
+//     ]
+//   };
+
+//   return (
+//     <div style={styles.tabContent}>
+//       <div style={styles.headerRow}>
+//         <h3 style={styles.tabTitle}>Teachers</h3>
+//         <button style={styles.primaryBtn}>+ Add New Teacher</button>
+//       </div>
+//       <Table data={tableData} />
+//     </div>
+//   );
+// };
+
+// Fixed Slots Tab
+const FixedSlots = () => {
+  return (
+    <div style={styles.tabContent}>
+      <Fixedslots />
+    </div>
+  );
+};
+
+// Finals Tab
+// const Feasibility = () => {
+//   return (
+//     <div style={styles.tabContent}>
+//       <div style={styles.headerRow}>
+//         <h3 style={styles.tabTitle}>Final Timetable</h3>
+//         <div style={styles.buttonGroup}>
+//           <button style={styles.successBtn}>Generate Final</button>
+//           <button style={styles.secondaryBtn}>Export as PDF</button>
+//         </div>
+//       </div>
+//       <div style={styles.placeholder}>
+//         <p style={styles.placeholderText}>No final timetable generated yet.</p>
+//         <p style={styles.mutedText}>Use the Generate tab to create a timetable first.</p>
+//       </div>
+//     </div>
+//   );
+// };
+
+// Update Slots Tab
+// const UpdateSlots = () => {
+//   return (
+//     <div style={styles.tabContent}>
+//       <h3 style={styles.tabTitle}>Update Slots</h3>
+//       <div style={styles.updateCard}>
+//         <div style={styles.warningBox}>
+//           <p><strong>Warning:</strong> Updating slots will affect all generated timetables.</p>
+//         </div>
+//         <div style={styles.buttonGroup}>
+//           <button style={styles.warningBtn}>Update All Slots</button>
+//           <button style={styles.secondaryBtn}>Reset Changes</button>
+//         </div>
+//         <div style={styles.hintText}>
+//           <p><strong>Tip:</strong> Update slots only when necessary to avoid conflicts.</p>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+/* ================================
+   REUSABLE COMPONENTS
+================================ */
+
+/* ================================
+   STYLES (Dashboard-like UI)
+================================ */
+
+const styles: Record<string, React.CSSProperties> = {
+  // Page Layout
+  page: {
+    background: "#ffffff",
+    padding: "24px",
+    borderRadius: "12px",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+  },
+  title: {
+    fontSize: "24px",
+    fontWeight: "600",
+    marginBottom: "24px",
+    color: "#1e293b",
+  },
+
+  // Timetable Dropdown Selector
+  timetableSelector: {
+    marginBottom: "24px",
+    padding: "16px 20px",
+    background: "#f8fafc",
+    borderRadius: "10px",
+    border: "1px solid #e2e8f0",
+  },
+  selectorRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+    flexWrap: "wrap",
+  },
+  dropdownLabel: {
+    fontSize: "14px",
+    fontWeight: "600",
+    color: "#1e293b",
+    whiteSpace: "nowrap",
+  },
+  timetableDropdown: {
+    flex: "1",
+    minWidth: "300px",
+    maxWidth: "500px",
+    padding: "10px 14px",
+    fontSize: "14px",
+    borderRadius: "8px",
+    border: "1px solid #d1d5db",
+    background: "#ffffff",
+    color: "#1e293b",
+    cursor: "pointer",
+    outline: "none",
+  },
+  selectedInfo: {
+    padding: "6px 12px",
+    background: "#dcfce7",
+    color: "#16a34a",
+    borderRadius: "16px",
+    fontSize: "12px",
+    fontWeight: "500",
+  },
+
+  // Tabs
+  tabContainer: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+    marginBottom: "24px",
+    paddingBottom: "12px",
+    borderBottom: "2px solid #f1f5f9",
+  },
+  tabButton: {
+    padding: "8px 16px",
+    borderRadius: "6px",
+    border: "1px solid #e2e8f0",
+    background: "#ffffff",
+    color: "#475569",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+    transition: "all 0.2s",
+  },
+  activeTab: {
+    background: "#3b82f6",
+    color: "#ffffff",
+    borderColor: "#3b82f6",
+  },
+
+  // Content Area
+  contentArea: {
+    background: "#ffffff",
+    borderRadius: "8px",
+  },
+
+  // Tab Content
+  tabContent: {
+    padding: "20px",
+    background: "#f8fafc",
+    borderRadius: "8px",
+  },
+  tabTitle: {
+    fontSize: "20px",
+    fontWeight: "600",
+    color: "#1e293b",
+    margin: "0",
+  },
+  headerRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "20px",
+  },
+  buttonGroup: {
+    display: "flex",
+    gap: "12px",
+  },
+
+  // Buttons
+  primaryBtn: {
+    background: "#3b82f6",
+    color: "#ffffff",
+    padding: "10px 20px",
+    borderRadius: "6px",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+    transition: "background 0.2s",
+  },
+  secondaryBtn: {
+    background: "#ffffff",
+    color: "#475569",
+    padding: "10px 20px",
+    borderRadius: "6px",
+    border: "1px solid #e2e8f0",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+  },
+  successBtn: {
+    background: "#10b981",
+    color: "#ffffff",
+    padding: "10px 20px",
+    borderRadius: "6px",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+    minWidth: "160px",
+  },
+  warningBtn: {
+    background: "#f59e0b",
+    color: "#ffffff",
+    padding: "10px 20px",
+    borderRadius: "6px",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+  },
+  editBtn: {
+    background: "#dbeafe",
+    color: "#1d4ed8",
+    padding: "6px 12px",
+    borderRadius: "4px",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "12px",
+    marginRight: "8px",
+  },
+  deleteBtn: {
+    background: "#fee2e2",
+    color: "#dc2626",
+    padding: "6px 12px",
+    borderRadius: "4px",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "12px",
+  },
+
+  // Table
+  tableContainer: {
+    overflowX: "auto",
+    borderRadius: "6px",
+    border: "1px solid #e2e8f0",
+    background: "#ffffff",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    minWidth: "800px",
+  },
+  tableHeader: {
+    padding: "16px",
+    textAlign: "left",
+    backgroundColor: "#f1f5f9",
+    color: "#475569",
+    fontWeight: "600",
+    fontSize: "14px",
+    borderBottom: "1px solid #e2e8f0",
+  },
+  tableCell: {
+    padding: "16px",
+    borderBottom: "1px solid #e2e8f0",
+    color: "#334155",
+    fontSize: "14px",
+  },
+  tableRowEven: {
+    backgroundColor: "#ffffff",
+  },
+  tableRowOdd: {
+    backgroundColor: "#f8fafc",
+  },
+  actionButtons: {
+    display: "flex",
+    gap: "4px",
+  },
+
+  // Form Elements
+  textarea: {
+    width: "100%",
+    minHeight: "150px",
+    padding: "16px",
+    borderRadius: "6px",
+    border: "1px solid #e2e8f0",
+    fontSize: "14px",
+    fontFamily: "inherit",
+    resize: "vertical",
+    marginBottom: "16px",
+    backgroundColor: "#ffffff",
+  },
+
+  // Special Cards
+  generateCard: {
+    background: "#ffffff",
+    padding: "24px",
+    borderRadius: "8px",
+    border: "1px solid #e2e8f0",
+  },
+  updateCard: {
+    background: "#ffffff",
+    padding: "24px",
+    borderRadius: "8px",
+    border: "1px solid #e2e8f0",
+  },
+  generateOptions: {
+    marginBottom: "24px",
+  },
+
+  // Checkbox
+  checkboxLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    marginBottom: "12px",
+    color: "#334155",
+    fontSize: "14px",
+  },
+
+  // Progress
+  progressContainer: {
+    marginTop: "20px",
+  },
+  progressBar: {
+    height: "8px",
+    background: "linear-gradient(90deg, #3b82f6 0%, #10b981 100%)",
+    borderRadius: "4px",
+    marginBottom: "8px",
+    animation: "pulse 2s infinite",
+  },
+
+  // Warning Box
+  warningBox: {
+    background: "#fffbeb",
+    border: "1px solid #fbbf24",
+    padding: "16px",
+    borderRadius: "6px",
+    marginBottom: "20px",
+    color: "#92400e",
+  },
+
+  // Placeholder
+  placeholder: {
+    background: "#f8fafc",
+    padding: "40px",
+    borderRadius: "8px",
+    textAlign: "center",
+    border: "2px dashed #cbd5e1",
+  },
+  placeholderText: {
+    fontSize: "18px",
+    color: "#64748b",
+    margin: "0 0 8px 0",
+  },
+
+  // Text Styles
+  hintText: {
+    marginTop: "16px",
+    padding: "12px",
+    background: "#f0f9ff",
+    borderRadius: "6px",
+    fontSize: "14px",
+    color: "#0369a1",
+  },
+  mutedText: {
+    color: "#64748b",
+    fontSize: "14px",
+    margin: "0",
+  },
+
+  // Loading and Error States
+  loadingText: {
+    color: "#3b82f6",
+    fontSize: "14px",
+    padding: "16px",
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  errorText: {
+    color: "#dc2626",
+    fontSize: "14px",
+    padding: "16px",
+    backgroundColor: "#fee2e2",
+    borderRadius: "6px",
+    marginBottom: "16px",
+    border: "1px solid #fecaca",
+  },
+
+  // Configuration Card Styles
+  configCard: {
+    background: "#ffffff",
+    padding: "24px",
+    borderRadius: "12px",
+    border: "1px solid #e2e8f0",
+    marginBottom: "20px",
+  },
+  configHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    marginBottom: "12px",
+  },
+  configIcon: {
+    fontSize: "24px",
+  },
+  configTitle: {
+    fontSize: "18px",
+    fontWeight: "600",
+    color: "#1e293b",
+    margin: "0",
+  },
+  configDescription: {
+    fontSize: "14px",
+    color: "#64748b",
+    marginBottom: "20px",
+    lineHeight: "1.5",
+  },
+  inputRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+    flexWrap: "wrap",
+    marginBottom: "16px",
+  },
+  inputLabel: {
+    fontSize: "14px",
+    fontWeight: "500",
+    color: "#475569",
+  },
+  numberInput: {
+    width: "120px",
+    padding: "10px 14px",
+    fontSize: "16px",
+    fontWeight: "600",
+    borderRadius: "8px",
+    border: "2px solid #e2e8f0",
+    textAlign: "center",
+    outline: "none",
+  },
+  saveConfigBtn: {
+    padding: "10px 20px",
+    background: "#3b82f6",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "600",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  },
+  messageBox: {
+    padding: "12px 16px",
+    borderRadius: "8px",
+    fontSize: "14px",
+    fontWeight: "500",
+    marginBottom: "16px",
+    border: "1px solid",
+  },
+  hintBox: {
+    background: "#f0f9ff",
+    padding: "16px",
+    borderRadius: "8px",
+    border: "1px solid #bae6fd",
+  },
+  hintTitle: {
+    fontSize: "14px",
+    fontWeight: "600",
+    color: "#0369a1",
+    margin: "0 0 8px 0",
+  },
+  hintDescription: {
+    fontSize: "13px",
+    color: "#0c4a6e",
+    margin: "0",
+    lineHeight: "1.5",
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    position: "fixed",
+    top: "0",
+    left: "0",
+    right: "0",
+    bottom: "0",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+  },
+  modalContent: {
+    background: "#ffffff",
+    borderRadius: "12px",
+    width: "500px",
+    maxWidth: "90vw",
+    maxHeight: "85vh",
+    overflow: "hidden",
+    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+  },
+  modalHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "20px 24px",
+    background: "#f8fafc",
+    borderBottom: "1px solid #e2e8f0",
+  },
+  modalTitle: {
+    fontSize: "18px",
+    fontWeight: "600",
+    color: "#1e293b",
+    margin: "0",
+  },
+  closeModalBtn: {
+    width: "32px",
+    height: "32px",
+    borderRadius: "6px",
+    border: "1px solid #d1d5db",
+    background: "#ffffff",
+    cursor: "pointer",
+    fontSize: "18px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalFooter: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "12px",
+    padding: "20px 24px",
+    background: "#f8fafc",
+    borderTop: "1px solid #e2e8f0",
+  },
+  cancelModalBtn: {
+    padding: "10px 20px",
+    background: "#ffffff",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+  },
+  confirmModalBtn: {
+    padding: "10px 20px",
+    background: "#10b981",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+  },
+
+  // Calendar Styles
+  timeNote: {
+    marginBottom: "20px",
+    padding: "12px 16px",
+    background: "#f0f9ff",
+    borderRadius: "8px",
+    border: "1px solid #bae6fd",
+  },
+  noteText: {
+    margin: "0",
+    fontSize: "13px",
+    color: "#0369a1",
+    lineHeight: "1.5",
+  },
+  calendarSelection: {
+    marginBottom: "24px",
+  },
+  calendarHeader: {
+    marginBottom: "20px",
+  },
+  selectionTitle: {
+    fontSize: "16px",
+    fontWeight: "600",
+    color: "#1e293b",
+  },
+  calendarInputs: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "20px",
+    marginBottom: "20px",
+  },
+  dateInputGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+  dateLabel: {
+    fontSize: "14px",
+    fontWeight: "500",
+    color: "#475569",
+  },
+  dateInput: {
+    padding: "10px 12px",
+    borderRadius: "6px",
+    border: "1px solid #d1d5db",
+    fontSize: "14px",
+    width: "100%",
+  },
+  quickDateButtons: {
+    display: "flex",
+    gap: "8px",
+  },
+  quickDateBtn: {
+    padding: "6px 12px",
+    background: "#f1f5f9",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "12px",
+    flex: "1",
+  },
+  calendarInfo: {
+    padding: "12px",
+    background: "#f0f9ff",
+    borderRadius: "6px",
+    border: "1px solid #bae6fd",
+    color: "#0369a1",
+    fontSize: "13px",
+    marginTop: "12px",
+  },
+  daysList: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "6px",
+    marginTop: "8px",
+  },
+  dayBadge: {
+    padding: "4px 10px",
+    background: "#dbeafe",
+    color: "#1d4ed8",
+    borderRadius: "12px",
+    fontSize: "12px",
+    fontWeight: "500",
+  },
+};
+
+export default Timetable;
