@@ -36,6 +36,16 @@ export default function PlatformInstitutes() {
     const [activeTab, setActiveTab] = useState<'all' | 'verified' | 'pending'>('all');
     const [selectedInstitute, setSelectedInstitute] = useState<Institute | null>(null);
 
+    const getRootDomain = () => {
+        if (typeof window === 'undefined') return 'exams.dashoapp.com';
+        const hostname = window.location.hostname;
+        if (hostname.includes('timetable')) {
+            return 'timetable.dashoapp.com';
+        }
+        return 'exams.dashoapp.com';
+    };
+    const ROOT_DOMAIN = getRootDomain();
+
     const [formData, setFormData] = useState({
         name: '',
         subdomain: '',
@@ -372,7 +382,7 @@ export default function PlatformInstitutes() {
                                                         placeholder="e.g. iitmadras"
                                                     />
                                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">
-                                                        .exams.dashoapp.com
+                                                        .{ROOT_DOMAIN}
                                                     </div>
                                                 </div>
                                             </div>
@@ -520,12 +530,12 @@ export default function PlatformInstitutes() {
                                                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Professional Deployment
                                                 </p>
                                                 <a
-                                                    href={`https://${selectedInstitute.subdomain}.exams.dashoapp.com`}
+                                                    href={`https://${selectedInstitute.subdomain}.${ROOT_DOMAIN}`}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="text-xs font-black text-indigo-600 flex items-center gap-1.5 hover:text-indigo-700 transition-all group/link"
                                                 >
-                                                    https://{selectedInstitute.subdomain}.exams.dashoapp.com
+                                                    https://{selectedInstitute.subdomain}.{ROOT_DOMAIN}
                                                     <ExternalLink className="w-3.5 h-3.5 group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform" />
                                                 </a>
                                             </div>
@@ -637,7 +647,7 @@ export default function PlatformInstitutes() {
                                                                     placeholder="subdomain"
                                                                 />
                                                                 <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[11px] font-black text-slate-400 group-focus-within/input:text-indigo-400 transition-colors">
-                                                                    .exams.dashoapp.com
+                                                                    .{ROOT_DOMAIN}
                                                                 </div>
                                                             </div>
                                                             <div className="flex gap-3">
@@ -668,8 +678,8 @@ export default function PlatformInstitutes() {
                                                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 italic">Live Deployment Endpoint</p>
                                                             <p className="text-base font-black text-indigo-900 break-all">
                                                                 {selectedInstitute.subdomain
-                                                                    ? `https://${selectedInstitute.subdomain}.exams.dashoapp.com`
-                                                                    : 'https://[subdomain].exams.dashoapp.com'}
+                                                                    ? `https://${selectedInstitute.subdomain}.${ROOT_DOMAIN}`
+                                                                    : `https://[subdomain].${ROOT_DOMAIN}`}
                                                             </p>
                                                         </div>
                                                     )}

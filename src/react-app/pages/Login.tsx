@@ -69,6 +69,9 @@ export default function Login() {
       if (hostname.endsWith('.' + ROOT_DOMAIN)) {
         return hostname.replace('.' + ROOT_DOMAIN, '');
       }
+      if (hostname.endsWith('.' + TIMETABLE_DOMAIN)) {
+        return hostname.replace('.' + TIMETABLE_DOMAIN, '');
+      }
       if (hostname.endsWith('.localhost')) {
         return hostname.replace('.localhost', '');
       }

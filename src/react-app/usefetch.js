@@ -3,15 +3,9 @@ export const Fetch = async (endPoint, config, headerKey) => {
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname;
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        // Option A: Use local backend (direct connection)
         return "http://127.0.0.1:8000";
-
-        // Option B: Use production backend (via relative path + Vite proxy to avoid CORS issues)
-        // return "";
-
-        // Option C: Use production backend directly (triggers CORS issues in local development)
-        // return "https://exams.dashoapp.com";
       }
+      return `${window.location.protocol}//${hostname}${window.location.port ? ':' + window.location.port : ''}`;
     }
     return "https://exams.dashoapp.com";
   };
