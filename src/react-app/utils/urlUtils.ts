@@ -2,7 +2,7 @@
  * Get the frontend base URL for generating shareable links.
  * Uses environment variable if set, otherwise uses production domain.
  */
-const PRODUCTION_DOMAIN = 'https://exams.dashoapp.com';
+const PRODUCTION_DOMAIN = typeof window !== 'undefined' ? window.location.origin : 'https://timetable.dashoapp.com';
 
 export function getFrontendUrl(): string {
   // Check for environment variable first
@@ -37,11 +37,11 @@ export function getExamViewLink(examId: number | string): string {
  */
 export function normalizeShareUrl(url: string | null | undefined): string {
   if (!url) return '';
-  
+
   // Replace any localhost URL with production domain
   const localhostPattern = /https?:\/\/localhost(:\d+)?/gi;
   const productionDomain = getFrontendUrl();
-  
+
   return url.replace(localhostPattern, productionDomain);
 }
 

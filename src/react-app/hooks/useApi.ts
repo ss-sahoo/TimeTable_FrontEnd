@@ -111,10 +111,7 @@ const getDefaultApiUrl = () => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
 
-    // Domain-specific API routing
-    if (hostname === 'timetable.dashoapp.com') {
-      return 'https://exams.dashoapp.com/api'; // Timetable uses same backend
-    }
+
 
     // For local development
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
